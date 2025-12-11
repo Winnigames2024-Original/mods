@@ -11,3 +11,6 @@ ErrorDocument 404 ./not-found.html
 
 RemoveHandler .html .htm
 AddType application/x-httpd-php .php .winniphp
+AddType text/html .winnihtml
+
+DirectoryIndex index.winnihtml
