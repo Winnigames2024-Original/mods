@@ -2,7 +2,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const type = urlParams.get('port');
 
 if (type == "v-slice") {
-  alert(type + " port");
+  console.log(type + " port");
   async function loadAndInsertContent(url, targetDivId) {
   try {
     const response = await fetch(url);
