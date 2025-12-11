@@ -16,8 +16,6 @@ else {
 }
 
 
-}
-
 async function loadAndInsertContent(url, targetDivId) {
   try {
     const response = await fetch(url);
