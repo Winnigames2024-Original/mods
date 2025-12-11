@@ -1,4 +1,4 @@
-const currentWindowParams = new URLSearchParams(window.location.search);
+ const currentWindowParams = new URLSearchParams(window.location.search);
 const storageUrl = currentWindowParams.get('storage');
 
 if (storageUrl) {
@@ -19,9 +19,9 @@ function downloadURL(urlFile) {
   element.textContent = "Download File: " + pathname;
   element.href = urlFile;
 
-  let container = document.getElementById('container');
+  const container = document.getElementById('downloadFile');
 
-  container.insertAdjacentHTML('beforeend', '<a href="' + urlFile + '" class="download-btn"">Download</a>'");
+  container.href(urlFile);
 
 }
 
