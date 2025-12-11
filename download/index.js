@@ -18,4 +18,10 @@ function downloadURL(urlFile) {
 
   element.textContent = "Download File: " + pathname;
   element.href = urlFile;
+
+  let container = document.getElementById('container');
+
+  container.insertAdjacentHTML('beforeend', '<a href="' + urlFile + '" class="download-btn"">Download</a>'");
+
 }
+
