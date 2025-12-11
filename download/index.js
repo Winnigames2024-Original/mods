@@ -13,15 +13,8 @@ if (storageUrl) {
 
 function downloadURL(urlFile) {
   const element = document.getElementById("downloadFile");
-  const urlsd = new URL(urlFile);
-  const pathname = urlsd.pathname;
-
-  element.textContent = "Download File: " + pathname;
+ 
   element.href = urlFile;
-
-  const container = document.getElementById('downloadFile');
-
-  container.href(urlFile);
 
 }
 
