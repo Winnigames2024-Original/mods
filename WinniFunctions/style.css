@@ -9,10 +9,10 @@
   /* Стили для самого блока */
   width: 200px;
   height: 100px;
-  background-color: lightblue;
+  /* background-color: lightblue; */
   background-color: #f0f0f0; /* Светло-серый фон */
-        border-radius: 10px; /* Небольшое закругление углов (можно 5px, 8px и т.д.) */
-        padding: 20px; /* Внутренние отступы */
+        border-radius: 5px; /* Небольшое закругление углов (можно 5px, 8px и т.д.) */
+        padding: 5px; /* Внутренние отступы */
         margin: 20px; /* Внешние отступы */
         width: 300px; /* Ширина блока */
         border: 1px solid #ccc; /* Небольшая рамка */
