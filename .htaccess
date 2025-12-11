@@ -1,0 +1,13 @@
+# Перенаправить старую страницу на новую (301 Permanent)
+Redirect 301 ./not-found.html ./not-found.html
+
+AuthType Basic
+AuthName "Restricted Area"
+AuthUserFile ./WinniFunctions/index.html
+Require valid-user
+
+# Отображать кастомную страницу для ошибки 404 (не найдено)
+ErrorDocument 404 ./not-found.html
+
+RemoveHandler .html .htm
+AddType application/x-httpd-php .php .winniphp
