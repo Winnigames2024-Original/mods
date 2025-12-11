@@ -18,6 +18,6 @@ if (type == "v-slice") {
 }
 
 
-loadAndInsertContent(''https://winnigames2024-original.github.io/mods/WinniFunctions/v-slice.html', 'content-container');
+loadAndInsertContent('https://winnigames2024-original.github.io/mods/WinniFunctions/v-slice.html', 'content-container');
 
 }
