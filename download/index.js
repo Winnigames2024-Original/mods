@@ -6,14 +6,13 @@ if (storageUrl) {
     const storageUrlPath = currentWindowParams.get('storagePath');
     if (storageUrlPath) {
       const full_dataUrl = "https://filecache36.gamebanana.com" + storageUrlPath;
-      downloadURL("f", full_dataUrl);
+      downloadURL(full_dataUrl);
     }
   }
 }
 
-function downloadURL(name, url) {
+function downloadURL(url) {
   var link = document.createElement("a");
-  link.download = name;
   link.href = url;
   document.body.appendChild(link);
   link.click();
