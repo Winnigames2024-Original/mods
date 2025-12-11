@@ -11,11 +11,11 @@ if (storageUrl) {
   }
 }
 
-function downloadURL(url) {
-  var link = document.createElement("a");
-  link.href = url;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  delete link;
+function downloadURL(urlFile) {
+  const element = document.getElementById("downloadFile");
+  const urlsd = new URL(urlFile);
+  const pathname = urlsd.pathname;
+
+  element.textContent = "Download File: " + filename;
+  element.href = urlFile;
 }
