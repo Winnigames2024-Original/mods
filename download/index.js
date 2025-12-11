@@ -1,4 +1,4 @@
- const currentWindowParams = new URLSearchParams(window.location.search);
+const currentWindowParams = new URLSearchParams(window.location.search);
 const storageUrl = currentWindowParams.get('storage');
 
 if (storageUrl) {
