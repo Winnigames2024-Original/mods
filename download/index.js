@@ -1,8 +1,9 @@
 const currentWindowParams = new URLSearchParams(window.location.search);
 const storageUrl = currentWindowParams.get('storage');
+
 if (storageUrl) {
   if (storageUrl == "gamebanana_storage36") {
-    const storageUrlPath = currentWindowParams.get('storagePath");
+    const storageUrlPath = currentWindowParams.get('storagePath');
     if (storageUrlPath) {
       const full_dataUrl = "https://filecache36.gamebanana.com" + storageUrlPath;
       downloadURL("filecache36.gamebanana.com-", full_dataUrl);
