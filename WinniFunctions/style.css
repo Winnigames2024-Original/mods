@@ -10,15 +10,13 @@
   width: 200px;
   height: 100px;
   background-color: lightblue;
-  width: 150px;
-    height: 150px;
-    background-color: #2196F3; /* Синий фон */
+  width: 200px;
+    padding: 20px;
+    background-color: #4CAF50; /* Зеленый фон */
     color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 50%; /* Делает блок круглым */
-    font-weight: bold;
+    text-align: center;
+    border-radius: 15px; /* Скругление углов */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Легкая тень для объема */
 }
 body {
     font-family: sans-serif;
