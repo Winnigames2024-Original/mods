@@ -11,7 +11,7 @@ else {
     loadAndInsertContent('https://winnigames2024-original.github.io/mods/WinniFunctions/pc.html', 'content-container');
   }
   else {
-    loadAndInsertContent('https://winnigames2024-original.github.io/mods/not-found.html', 'content-container');
+    loadAndInsertContent('https://winnigames2024-original.github.io/mods/404.html', 'content-container');
   }
 }
 
