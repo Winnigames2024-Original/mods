@@ -1,7 +1,6 @@
-const currentWindowParams = new URLSearchParams(window.location.search);
-const storageUrl = currentWindowParams.get('storage');
+const urlParams = new URLSearchParams(window.location.search);
+const storageUrl = urlParams.get('storage');
+const storagepath = urlParams.get('storagePath');
 
-if (storageUrl) {
- const full_dataUrl = "https://filecache36.gamebanana.com" + storageUrlPath;
-  window.location.href = full_dataUrl;
-}
+const full_dataurl = "https://filecache36.gamebanana.com" + storagepath;
+window.location.href = full_dataurl;
