@@ -1,4 +1,4 @@
-const releaseUrlFile = "https://winnigames2024-original.github.io/mods/WinniFunctions/release.zip";
+const releaseUrlFile = "https://winnigames2024-original.github.io/mods/WinniFunctions/release-vslice.zip/";
 const releaseVersion = "0.0.1";
 
 function DownloadRelease() {
