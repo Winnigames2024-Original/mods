@@ -3,7 +3,22 @@ const type = urlParams.get('port');
 
 if (type == "v-slice") {
   console.log(type + " port");
-  async function loadAndInsertContent(url, targetDivId) {
+  loadAndInsertContent('https://winnigames2024-original.github.io/mods/WinniFunctions/v-slice.html', 'content-container');
+}
+else {
+  if (type == "pc") {
+    console.log(type + " port");
+    loadAndInsertContent('https://winnigames2024-original.github.io/mods/WinniFunctions/pc.html', 'content-container');
+  }
+  else {
+    loadAndInsertContent('https://winnigames2024-original.github.io/mods/not-found.html', 'content-container');
+  }
+}
+
+
+}
+
+async function loadAndInsertContent(url, targetDivId) {
   try {
     const response = await fetch(url);
     const htmlContent = await response.text(); // Получаем HTML как текст
@@ -12,12 +27,7 @@ if (type == "v-slice") {
 
     targetDiv.insertAdjacentHTML('beforeend', htmlContent);
 
-  } catch (error) {
+    } catch (error) {
     console.error('Ошибка при загрузке или вставке контента:', error);
-  }
-}
-
-
-loadAndInsertContent('https://winnigames2024-original.github.io/mods/WinniFunctions/v-slice.html', 'content-container');
-
+    }
 }
