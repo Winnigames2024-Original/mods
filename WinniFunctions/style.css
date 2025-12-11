@@ -6,8 +6,8 @@
 }
 
 .main-box {
-  /* background-color: #ff33c9; */
-  background-color: LightBlue; /* Светло-серый фон */
+  background-color: #4CAF50;
+  background-color: #4CAF50;
         border-radius: 5px; /* Небольшое закругление углов (можно 5px, 8px и т.д.) */
         padding: 5px; /* Внутренние отступы */
         margin: 5px; /* Внешние отступы */
@@ -20,7 +20,7 @@ body {
     align-items: center;
     height: 100vh;
     gap: 20px;
-    background-color: #f0f0f0;
+    background-color: LightBlue;
 }
 
 /* Обычный скругленный div */
