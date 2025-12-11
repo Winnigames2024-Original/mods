@@ -1,0 +1,42 @@
+.container {
+  display: flex;
+  justify-content: center; /* Горизонтальное центрирование */
+  align-items: center;     /* Вертикальное центрирование */
+  min-height: 100vh;       /* Высота контейнера = 100% высоты viewport */
+}
+
+.main-box {
+  /* Стили для самого блока */
+  width: 200px;
+  height: 100px;
+  background-color: lightblue;
+  width: 150px;
+    height: 150px;
+    background-color: #2196F3; /* Синий фон */
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%; /* Делает блок круглым */
+    font-weight: bold;
+}
+body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    gap: 20px;
+    background-color: #f0f0f0;
+}
+
+/* Обычный скругленный div */
+.rounded-box {
+    width: 200px;
+    padding: 20px;
+    background-color: #4CAF50; /* Зеленый фон */
+    color: white;
+    text-align: center;
+    border-radius: 15px; /* Скругление углов */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Легкая тень для объема */
+}
