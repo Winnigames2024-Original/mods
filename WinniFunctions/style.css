@@ -6,8 +6,8 @@
 }
 
 .main-box {
-  background-color: #ff33c9;
-  background-color: #ff33c9; /* Светло-серый фон */
+  /* background-color: #ff33c9; */
+  background-color: LightBlue; /* Светло-серый фон */
         border-radius: 5px; /* Небольшое закругление углов (можно 5px, 8px и т.д.) */
         padding: 5px; /* Внутренние отступы */
         margin: 5px; /* Внешние отступы */
