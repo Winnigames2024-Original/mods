@@ -1,0 +1,13 @@
+name: NareServer
+version: '$version'
+main: com.winnigames2024.nareserver.NareServer
+api-version: '1.21'
+load: POSTWORLD
+description: Серверная половина NareVisuals — значок мода, честная дальность, метки сломанных блоков
+authors:
+  - Winnigames2024
+
+permissions:
+  narevisuals.reach:
+    description: Разрешить расширенную дальность ломания и удара
+    default: op
