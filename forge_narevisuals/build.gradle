@@ -227,7 +227,26 @@ tasks.register('copyToLauncher', Copy) {
     description = 'Копирует собранный jar в Resources\\Mods лаунчера NareLauncher'
     from tasks.named('jar')
     into launcherMods
-    doFirst { launcherMods.mkdirs() }
+    doFirst {
+        launcherMods.mkdirs()
+        // старые версии убираем: два jar одного мода — и Forge не запустится
+        dropOld(launcherMods, tasks.named('jar').get().archiveFileName.get())
+    }
+}
+
+/** Удаляет прежние jar этого же мода, кроме только что собранного. */
+void dropOld(File dir, String keep) {
+    if (!dir.isDirectory()) return
+
+    dir.listFiles()?.each { file ->
+        if (file.isFile()
+                && file.name.startsWith("${mod_id}-")
+                && file.name.endsWith('.jar')
+                && file.name != keep) {
+            logger.lifecycle("Убираю прежний jar мода: ${file.name}")
+            file.delete()
+        }
+    }
 }
 
 tasks.named('build') { finalizedBy 'copyToLauncher' }
@@ -242,7 +261,10 @@ if (appData != null) {
         from tasks.named('jar')
         into instanceMods
         onlyIf { instanceMods.parentFile.exists() }
-        doFirst { instanceMods.mkdirs() }
+        doFirst {
+            instanceMods.mkdirs()
+            dropOld(instanceMods, tasks.named('jar').get().archiveFileName.get())
+        }
     }
 
     tasks.named('build') { finalizedBy 'copyToInstance' }
