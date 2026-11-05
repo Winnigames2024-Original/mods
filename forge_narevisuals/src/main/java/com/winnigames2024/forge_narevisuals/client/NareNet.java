@@ -59,6 +59,7 @@ public final class NareNet {
 
     private static boolean serverHasPlugin;
     private static int loginTicks = -1;
+    private static int helloRetry = -1;
 
     private NareNet() { }
 
@@ -96,6 +97,29 @@ public final class NareNet {
         return false;
     }
 
+    // --------------------------------------------------------------- строки
+
+    /**
+     * Плагин читает строки через DataInputStream.readUTF: длина в двух
+     * байтах, дальше UTF-8. Родной writeUtf у игры кладёт длину VarInt'ом —
+     * с ним плагин разъезжается на первой же строке и выбрасывает пакет.
+     * Поэтому строки пишем и читаем по-джавовски, руками.
+     */
+    private static void putText(FriendlyByteBuf buf, String text) {
+        byte[] bytes = (text == null ? "" : text)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        buf.writeShort(bytes.length);
+        buf.writeBytes(bytes);
+    }
+
+    private static String takeText(FriendlyByteBuf buf) {
+        int length = buf.readUnsignedShort();
+        byte[] bytes = new byte[length];
+        buf.readBytes(bytes);
+        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     // ------------------------------------------------------------- приём
 
     public static void register() {
@@ -104,9 +128,15 @@ public final class NareNet {
         ChannelBuilder.named(S2C).optional().eventNetworkChannel()
                 .addListener(event -> {
                     FriendlyByteBuf buf = event.getPayload();
-                    if (buf == null) return;
+                    if (buf == null) {
+                        Forge_narevisuals.LOGGER.warn("{}: пакет с сервера без содержимого",
+                                Forge_narevisuals.NAME);
+                        return;
+                    }
 
                     try {
+                        Forge_narevisuals.LOGGER.info("{}: пакет с сервера, {} байт",
+                                Forge_narevisuals.NAME, buf.readableBytes());
                         read(buf);
                     } catch (Exception e) {
                         Forge_narevisuals.LOGGER.warn("{}: битый пакет с сервера: {}",
@@ -115,6 +145,9 @@ public final class NareNet {
 
                     event.getSource().setPacketHandled(true);
                 });
+
+        Forge_narevisuals.LOGGER.info("{}: каналы {} и {} зарегистрированы",
+                Forge_narevisuals.NAME, C2S, S2C);
     }
 
     private static void read(FriendlyByteBuf buf) {
@@ -138,7 +171,7 @@ public final class NareNet {
                 Set<String> fun = new HashSet<>();
 
                 for (int i = 0; i < count; i++) {
-                    String name = buf.readUtf();
+                    String name = takeText(buf);
                     if (buf.readBoolean()) fun.add(name);
                     names.add(name);
                 }
@@ -149,7 +182,7 @@ public final class NareNet {
                 trollable.addAll(fun);
             }
             case S2C_MARK -> {
-                String who = buf.readUtf();
+                String who = takeText(buf);
                 int x = buf.readInt(), y = buf.readInt(), z = buf.readInt();
 
                 synchronized (marks) {
@@ -158,7 +191,7 @@ public final class NareNet {
                 }
             }
             case S2C_TROLL -> {
-                String from = buf.readUtf();
+                String from = takeText(buf);
                 byte kind = buf.readByte();
                 NareFun.play(from, kind);
             }
@@ -169,19 +202,53 @@ public final class NareNet {
     // ------------------------------------------------------------ отправка
 
     private static void send(FriendlyByteBuf buf) {
-        if (out == null) return;
+        if (out == null) {
+            Forge_narevisuals.LOGGER.warn("{}: канал не создан, отправлять некуда",
+                    Forge_narevisuals.NAME);
+            return;
+        }
+
         try {
             out.send(buf, PacketDistributor.SERVER.noArg());
-        } catch (Exception ignored) {
-            // сервера без плагина канал не знают — это нормально
+        } catch (Exception e) {
+            // сервера без плагина канал не знают — это нормально, но знать хочется
+            Forge_narevisuals.LOGGER.warn("{}: пакет не ушёл: {}",
+                    Forge_narevisuals.NAME, e.toString());
+        }
+    }
+
+    /**
+     * Говорим серверу, какие каналы слушаем.
+     *
+     * Bukkit не отправит клиенту ни одного plugin-сообщения, пока тот сам не
+     * объявит канал пакетом minecraft:register. Forge делает это только для
+     * Forge-сервера, а для обычного Paper — нет. Свой канал с таким именем
+     * создать нельзя, его держит сама игра, поэтому просим Forge дослать
+     * объявление его же механизмом.
+     */
+    private static void announce() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() == null) return;
+
+        try {
+            net.minecraftforge.network.ChannelListManager.addChannels(
+                    mc.getConnection().getConnection(), S2C, C2S);
+
+            Forge_narevisuals.LOGGER.info("{}: каналы объявлены серверу",
+                    Forge_narevisuals.NAME);
+        } catch (Throwable e) {
+            Forge_narevisuals.LOGGER.warn("{}: объявить каналы не вышло: {}",
+                    Forge_narevisuals.NAME, e.toString());
         }
     }
 
     public static void hello() {
+        announce();
+
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
         buf.writeByte(C2S_HELLO);
         buf.writeInt(PROTOCOL);
-        buf.writeUtf(Forge_narevisuals.VERSION);
+        putText(buf, Forge_narevisuals.VERSION);
         buf.writeBoolean(weAllowFun());
         send(buf);
     }
@@ -192,7 +259,7 @@ public final class NareNet {
 
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
         buf.writeByte(C2S_TROLL);
-        buf.writeUtf(target);
+        putText(buf, target);
         buf.writeByte(kind);
         send(buf);
     }
@@ -208,8 +275,11 @@ public final class NareNet {
 
         if (!Launch.visuals()) return;
 
+        Forge_narevisuals.LOGGER.info("{}: зашли на сервер, здороваюсь", Forge_narevisuals.NAME);
         hello();
-        loginTicks = Config.get().autoLogin ? 60 : -1;
+
+        helloRetry = 60;      // повторим через три секунды, вдруг рано
+        loginTicks = Config.get().autoLogin ? 80 : -1;
     }
 
     @SubscribeEvent
@@ -219,6 +289,7 @@ public final class NareNet {
         marks.clear();
         serverHasPlugin = false;
         loginTicks = -1;
+        helloRetry = -1;
     }
 
     /**
@@ -227,6 +298,12 @@ public final class NareNet {
      */
     @SubscribeEvent
     public static void onTick(TickEvent.ClientTickEvent.Post event) {
+        if (helloRetry > 0 && --helloRetry == 0 && !serverHasPlugin) {
+            Forge_narevisuals.LOGGER.info("{}: сервер молчит, здороваюсь ещё раз",
+                    Forge_narevisuals.NAME);
+            hello();
+        }
+
         if (loginTicks < 0) return;
         if (--loginTicks > 0) return;
 

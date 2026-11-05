@@ -1,8 +1,8 @@
 {
-  "version": "1.0.3",
+  "version": "1.1.0",
   "file": "forge_narevisuals-1.0.jar",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.0.jar",
-  "sha1": "b94ef19e3f8faf59b0c40559893742b2791a7518",
-  "size": 676593,
-  "notes": "починен вылет 1.0.2 — объявление каналов идёт через механизм Forge"
+  "sha1": "8be05701ec937213e4af505234b19888c6a02eee",
+  "size": 676947,
+  "notes": "связь с сервером заработала: строки в формате DataInputStream"
 }
