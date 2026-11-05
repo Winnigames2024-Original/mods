@@ -43,6 +43,7 @@ public final class NareHud {
         MODULES.add(new HudModules.Effects());
         MODULES.add(new HudModules.Near());
         MODULES.add(new HudModules.Pointer());
+        MODULES.add(new HudModules.Broken());
         MODULES.add(new HudModules.HitMarker());
     }
 

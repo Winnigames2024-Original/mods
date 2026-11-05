@@ -20,6 +20,65 @@ public final class HudModules {
 
     private HudModules() { }
 
+    // ------------------------------------------------------- Сломанные блоки
+
+    /**
+     * Что сломали другие игроки с модом. Координаты присылает серверный
+     * плагин — без него список всегда пуст, и это честно написано внутри.
+     */
+    public static class Broken extends HudModule {
+
+        private static final int MAX_ROWS = 4, HEAD = 17, ROW_H = 10;
+
+        public Broken() { super("broken", "Сломанные блоки", 0.735f, 0.47f); }
+
+        @Override public int width(Minecraft mc) { return 150; }
+
+        @Override
+        public int height(Minecraft mc) {
+            int n = NareNet.marks().size();
+            int rows = n == 0 ? 1 : Math.min(MAX_ROWS, n);
+            return HEAD + rows * ROW_H + 5;
+        }
+
+        @Override
+        public void render(GuiGraphics g, Minecraft mc, int x, int y) {
+            List<NareNet.Mark> list = NareNet.marks();
+
+            int w = width(mc), h = height(mc);
+            NareTheme.card(g, x, y, w, h);
+
+            NareTheme.text(g, mc.font, "СЛОМАНО", x + 9, y + 5, NareTheme.MUTED);
+            NareTheme.rightBold(g, mc.font, String.valueOf(list.size()), x + w - 8, y + 5,
+                    list.isEmpty() ? NareTheme.DIM : NareTheme.accent());
+
+            g.fill(x + 9, y + HEAD - 2, x + w - 8, y + HEAD - 1, NareTheme.LINE_SOFT);
+
+            int ry = y + HEAD + 2;
+
+            if (list.isEmpty()) {
+                NareTheme.text(g, mc.font,
+                        NareNet.plugged() ? "пока ничего" : "нужен плагин на сервере",
+                        x + 9, ry, NareTheme.DIM);
+                return;
+            }
+
+            int shown = Math.min(MAX_ROWS, list.size());
+            for (int i = 0; i < shown; i++) {
+                NareNet.Mark mark = list.get(i);
+
+                String who = mark.who();
+                if (who.length() > 9) who = who.substring(0, 8) + "\u2026";
+                NareTheme.text(g, mc.font, who, x + 9, ry, NareTheme.TEXT);
+
+                String where = mark.x() + " " + mark.y() + " " + mark.z();
+                NareTheme.rightBold(g, mc.font, where, x + w - 8, ry, NareTheme.MUTED);
+
+                ry += ROW_H;
+            }
+        }
+    }
+
     // --------------------------------------------------- Стрелка на игрока
 
     /**
@@ -436,9 +495,19 @@ public final class HudModules {
                 NareTheme.bold(g, mc.font, NareNear.arrow(spot.relative()),
                         x + 9, ry, NareTheme.accent());
 
+                boolean ours = NareNet.hasMod(spot.name());
+
                 String name = spot.name();
-                if (name.length() > 10) name = name.substring(0, 9) + "\u2026";
+                int limit = ours ? 9 : 10;
+                if (name.length() > limit) name = name.substring(0, limit - 1) + "\u2026";
                 NareTheme.text(g, mc.font, name, x + 18, ry, NareTheme.TEXT);
+
+                // значок: у этого игрока тоже стоит мод
+                if (ours) {
+                    int bx = x + 18 + mc.font.width(name) + 3;
+                    NareTheme.roundRect(g, bx, ry - 1, 7, 7, 2,
+                            NareTheme.alpha(NareTheme.accent(), 0.9f));
+                }
 
                 int distance = (int) Math.round(spot.distance());
                 NareTheme.rightBold(g, mc.font, distance + " \u0431\u043b", x + w - 8, ry,

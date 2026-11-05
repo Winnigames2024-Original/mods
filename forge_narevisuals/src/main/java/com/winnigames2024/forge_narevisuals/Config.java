@@ -119,6 +119,14 @@ public class Config {
     /** Дальность, на которой во freecam можно ломать и бить. 0 — как обычно. */
     public int freecamReach = 24;
     /** Показывать подсказку с управлением. */
+    // ------------------------------------------------------------- автовход
+    /** Слать команду входа после захода на сервер. */
+    public boolean autoLogin = false;
+    /** Какая команда: login, l, reg — у серверов по-разному. */
+    public String loginCommand = "login";
+    /** Пароль. Лежит в этом файле открытым текстом — помните об этом. */
+    public String loginPassword = "";
+
     // ------------------------------------------------- дальность и область
     /** Насколько далеко можно ломать. 0 — как обычно. */
     public int reachBlocks = 0;
@@ -207,6 +215,8 @@ public class Config {
         if (loaded.crosshairImage == null) loaded.crosshairImage = "";
         if (loaded.skyImage == null) loaded.skyImage = "";
         if (loaded.skyPreset == null) loaded.skyPreset = "";
+        if (loaded.loginCommand == null) loaded.loginCommand = "login";
+        if (loaded.loginPassword == null) loaded.loginPassword = "";
         instance = loaded;
     }
 

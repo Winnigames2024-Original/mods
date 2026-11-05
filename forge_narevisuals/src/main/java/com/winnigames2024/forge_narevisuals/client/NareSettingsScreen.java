@@ -369,6 +369,8 @@ public class NareSettingsScreen extends Screen {
             default -> {
                 list.add(Row.action("Клавиши отдельным окном", "То же самое, но поверх игры",
                         () -> minecraft.setScreen(new NareKeysScreen(this))));
+                list.add(Row.action("Автовход на сервер", "Команда и пароль для /login",
+                        () -> minecraft.setScreen(new NareLoginScreen(this))));
                 list.add(Row.action("Свои текстуры", "Заменить блок или предмет своей картинкой",
                         () -> minecraft.setScreen(new NareTextureScreen(this))));
                 list.add(Row.action("Расположение HUD", "Перетащить элементы мышью",
