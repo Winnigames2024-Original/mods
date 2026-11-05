@@ -1,8 +1,8 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "file": "forge_narevisuals-1.0.jar",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.0.jar",
-  "sha1": "5242c79e329a1211153979cc483a99348ca97dec",
-  "size": 676714,
-  "notes": "объявление каналов серверу — без него Paper не отвечает клиенту"
+  "sha1": "b94ef19e3f8faf59b0c40559893742b2791a7518",
+  "size": 676593,
+  "notes": "починен вылет 1.0.2 — объявление каналов идёт через механизм Forge"
 }
