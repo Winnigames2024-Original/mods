@@ -178,7 +178,7 @@ public final class NareReach {
         BlockPos center = hit.getBlockPos();
         int r = (size - 1) / 2;
 
-        int done = 0;
+        List<BlockPos> picked = new ArrayList<>();
         for (int a = -r; a <= r; a++) {
             for (int b = -r; b <= r; b++) {
                 for (int d = 0; d < depth; d++) {
@@ -186,10 +186,20 @@ public final class NareReach {
                     if (pos.equals(center)) continue;
                     if (mc.level.getBlockState(pos).isAir()) continue;
 
-                    mc.gameMode.destroyBlock(pos);
-                    if (++done >= 96) { breakCooldown = 4; return; }
+                    picked.add(pos);
+                    if (picked.size() >= 96) break;
                 }
             }
+        }
+
+        if (picked.isEmpty()) { breakCooldown = 4; return; }
+
+        if (NareNet.plugged()) {
+            // на сервере ломает он сам — иначе блоки исчезнут только у нас
+            // на экране, и мы упрёмся в стену, которой не видно
+            NareNet.breakArea(picked);
+        } else {
+            for (BlockPos pos : picked) mc.gameMode.destroyBlock(pos);
         }
 
         breakCooldown = 4;

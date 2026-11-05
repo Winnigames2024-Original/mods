@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.1",
   "file": "forge_narevisuals-1.0.jar",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.0.jar",
-  "sha1": "8be05701ec937213e4af505234b19888c6a02eee",
-  "size": 676947,
-  "notes": "связь с сервером заработала: строки в формате DataInputStream"
+  "sha1": "3f32048105488995e79d544f918a019fa39ab0b1",
+  "size": 677408,
+  "notes": "ломание области теперь делает сервер — в дыру можно зайти"
 }

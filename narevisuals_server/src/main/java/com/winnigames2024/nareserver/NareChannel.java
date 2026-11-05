@@ -28,6 +28,7 @@ public final class NareChannel implements PluginMessageListener {
     // от клиента
     public static final byte C2S_HELLO = 1;
     public static final byte C2S_TROLL = 2;
+    public static final byte C2S_BREAK = 3;
 
     // к клиенту
     public static final byte S2C_WELCOME = 1;
@@ -68,6 +69,20 @@ public final class NareChannel implements PluginMessageListener {
 
                     Bukkit.getScheduler().runTask(plugin,
                             () -> plugin.onHello(player, version, funTrolls));
+                }
+                case C2S_BREAK -> {
+                    int count = in.readInt();
+                    if (count < 0 || count > 1024) return;
+
+                    int[][] blocks = new int[count][3];
+                    for (int i = 0; i < count; i++) {
+                        blocks[i][0] = in.readInt();
+                        blocks[i][1] = in.readInt();
+                        blocks[i][2] = in.readInt();
+                    }
+
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> plugin.onBreakArea(player, blocks));
                 }
                 case C2S_TROLL -> {
                     String target = in.readUTF();

@@ -43,6 +43,8 @@ public final class NareServer extends JavaPlugin implements Listener {
     private double reachEntities;
     private boolean marks;
     private boolean trolls;
+    private boolean area;
+    private int areaMax;
 
     @Override
     public void onEnable() {
@@ -74,6 +76,8 @@ public final class NareServer extends JavaPlugin implements Listener {
         reachEntities = getConfig().getDouble("reach.entities", 0);
         marks = getConfig().getBoolean("marks", true);
         trolls = getConfig().getBoolean("trolls", true);
+        area = getConfig().getBoolean("area.enabled", true);
+        areaMax = getConfig().getInt("area.max", 128);
     }
 
     public boolean trollsAllowed() {
@@ -176,6 +180,51 @@ public final class NareServer extends JavaPlugin implements Listener {
 
             channel.sendMark(player, who,
                     block.getX(), block.getY(), block.getZ());
+        }
+    }
+
+    // --------------------------------------------------------- область
+
+    /**
+     * Ломает блоки, которые клиент захватил областью.
+     *
+     * Ломаем через player.breakBlock — то есть ровно так, как если бы игрок
+     * ударил по блоку сам: срабатывает BlockBreakEvent, а значит защиты
+     * вроде WorldGuard могут это отменить, и дроп падает по обычным правилам.
+     * Своей дырки в чужом регионе так не выйдет, и это правильно.
+     */
+    public void onBreakArea(Player player, int[][] blocks) {
+        if (!area || blocks.length == 0) return;
+        if (!player.hasPermission("narevisuals.area")) return;
+
+        Guest guest = guests.get(player.getUniqueId());
+        if (guest == null) return;
+
+        double limit = reachBlocks > 0 ? reachBlocks + 2 : 8;
+        double limitSq = limit * limit;
+
+        var world = player.getWorld();
+        var eye = player.getEyeLocation();
+
+        int done = 0;
+        for (int[] at : blocks) {
+            if (done >= areaMax) break;
+
+            Block block = world.getBlockAt(at[0], at[1], at[2]);
+            if (block.getType().isAir()) continue;
+            if (block.getLocation().add(0.5, 0.5, 0.5).distanceSquared(eye) > limitSq) continue;
+
+            if (player.breakBlock(block)) done++;
+        }
+
+        if (done > 0 && marks) {
+            for (UUID id : guests.keySet()) {
+                Player other = Bukkit.getPlayer(id);
+                if (other == null || !other.getWorld().equals(world)) continue;
+
+                channel.sendMark(other, player.getName(),
+                        blocks[0][0], blocks[0][1], blocks[0][2]);
+            }
         }
     }
 

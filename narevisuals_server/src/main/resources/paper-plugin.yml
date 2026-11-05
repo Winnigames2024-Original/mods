@@ -11,3 +11,6 @@ permissions:
   narevisuals.reach:
     description: Разрешить расширенную дальность ломания и удара
     default: op
+  narevisuals.area:
+    description: Разрешить ломание области (3x3 и больше)
+    default: op
