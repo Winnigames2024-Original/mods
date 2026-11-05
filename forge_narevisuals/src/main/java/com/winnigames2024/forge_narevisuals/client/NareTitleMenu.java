@@ -338,7 +338,10 @@ public final class NareTitleMenu {
             if (container.isPresent())
                 return container.get().getModInfo().getVersion().toString();
         } catch (Throwable ignored) { }
-        return "1.0";
+
+        // до списка модов не достучались — показываем то, что знаем сами,
+        // а не выдуманное число: иначе версия в меню живёт своей жизнью
+        return Forge_narevisuals.VERSION;
     }
 
     /** Текст крупнее обычного: масштабируем матрицу, а не шрифт. */

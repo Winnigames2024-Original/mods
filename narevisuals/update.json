@@ -2,7 +2,7 @@
   "version": "1.1.1",
   "file": "forge_narevisuals-1.1.1.jar",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.1.1.jar",
-  "sha1": "9848c402a3e76140d596348733efb415efdc7a7d",
-  "size": 677410,
-  "notes": "версия мода теперь настоящая: так называется jar и так его видит Forge"
+  "sha1": "b61221b2f557119e402ae170d6827ea1115c6150",
+  "size": 677409,
+  "notes": "версия больше не врёт: берётся из мода и из сборки лаунчера"
 }
