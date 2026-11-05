@@ -216,23 +216,10 @@ sourceSets.each {
 }
 
 // ---------------------------------------------------------------------------
-// Автокопирование собранного мода после build:
-//   1) в NareLauncher — оттуда он попадает в сборку Forge Visuals;
-//   2) в папку mods самой сборки — чтобы сразу проверить в игре.
+// После build кладём jar в папку mods сборки — чтобы сразу проверить в игре.
+// В лаунчер больше не копируем: мод берётся только с GitHub, встроенных
+// копий в exe нет.
 // ---------------------------------------------------------------------------
-def launcherMods = file('C:/Visual Studio Projects/NareLauncher/Resources/Mods')
-
-tasks.register('copyToLauncher', Copy) {
-    group = 'narevisuals'
-    description = 'Копирует собранный jar в Resources\\Mods лаунчера NareLauncher'
-    from tasks.named('jar')
-    into launcherMods
-    doFirst {
-        launcherMods.mkdirs()
-        // старые версии убираем: два jar одного мода — и Forge не запустится
-        dropOld(launcherMods, tasks.named('jar').get().archiveFileName.get())
-    }
-}
 
 /** Удаляет прежние jar этого же мода, кроме только что собранного. */
 void dropOld(File dir, String keep) {
@@ -249,7 +236,6 @@ void dropOld(File dir, String keep) {
     }
 }
 
-tasks.named('build') { finalizedBy 'copyToLauncher' }
 
 def appData = System.getenv('APPDATA')
 if (appData != null) {
