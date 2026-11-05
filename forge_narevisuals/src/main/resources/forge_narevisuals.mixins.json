@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.winnigames2024.forge_narevisuals.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "forge_narevisuals.refmap.json",
+  "mixins": [
+  ],
+  "client": [
+    "SkyRendererMixin",
+    "GameRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

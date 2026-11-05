@@ -1,0 +1,38 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+# мод целиком клиентский: на выделенном сервере он не загружается
+clientSideOnly = true
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "NareVisuals"
+authors = "Winnigames2024"
+description = '''
+NareVisuals - клиентский мод визуальных улучшений.
+
+Чистый HUD без вмешательства в механику игры: FPS, пинг, координаты,
+клики в секунду, индикатор клавиш, броня с прочностью, активные эффекты
+и маркер попадания. Элементы включаются по отдельности и двигаются мышью.
+
+Правый Shift - настройки, H - спрятать HUD.
+'''
+
+[[dependencies."${mod_id}"]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_version_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+# свои миксины: своё небо вместо ванильного купола
+[[mixins]]
+config = "forge_narevisuals.mixins.json"

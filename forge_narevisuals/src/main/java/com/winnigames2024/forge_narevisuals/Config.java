@@ -1,0 +1,246 @@
+package com.winnigames2024.forge_narevisuals;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.minecraftforge.fml.loading.FMLPaths;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Настройки NareVisuals. Хранятся в config/narevisuals.json,
+ * чтобы их можно было править руками и переносить между сборками.
+ */
+public class Config {
+
+    /** Настройки одного элемента HUD. Координаты — доли экрана, а не пиксели. */
+    public static class Element {
+        public boolean enabled = true;
+        public float x;
+        public float y;
+
+        public Element() { }
+
+        public Element(boolean enabled, float x, float y) {
+            this.enabled = enabled;
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    public boolean hudEnabled = true;
+    public boolean background = true;
+    public boolean shadow = true;
+    public boolean hitMarker = true;
+    public int accent = 0xFF5E86FF;
+
+    /** Скруглять углы карточек. */
+    public boolean rounded = true;
+
+    /** Мягкая тень под карточками. */
+    public boolean panelShadow = true;
+
+    /** Подключать встроенный ресурспак (кнопки, поля, фон главного меню). Нужен перезапуск. */
+    public boolean resourcePack = true;
+
+    /** Своё главное меню вместо ванильного. */
+    public boolean customMenu = true;
+
+    // ------------------------------------------------------------ главное меню
+
+    /** Звёзды на фоне своего главного меню. */
+    public boolean menuStars = true;
+    /** Сколько звёзд рисовать. */
+    public int menuStarCount = 220;
+    /** Свечение у горизонта. */
+    public boolean menuGlow = true;
+    /** Значок с буквой N и надпись NareVisuals. */
+    public boolean menuMark = true;
+    /** Подписи по углам: издание, версии, кто собрал. */
+    public boolean menuCorners = true;
+    /** Пункты по центру экрана вместо левого края. */
+    public boolean menuCentered = false;
+    /** Отступ списка от левого края, пикселей. */
+    public int menuLeft = 44;
+    /** Размер пунктов в процентах от обычного. */
+    public int menuScale = 100;
+
+    // ------------------------------------------------------- подсветка игроков
+
+    public boolean playerEsp = false;
+    /** Цвет рамки по здоровью: зелёная — целый, красная — почти мёртвый. */
+    public boolean espHealthColor = true;
+    public int espColor = 0xFF5E86FF;
+    /** Подпись под рамкой: имя, здоровье, расстояние. */
+    /** Броня игрока над головой — её сервер присылает всем. */
+    public boolean espArmor = true;
+    /** Опыт и сытость — сервер шлёт их только про вас самих. */
+    public boolean espExtra = true;
+    /** Полоска здоровья над головой, а не только цифры. */
+    public boolean espBar = true;
+    public boolean espName = true;
+    public boolean espHealth = true;
+    public boolean espDistance = false;
+    /** Насколько далеко подсвечивать, в блоках. */
+    public int espRange = 64;
+    /** Рамки и на остальных существах, не только на игроках. */
+    public boolean espMobs = false;
+
+    // --------------------------------------------------------- подсветка блока
+
+    public boolean blockHighlight = false;
+    public int blockColor = 0xFF5E86FF;
+    /** Залить грани полупрозрачным цветом, а не только обвести. */
+    public boolean blockFill = true;
+
+    // ------------------------------------------------------------ яркость
+
+    /** Поднять гамму до предела. */
+    public boolean fullbright = false;
+    /** Эффект ночного зрения на клиенте. */
+    public boolean nightVision = false;
+
+    // ------------------------------------------------------------ прицел
+
+    public boolean customCrosshair = false;
+    /** Имя файла в config/narevisuals/images. Пусто — встроенная точка. */
+    public String crosshairImage = "";
+    public int crosshairSize = 16;
+    public int crosshairColor = 0xFFFFFFFF;
+
+    // ------------------------------------------------------------ свободная камера
+
+    /** Скорость полёта камеры, блоков за тик. */
+    public double freecamSpeed = 0.55;
+    /** Дальность, на которой во freecam можно ломать и бить. 0 — как обычно. */
+    public int freecamReach = 24;
+    /** Показывать подсказку с управлением. */
+    // ------------------------------------------------- дальность и область
+    /** Насколько далеко можно ломать. 0 — как обычно. */
+    public int reachBlocks = 0;
+    /** Насколько далеко можно бить. 0 — как обычно. */
+    public int reachEntities = 0;
+    /** Держать дальность не только в свободной камере, но и всегда. */
+    public boolean reachAlways = false;
+    /** Сторона области ломания: 1 — обычный блок, 3 — 3x3 и так далее. */
+    public int breakSize = 1;
+    /** На сколько блоков вглубь. */
+    public int breakDepth = 1;
+    /** Радиус удара по области. 0 — бьём только по цели. */
+    public int attackArea = 0;
+    /** Размер персонажа в процентах. */
+    public int playerScale = 100;
+
+    /** Свободную камеру один раз перенесли со старой N на F. */
+    public boolean freecamKeyMoved = false;
+    public boolean freecamHint = true;
+
+    // ------------------------------------------------------------ зум
+
+    /** Приближение по клавише. */
+    public boolean zoomEnabled = true;
+    /** Угол обзора в приближении, градусов. */
+    public int zoomFov = 25;
+
+    // ------------------------------------------------------------ игроки рядом
+
+    /** Радиус для /near и списка «игроки рядом». */
+    public int nearRange = 128;
+    /** Показывать здоровье в списке. */
+    public boolean nearHealth = true;
+
+    // ------------------------------------------------------------ небо
+
+    public boolean customSky = false;
+    /** Встроенный пресет: sunset, nebula, aurora, void, dawn. Пусто — своя картинка. */
+    public String skyPreset = "nebula";
+    /** Имя файла в config/narevisuals/images для своего неба. */
+    public String skyImage = "";
+    /** Медленное вращение неба. */
+    public boolean skySpin = true;
+    /** Оставить солнце, луну и звёзды поверх своего неба. */
+    public boolean skyKeepSun = true;
+
+    public Map<String, Element> elements = new LinkedHashMap<>();
+
+    // ------------------------------------------------------------------
+
+    private static Config instance;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    public static Config get() {
+        if (instance == null) load();
+        return instance;
+    }
+
+    public static Path file() {
+        return FMLPaths.CONFIGDIR.get().resolve("narevisuals.json");
+    }
+
+    /** Папка мода: туда кладутся картинки и пресеты .nvc. */
+    public static Path folder() {
+        return FMLPaths.CONFIGDIR.get().resolve("narevisuals");
+    }
+
+    public static Path images() {
+        return folder().resolve("images");
+    }
+
+    public static void load() {
+        Config loaded = null;
+        try {
+            Path path = file();
+            if (Files.exists(path)) {
+                String json = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+                loaded = GSON.fromJson(json, Config.class);
+            }
+        } catch (Exception ignored) {
+            // битый конфиг не должен мешать запуску — просто начнём с настроек по умолчанию
+        }
+
+        if (loaded == null) loaded = new Config();
+        if (loaded.elements == null) loaded.elements = new LinkedHashMap<>();
+        if (loaded.crosshairImage == null) loaded.crosshairImage = "";
+        if (loaded.skyImage == null) loaded.skyImage = "";
+        if (loaded.skyPreset == null) loaded.skyPreset = "";
+        instance = loaded;
+    }
+
+    public static void save() {
+        try {
+            Path path = file();
+            Files.createDirectories(path.getParent());
+            Files.write(path, GSON.toJson(get()).getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+        }
+    }
+
+    /** Полностью заменить настройки (после загрузки пресета .nvc). */
+    public static void replace(Config cfg) {
+        if (cfg == null) return;
+        if (cfg.elements == null) cfg.elements = new LinkedHashMap<>();
+        instance = cfg;
+    }
+
+    public static String toJson() {
+        return GSON.toJson(get());
+    }
+
+    public static Config fromJson(String json) {
+        return GSON.fromJson(json, Config.class);
+    }
+
+    /** Настройки элемента; если их ещё нет — создаются со значениями по умолчанию. */
+    public Element element(String id, boolean enabled, float x, float y) {
+        Element e = elements.get(id);
+        if (e == null) {
+            e = new Element(enabled, x, y);
+            elements.put(id, e);
+        }
+        return e;
+    }
+}
