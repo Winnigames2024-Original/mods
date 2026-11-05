@@ -164,6 +164,8 @@ public final class NareReach {
      * как работают «молоты» в модах.
      */
     private static void areaBreak(Minecraft mc, Config cfg) {
+        if (!cfg.areaBreak) return;
+
         int size = Math.max(1, cfg.breakSize);
         int depth = Math.max(1, cfg.breakDepth);
         if (size <= 1 && depth <= 1) return;
@@ -227,6 +229,8 @@ public final class NareReach {
         if (!event.isAttack() || !Launch.visuals()) return;
 
         Config cfg = Config.get();
+        if (!cfg.areaAttack) return;
+
         double radius = Math.max(0, cfg.attackArea);
         if (radius <= 0 || attackCooldown > 0) return;
 

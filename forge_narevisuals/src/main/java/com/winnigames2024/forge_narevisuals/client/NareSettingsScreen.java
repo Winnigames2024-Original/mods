@@ -111,6 +111,9 @@ public class NareSettingsScreen extends Screen {
     /** Привязка, для которой ждём нажатие. null — никого не ждём. */
     private KeyMapping awaiting;
 
+    /** Поиск по всем разделам. Пусто — показываем обычный раздел. */
+    private String query = "";
+
     /** Панель подстраивается под окно: в маленьком она просто ужимается. */
     private int px, py, pw, ph, sideW, headH, footH, tabH;
     private boolean hoverDone;
@@ -326,7 +329,11 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.reachAlways, () -> { cfg.reachAlways = !cfg.reachAlways; Config.save(); }));
                 list.add(Row.label("Поднимает дальность только там, где сервер наш"));
 
-                list.add(Row.slider("Ломать область", 1, 15,
+                list.add(Row.toggle("Ломать область", "Общий выключатель",
+                        () -> cfg.areaBreak, () -> { cfg.areaBreak = !cfg.areaBreak; Config.save(); }));
+                list.add(Row.toggle("Бить по области", "Общий выключатель",
+                        () -> cfg.areaAttack, () -> { cfg.areaAttack = !cfg.areaAttack; Config.save(); }));
+                list.add(Row.slider("Размер области", 1, 15,
                         () -> cfg.breakSize,
                         v -> { cfg.breakSize = v % 2 == 0 ? v + 1 : v; Config.save(); },
                         v -> v <= 1 ? "один блок" : v + "x" + v));
@@ -369,6 +376,13 @@ public class NareSettingsScreen extends Screen {
             default -> {
                 list.add(Row.action("Клавиши отдельным окном", "То же самое, но поверх игры",
                         () -> minecraft.setScreen(new NareKeysScreen(this))));
+                list.add(Row.action("Панель: свои и телепорт", "Кто с модом, перенос к ним, возврат блоков",
+                        () -> minecraft.setScreen(new NarePanelScreen(this))));
+                list.add(Row.toggle("Метки сломанного", "Что ломают другие игроки с модом",
+                        () -> cfg.showMarks, () -> { cfg.showMarks = !cfg.showMarks; Config.save(); }));
+                list.add(Row.slider("Возвращать пачкой", 1, 128,
+                        () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
+                        v -> v + " бл."));
                 list.add(Row.action("Автовход на сервер", "Команда и пароль для /login",
                         () -> minecraft.setScreen(new NareLoginScreen(this))));
                 list.add(Row.action("Свои текстуры", "Заменить блок или предмет своей картинкой",
@@ -384,6 +398,30 @@ public class NareSettingsScreen extends Screen {
         }
 
         return list;
+    }
+
+    /**
+     * Что показываем сейчас. Пока ничего не набрано — обычный раздел,
+     * иначе проходим по всем разделам и оставляем подходящие строки.
+     * Заголовки в поиск не берём: искать надо настройку, а не рубрику.
+     */
+    private List<Row> shown() {
+        if (query.isEmpty()) return rows();
+
+        String needle = query.toLowerCase();
+        var found = new ArrayList<Row>();
+
+        int saved = tab;
+        for (int t = 0; t < TABS.length; t++) {
+            tab = t;
+            for (Row row : rows()) {
+                if (row.kind == Row.Kind.LABEL) continue;
+                if (row.title.toLowerCase().contains(needle)) found.add(row);
+            }
+        }
+        tab = saved;
+
+        return found;
     }
 
     private static String scaleText(int value) {
@@ -466,7 +504,7 @@ public class NareSettingsScreen extends Screen {
 
         int cx = px + sideW;
         int cw = pw - sideW - 14;
-        var list = rows();
+        var list = shown();
         clampScroll(list.size());
         int limit = Math.min(list.size() - scroll, visibleRows());
 
@@ -513,7 +551,35 @@ public class NareSettingsScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(char c, int modifiers) {
+        // ждём клавишу для привязки — буквы сейчас не для поиска
+        if (awaiting != null) return super.charTyped(c, modifiers);
+
+        if (c >= ' ') {
+            query = query + c;
+            scroll = 0;
+            return true;
+        }
+        return super.charTyped(c, modifiers);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (awaiting == null) {
+            if (keyCode == InputConstants.KEY_BACKSPACE && !query.isEmpty()) {
+                query = query.substring(0, query.length() - 1);
+                scroll = 0;
+                return true;
+            }
+
+            // Esc сначала убирает поиск, и только потом закрывает окно
+            if (keyCode == InputConstants.KEY_ESCAPE && !query.isEmpty()) {
+                query = "";
+                scroll = 0;
+                return true;
+            }
+        }
+
         if (awaiting != null) {
             // Esc снимает привязку — так же, как это делает игра
             bindKey(awaiting, keyCode == InputConstants.KEY_ESCAPE
@@ -557,7 +623,7 @@ public class NareSettingsScreen extends Screen {
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (dragging >= 0) {
             measure();
-            var list = rows();
+            var list = shown();
             if (dragging < list.size()) {
                 Row row = list.get(dragging);
                 if (row.kind == Row.Kind.SLIDER)
@@ -601,7 +667,7 @@ public class NareSettingsScreen extends Screen {
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
         if (sy != 0) {
             scroll -= (int) Math.signum(sy);
-            clampScroll(rows().size());
+            clampScroll(shown().size());
         }
         return true;
     }
@@ -628,6 +694,7 @@ public class NareSettingsScreen extends Screen {
 
         panel(g);
         head(g);
+        search(g);
         side(g, mouseX, mouseY);
         content(g, mouseX, mouseY, partialTick);
         foot(g, mouseX, mouseY);
@@ -661,6 +728,25 @@ public class NareSettingsScreen extends Screen {
         }
     }
 
+    /** Строка поиска: отдельного поля нет, просто печатаем. */
+    private void search(GuiGraphics g) {
+        int x = px + sideW;
+        int y = py + headH - 13;
+        int w = pw - sideW - 14;
+
+        if (query.isEmpty()) {
+            if (pw >= 380)
+                g.drawString(font, "печатайте — это поиск по всем разделам",
+                        x + 10, y, 0x55FFFFFF, false);
+            return;
+        }
+
+        NareTheme.bold(g, font, "Поиск: " + query, x + 10, y, NareTheme.accent());
+
+        String count = shown().size() + " найдено · Esc — убрать";
+        g.drawString(font, count, x + w - font.width(count) - 6, y, NareTheme.DIM, false);
+    }
+
     private void side(GuiGraphics g, int mouseX, int mouseY) {
         for (int i = 0; i < TABS.length; i++) {
             int x = px + 10;
@@ -687,7 +773,7 @@ public class NareSettingsScreen extends Screen {
     private void content(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int cx = px + sideW;
         int cw = pw - sideW - 14;
-        var list = rows();
+        var list = shown();
         clampScroll(list.size());
 
         int shown = visibleRows();
@@ -841,6 +927,7 @@ public class NareSettingsScreen extends Screen {
     public void onClose() {
         pendingScale = -1;      // невыбранный размер не должен «залипать» до следующего раза
         awaiting = null;
+        query = "";
         Config.save();
         minecraft.setScreen(parent);
     }

@@ -29,12 +29,15 @@ public final class NareChannel implements PluginMessageListener {
     public static final byte C2S_HELLO = 1;
     public static final byte C2S_TROLL = 2;
     public static final byte C2S_BREAK = 3;
+    public static final byte C2S_RESTORE = 4;
+    public static final byte C2S_TP = 5;
 
     // к клиенту
     public static final byte S2C_WELCOME = 1;
     public static final byte S2C_PLAYERS = 2;
     public static final byte S2C_MARK = 3;
     public static final byte S2C_TROLL = 4;
+    public static final byte S2C_INFO = 5;
 
     private final NareServer plugin;
 
@@ -84,6 +87,16 @@ public final class NareChannel implements PluginMessageListener {
                     Bukkit.getScheduler().runTask(plugin,
                             () -> plugin.onBreakArea(player, blocks));
                 }
+                case C2S_RESTORE -> {
+                    int count = in.readInt();
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> plugin.onRestore(player, count));
+                }
+                case C2S_TP -> {
+                    String target = in.readUTF();
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> plugin.onTeleport(player, target));
+                }
                 case C2S_TROLL -> {
                     String target = in.readUTF();
                     byte kind = in.readByte();
@@ -127,6 +140,14 @@ public final class NareChannel implements PluginMessageListener {
             out.writeInt(x);
             out.writeInt(y);
             out.writeInt(z);
+        });
+    }
+
+    /** Короткая строка для игрока: что получилось, что нет. */
+    public void sendInfo(Player player, String text) {
+        send(player, out -> {
+            out.writeByte(S2C_INFO);
+            out.writeUTF(text);
         });
     }
 

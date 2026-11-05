@@ -14,3 +14,9 @@ permissions:
   narevisuals.area:
     description: Разрешить ломание области (3x3 и больше)
     default: op
+  narevisuals.restore:
+    description: Разрешить возвращать на место сломанные блоки
+    default: op
+  narevisuals.tp:
+    description: Разрешить телепорт к игрокам с модом
+    default: op

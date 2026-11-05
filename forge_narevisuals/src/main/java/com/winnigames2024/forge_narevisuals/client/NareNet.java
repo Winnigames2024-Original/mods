@@ -43,11 +43,14 @@ public final class NareNet {
     private static final byte C2S_HELLO = 1;
     private static final byte C2S_TROLL = 2;
     private static final byte C2S_BREAK = 3;
+    private static final byte C2S_RESTORE = 4;
+    private static final byte C2S_TP = 5;
 
     private static final byte S2C_WELCOME = 1;
     private static final byte S2C_PLAYERS = 2;
     private static final byte S2C_MARK = 3;
     private static final byte S2C_TROLL = 4;
+    private static final byte S2C_INFO = 5;
 
     /** Одна метка сломанного блока. */
     public record Mark(String who, int x, int y, int z, long at) { }
@@ -191,6 +194,15 @@ public final class NareNet {
                     while (marks.size() > 24) marks.remove(marks.size() - 1);
                 }
             }
+            case S2C_INFO -> {
+                String text = takeText(buf);
+                Minecraft mc = Minecraft.getInstance();
+                mc.execute(() -> {
+                    if (mc.gui != null)
+                        mc.gui.setOverlayMessage(
+                                net.minecraft.network.chat.Component.literal(text), false);
+                });
+            }
             case S2C_TROLL -> {
                 String from = takeText(buf);
                 byte kind = buf.readByte();
@@ -273,6 +285,33 @@ public final class NareNet {
         }
 
         send(buf);
+    }
+
+    /** Просим вернуть на место последние сломанные блоки. */
+    public static void restore(int count) {
+        if (!serverHasPlugin) return;
+
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeByte(C2S_RESTORE);
+        buf.writeInt(count);
+        send(buf);
+    }
+
+    /** Телепорт к игроку с модом — разрешает сервер, не мы. */
+    public static void teleport(String target) {
+        if (!serverHasPlugin) return;
+
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeByte(C2S_TP);
+        putText(buf, target);
+        send(buf);
+    }
+
+    /** Кто сейчас с модом — для панели. */
+    public static java.util.List<String> modded() {
+        java.util.List<String> out = new ArrayList<>(modded);
+        out.sort(String::compareToIgnoreCase);
+        return out;
     }
 
     /** Шутка дойдёт только если тот игрок сам её разрешил — решает сервер. */

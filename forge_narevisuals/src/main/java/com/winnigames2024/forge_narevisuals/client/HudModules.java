@@ -43,7 +43,8 @@ public final class HudModules {
 
         @Override
         public void render(GuiGraphics g, Minecraft mc, int x, int y) {
-            List<NareNet.Mark> list = NareNet.marks();
+            List<NareNet.Mark> list = com.winnigames2024.forge_narevisuals.Config.get().showMarks
+                    ? NareNet.marks() : java.util.Collections.emptyList();
 
             int w = width(mc), h = height(mc);
             NareTheme.card(g, x, y, w, h);
