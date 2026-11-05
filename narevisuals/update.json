@@ -1,8 +1,8 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "file": "forge_narevisuals-1.0.jar",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.0.jar",
-  "sha1": "e03d3f9b8429d6c586dd23a880017420ec372b73",
-  "size": 676329,
-  "notes": "подробный лог связи с сервером и повторное приветствие"
+  "sha1": "5242c79e329a1211153979cc483a99348ca97dec",
+  "size": 676714,
+  "notes": "объявление каналов серверу — без него Paper не отвечает клиенту"
 }
