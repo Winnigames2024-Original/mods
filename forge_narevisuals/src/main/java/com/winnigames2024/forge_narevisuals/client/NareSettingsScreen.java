@@ -26,8 +26,8 @@ import java.util.function.IntFunction;
  */
 public class NareSettingsScreen extends Screen {
 
-    private static final int MAX_W = 520;
-    private static final int MAX_H = 320;
+    private static final int MAX_W = 560;
+    private static final int MAX_H = 420;
     private static final int ROW_H = 24;
 
     private static final int[] ACCENTS = {
@@ -633,6 +633,26 @@ public class NareSettingsScreen extends Screen {
                 scroll = 0;
                 return true;
             }
+
+            // список листается и с клавиатуры: не у всех мышей доходит колесо
+            int total = shown().size();
+            switch (keyCode) {
+                case InputConstants.KEY_DOWN -> { scroll++; clampScroll(total); return true; }
+                case InputConstants.KEY_UP -> { scroll--; clampScroll(total); return true; }
+                case InputConstants.KEY_PAGEDOWN -> {
+                    scroll += visibleRows();
+                    clampScroll(total);
+                    return true;
+                }
+                case InputConstants.KEY_PAGEUP -> {
+                    scroll -= visibleRows();
+                    clampScroll(total);
+                    return true;
+                }
+                case InputConstants.KEY_HOME -> { scroll = 0; return true; }
+                case InputConstants.KEY_END -> { scroll = total; clampScroll(total); return true; }
+                default -> { }
+            }
         }
 
         if (awaiting != null) {
@@ -783,23 +803,48 @@ public class NareSettingsScreen extends Screen {
         }
     }
 
-    /** Строка поиска: отдельного поля нет, просто печатаем. */
+    /**
+     * Поле поиска. Отдельного «фокуса» нет: что ни напечатай при открытом
+     * окне — попадёт сюда. Но раз это поиск, он и выглядеть должен полем,
+     * иначе его просто не находят.
+     */
     private void search(GuiGraphics g) {
         int x = px + sideW;
-        int y = py + headH - 13;
+        int y = py + headH - 17;
         int w = pw - sideW - 14;
+        int h = 14;
 
-        if (query.isEmpty()) {
-            if (pw >= 380)
-                g.drawString(font, "печатайте — это поиск по всем разделам",
-                        x + 10, y, 0x55FFFFFF, false);
+        boolean empty = query.isEmpty();
+
+        NareTheme.roundRect(g, x, y, w, h, 4, empty ? 0x18FFFFFF : 0x24FFFFFF);
+        NareTheme.outline(g, x, y, w, h, 4,
+                empty ? 0x1EFFFFFF : NareTheme.alpha(NareTheme.accent(), 0.55f));
+
+        int gx = x + 6;
+        int gy = y + 4;
+        int ring = empty ? NareTheme.DIM : NareTheme.accent();
+        g.fill(gx + 1, gy, gx + 4, gy + 1, ring);
+        g.fill(gx + 1, gy + 4, gx + 4, gy + 5, ring);
+        g.fill(gx, gy + 1, gx + 1, gy + 4, ring);
+        g.fill(gx + 4, gy + 1, gx + 5, gy + 4, ring);
+        g.fill(gx + 5, gy + 5, gx + 7, gy + 7, ring);
+
+        int tx = x + 16;
+        int ty = y + 3;
+
+        if (empty) {
+            g.drawString(font, "Поиск по всем разделам", tx, ty, 0x66FFFFFF, false);
             return;
         }
 
-        NareTheme.bold(g, font, "Поиск: " + query, x + 10, y, NareTheme.accent());
+        g.drawString(font, query, tx, ty, NareTheme.TEXT, false);
 
-        String count = shown().size() + " найдено · Esc — убрать";
-        g.drawString(font, count, x + w - font.width(count) - 6, y, NareTheme.DIM, false);
+        if ((System.currentTimeMillis() / 500) % 2 == 0)
+            g.fill(tx + font.width(query) + 1, ty - 1, tx + font.width(query) + 2, ty + 8,
+                    NareTheme.accent());
+
+        String count = shown().size() + " найдено · Esc";
+        g.drawString(font, count, x + w - font.width(count) - 6, ty, NareTheme.DIM, false);
     }
 
     private void side(GuiGraphics g, int mouseX, int mouseY) {
