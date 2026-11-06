@@ -432,6 +432,8 @@ public class NareSettingsScreen extends Screen {
                         () -> minecraft.setScreen(new NareKeysScreen(this))));
                 list.add(Row.action("Панель: свои и телепорт", "Кто с модом, перенос к ним, возврат блоков",
                         () -> minecraft.setScreen(new NarePanelScreen(this))));
+                list.add(Row.action("FPS+", NareFps.state(),
+                        () -> minecraft.setScreen(new NareFpsScreen(this))));
                 list.add(Row.toggle("Метки сломанного", "Что ломают другие игроки с модом",
                         () -> cfg.showMarks, () -> { cfg.showMarks = !cfg.showMarks; Config.save(); }));
                 list.add(Row.slider("Возвращать пачкой", 1, 128,

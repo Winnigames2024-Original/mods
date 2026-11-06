@@ -95,6 +95,7 @@ public final class ScreenHooks {
         // в своих экранах Shift не перехватываем — там он может назначаться как бинд
         if (screen instanceof NareSettingsScreen) return;
         if (screen instanceof NareClickScreen) return;
+        if (screen instanceof NareFpsScreen) return;
         if (screen instanceof HudEditScreen) return;
         if (screen instanceof NareKeysScreen) return;
 

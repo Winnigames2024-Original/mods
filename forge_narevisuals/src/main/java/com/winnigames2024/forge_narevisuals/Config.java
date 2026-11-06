@@ -188,6 +188,29 @@ public class Config {
     /** Оставить солнце, луну и звёзды поверх своего неба. */
     public boolean skyKeepSun = true;
 
+    // ------------------------------------------------------------ FPS+
+
+    /** Не рисовать лишнее, когда его становится слишком много. */
+    public boolean fpsPlus = false;
+
+    /** Сколько штук терпим, прежде чем начать прятать. 0 — не прятать. */
+    public int fpsTntOver = 24;
+    public int fpsMobsOver = 60;
+    public int fpsItemsOver = 80;
+    public int fpsOrbsOver = 40;
+
+    /** Дальше этого не рисуем ничего. 0 — без ограничения. */
+    public int fpsRange = 0;
+
+    /** Ванильные частицы на минимум, пока FPS+ включён. */
+    public boolean fpsLessParticles = false;
+
+    /** Прятать и игроков тоже. По умолчанию их не трогаем. */
+    public boolean fpsHidePlayers = false;
+
+    /** Виды, которые не рисуем совсем. Ключи реестра. */
+    public java.util.List<String> fpsNever = new java.util.ArrayList<>();
+
     public Map<String, Element> elements = new LinkedHashMap<>();
 
     // ------------------------------------------------------------------
@@ -227,6 +250,7 @@ public class Config {
 
         if (loaded == null) loaded = new Config();
         if (loaded.elements == null) loaded.elements = new LinkedHashMap<>();
+        if (loaded.fpsNever == null) loaded.fpsNever = new java.util.ArrayList<>();
         if (loaded.crosshairImage == null) loaded.crosshairImage = "";
         if (loaded.skyImage == null) loaded.skyImage = "";
         if (loaded.skyPreset == null) loaded.skyPreset = "";

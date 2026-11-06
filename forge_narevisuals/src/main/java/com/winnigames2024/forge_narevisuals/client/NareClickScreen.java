@@ -115,6 +115,10 @@ public class NareClickScreen extends Screen {
                 }));
         world.rows.add(Row.toggle("Метки сломанного", () -> cfg.showMarks,
                 () -> { cfg.showMarks = !cfg.showMarks; Config.save(); }));
+        world.rows.add(Row.toggle("FPS+", () -> cfg.fpsPlus,
+                () -> { cfg.fpsPlus = !cfg.fpsPlus; Config.save(); }));
+        world.rows.add(Row.action("Настроить FPS+",
+                () -> minecraft.setScreen(new NareFpsScreen(this))));
 
         Panel camera = panel("camera", "Камера", 10 + (PANEL_W + 6) * 2, 10);
         camera.rows.add(Row.toggle("Свободная камера", Freecam::active, Freecam::toggle));
