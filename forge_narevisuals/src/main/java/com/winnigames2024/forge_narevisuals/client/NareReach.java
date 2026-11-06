@@ -52,7 +52,6 @@ public final class NareReach {
     /** Что мы в последний раз отправили на сервер — чтобы не слать каждый тик. */
     private static double sentBlocks = -1, sentEntities = -1, sentScale = -1;
 
-    private static int breakCooldown;
     private static int attackCooldown;
 
     private NareReach() { }
@@ -73,10 +72,7 @@ public final class NareReach {
 
         sync(mc, cfg, on);
 
-        if (breakCooldown > 0) breakCooldown--;
         if (attackCooldown > 0) attackCooldown--;
-
-        if (on) areaBreak(mc, cfg);
     }
 
     // ------------------------------------------------------- атрибуты игрока
@@ -157,65 +153,6 @@ public final class NareReach {
     }
 
     // ----------------------------------------------------- ломание областью
-
-    /**
-     * Пока зажата кнопка удара, вместе с блоком под прицелом сносим и соседей.
-     * Плоскость берём перпендикулярно той грани, на которую смотрим — так же,
-     * как работают «молоты» в модах.
-     */
-    private static void areaBreak(Minecraft mc, Config cfg) {
-        if (!cfg.areaBreak) return;
-
-        int size = Math.max(1, cfg.breakSize);
-        int depth = Math.max(1, cfg.breakDepth);
-        if (size <= 1 && depth <= 1) return;
-        if (breakCooldown > 0) return;
-
-        if (mc.screen != null || mc.player == null || mc.level == null) return;
-        if (!mc.options.keyAttack.isDown()) return;
-        if (!(mc.hitResult instanceof BlockHitResult hit)) return;
-        if (hit.getType() != HitResult.Type.BLOCK) return;
-
-        Direction face = hit.getDirection();
-        BlockPos center = hit.getBlockPos();
-        int r = (size - 1) / 2;
-
-        List<BlockPos> picked = new ArrayList<>();
-        for (int a = -r; a <= r; a++) {
-            for (int b = -r; b <= r; b++) {
-                for (int d = 0; d < depth; d++) {
-                    BlockPos pos = shift(center, face, a, b, d);
-                    if (pos.equals(center)) continue;
-                    if (mc.level.getBlockState(pos).isAir()) continue;
-
-                    picked.add(pos);
-                    if (picked.size() >= 96) break;
-                }
-            }
-        }
-
-        if (picked.isEmpty()) { breakCooldown = 4; return; }
-
-        if (NareNet.plugged()) {
-            // на сервере ломает он сам — иначе блоки исчезнут только у нас
-            // на экране, и мы упрёмся в стену, которой не видно
-            NareNet.breakArea(picked);
-        } else {
-            for (BlockPos pos : picked) mc.gameMode.destroyBlock(pos);
-        }
-
-        breakCooldown = 4;
-    }
-
-    /** Сдвиг от центра: a и b — вдоль грани, d — вглубь блока. */
-    private static BlockPos shift(BlockPos center, Direction face, int a, int b, int d) {
-        BlockPos deep = center.relative(face.getOpposite(), d);
-        return switch (face.getAxis()) {
-            case Y -> deep.offset(a, 0, b);
-            case X -> deep.offset(0, a, b);
-            case Z -> deep.offset(a, b, 0);
-        };
-    }
 
     // -------------------------------------------------------- удар областью
 

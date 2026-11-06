@@ -7,9 +7,7 @@ import org.bukkit.Registry;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.Location;
 import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -18,8 +16,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -47,16 +43,6 @@ public final class NareServer extends JavaPlugin implements Listener {
     private double reachEntities;
     private boolean marks;
     private boolean trolls;
-    private boolean area;
-    private int areaMax;
-    private boolean restore;
-    private int restoreMax;
-    private boolean teleport;
-
-    /** Что игрок сломал — чтобы можно было вернуть. Храним снимок блока. */
-    private record Saved(Location where, BlockData what) { }
-
-    private final Map<UUID, Deque<Saved>> history = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -81,7 +67,6 @@ public final class NareServer extends JavaPlugin implements Listener {
             if (player != null) reach(player, 0, 0);
         }
         guests.clear();
-        history.clear();
     }
 
     private void readConfig() {
@@ -89,11 +74,6 @@ public final class NareServer extends JavaPlugin implements Listener {
         reachEntities = getConfig().getDouble("reach.entities", 0);
         marks = getConfig().getBoolean("marks", true);
         trolls = getConfig().getBoolean("trolls", true);
-        area = getConfig().getBoolean("area.enabled", true);
-        areaMax = getConfig().getInt("area.max", 128);
-        restore = getConfig().getBoolean("restore.enabled", true);
-        restoreMax = getConfig().getInt("restore.max", 512);
-        teleport = getConfig().getBoolean("teleport", true);
     }
 
     public boolean trollsAllowed() {
@@ -126,7 +106,6 @@ public final class NareServer extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        history.remove(event.getPlayer().getUniqueId());
         if (guests.remove(event.getPlayer().getUniqueId()) == null) return;
         reach(event.getPlayer(), 0, 0);
         broadcastPlayers();
@@ -190,8 +169,6 @@ public final class NareServer extends JavaPlugin implements Listener {
         Block block = event.getBlock();
         String who = event.getPlayer().getName();
 
-        remember(event.getPlayer(), block);
-
         for (UUID id : guests.keySet()) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) continue;
@@ -200,141 +177,6 @@ public final class NareServer extends JavaPlugin implements Listener {
             channel.sendMark(player, who,
                     block.getX(), block.getY(), block.getZ());
         }
-    }
-
-    // --------------------------------------------------------- область
-
-    /**
-     * Ломает блоки, которые клиент захватил областью.
-     *
-     * Ломаем через player.breakBlock — то есть ровно так, как если бы игрок
-     * ударил по блоку сам: срабатывает BlockBreakEvent, а значит защиты
-     * вроде WorldGuard могут это отменить, и дроп падает по обычным правилам.
-     * Своей дырки в чужом регионе так не выйдет, и это правильно.
-     */
-    public void onBreakArea(Player player, int[][] blocks) {
-        if (!area || blocks.length == 0) return;
-        if (!player.hasPermission("narevisuals.area")) return;
-
-        Guest guest = guests.get(player.getUniqueId());
-        if (guest == null) return;
-
-        double limit = reachBlocks > 0 ? reachBlocks + 2 : 8;
-        double limitSq = limit * limit;
-
-        var world = player.getWorld();
-        var eye = player.getEyeLocation();
-
-        int done = 0;
-        for (int[] at : blocks) {
-            if (done >= areaMax) break;
-
-            Block block = world.getBlockAt(at[0], at[1], at[2]);
-            if (block.getType().isAir()) continue;
-            if (block.getLocation().add(0.5, 0.5, 0.5).distanceSquared(eye) > limitSq) continue;
-
-            BlockData before = block.getBlockData();
-            if (player.breakBlock(block)) {
-                keep(player, new Saved(block.getLocation(), before));
-                done++;
-            }
-        }
-
-        if (done > 0 && marks) {
-            for (UUID id : guests.keySet()) {
-                Player other = Bukkit.getPlayer(id);
-                if (other == null || !other.getWorld().equals(world)) continue;
-
-                channel.sendMark(other, player.getName(),
-                        blocks[0][0], blocks[0][1], blocks[0][2]);
-            }
-        }
-    }
-
-    // ------------------------------------------------------- восстановление
-
-    private void remember(Player player, Block block) {
-        if (!restore) return;
-        if (!guests.containsKey(player.getUniqueId())) return;
-
-        keep(player, new Saved(block.getLocation(), block.getBlockData()));
-    }
-
-    private void keep(Player player, Saved saved) {
-        if (!restore) return;
-
-        Deque<Saved> list = history.computeIfAbsent(player.getUniqueId(), id -> new ArrayDeque<>());
-        list.addLast(saved);
-
-        while (list.size() > restoreMax) list.removeFirst();
-    }
-
-    /**
-     * Возвращает на место последние сломанные блоки.
-     *
-     * Ставим только туда, где сейчас пусто: если игрок успел там что-то
-     * построить, его постройку мы не затрём — лучше вернуть меньше, чем
-     * сломать чужую работу.
-     */
-    public void onRestore(Player player, int count) {
-        if (!restore) return;
-        if (!player.hasPermission("narevisuals.restore")) {
-            channel.sendInfo(player, "Нет права на восстановление.");
-            return;
-        }
-
-        Deque<Saved> list = history.get(player.getUniqueId());
-        if (list == null || list.isEmpty()) {
-            channel.sendInfo(player, "Возвращать нечего.");
-            return;
-        }
-
-        int want = Math.max(1, Math.min(count, restoreMax));
-        int done = 0, busy = 0;
-
-        while (done + busy < want && !list.isEmpty()) {
-            Saved saved = list.removeLast();
-            Block block = saved.where().getBlock();
-
-            if (!block.getType().isAir()) { busy++; continue; }
-
-            block.setBlockData(saved.what(), false);
-            done++;
-        }
-
-        channel.sendInfo(player, busy == 0
-                ? "Вернул блоков: " + done
-                : "Вернул блоков: " + done + ", занято другим: " + busy);
-    }
-
-    // ---------------------------------------------------------- телепорт
-
-    /**
-     * Телепорт к игроку с модом. Только к своим: к тем, у кого мод тоже
-     * стоит, и только если сервер это разрешил, а у игрока есть право.
-     */
-    public void onTeleport(Player player, String targetName) {
-        if (!teleport) return;
-
-        if (!player.hasPermission("narevisuals.tp")) {
-            channel.sendInfo(player, "Нет права на телепорт.");
-            return;
-        }
-
-        Player target = Bukkit.getPlayerExact(targetName);
-        if (target == null || target.equals(player)) {
-            channel.sendInfo(player, "Такого игрока нет рядом.");
-            return;
-        }
-
-        if (!guests.containsKey(target.getUniqueId())) {
-            channel.sendInfo(player, "У этого игрока нет мода.");
-            return;
-        }
-
-        player.teleport(target);
-        channel.sendInfo(player, "Перенёс к " + target.getName());
-        channel.sendInfo(target, player.getName() + " телепортировался к вам");
     }
 
     // ---------------------------------------------------------------- шутки

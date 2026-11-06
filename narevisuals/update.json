@@ -1,8 +1,8 @@
 {
-  "version": "1.4.0",
-  "file": "forge_narevisuals-1.4.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.4.0.jar",
-  "sha1": "48d0d638b3c5dac46b442d23077113e2d1c9c8af",
-  "size": 686085,
-  "notes": "видимое поле поиска, окно настроек выше, список листается и с клавиатуры"
+  "version": "1.5.0",
+  "file": "forge_narevisuals-1.5.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.5.0.jar",
+  "sha1": "07ed5348ecc0eb6108f76fa049165b31edb6e0f3",
+  "size": 685991,
+  "notes": "выбор темы оформления, ломание областью убрано"
 }

@@ -38,6 +38,12 @@ public class Config {
     public boolean hitMarker = true;
     public int accent = 0xFF5E86FF;
 
+    /** Имя выбранной темы оформления. */
+    public String theme = "Полночь";
+
+    /** Акцент выбран руками — тема его больше не трогает. */
+    public boolean ownAccent = false;
+
     /** Скруглять углы карточек. */
     public boolean rounded = true;
 
@@ -121,8 +127,6 @@ public class Config {
     /** Показывать подсказку с управлением. */
     /** Сколько блоков возвращать кнопкой «вернуть пачкой». */
     public int restoreBatch = 16;
-    /** Ломать область вообще. Выключатель поверх размера. */
-    public boolean areaBreak = true;
     /** Бить по области вообще. */
     public boolean areaAttack = true;
     /** Показывать метки сломанного от других игроков. */
@@ -143,10 +147,6 @@ public class Config {
     public int reachEntities = 0;
     /** Держать дальность не только в свободной камере, но и всегда. */
     public boolean reachAlways = false;
-    /** Сторона области ломания: 1 — обычный блок, 3 — 3x3 и так далее. */
-    public int breakSize = 1;
-    /** На сколько блоков вглубь. */
-    public int breakDepth = 1;
     /** Радиус удара по области. 0 — бьём только по цели. */
     public int attackArea = 0;
     /** Размер персонажа в процентах. */

@@ -42,7 +42,6 @@ public final class NareNet {
 
     private static final byte C2S_HELLO = 1;
     private static final byte C2S_TROLL = 2;
-    private static final byte C2S_BREAK = 3;
     private static final byte C2S_RESTORE = 4;
     private static final byte C2S_TP = 5;
 
@@ -263,27 +262,6 @@ public final class NareNet {
         buf.writeInt(PROTOCOL);
         putText(buf, Forge_narevisuals.VERSION);
         buf.writeBoolean(weAllowFun());
-        send(buf);
-    }
-
-    /**
-     * Просим сервер сломать область. Сам клиент этого не может: он уберёт
-     * блоки только у себя на экране, сервер их оставит, и игрок упрётся в
-     * стену, которой не видно.
-     */
-    public static void breakArea(java.util.List<net.minecraft.core.BlockPos> blocks) {
-        if (!serverHasPlugin || blocks.isEmpty()) return;
-
-        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
-        buf.writeByte(C2S_BREAK);
-        buf.writeInt(blocks.size());
-
-        for (net.minecraft.core.BlockPos pos : blocks) {
-            buf.writeInt(pos.getX());
-            buf.writeInt(pos.getY());
-            buf.writeInt(pos.getZ());
-        }
-
         send(buf);
     }
 

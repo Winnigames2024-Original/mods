@@ -206,8 +206,6 @@ public class NareSettingsScreen extends Screen {
                         Freecam::active, Freecam::toggle));
                 list.add(Row.toggle("Приближение", null,
                         () -> cfg.zoomEnabled, () -> { cfg.zoomEnabled = !cfg.zoomEnabled; Config.save(); }));
-                list.add(Row.toggle("Ломать область", null,
-                        () -> cfg.areaBreak, () -> { cfg.areaBreak = !cfg.areaBreak; Config.save(); }));
                 list.add(Row.toggle("Бить по области", null,
                         () -> cfg.areaAttack, () -> { cfg.areaAttack = !cfg.areaAttack; Config.save(); }));
                 list.add(Row.toggle("Дальность всегда", "А не только в свободной камере",
@@ -260,7 +258,10 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.hitMarker, () -> { cfg.hitMarker = !cfg.hitMarker; Config.save(); }));
                 list.add(Row.toggle("Ресурспак интерфейса", "Применится после перезапуска",
                         () -> cfg.resourcePack, () -> { cfg.resourcePack = !cfg.resourcePack; Config.save(); }));
-                list.add(Row.accent("Цвет акцента", null));
+                list.add(Row.action("Тема", NareTheme.themeByName(cfg.theme).name,
+                        NareTheme::nextTheme));
+                list.add(Row.accent("Цвет акцента",
+                        cfg.ownAccent ? "выбран вручную" : "от темы"));
             }
             case 4 -> {
                 list.add(Row.label("Главное меню игры"));
@@ -384,17 +385,8 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.reachAlways, () -> { cfg.reachAlways = !cfg.reachAlways; Config.save(); }));
                 list.add(Row.label("Поднимает дальность только там, где сервер наш"));
 
-                list.add(Row.toggle("Ломать область", "Общий выключатель",
-                        () -> cfg.areaBreak, () -> { cfg.areaBreak = !cfg.areaBreak; Config.save(); }));
                 list.add(Row.toggle("Бить по области", "Общий выключатель",
                         () -> cfg.areaAttack, () -> { cfg.areaAttack = !cfg.areaAttack; Config.save(); }));
-                list.add(Row.slider("Размер области", 1, 15,
-                        () -> cfg.breakSize,
-                        v -> { cfg.breakSize = v % 2 == 0 ? v + 1 : v; Config.save(); },
-                        v -> v <= 1 ? "один блок" : v + "x" + v));
-                list.add(Row.slider("Глубина", 1, 5,
-                        () -> cfg.breakDepth, v -> { cfg.breakDepth = v; Config.save(); },
-                        v -> v + " бл."));
                 list.add(Row.slider("Удар по области", 0, 8,
                         () -> cfg.attackArea, v -> { cfg.attackArea = v; Config.save(); },
                         v -> v <= 0 ? "только цель" : v + " бл."));
@@ -576,6 +568,7 @@ public class NareSettingsScreen extends Screen {
                 for (int c = 0; c < ACCENTS.length; c++) {
                     if (mx >= sx + c * 15 && mx <= sx + c * 15 + 12) {
                         Config.get().accent = ACCENTS[c];
+                        Config.get().ownAccent = true;
                         Config.save();
                         return true;
                     }
