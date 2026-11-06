@@ -1,8 +1,8 @@
 {
-  "version": "1.2.0",
-  "file": "forge_narevisuals-1.2.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.2.0.jar",
-  "sha1": "79d9b66b8534fc5117ef731f65be200a933e9e65",
-  "size": 684215,
-  "notes": "поиск по настройкам, панель своих с телепортом, возврат сломанного"
+  "version": "1.3.0",
+  "file": "forge_narevisuals-1.3.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.3.0.jar",
+  "sha1": "574ea44c679825ce664df6f42dae63ec566ceb35",
+  "size": 685682,
+  "notes": "вкладка «Функции» — все возможности мода одним списком"
 }

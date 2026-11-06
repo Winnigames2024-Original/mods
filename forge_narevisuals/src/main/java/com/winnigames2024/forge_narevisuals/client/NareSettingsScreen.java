@@ -35,7 +35,7 @@ public class NareSettingsScreen extends Screen {
             0xFFF0B446, 0xFFFF5C5C, 0xFF36C8D8, 0xFFE8EEF8
     };
 
-    private static final String[] TABS = { "Быстро", "Элементы", "Вид", "Меню", "Мир", "Камера", "Бинды", "Ещё" };
+    private static final String[] TABS = { "Быстро", "Функции", "Элементы", "Вид", "Меню", "Мир", "Камера", "Бинды", "Ещё" };
 
     private static final String[] SKY_PRESETS = { "nebula", "sunset", "aurora", "dawn", "void" };
     private static final String[] SKY_TITLES = { "Туманность", "Закат", "Сияние", "Рассвет", "Пустота" };
@@ -171,6 +171,61 @@ public class NareSettingsScreen extends Screen {
                             near::isEnabled, () -> { near.setEnabled(!near.isEnabled()); Config.save(); }));
             }
             case 1 -> {
+                list.add(Row.label("Что рисуем"));
+                list.add(Row.toggle("HUD", "Все элементы разом",
+                        () -> cfg.hudEnabled, () -> { cfg.hudEnabled = !cfg.hudEnabled; Config.save(); }));
+                list.add(Row.toggle("Своё главное меню", null,
+                        () -> cfg.customMenu, () -> { cfg.customMenu = !cfg.customMenu; Config.save(); }));
+                list.add(Row.toggle("Свой ресурспак", "Кнопки, поля, ползунки",
+                        () -> cfg.resourcePack, () -> { cfg.resourcePack = !cfg.resourcePack; Config.save(); }));
+                list.add(Row.toggle("Свой прицел", null,
+                        () -> cfg.customCrosshair, () -> { cfg.customCrosshair = !cfg.customCrosshair; Config.save(); }));
+                list.add(Row.toggle("Своё небо", null,
+                        () -> cfg.customSky, () -> { cfg.customSky = !cfg.customSky; Config.save(); }));
+
+                list.add(Row.label("Что видим в мире"));
+                list.add(Row.toggle("Подсветка игроков", null,
+                        () -> cfg.playerEsp, () -> { cfg.playerEsp = !cfg.playerEsp; Config.save(); }));
+                list.add(Row.toggle("Подсветка существ", null,
+                        () -> cfg.espMobs, () -> { cfg.espMobs = !cfg.espMobs; Config.save(); }));
+                list.add(Row.toggle("Подсветка блока", null,
+                        () -> cfg.blockHighlight, () -> { cfg.blockHighlight = !cfg.blockHighlight; Config.save(); }));
+                list.add(Row.toggle("Яркость", "Гамма и ночное зрение",
+                        () -> cfg.fullbright || cfg.nightVision,
+                        () -> {
+                            boolean on = !(cfg.fullbright || cfg.nightVision);
+                            cfg.fullbright = on;
+                            cfg.nightVision = on;
+                            Config.save();
+                        }));
+                list.add(Row.toggle("Метки сломанного", "Что ломают другие с модом",
+                        () -> cfg.showMarks, () -> { cfg.showMarks = !cfg.showMarks; Config.save(); }));
+
+                list.add(Row.label("Камера и действия"));
+                list.add(Row.toggle("Свободная камера", "Прямо сейчас",
+                        Freecam::active, Freecam::toggle));
+                list.add(Row.toggle("Приближение", null,
+                        () -> cfg.zoomEnabled, () -> { cfg.zoomEnabled = !cfg.zoomEnabled; Config.save(); }));
+                list.add(Row.toggle("Ломать область", null,
+                        () -> cfg.areaBreak, () -> { cfg.areaBreak = !cfg.areaBreak; Config.save(); }));
+                list.add(Row.toggle("Бить по области", null,
+                        () -> cfg.areaAttack, () -> { cfg.areaAttack = !cfg.areaAttack; Config.save(); }));
+                list.add(Row.toggle("Дальность всегда", "А не только в свободной камере",
+                        () -> cfg.reachAlways, () -> { cfg.reachAlways = !cfg.reachAlways; Config.save(); }));
+
+                list.add(Row.label("Сервер"));
+                list.add(Row.toggle("Автовход", "Команда и пароль — в «Ещё»",
+                        () -> cfg.autoLogin, () -> { cfg.autoLogin = !cfg.autoLogin; Config.save(); }));
+                list.add(Row.action("Панель: свои и телепорт", NareNet.plugged()
+                                ? "Плагин на сервере есть" : "Нужен плагин на сервере",
+                        () -> minecraft.setScreen(new NarePanelScreen(this))));
+                list.add(Row.label(NareNet.weAllowFun()
+                        ? "Шутки разрешены аргументом запуска"
+                        : "Шутки выключены: нет аргумента --funtrolls2026"));
+
+                list.add(Row.label("Подробности — в соседних разделах"));
+            }
+            case 2 -> {
                 for (HudModule module : NareHud.MODULES) {
                     final HudModule m = module;
                     list.add(Row.toggle(m.title, null, m::isEnabled, () -> {
@@ -179,7 +234,7 @@ public class NareSettingsScreen extends Screen {
                     }));
                 }
             }
-            case 2 -> {
+            case 3 -> {
                 int maxScale = Math.max(1, minecraft.getWindow().calculateScale(0, false));
                 int liveScale = minecraft.options.guiScale().get();
 
@@ -207,7 +262,7 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.resourcePack, () -> { cfg.resourcePack = !cfg.resourcePack; Config.save(); }));
                 list.add(Row.accent("Цвет акцента", null));
             }
-            case 3 -> {
+            case 4 -> {
                 list.add(Row.label("Главное меню игры"));
                 list.add(Row.toggle("Своё главное меню", "Плоский список вместо ванильных кнопок",
                         () -> cfg.customMenu, () -> { cfg.customMenu = !cfg.customMenu; Config.save(); }));
@@ -235,7 +290,7 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.toggle("Свечение у горизонта", "Подсвечивается цветом акцента",
                         () -> cfg.menuGlow, () -> { cfg.menuGlow = !cfg.menuGlow; Config.save(); }));
             }
-            case 4 -> {
+            case 5 -> {
                 list.add(Row.label("Игроки"));
                 list.add(Row.toggle("Подсветка игроков",
                         NareKeys.TOGGLE_ESP.getTranslatedKeyMessage().getString() + " — быстрый выключатель",
@@ -283,7 +338,7 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.toggle("Ночное зрение", "Эффект только на клиенте",
                         () -> cfg.nightVision, () -> { cfg.nightVision = !cfg.nightVision; Config.save(); }));
             }
-            case 5 -> {
+            case 6 -> {
                 list.add(Row.label("Прицел"));
                 list.add(Row.toggle("Свой прицел", null,
                         () -> cfg.customCrosshair, () -> {
@@ -362,7 +417,7 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.toggle("Оставить солнце и звёзды", null,
                         () -> cfg.skyKeepSun, () -> { cfg.skyKeepSun = !cfg.skyKeepSun; Config.save(); }));
             }
-            case 6 -> {
+            case 7 -> {
                 list.add(Row.label("Клавиши мода"));
                 for (int i = 0; i < NareKeys.ALL.length; i++)
                     list.add(Row.key(NareKeys.TITLES[i], NareKeys.ALL[i]));
