@@ -258,6 +258,13 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.hitMarker, () -> { cfg.hitMarker = !cfg.hitMarker; Config.save(); }));
                 list.add(Row.toggle("Ресурспак интерфейса", "Применится после перезапуска",
                         () -> cfg.resourcePack, () -> { cfg.resourcePack = !cfg.resourcePack; Config.save(); }));
+                list.add(Row.action("Тип меню", NareMenus.style() + " · " + NareMenus.hint(),
+                        () -> {
+                            NareMenus.next();
+                            // переключились на панели — показываем их сразу
+                            if (NareMenus.panels())
+                                minecraft.setScreen(new NareClickScreen(parent));
+                        }));
                 list.add(Row.action("Тема", NareTheme.themeByName(cfg.theme).name,
                         NareTheme::nextTheme));
                 list.add(Row.accent("Цвет акцента",

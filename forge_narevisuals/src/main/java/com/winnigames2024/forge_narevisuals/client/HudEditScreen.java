@@ -105,6 +105,15 @@ public class HudEditScreen extends Screen {
         minecraft.setScreen(parent);
     }
 
+    /**
+     * Игру не затемняем и не размываем. Элементы двигают, чтобы посмотреть,
+     * как они лягут поверх живой картинки, а не поверх серого прямоугольника.
+     */
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // ничего: пусть будет видно саму игру
+    }
+
     @Override
     public boolean isPauseScreen() {
         return false;

@@ -1,6 +1,14 @@
 {
-  "latest": "1.5.0",
+  "latest": "1.6.0",
   "releases": [
+    {
+      "version": "1.6.0",
+      "file": "forge_narevisuals-1.6.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.6.0.jar",
+      "sha1": "533cf2b00776e5e02fe39a26f52d11c8a7716587",
+      "size": 696909,
+      "notes": "панельное меню как в клиентах, клавиша передвижения элементов"
+    },
     {
       "version": "1.5.0",
       "file": "forge_narevisuals-1.5.0.jar",

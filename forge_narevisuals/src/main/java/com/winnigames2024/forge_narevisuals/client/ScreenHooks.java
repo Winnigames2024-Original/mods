@@ -47,7 +47,7 @@ public final class ScreenHooks {
         int[] spot = freeSpot(screen);
 
         Button button = Button.builder(Component.literal(Forge_narevisuals.NAME), b ->
-                Minecraft.getInstance().setScreen(new NareSettingsScreen(screen))
+                Minecraft.getInstance().setScreen(NareMenus.open(screen))
         ).bounds(spot[0], spot[1], BW, BH).build();
 
         event.addListener(button);
@@ -94,13 +94,14 @@ public final class ScreenHooks {
 
         // в своих экранах Shift не перехватываем — там он может назначаться как бинд
         if (screen instanceof NareSettingsScreen) return;
+        if (screen instanceof NareClickScreen) return;
         if (screen instanceof HudEditScreen) return;
         if (screen instanceof NareKeysScreen) return;
 
         // не мешаем вводу текста (чат, поиск, переименование)
         if (screen.getFocused() instanceof EditBox) return;
 
-        Minecraft.getInstance().setScreen(new NareSettingsScreen(screen));
+        Minecraft.getInstance().setScreen(NareMenus.open(screen));
         event.setCanceled(true);
     }
 }

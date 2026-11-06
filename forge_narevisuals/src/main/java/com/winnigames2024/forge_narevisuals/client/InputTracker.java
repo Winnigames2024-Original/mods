@@ -53,7 +53,7 @@ public final class InputTracker {
         Config cfg = Config.get();
 
         if (NareKeys.OPEN_SETTINGS.isDown()) {
-            mc.setScreen(new NareSettingsScreen(null));
+            mc.setScreen(NareMenus.open(null));
         } else if (NareKeys.TOGGLE_HUD.isDown()) {
             cfg.hudEnabled = !cfg.hudEnabled;
             Config.save();
@@ -73,6 +73,8 @@ public final class InputTracker {
             cfg.customSky = !cfg.customSky;
             Config.save();
             note(mc, "Своё небо: " + onOff(cfg.customSky));
+        } else if (NareKeys.MOVE_HUD.isDown()) {
+            mc.setScreen(new HudEditScreen(null));
         } else if (NareKeys.TOGGLE_NEAR.isDown()) {
             HudModule near = NareHud.byId("players");
             if (near != null) {
