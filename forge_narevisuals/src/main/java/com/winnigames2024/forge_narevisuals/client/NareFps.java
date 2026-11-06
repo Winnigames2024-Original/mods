@@ -49,6 +49,11 @@ public final class NareFps {
 
     private static ParticleStatus savedParticles;
 
+    // бюджет частиц на тик и счётчик взрывных звуков
+    private static int particlesThisTick;
+    private static int particlesDropped;
+    private static final java.util.ArrayDeque<Long> booms = new java.util.ArrayDeque<>();
+
     private NareFps() { }
 
     /** Виды, которые можно выключить списком. Ключ реестра плюс подпись. */
@@ -112,6 +117,53 @@ public final class NareFps {
         return hidden.contains(entity.getId());
     }
 
+    /**
+     * Можно ли добавить ещё одну частицу. Зовётся из миксина на каждую.
+     *
+     * Полсотни динамита разом — десятки тысяч частиц за тик, и кадр встаёт
+     * колом именно на них. Первые сотни рисуют взрыв целиком, остальные
+     * ложатся поверх и видны только счётчику кадров.
+     */
+    public static boolean allowParticle() {
+        Config cfg = Config.get();
+        if (!cfg.fpsPlus || !cfg.fpsExplosions) return true;
+        if (cfg.fpsParticleBudget <= 0) return true;
+
+        if (particlesThisTick >= cfg.fpsParticleBudget) {
+            particlesDropped++;
+            return false;
+        }
+
+        particlesThisTick++;
+        return true;
+    }
+
+    /**
+     * Звук взрыва. Когда их десяток разом, они не складываются во что-то
+     * осмысленное — только рвут микшер и подтормаживают. Лишние глушим.
+     */
+    @SubscribeEvent
+    public static void onSound(net.minecraftforge.client.event.sound.PlaySoundEvent event) {
+        Config cfg = Config.get();
+        if (!cfg.fpsPlus || !cfg.fpsExplosions || cfg.fpsBoomsAtOnce <= 0) return;
+
+        var sound = event.getSound();
+        if (sound == null) return;
+
+        String name = sound.getLocation() == null ? "" : sound.getLocation().getPath();
+        if (name.indexOf("explode") < 0 && name.indexOf("explosion") < 0) return;
+
+        long now = System.currentTimeMillis();
+        while (!booms.isEmpty() && now - booms.peekFirst() > 400L) booms.pollFirst();
+
+        if (booms.size() >= cfg.fpsBoomsAtOnce) {
+            event.setSound(null);
+            return;
+        }
+
+        booms.addLast(now);
+    }
+
     // --------------------------------------------------------------- тик
 
     @SubscribeEvent
@@ -122,6 +174,9 @@ public final class NareFps {
         Config cfg = Config.get();
 
         particles(mc, cfg);
+
+        // бюджет частиц начинается заново каждый тик
+        particlesThisTick = 0;
 
         if (!cfg.fpsPlus || mc.level == null || mc.player == null) {
             if (!hidden.isEmpty()) hidden = new HashSet<>();
@@ -229,6 +284,18 @@ public final class NareFps {
         if (!working) return "не включился — отсечение недоступно";
         if (hiddenCount == 0) return "включён, прятать нечего";
         return "включён, скрыто " + hiddenCount;
+    }
+
+    public static String boomText(int value) {
+        return value <= 0 ? "не ограничивать" : value + " разом";
+    }
+
+    public static String budgetText(int value) {
+        return value <= 0 ? "не ограничивать" : value + " за тик";
+    }
+
+    public static String droppedText() {
+        return particlesDropped == 0 ? "" : "частиц отброшено: " + particlesDropped;
     }
 
     public static String counts() {

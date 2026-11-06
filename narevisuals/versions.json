@@ -1,6 +1,14 @@
 {
-  "latest": "1.7.0",
+  "latest": "1.9.0",
   "releases": [
+    {
+      "version": "1.9.0",
+      "file": "forge_narevisuals-1.9.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.9.0.jar",
+      "sha1": "9391622e7d32807d9ddf51361ce996662c09abcf",
+      "size": 715602,
+      "notes": "взрывы не вешают игру, меню стало удобнее"
+    },
     {
       "version": "1.7.0",
       "file": "forge_narevisuals-1.7.0.jar",
@@ -40,14 +48,6 @@
       "sha1": "574ea44c679825ce664df6f42dae63ec566ceb35",
       "size": 685682,
       "notes": "вкладка «Функции» — все возможности одним списком"
-    },
-    {
-      "version": "1.2.0",
-      "file": "forge_narevisuals-1.2.0.jar",
-      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.2.0.jar",
-      "sha1": "79d9b66b8534fc5117ef731f65be200a933e9e65",
-      "size": 684215,
-      "notes": "поиск по настройкам, панель своих с телепортом, возврат сломанного"
     }
   ]
 }

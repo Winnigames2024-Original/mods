@@ -205,6 +205,15 @@ public class Config {
     /** Ванильные частицы на минимум, пока FPS+ включён. */
     public boolean fpsLessParticles = false;
 
+    /** Беречь кадры на взрывах: предел частиц и одновременных «бумов». */
+    public boolean fpsExplosions = true;
+
+    /** Сколько частиц разрешаем добавить за тик. 0 — не ограничивать. */
+    public int fpsParticleBudget = 600;
+
+    /** Сколько звуков взрыва звучит разом. 0 — не ограничивать. */
+    public int fpsBoomsAtOnce = 4;
+
     /** Прятать и игроков тоже. По умолчанию их не трогаем. */
     public boolean fpsHidePlayers = false;
 

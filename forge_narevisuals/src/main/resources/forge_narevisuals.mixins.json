@@ -9,7 +9,8 @@
   "client": [
     "SkyRendererMixin",
     "GameRendererMixin",
-    "EntityCullMixin"
+    "EntityCullMixin",
+    "ParticleEngineMixin"
   ],
   "injectors": {
     "defaultRequire": 0

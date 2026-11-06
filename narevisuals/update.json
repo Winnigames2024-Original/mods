@@ -1,8 +1,8 @@
 {
-  "version": "1.7.0",
-  "file": "forge_narevisuals-1.7.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.7.0.jar",
-  "sha1": "58297e33fb8ca220d025eba7c827c506c0e81816",
-  "size": 712135,
-  "notes": "FPS+ — не рисовать лишнее, когда его много"
+  "version": "1.9.0",
+  "file": "forge_narevisuals-1.9.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.9.0.jar",
+  "sha1": "9391622e7d32807d9ddf51361ce996662c09abcf",
+  "size": 715602,
+  "notes": "взрывы не вешают игру, меню стало удобнее"
 }

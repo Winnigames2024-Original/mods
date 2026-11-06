@@ -81,6 +81,26 @@ public class NareFpsScreen extends Screen {
         list.add(slider("Шарики опыта", null,
                 0, 300, () -> cfg.fpsOrbsOver, v -> { cfg.fpsOrbsOver = v; Config.save(); }));
 
+        list.add(new Row(Row.Kind.LABEL, "Взрывы", null));
+
+        Row boom = new Row(Row.Kind.TOGGLE, "Беречь кадры на взрывах",
+                "Предел частиц и одновременных «бумов»");
+        boom.state = () -> cfg.fpsExplosions;
+        boom.act = () -> { cfg.fpsExplosions = !cfg.fpsExplosions; Config.save(); };
+        list.add(boom);
+
+        Row budget = slider("Частиц за тик", "Взрыв всё равно виден",
+                0, 3000, () -> cfg.fpsParticleBudget,
+                v -> { cfg.fpsParticleBudget = v; Config.save(); });
+        budget.text = NareFps::budgetText;
+        list.add(budget);
+
+        Row booms = slider("Звуков взрыва разом", "Лишние глушим",
+                0, 16, () -> cfg.fpsBoomsAtOnce,
+                v -> { cfg.fpsBoomsAtOnce = v; Config.save(); });
+        booms.text = NareFps::boomText;
+        list.add(booms);
+
         list.add(new Row(Row.Kind.LABEL, "Ещё", null));
 
         Row range = slider("Дальше этого не рисовать", "Для всего разом",
@@ -109,6 +129,9 @@ public class NareFpsScreen extends Screen {
         }
 
         list.add(new Row(Row.Kind.LABEL, "Сейчас вокруг: " + NareFps.counts(), null));
+
+        String dropped = NareFps.droppedText();
+        if (!dropped.isEmpty()) list.add(new Row(Row.Kind.LABEL, dropped, null));
 
         return list;
     }

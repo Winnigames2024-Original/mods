@@ -101,9 +101,15 @@ public class NareSettingsScreen extends Screen {
     private final Screen parent;
     private final Map<String, Float> knobs = new HashMap<>();
 
+    /** Какой раздел был открыт в прошлый раз — возвращаемся туда же. */
+    private static int lastTab;
+
     private int tab;
     private int scroll;
     private int dragging = -1;
+
+    /** Тянем полосу прокрутки мышью. */
+    private boolean scrollDrag;
 
     /** Выбранный, но ещё не применённый масштаб интерфейса. -1 — ничего не меняли. */
     private int pendingScale = -1;
@@ -121,6 +127,8 @@ public class NareSettingsScreen extends Screen {
     public NareSettingsScreen(Screen parent) {
         super(Component.literal(Forge_narevisuals.NAME));
         this.parent = parent;
+
+        if (lastTab >= 0 && lastTab < TABS.length) tab = lastTab;
     }
 
     // ---------------------------------------------------------------- строки
@@ -548,13 +556,31 @@ public class NareSettingsScreen extends Screen {
 
         for (int i = 0; i < TABS.length; i++) {
             if (inside(mx, my, px + 10, py + headH + i * tabH, sideW - 18, tabH - 4)) {
-                if (tab != i) { tab = i; scroll = 0; }
+                if (tab != i) { tab = i; lastTab = i; scroll = 0; }
                 return true;
             }
         }
 
         if (inside(mx, my, px + pw - 94, py + ph - 30, 84, 22)) {
             onClose();
+            return true;
+        }
+
+        // крестик в строке поиска
+        if (!query.isEmpty()
+                && inside(mx, my, px + pw - 20, py + headH - 18, 16, 16)) {
+            query = "";
+            scroll = 0;
+            return true;
+        }
+
+        // полоса прокрутки: тянем ползунок или прыгаем щелчком по дорожке
+        int total = shown().size();
+        if (total > visibleRows()
+                && mx >= px + pw - 10 && mx <= px + pw - 3
+                && my >= py + headH && my <= py + headH + visibleRows() * ROW_H) {
+            scrollDrag = true;
+            scrollTo(my, total);
             return true;
         }
 
@@ -636,6 +662,16 @@ public class NareSettingsScreen extends Screen {
                 return true;
             }
 
+            // Tab переходит к следующему разделу, Shift+Tab — к прежнему
+            if (keyCode == InputConstants.KEY_TAB) {
+                boolean back = (modifiers & 1) != 0;   // Shift
+                tab = (tab + (back ? TABS.length - 1 : 1)) % TABS.length;
+                lastTab = tab;
+                scroll = 0;
+                query = "";
+                return true;
+            }
+
             // список листается и с клавиатуры: не у всех мышей доходит колесо
             int total = shown().size();
             switch (keyCode) {
@@ -698,6 +734,12 @@ public class NareSettingsScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (scrollDrag) {
+            measure();
+            scrollTo(my, shown().size());
+            return true;
+        }
+
         if (dragging >= 0) {
             measure();
             var list = shown();
@@ -714,7 +756,24 @@ public class NareSettingsScreen extends Screen {
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
         dragging = -1;
+        scrollDrag = false;
         return super.mouseReleased(mx, my, button);
+    }
+
+    /** Ставит список так, чтобы ползунок оказался под курсором. */
+    private void scrollTo(double my, int total) {
+        int shownRows = visibleRows();
+        if (total <= shownRows) return;
+
+        int trackY = py + headH;
+        int trackH = shownRows * ROW_H - 4;
+
+        float k = (float) ((my - trackY) / Math.max(1, trackH));
+        if (k < 0f) k = 0f;
+        if (k > 1f) k = 1f;
+
+        scroll = Math.round(k * (total - shownRows));
+        clampScroll(total);
     }
 
     /** Попал ли курсор в дорожку ползунка — с небольшим запасом по краям. */
@@ -742,11 +801,38 @@ public class NareSettingsScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (sy != 0) {
-            scroll -= (int) Math.signum(sy);
-            clampScroll(shown().size());
+        if (sy == 0) return true;
+
+        // колесо над ползунком двигает его, а не список: так точнее
+        Row under = rowAt(mx, my);
+        if (under != null && under.kind == Row.Kind.SLIDER) {
+            int step = Math.max(1, (under.max - under.min) / 40);
+            int value = under.get.getAsInt() + (int) Math.signum(sy) * step;
+            under.set.accept(Math.max(under.min, Math.min(under.max, value)));
+            return true;
         }
+
+        scroll -= (int) Math.signum(sy);
+        clampScroll(shown().size());
         return true;
+    }
+
+    /** Строка под курсором или null. Нужна и колесу, и подсказкам. */
+    private Row rowAt(double mx, double my) {
+        measure();
+
+        int cx = px + sideW;
+        int cw = pw - sideW - 14;
+        if (mx < cx || mx > cx + cw) return null;
+
+        var list = shown();
+        int limit = Math.min(list.size() - scroll, visibleRows());
+
+        for (int i = 0; i < limit; i++) {
+            int ry = py + headH + i * ROW_H;
+            if (my >= ry && my < ry + ROW_H - 2) return list.get(i + scroll);
+        }
+        return null;
     }
 
     private void clampScroll(int total) {
@@ -845,8 +931,11 @@ public class NareSettingsScreen extends Screen {
             g.fill(tx + font.width(query) + 1, ty - 1, tx + font.width(query) + 2, ty + 8,
                     NareTheme.accent());
 
-        String count = shown().size() + " найдено · Esc";
-        g.drawString(font, count, x + w - font.width(count) - 6, ty, NareTheme.DIM, false);
+        String count = shown().size() + " найдено";
+        g.drawString(font, count, x + w - font.width(count) - 18, ty, NareTheme.DIM, false);
+
+        // крестик: мышью очистить быстрее, чем держать Backspace
+        g.drawString(font, "x", x + w - 11, ty, NareTheme.MUTED, false);
     }
 
     private void side(GuiGraphics g, int mouseX, int mouseY) {
@@ -887,8 +976,9 @@ public class NareSettingsScreen extends Screen {
             int barH = Math.max(14, trackH * shown / list.size());
             int barY = trackY + (trackH - barH) * scroll / Math.max(1, list.size() - shown);
 
-            g.fill(px + pw - 7, trackY, px + pw - 5, trackY + trackH, 0x18FFFFFF);
-            g.fill(px + pw - 7, barY, px + pw - 5, barY + barH, 0x55FFFFFF);
+            g.fill(px + pw - 9, trackY, px + pw - 4, trackY + trackH, 0x18FFFFFF);
+            g.fill(px + pw - 9, barY, px + pw - 4, barY + barH,
+                    scrollDrag ? NareTheme.accent() : 0x66FFFFFF);
         }
 
         for (int i = 0; i < limit; i++) {
@@ -1019,8 +1109,12 @@ public class NareSettingsScreen extends Screen {
         if (awaiting != null)
             g.drawString(font, "Нажми клавишу или кнопку мыши · Esc — снять", px + 14, y + 7,
                     NareTheme.accent(), false);
+        else if (pw >= 460)
+            g.drawString(font, "Сохраняется сразу · Tab — раздел · колесо над ползунком — значение",
+                    px + 14, y + 7, NareTheme.DIM, false);
         else if (pw >= 380)
-            g.drawString(font, "Настройки сохраняются сразу", px + 14, y + 7, NareTheme.DIM, false);
+            g.drawString(font, "Сохраняется сразу · Tab — следующий раздел",
+                    px + 14, y + 7, NareTheme.DIM, false);
     }
 
     // ---------------------------------------------------------------- прочее
