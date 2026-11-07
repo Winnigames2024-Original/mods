@@ -1,8 +1,8 @@
 {
-  "version": "1.9.1",
+  "version": "1.10",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "e1ceb4377a74ddabd3dcedbe9814c88bf4fc7dec",
-  "size": 406528,
-  "notes": "кнопка WMine больше не налезает на «Папка версии»"
+  "sha1": "0c2d847c79e340037738ef713cdf3d59547bff39",
+  "size": 423936,
+  "notes": "версия игры читается из jar, понятное «выберите другую версию», источники GitHub и «Наш список»"
 }

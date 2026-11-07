@@ -1,6 +1,14 @@
 {
-  "latest": "2.8.0",
+  "latest": "2.9.0",
   "releases": [
+    {
+      "version": "2.9.0",
+      "file": "forge_narevisuals-2.9.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.9.0.jar",
+      "sha1": "fa623726e669ddaa7f881bf994715c26cc8c46df",
+      "size": 810459,
+      "notes": "«что умеет мод» на первой вкладке и по F1"
+    },
     {
       "version": "2.8.0",
       "file": "forge_narevisuals-2.8.0.jar",

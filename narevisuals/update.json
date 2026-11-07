@@ -1,8 +1,8 @@
 {
-  "version": "2.8.0",
-  "file": "forge_narevisuals-2.8.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.8.0.jar",
-  "sha1": "205cee8c75e5fd3c7031f0a662762c3807d74a88",
-  "size": 810339,
-  "notes": "окно «что умеет мод» с картинками, плитки со своей текстурой"
+  "version": "2.9.0",
+  "file": "forge_narevisuals-2.9.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.9.0.jar",
+  "sha1": "fa623726e669ddaa7f881bf994715c26cc8c46df",
+  "size": 810459,
+  "notes": "«что умеет мод» на первой вкладке и по F1"
 }

@@ -1,0 +1,140 @@
+{
+  "updated": "2026-11-07",
+  "note": "Список модов для источника «Наш список» в NareLauncher. Дописывайте сюда свои моды.",
+  "mods": [
+    {
+      "id": "narevisuals",
+      "title": "NareVisuals",
+      "author": "Winnigames2024",
+      "description": "Визуалы, голосовой чат, свободная камера, паркур-плитки. Right Shift — настройки, F1 — что умеет.",
+      "type": "mod",
+      "loader": "forge",
+      "game": [
+        "[1.21,1.22)"
+      ],
+      "icon": "",
+      "releases": [
+        {
+          "version": "2.9.0",
+          "file": "forge_narevisuals-2.9.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.9.0.jar",
+          "sha1": "fa623726e669ddaa7f881bf994715c26cc8c46df",
+          "size": 810459,
+          "notes": "«что умеет мод» на первой вкладке и по F1"
+        },
+        {
+          "version": "2.8.0",
+          "file": "forge_narevisuals-2.8.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.8.0.jar",
+          "sha1": "205cee8c75e5fd3c7031f0a662762c3807d74a88",
+          "size": 810339,
+          "notes": "окно «что умеет мод» с картинками, плитки со своей текстурой"
+        },
+        {
+          "version": "2.7.0",
+          "file": "forge_narevisuals-2.7.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.7.0.jar",
+          "sha1": "535b08352e50e2be2fba21b99d1aa0f38e5b059d",
+          "size": 795149,
+          "notes": "инвентарь в бою, огонь и щит, плитки паркура"
+        },
+        {
+          "version": "2.5.0",
+          "file": "forge_narevisuals-2.5.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.5.0.jar",
+          "sha1": "ff371878609fd638bb6184954b073732df478c52",
+          "size": 768460,
+          "notes": "кнопка WMine, команды при входе, тема в настройках игры"
+        },
+        {
+          "version": "2.4.0",
+          "file": "forge_narevisuals-2.4.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.4.0.jar",
+          "sha1": "5f3b173859fc393f8e40750ec3790883c08592ab",
+          "size": 758319,
+          "notes": "сервер может ограничить камеру, подсветку, яркость и зум"
+        },
+        {
+          "version": "2.3.0",
+          "file": "forge_narevisuals-2.3.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.3.0.jar",
+          "sha1": "cf1cd96a293196f30b16b76a49e495004be41d1a",
+          "size": 755681,
+          "notes": "голос может идти через свой UDP-порт сервера"
+        },
+        {
+          "version": "2.2.0",
+          "file": "forge_narevisuals-2.2.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.2.0.jar",
+          "sha1": "5a48f6d0247c82ba4dd7584bcd3cefff0a293e7f",
+          "size": 751384,
+          "notes": "дальность голоса задаёт сервер, можно слышать везде"
+        },
+        {
+          "version": "2.1.0",
+          "file": "forge_narevisuals-2.1.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.1.0.jar",
+          "sha1": "25f28c813948198b805f39a149e5594b3af117dc",
+          "size": 750611,
+          "notes": "меню голоса на V, громкость по людям, окно ошибок"
+        },
+        {
+          "version": "2.0.0",
+          "file": "forge_narevisuals-2.0.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.0.0.jar",
+          "sha1": "213dc011f054a1d0751766c8c4e07cccb46b40a5",
+          "size": 739220,
+          "notes": "свой голосовой чат — клавиша V, слышно по расстоянию"
+        },
+        {
+          "version": "1.9.0",
+          "file": "forge_narevisuals-1.9.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.9.0.jar",
+          "sha1": "9391622e7d32807d9ddf51361ce996662c09abcf",
+          "size": 715602,
+          "notes": "взрывы не вешают игру, меню стало удобнее"
+        },
+        {
+          "version": "1.7.0",
+          "file": "forge_narevisuals-1.7.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.7.0.jar",
+          "sha1": "58297e33fb8ca220d025eba7c827c506c0e81816",
+          "size": 712135,
+          "notes": "FPS+ — не рисовать лишнее, когда его много"
+        },
+        {
+          "version": "1.6.0",
+          "file": "forge_narevisuals-1.6.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.6.0.jar",
+          "sha1": "533cf2b00776e5e02fe39a26f52d11c8a7716587",
+          "size": 696909,
+          "notes": "панельное меню как в клиентах, клавиша передвижения элементов"
+        },
+        {
+          "version": "1.5.0",
+          "file": "forge_narevisuals-1.5.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.5.0.jar",
+          "sha1": "07ed5348ecc0eb6108f76fa049165b31edb6e0f3",
+          "size": 685991,
+          "notes": "выбор темы оформления, ломание областью убрано"
+        },
+        {
+          "version": "1.4.0",
+          "file": "forge_narevisuals-1.4.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.4.0.jar",
+          "sha1": "48d0d638b3c5dac46b442d23077113e2d1c9c8af",
+          "size": 686085,
+          "notes": "видимое поле поиска, окно настроек выше, листание с клавиатуры"
+        },
+        {
+          "version": "1.3.0",
+          "file": "forge_narevisuals-1.3.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.3.0.jar",
+          "sha1": "574ea44c679825ce664df6f42dae63ec566ceb35",
+          "size": 685682,
+          "notes": "вкладка «Функции» — все возможности одним списком"
+        }
+      ]
+    }
+  ]
+}
