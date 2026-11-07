@@ -108,6 +108,10 @@ public final class NareChannel implements PluginMessageListener {
             // дальность голоса: решает сервер, клиент может только убавить.
             // дописано в конец — старые клиенты это поле просто не читают
             out.writeInt(plugin.voiceDistance());
+
+            // отдельный порт для голоса и число, которым игрок там представится
+            out.writeInt(plugin.voicePort());
+            out.writeLong(plugin.voiceToken(player.getUniqueId()));
         });
     }
 

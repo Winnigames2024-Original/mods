@@ -193,6 +193,13 @@ public final class NareNet {
                 // дальность голоса дописана в конец: у старых плагинов её нет
                 serverVoice = buf.isReadable(4) ? buf.readInt() : -1;
 
+                // а следом — отдельный голосовой порт, если сервер его открыл
+                int voicePort = buf.isReadable(4) ? buf.readInt() : 0;
+                long voiceToken = buf.isReadable(8) ? buf.readLong() : 0L;
+
+                if (voicePort > 0 && voiceToken != 0L) NareUdp.start(voicePort, voiceToken);
+                else NareUdp.stop();
+
                 serverHasPlugin = true;
                 Forge_narevisuals.LOGGER.info(
                         "{}: сервер с плагином (протокол {}), дальность {}/{}",
@@ -244,6 +251,9 @@ public final class NareNet {
     /** Отправляет кадр голоса. Молча: это горячий путь, журналу тут не место. */
     public static void sendVoice(byte[] data) {
         if (out == null || !serverHasPlugin) return;
+
+        // сначала голосовой порт: там звук не ждёт потерянные пакеты
+        if (NareUdp.sendVoice(data)) return;
 
         try {
             var buf = new FriendlyByteBuf(Unpooled.buffer(data.length + 8));
@@ -377,6 +387,7 @@ public final class NareNet {
         helloRetry = -1;
 
         NareVoice.stop();
+        NareUdp.stop();
     }
 
     /**

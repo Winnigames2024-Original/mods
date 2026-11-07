@@ -47,6 +47,11 @@ public final class NareServer extends JavaPlugin implements Listener {
 
     private boolean voice;
     private int voiceDistance;
+    private int voicePort;
+    private String voiceBind = "";
+
+    /** Отдельный порт для голоса. null — звук идёт по игровому соединению. */
+    private NareVoicePort voicePipe;
 
     /**
      * Где кто стоит — снимок, обновляемый каждый тик.
@@ -66,6 +71,11 @@ public final class NareServer extends JavaPlugin implements Listener {
 
         channel = new NareChannel(this);
         channel.register();
+
+        if (voice && voicePort > 0) {
+            var pipe = new NareVoicePort(this, voicePort);
+            if (pipe.open(voiceBind)) voicePipe = pipe;
+        }
 
         Bukkit.getPluginManager().registerEvents(this, this);
 
@@ -90,11 +100,25 @@ public final class NareServer extends JavaPlugin implements Listener {
                 + ", шутки " + (trolls ? "разрешены" : "запрещены")
                 + ", голос " + (voice
                         ? "включён, слышно " + (voiceDistance <= 0 ? "везде" : voiceDistance + " бл.")
+                          + (voicePipe != null ? ", порт " + voicePipe.port() + "/udp"
+                                               : ", по игровому соединению")
                         : "выключен"));
+    }
+
+    /** Порт голоса, 0 — отдельного порта нет. */
+    public int voicePort() {
+        return voicePipe == null ? 0 : voicePipe.port();
+    }
+
+    /** Число, по которому игрок представляется на голосовом порту. */
+    public long voiceToken(java.util.UUID id) {
+        return voicePipe == null ? 0L : voicePipe.tokenFor(id);
     }
 
     @Override
     public void onDisable() {
+        if (voicePipe != null) { voicePipe.close(); voicePipe = null; }
+
         for (UUID id : guests.keySet()) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) reach(player, 0, 0);
@@ -120,7 +144,8 @@ public final class NareServer extends JavaPlugin implements Listener {
 
         // что из новых настроек в файле ещё не записано — смотрим до слияния,
         // потому что после copyDefaults всё выглядит записанным
-        for (String key : new String[] { "voice.enabled", "voice.distance" }) {
+        for (String key : new String[] { "voice.enabled", "voice.distance",
+                                         "voice.port", "voice.bind" }) {
             if (getConfig().isSet(key)) continue;
             changed = true;
             getLogger().info("NareVisuals: дописал в config.yml настройку " + key);
@@ -139,6 +164,8 @@ public final class NareServer extends JavaPlugin implements Listener {
         trolls = getConfig().getBoolean("trolls", true);
         voice = getConfig().getBoolean("voice.enabled", true);
         voiceDistance = getConfig().getInt("voice.distance", 48);
+        voicePort = getConfig().getInt("voice.port", 0);
+        voiceBind = getConfig().getString("voice.bind", "");
     }
 
     public boolean trollsAllowed() {
@@ -214,6 +241,10 @@ public final class NareServer extends JavaPlugin implements Listener {
             Player to = Bukkit.getPlayer(id);
             if (to == null) continue;
 
+            // через голосовой порт, если он открыт и слушатель до нас достучался
+            if (voicePipe != null && voicePipe.send(id, who, at[0], at[1], at[2], data))
+                continue;
+
             channel.sendVoice(to, who, at[0], at[1], at[2], data);
         }
     }
@@ -222,6 +253,8 @@ public final class NareServer extends JavaPlugin implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         where.remove(event.getPlayer().getUniqueId());
         worlds.remove(event.getPlayer().getUniqueId());
+
+        if (voicePipe != null) voicePipe.forget(event.getPlayer().getUniqueId());
 
         if (guests.remove(event.getPlayer().getUniqueId()) == null) return;
         reach(event.getPlayer(), 0, 0);

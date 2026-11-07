@@ -195,7 +195,14 @@ public class NareVoiceScreen extends Screen {
         if (!NareVoice.running()) return "не запущен";
 
         var talkers = NareVoice.talkers();
-        return talkers.isEmpty() ? "работает" : "говорят: " + String.join(", ", talkers);
+        if (!talkers.isEmpty()) return "говорят: " + String.join(", ", talkers);
+
+        if (NareUdp.ready())
+            return NareUdp.alive()
+                    ? "работает через порт " + NareUdp.port()
+                    : "жду ответа с порта " + NareUdp.port();
+
+        return "работает через игровое соединение";
     }
 
     private static Row slider(String title, String hint, int min, int max,
