@@ -80,6 +80,14 @@ public final class Freecam {
         if (mc.level == null || mc.player == null) return;
         if (active) return;
 
+        // сервер может её запрещать — тогда честно говорим об этом
+        if (!NareRules.freecam()) {
+            if (mc.gui != null)
+                mc.gui.setOverlayMessage(net.minecraft.network.chat.Component.literal(
+                        "Свободная камера " + NareRules.why()), false);
+            return;
+        }
+
         LocalPlayer player = mc.player;
 
         ArmorStand stand = new ArmorStand(mc.level, player.getX(), player.getY(), player.getZ());
@@ -184,6 +192,9 @@ public final class Freecam {
         // мир сменился — камера из старого мира больше не годится
         if (ghost.level() != mc.level) { stop(); return; }
 
+        // зашли на сервер, где её нельзя, прямо с включённой камерой
+        if (!NareRules.freecam()) { stop(); return; }
+
         ghost.setOldPosAndRot();
 
         if (mc.screen == null) {
@@ -209,9 +220,28 @@ public final class Freecam {
             if (len > 1e-4) { fx /= len; fz /= len; }
 
             if (fx != 0 || fy != 0 || fz != 0) {
-                ghost.setPos(ghost.getX() + fx * speed,
-                             ghost.getY() + fy * speed,
-                             ghost.getZ() + fz * speed);
+                double nx = ghost.getX() + fx * speed;
+                double ny = ghost.getY() + fy * speed;
+                double nz = ghost.getZ() + fz * speed;
+
+                // сервер может ограничить, насколько далеко можно улететь
+                int range = NareRules.freecamRange();
+                if (range > 0) {
+                    double dx = nx - mc.player.getX();
+                    double dy = ny - mc.player.getY();
+                    double dz = nz - mc.player.getZ();
+                    double far = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (far > range) {
+                        // подтягиваем обратно на границу, а не стопорим намертво
+                        double k = range / far;
+                        nx = mc.player.getX() + dx * k;
+                        ny = mc.player.getY() + dy * k;
+                        nz = mc.player.getZ() + dz * k;
+                    }
+                }
+
+                ghost.setPos(nx, ny, nz);
             }
         }
 

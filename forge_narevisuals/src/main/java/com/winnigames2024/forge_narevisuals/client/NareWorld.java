@@ -52,7 +52,7 @@ public final class NareWorld {
         if (!Launch.visuals()) return;
 
         Config cfg = Config.get();
-        if (!cfg.playerEsp) return;
+        if (!cfg.playerEsp || !NareRules.espPlayers()) return;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
@@ -60,7 +60,7 @@ public final class NareWorld {
         // существа кроме игроков: только рамка, без подписи — имени и здоровья
         // в состоянии отрисовки нет, а искать существо по координатам каждый кадр дорого
         if (!(event.getState() instanceof PlayerRenderState state)) {
-            if (!cfg.espMobs) return;
+            if (!cfg.espMobs || !NareRules.espMobs()) return;
             drawPlainBox(event, cfg.espColor);
             return;
         }

@@ -48,6 +48,13 @@ public final class NareServer extends JavaPlugin implements Listener {
     private boolean voice;
     private int voiceDistance;
     private int voicePort;
+
+    private boolean ruleFreecam = true;
+    private int ruleFreecamRange;
+    private boolean ruleEspPlayers = true;
+    private boolean ruleEspMobs = true;
+    private boolean ruleBright = true;
+    private boolean ruleZoom = true;
     private String voiceBind = "";
 
     /** Отдельный порт для голоса. null — звук идёт по игровому соединению. */
@@ -105,6 +112,13 @@ public final class NareServer extends JavaPlugin implements Listener {
                         : "выключен"));
     }
 
+    public boolean ruleFreecam() { return ruleFreecam; }
+    public int ruleFreecamRange() { return ruleFreecamRange; }
+    public boolean ruleEspPlayers() { return ruleEspPlayers; }
+    public boolean ruleEspMobs() { return ruleEspMobs; }
+    public boolean ruleBright() { return ruleBright; }
+    public boolean ruleZoom() { return ruleZoom; }
+
     /** Порт голоса, 0 — отдельного порта нет. */
     public int voicePort() {
         return voicePipe == null ? 0 : voicePipe.port();
@@ -145,7 +159,10 @@ public final class NareServer extends JavaPlugin implements Listener {
         // что из новых настроек в файле ещё не записано — смотрим до слияния,
         // потому что после copyDefaults всё выглядит записанным
         for (String key : new String[] { "voice.enabled", "voice.distance",
-                                         "voice.port", "voice.bind" }) {
+                                         "voice.port", "voice.bind",
+                                         "limits.freecam", "limits.freecam-distance",
+                                         "limits.esp-players", "limits.esp-mobs",
+                                         "limits.bright", "limits.zoom" }) {
             if (getConfig().isSet(key)) continue;
             changed = true;
             getLogger().info("NareVisuals: дописал в config.yml настройку " + key);
@@ -165,6 +182,13 @@ public final class NareServer extends JavaPlugin implements Listener {
         voice = getConfig().getBoolean("voice.enabled", true);
         voiceDistance = getConfig().getInt("voice.distance", 48);
         voicePort = getConfig().getInt("voice.port", 0);
+
+        ruleFreecam = getConfig().getBoolean("limits.freecam", true);
+        ruleFreecamRange = Math.max(0, getConfig().getInt("limits.freecam-distance", 0));
+        ruleEspPlayers = getConfig().getBoolean("limits.esp-players", true);
+        ruleEspMobs = getConfig().getBoolean("limits.esp-mobs", true);
+        ruleBright = getConfig().getBoolean("limits.bright", true);
+        ruleZoom = getConfig().getBoolean("limits.zoom", true);
         voiceBind = getConfig().getString("voice.bind", "");
     }
 
@@ -190,6 +214,7 @@ public final class NareServer extends JavaPlugin implements Listener {
         reach(player, blocks, entities);
 
         channel.sendWelcome(player, blocks, entities, trolls);
+        channel.sendRules(player);
         broadcastPlayers();
 
         getLogger().info("NareVisuals " + version + " у " + player.getName()

@@ -52,6 +52,7 @@ public final class NareNet {
     private static final byte S2C_TROLL = 4;
     private static final byte S2C_INFO = 5;
     private static final byte S2C_VOICE = 6;
+    private static final byte S2C_RULES = 7;
 
     /** Одна метка сломанного блока. */
     public record Mark(String who, int x, int y, int z, long at) { }
@@ -170,6 +171,14 @@ public final class NareNet {
                     Forge_narevisuals.NAME, type);
 
         switch (type) {
+            case S2C_RULES -> {
+                NareRules.set(buf.readBoolean(), buf.readInt(), buf.readBoolean(),
+                        buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+
+                Forge_narevisuals.LOGGER.info("{}: правила сервера — {}",
+                        Forge_narevisuals.NAME, NareRules.text());
+            }
+
             case S2C_VOICE -> {
                 String who = takeText(buf);
                 double x = buf.readDouble();
@@ -388,6 +397,7 @@ public final class NareNet {
 
         NareVoice.stop();
         NareUdp.stop();
+        NareRules.forget();
     }
 
     /**

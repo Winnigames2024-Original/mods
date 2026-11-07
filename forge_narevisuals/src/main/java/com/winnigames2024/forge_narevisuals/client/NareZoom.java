@@ -30,6 +30,7 @@ public final class NareZoom {
 
         zooming = Launch.visuals()
                 && Config.get().zoomEnabled
+                && NareRules.zoom()
                 && mc.screen == null
                 && NareKeys.ZOOM.isDown();
 

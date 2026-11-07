@@ -33,8 +33,8 @@ public final class NareVision {
         Minecraft mc = Minecraft.getInstance();
         Config cfg = Config.get();
 
-        boolean bright = Launch.visuals() && cfg.fullbright;
-        boolean vision = Launch.visuals() && cfg.nightVision;
+        boolean bright = Launch.visuals() && cfg.fullbright && NareRules.bright();
+        boolean vision = Launch.visuals() && cfg.nightVision && NareRules.bright();
 
         // --- гамма ---
         if (bright) {

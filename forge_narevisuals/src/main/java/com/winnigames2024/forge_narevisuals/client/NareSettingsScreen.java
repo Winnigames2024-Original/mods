@@ -447,6 +447,8 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.slider("Возвращать пачкой", 1, 128,
                         () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
                         v -> v + " бл."));
+                list.add(Row.action("Правила сервера", NareRules.text(), () -> { }));
+
                 if (!NareErrors.ignored().isEmpty())
                     list.add(Row.action("Скрытые ошибки",
                             "Сейчас молчим о " + NareErrors.ignored().size()

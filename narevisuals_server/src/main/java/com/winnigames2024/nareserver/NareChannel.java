@@ -36,6 +36,7 @@ public final class NareChannel implements PluginMessageListener {
     public static final byte S2C_MARK = 3;
     public static final byte S2C_TROLL = 4;
     public static final byte S2C_VOICE = 6;
+    public static final byte S2C_RULES = 7;
 
     private final NareServer plugin;
 
@@ -112,6 +113,22 @@ public final class NareChannel implements PluginMessageListener {
             // отдельный порт для голоса и число, которым игрок там представится
             out.writeInt(plugin.voicePort());
             out.writeLong(plugin.voiceToken(player.getUniqueId()));
+        });
+    }
+
+    /**
+     * Что на этом сервере можно. Отдельным пакетом, а не в WELCOME: правил
+     * будет прибавляться, а WELCOME и так длинный.
+     */
+    public void sendRules(Player player) {
+        send(player, out -> {
+            out.writeByte(S2C_RULES);
+            out.writeBoolean(plugin.ruleFreecam());
+            out.writeInt(plugin.ruleFreecamRange());
+            out.writeBoolean(plugin.ruleEspPlayers());
+            out.writeBoolean(plugin.ruleEspMobs());
+            out.writeBoolean(plugin.ruleBright());
+            out.writeBoolean(plugin.ruleZoom());
         });
     }
 
