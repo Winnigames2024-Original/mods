@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NareVisuals — мод для Minecraft 1.21.4 Forge</title>
+<meta name="description" content="NareVisuals — клиентский мод для Forge 1.21.4: свой HUD, голосовой чат на клавишу V, FPS+, темы оформления и серверный плагин NareServer.">
+<meta property="og:title" content="NareVisuals">
+<meta property="og:description" content="Свой HUD, голосовой чат, FPS+ и семь тем оформления. Forge 1.21.4.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="midnight">
+
+<header class="top">
+  <a class="mark" href="#">
+    <span class="mark-dot" aria-hidden="true"></span>
+    NareVisuals
+  </a>
+  <nav class="top-nav">
+    <a href="#features">Что умеет</a>
+    <a href="#voice">Голос</a>
+    <a href="#install">Установка</a>
+    <a href="#versions">Версии</a>
+  </nav>
+  <div class="themes" id="themes" role="group" aria-label="Тема оформления"></div>
+</header>
+
+<main>
+
+  <!-- ------------------------------------------------------------- hero -->
+  <section class="hero">
+    <div class="hero-text">
+      <p class="eyebrow">Forge 1.21.4 · клиентский мод</p>
+      <h1>Всё нужное на экране<br>и голос, который слышно<br>по расстоянию.</h1>
+      <p class="lead">
+        NareVisuals — это свой HUD, который можно переставить прямо в игре,
+        голосовой чат без отдельного порта на сервере, FPS+ для больших
+        взрывов и семь тем оформления. Мод включается только с аргументом
+        <code>--visuals</code>, так что обычный клиент остаётся обычным.
+      </p>
+      <div class="cta">
+        <a class="btn btn-main" id="dl-mod" href="#versions">
+          <span>Скачать мод</span>
+          <small id="dl-mod-meta">версия загружается…</small>
+        </a>
+        <a class="btn" href="../nareinstaller/NareInstaller.exe">
+          <span>Установщик лаунчера</span>
+          <small>NareInstaller.exe</small>
+        </a>
+      </div>
+      <p class="note">
+        Если играете через <a href="../narelauncher/">NareLauncher</a>, качать
+        мод руками не нужно — сборка «Forge Visuals» подтягивает его сама.
+      </p>
+    </div>
+
+    <!-- окно мода, нарисованное вёрсткой -->
+    <div class="hero-art" aria-hidden="true">
+      <div class="win">
+        <div class="win-head">
+          <span class="win-title">Настройки</span>
+          <span class="win-key">Right Shift</span>
+        </div>
+        <div class="win-tabs">
+          <span class="on">Функции</span><span>Элементы</span><span>Вид</span><span>Ещё</span>
+        </div>
+        <div class="win-rows">
+          <div class="row"><span>Голосовой чат</span><i class="sw on"></i></div>
+          <div class="row"><span>FPS+</span><i class="sw on"></i></div>
+          <div class="row"><span>Своё небо</span><i class="sw"></i></div>
+          <div class="row"><span>Игроки рядом</span><i class="sw on"></i></div>
+          <div class="row"><span>Приближение</span><i class="sw on"></i></div>
+        </div>
+        <div class="win-foot"><span>Tab — раздел</span><span>Esc — назад</span></div>
+      </div>
+
+      <div class="hud hud-a">
+        <span class="hud-k">FPS</span><span class="hud-v good">243</span>
+      </div>
+      <div class="hud hud-b">
+        <span class="hud-k">MS</span><span class="hud-v">21</span>
+      </div>
+      <div class="hud hud-c">
+        <span class="hud-k">ГОЛОС</span>
+        <span class="bar"><i></i></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------- features -->
+  <section id="features" class="band">
+    <h2>Что умеет</h2>
+    <p class="band-lead">
+      Ничего не включено насильно: каждая строчка — переключатель, и всё
+      лежит одним списком с поиском.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>HUD, который вы сами расставите</h3>
+        <p>
+          FPS, пинг, координаты, CPS, нажатия клавиш, броня, эффекты, игроки
+          рядом, стрелка на ближайшего, метки сломанных блоков, попадания и
+          кто сейчас говорит. Клавиша <kbd>]</kbd> — передвинуть элементы, не
+          выходя из игры: мир под ними не темнеет.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Два вида меню</h3>
+        <p>
+          Обычное окно с разделами, поиском и листанием с клавиатуры — или
+          панельное, как в клиентах: отдельные окошки, которые таскаешь по
+          экрану и схлопываешь правым кликом. Переключается в один клик.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>FPS+</h3>
+        <p>
+          Когда чего-то становится слишком много, лишнее просто не рисуется —
+          только у вас. ТНТ, мобы, предметы, опыт, список «никогда не
+          рендерить», бюджет частиц и ограничение на одновременные взрывы.
+          На сервере при этом ничего не меняется.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Семь тем</h3>
+        <p>
+          Полночь, Уголь, Закат, Хвоя, Сирень, Молоко, Вишня — или свой
+          акцентный цвет. Кнопки наверху этой страницы переключают ровно те
+          же темы, что и мод.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Камера и обзор</h3>
+        <p>
+          Свободная камера, приближение на клавишу, подсветка блока под
+          прицелом, честная яркость, свой прицел и своё небо.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Серверная половина</h3>
+        <p>
+          Плагин <b>NareServer</b> для Paper 1.21.4 добавляет то, чего клиент
+          не может один: значок «у игрока есть мод», честную дальность по
+          праву, метки сломанных блоков и раздачу голоса.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ voice -->
+  <section id="voice" class="band band-voice">
+    <div class="voice-wrap">
+      <div>
+        <p class="eyebrow">новое в 2.0.0</p>
+        <h2>Голосовой чат на клавишу <kbd>V</kbd></h2>
+        <p class="band-lead">
+          Свой голос, без сторонних модов. Звук идёт тем же каналом, что и
+          остальное, поэтому на сервере <b>не нужно открывать отдельный
+          порт</b> — хватает плагина.
+        </p>
+        <ul class="ticks">
+          <li>Слышно по расстоянию: чем дальше человек, тем тише.</li>
+          <li>Звук приходит с той стороны, где он стоит.</li>
+          <li>Три режима: держать клавишу, нажал-говоришь, по голосу.</li>
+          <li>Выбор микрофона, громкость, усиление и порог — в настройках.</li>
+          <li>Живая полоска уровня: видно, что вас слышно.</li>
+          <li>IMA ADPCM на 16 кГц — около 8 КБ/с на говорящего.</li>
+        </ul>
+      </div>
+
+      <div class="voice-demo" aria-hidden="true">
+        <div class="panel">
+          <div class="panel-head">
+            <span>ГОЛОС</span>
+            <span class="bar wide"><i></i></span>
+          </div>
+          <div class="talker"><i class="dot"></i>Winnigames2024</div>
+          <div class="talker"><i class="dot d2"></i>Nare</div>
+          <div class="talker muted">и ещё 2</div>
+        </div>
+        <div class="dist">
+          <span class="me">вы</span>
+          <span class="ring r1"></span>
+          <span class="ring r2"></span>
+          <span class="ring r3"></span>
+          <span class="dlabel">48 блоков</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- install -->
+  <section id="install" class="band">
+    <h2>Установка</h2>
+
+    <ol class="steps">
+      <li>
+        <h3>Клиент</h3>
+        <p>
+          Minecraft <b>1.21.4</b> с Forge <b>54.1.22</b>. Положите jar в
+          <code>mods</code> и запустите игру с аргументом
+          <code>--visuals</code> — без него мода на экране нет.
+        </p>
+      </li>
+      <li>
+        <h3>Через лаунчер — проще</h3>
+        <p>
+          В <a href="../narelauncher/">NareLauncher</a> выберите сборку
+          «Forge Visuals»: аргумент подставляется сам, а мод обновляется с
+          этой страницы автоматически.
+        </p>
+      </li>
+      <li>
+        <h3>Сервер</h3>
+        <p>
+          Плагин в <code>plugins/</code>, перезапуск, затем
+          <code>plugins/NareServer/config.yml</code>:
+        </p>
+        <pre><code>voice:
+  enabled: true
+  distance: 48     # на сколько блоков слышно
+reach:
+  blocks: 0        # 0 — обычная дальность
+  entities: 0
+marks: true</code><button class="copy" type="button">копировать</button></pre>
+        <p>
+          Право <code>narevisuals.voice</code> по умолчанию есть у всех,
+          <code>narevisuals.reach</code> — только у операторов.
+        </p>
+      </li>
+    </ol>
+
+    <div class="keys">
+      <div><kbd>Right Shift</kbd><span>настройки</span></div>
+      <div><kbd>V</kbd><span>говорить</span></div>
+      <div><kbd>]</kbd><span>передвинуть элементы</span></div>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------- versions -->
+  <section id="versions" class="band">
+    <h2>Версии</h2>
+    <p class="band-lead">
+      Список читается из <a href="versions.json">versions.json</a> — того же
+      файла, по которому лаунчер решает, пора ли обновляться.
+    </p>
+    <div id="releases" class="releases">
+      <p class="loading">Загружаю список…</p>
+    </div>
+
+    <div class="extra">
+      <a class="btn" href="NareServer-1.4.jar">
+        <span>Плагин для сервера</span><small>NareServer-1.4.jar · Paper 1.21.4</small>
+      </a>
+      <a class="btn" href="https://github.com/Winnigames2024-Original/mods/tree/main/forge_narevisuals">
+        <span>Исходники мода</span><small>forge_narevisuals</small>
+      </a>
+      <a class="btn" href="https://github.com/Winnigames2024-Original/mods/tree/main/narevisuals_server">
+        <span>Исходники плагина</span><small>narevisuals_server</small>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>NareVisuals · Winnigames2024</p>
+  <p class="small">
+    Minecraft — торговая марка Mojang Studios. Мод с ними не связан.
+  </p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
