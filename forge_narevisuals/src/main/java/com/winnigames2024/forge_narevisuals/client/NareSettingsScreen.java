@@ -140,6 +140,8 @@ public class NareSettingsScreen extends Screen {
 
         switch (tab) {
             case 0 -> {
+                list.add(Row.action("Что умеет мод", "Все возможности с картинками · F1",
+                        () -> minecraft.setScreen(new NareAboutScreen(this))));
                 list.add(Row.label("Включить прямо сейчас"));
                 list.add(Row.toggle("Свободная камера",
                         NareKeys.TOGGLE_FREECAM.getTranslatedKeyMessage().getString()
@@ -738,6 +740,12 @@ public class NareSettingsScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (awaiting == null) {
+            // F1 — окно «что умеет мод»: его искать не надо
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_F1) {
+                minecraft.setScreen(new NareAboutScreen(this));
+                return true;
+            }
+
             if (keyCode == InputConstants.KEY_BACKSPACE && !query.isEmpty()) {
                 query = query.substring(0, query.length() - 1);
                 scroll = 0;
