@@ -357,7 +357,12 @@ public final class HudModules {
 
         @Override
         public int height(Minecraft mc) {
-            int rows = mc.player == null ? 0 : mc.player.getActiveEffects().size();
+            int rows = 0;
+
+            if (mc.player != null)
+                for (MobEffectInstance effect : mc.player.getActiveEffects())
+                    if (NareLook.show(effect)) rows++;
+
             return Math.max(ROW, rows * 13 + 8);
         }
 
@@ -365,7 +370,10 @@ public final class HudModules {
         public void render(GuiGraphics g, Minecraft mc, int x, int y) {
             if (mc.player == null) return;
 
-            List<MobEffectInstance> effects = new ArrayList<>(mc.player.getActiveEffects());
+            List<MobEffectInstance> effects = new ArrayList<>();
+            for (MobEffectInstance effect : mc.player.getActiveEffects())
+                if (NareLook.show(effect)) effects.add(effect);
+
             if (effects.isEmpty()) return;
 
             int w = width(mc);

@@ -72,6 +72,13 @@ public final class NareHud {
         countFrame();
 
         Minecraft mc = Minecraft.getInstance();
+
+        // свой маленький огонь рисуем всегда, даже когда HUD выключен:
+        // это не элемент интерфейса, а замена ванильной картинке
+        if (!mc.options.hideGui)
+            NareLook.drawFire(g, mc.getWindow().getGuiScaledWidth(),
+                    mc.getWindow().getGuiScaledHeight());
+
         if (!Config.get().hudEnabled) return;
         if (mc.options.hideGui) return;
         if (mc.screen instanceof HudEditScreen) return;   // там HUD рисует сам редактор

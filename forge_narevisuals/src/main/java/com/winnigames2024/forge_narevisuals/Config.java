@@ -283,6 +283,48 @@ public class Config {
     /** И сколько зажжённой ТНТ рядом для этого должно быть. */
     public int panicTnt = 40;
 
+    // ---------------------------------------------------------- инвентарь
+
+    /** Доставать тотем в руку, когда здоровья осталось мало. */
+    public boolean autoTotem = false;
+
+    /** При скольки сердцах доставать тотем. */
+    public int autoTotemAt = 6;
+
+    /** Надевать лучшую броню из инвентаря, когда свободен слот. */
+    public boolean autoArmor = false;
+
+    /** Менять броню и на более крепкую, а не только пустые слоты. */
+    public boolean autoArmorUpgrade = true;
+
+    /** Не показывать на игроке никаких эффектов, кроме перечисленных. */
+    public boolean effectsFilter = false;
+
+    /**
+     * Что показывать, когда фильтр включён. Ключи — как в игре:
+     * minecraft:speed, minecraft:strength и так далее.
+     */
+    public java.util.List<String> effectsKeep = new java.util.ArrayList<>(
+            java.util.List.of("minecraft:speed", "minecraft:strength",
+                              "minecraft:regeneration", "minecraft:fire_resistance"));
+
+    // ------------------------------------------------------------- огонь
+
+    /** Не рисовать огонь на весь экран, когда горим. */
+    public boolean fireOff = false;
+
+    /** Насколько уменьшить картинку огня, в процентах от обычной. */
+    public int fireSize = 45;
+
+    /** Насколько уменьшить щит в руке, в процентах. */
+    public int shieldSize = 70;
+
+    /**
+     * Держать настройки мода на сервере, в папке плагина. Тогда они
+     * переезжают вместе с игроком на другой компьютер.
+     */
+    public boolean syncToServer = true;
+
     /** Виды, которые не рисуем совсем. Ключи реестра. */
     public java.util.List<String> fpsNever = new java.util.ArrayList<>();
 
@@ -341,6 +383,10 @@ public class Config {
             Files.write(path, GSON.toJson(get()).getBytes(StandardCharsets.UTF_8));
         } catch (IOException ignored) {
         }
+
+        // и на сервер — но не сразу, а когда человек перестанет крутить
+        try { com.winnigames2024.forge_narevisuals.client.NareCloud.touched(); }
+        catch (Throwable ignored) { /* сервера может и не быть */ }
     }
 
     /** Полностью заменить настройки (после загрузки пресета .nvc). */

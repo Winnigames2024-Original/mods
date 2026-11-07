@@ -69,6 +69,9 @@ public final class NareServer extends JavaPlugin implements Listener {
     /** Отдельный порт для голоса. null — звук идёт по игровому соединению. */
     private NareVoicePort voicePipe;
 
+    private NareParkour parkour;
+    private NareFiles files;
+
     /**
      * Где кто стоит — снимок, обновляемый каждый тик.
      *
@@ -87,6 +90,17 @@ public final class NareServer extends JavaPlugin implements Listener {
 
         channel = new NareChannel(this);
         channel.register();
+
+        parkour = new NareParkour(this);
+        parkour.load();
+        parkour.recipes();
+
+        files = new NareFiles(this);
+
+        var nare = getCommand("nare");
+        if (nare != null) nare.setExecutor(this);
+        else getLogger().warning("NareVisuals: команда /nare не зарегистрировалась — "
+                + "плитки выдаются только крафтом");
 
         if (voice && voicePort > 0) {
             var pipe = new NareVoicePort(this, voicePort);
@@ -121,6 +135,56 @@ public final class NareServer extends JavaPlugin implements Listener {
                         : "выключен"));
     }
 
+    /** Команда /nare: выдать плитки и посмотреть, сколько их стоит. */
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender,
+                             org.bukkit.command.Command command,
+                             String label, String[] args) {
+        if (!sender.hasPermission("narevisuals.parkour")) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Нужно право narevisuals.parkour"));
+            return true;
+        }
+
+        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("/nare give checkpoint|uncheckpoint|jumppad [сила] [ник]"));
+            sender.sendMessage(net.kyori.adventure.text.Component.text("/nare count — сколько плиток стоит"));
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Плитки ещё и крафтятся: керамика в кольце из"));
+            sender.sendMessage(net.kyori.adventure.text.Component.text("жемчуга Края, редстоуна или слизи."));
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("count")) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Плиток паркура: " + (parkour == null ? 0 : parkour.count())));
+            return true;
+        }
+
+        if (!args[0].equalsIgnoreCase("give") || args.length < 2) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Так: /nare give checkpoint|uncheckpoint|jumppad [сила] [ник]"));
+            return true;
+        }
+
+        String kind = args[1].toLowerCase(java.util.Locale.ROOT);
+        if (!kind.equals("checkpoint") && !kind.equals("uncheckpoint") && !kind.equals("jumppad")) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Плитки бывают: checkpoint, uncheckpoint, jumppad"));
+            return true;
+        }
+
+        int power = 12;
+        if (args.length > 2) try { power = Integer.parseInt(args[2]); } catch (Exception ignored) { }
+
+        Player target = args.length > 3 ? Bukkit.getPlayerExact(args[3])
+                : (sender instanceof Player self ? self : null);
+
+        if (target == null) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Кому выдавать? Укажите ник."));
+            return true;
+        }
+
+        target.getInventory().addItem(parkour.item(kind, power));
+        sender.sendMessage(net.kyori.adventure.text.Component.text("Выдал: " + title(kind) + " для " + target.getName()));
+        return true;
+    }
+
     public boolean ruleFreecam() { return ruleFreecam; }
     public int ruleFreecamRange() { return ruleFreecamRange; }
     public boolean ruleEspPlayers() { return ruleEspPlayers; }
@@ -141,6 +205,7 @@ public final class NareServer extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         if (voicePipe != null) { voicePipe.close(); voicePipe = null; }
+        if (parkour != null) parkour.save();
 
         for (UUID id : guests.keySet()) {
             Player player = Bukkit.getPlayer(id);
@@ -367,12 +432,120 @@ public final class NareServer extends JavaPlugin implements Listener {
                 + " (говорит, рядом " + tnt + " ТНТ), убрал " + removed);
     }
 
+    // ------------------------------------------------------------ паркур
+
+    /** Поставили помеченную плитку — запоминаем её. */
+    @EventHandler(ignoreCancelled = true)
+    public void onPlaceTile(org.bukkit.event.block.BlockPlaceEvent event) {
+        if (parkour == null) return;
+
+        var tile = parkour.kindOf(event.getItemInHand());
+        if (tile == null) return;
+
+        parkour.placed(event.getBlockPlaced(), tile);
+        hint(event.getPlayer(), "Плитка поставлена: " + title(tile.kind()));
+    }
+
+    /** Сломали — забываем, иначе на этом месте потом «призрак». */
+    @EventHandler(ignoreCancelled = true)
+    public void onBreakTile(org.bukkit.event.block.BlockBreakEvent event) {
+        if (parkour == null) return;
+        if (parkour.tileAt(event.getBlock().getLocation()) == null) return;
+
+        parkour.remove(event.getBlock().getLocation());
+        hint(event.getPlayer(), "Плитка убрана");
+    }
+
+    /** Наступили на плитку. Проверяем только смену блока, а не каждый шаг. */
+    @EventHandler(ignoreCancelled = true)
+    public void onStep(org.bukkit.event.player.PlayerMoveEvent event) {
+        if (parkour == null || parkour.count() == 0) return;
+
+        var to = event.getTo();
+        var from = event.getFrom();
+        if (to.getBlockX() == from.getBlockX()
+                && to.getBlockY() == from.getBlockY()
+                && to.getBlockZ() == from.getBlockZ()) return;
+
+        var under = to.clone().add(0, -0.2, 0).getBlock();
+        String said = parkour.stepped(event.getPlayer(), under);
+        if (said != null) hint(event.getPlayer(), said);
+    }
+
+    /** Правый клик по прыжковой плите у кого есть право — открыть настройку. */
+    @EventHandler(ignoreCancelled = true)
+    public void onTouchTile(org.bukkit.event.player.PlayerInteractEvent event) {
+        if (parkour == null) return;
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
+
+        var tile = parkour.tileAt(event.getClickedBlock().getLocation());
+        if (tile == null || !tile.kind().equals("jumppad")) return;
+        if (!event.getPlayer().hasPermission("narevisuals.parkour")) return;
+        if (!guests.containsKey(event.getPlayer().getUniqueId())) {
+            hint(event.getPlayer(), "Настроить плиту можно только с модом");
+            return;
+        }
+
+        event.setCancelled(true);
+
+        var at = event.getClickedBlock().getLocation();
+        channel.sendJumpPad(event.getPlayer(), at.getWorld().getName(),
+                at.getBlockX(), at.getBlockY(), at.getBlockZ(), tile.power());
+    }
+
+    /** Мод прислал новую силу плиты. */
+    public void onJumpPadSet(Player player, String world, int x, int y, int z, int power) {
+        if (parkour == null) return;
+        if (!player.hasPermission("narevisuals.parkour")) return;
+
+        var level = Bukkit.getWorld(world);
+        if (level == null) return;
+
+        var at = new org.bukkit.Location(level, x, y, z);
+        var tile = parkour.tileAt(at);
+        if (tile == null || !tile.kind().equals("jumppad")) return;
+
+        parkour.put(at, "jumppad", power);
+        hint(player, "Сила плиты: " + NareParkour.clamp(power));
+    }
+
+    // -------------------------------------------------------- файлы мода
+
+    /** Мод просит записать, удалить или перечислить свой файл. */
+    public void onModFile(Player player, byte action, String name, byte[] data) {
+        if (files == null) return;
+        if (!guests.containsKey(player.getUniqueId())) return;
+
+        switch (action) {
+            case 0 -> files.write(player, name, data);
+            case 1 -> files.delete(player, name);
+            default -> { }
+        }
+
+        channel.sendFiles(player, files.list(player));
+    }
+
+    private static String title(String kind) {
+        return switch (kind) {
+            case "checkpoint" -> "чекпоинт";
+            case "uncheckpoint" -> "сброс чекпоинта";
+            default -> "прыжковая плита";
+        };
+    }
+
+    private static void hint(Player player, String text) {
+        player.sendActionBar(net.kyori.adventure.text.Component.text(text));
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         where.remove(event.getPlayer().getUniqueId());
         worlds.remove(event.getPlayer().getUniqueId());
 
         if (voicePipe != null) voicePipe.forget(event.getPlayer().getUniqueId());
+        if (parkour != null) parkour.forget(event.getPlayer().getUniqueId());
 
         if (guests.remove(event.getPlayer().getUniqueId()) == null) return;
         reach(event.getPlayer(), 0, 0);

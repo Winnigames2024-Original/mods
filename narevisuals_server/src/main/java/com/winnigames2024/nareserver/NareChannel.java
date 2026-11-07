@@ -39,6 +39,11 @@ public final class NareChannel implements PluginMessageListener {
     public static final byte S2C_RULES = 7;
 
     public static final byte C2S_PANIC = 7;
+    public static final byte C2S_JUMPPAD = 8;
+    public static final byte C2S_FILE = 9;
+
+    public static final byte S2C_JUMPPAD = 8;
+    public static final byte S2C_FILES = 9;
 
     private final NareServer plugin;
 
@@ -84,6 +89,30 @@ public final class NareChannel implements PluginMessageListener {
                     // голос не ставим в очередь главного потока: двадцать пять
                     // кадров в секунду на каждого говорящего её и затопят
                     plugin.onVoice(player, data);
+                }
+                case C2S_JUMPPAD -> {
+                    String world = in.readUTF();
+                    int x = in.readInt(), y = in.readInt(), z = in.readInt();
+                    int power = in.readInt();
+
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> plugin.onJumpPadSet(player, world, x, y, z, power));
+                }
+                case C2S_FILE -> {
+                    byte action = in.readByte();          // 0 записать, 1 удалить, 2 список
+                    String name = in.readUTF();
+
+                    byte[] data = new byte[0];
+                    if (action == 0) {
+                        int size = in.readInt();
+                        if (size < 0 || size > 512 * 1024) return;
+                        data = new byte[size];
+                        in.readFully(data);
+                    }
+
+                    byte[] payload = data;
+                    Bukkit.getScheduler().runTask(plugin,
+                            () -> plugin.onModFile(player, action, name, payload));
                 }
                 case C2S_PANIC -> {
                     int tnt = in.readInt();
@@ -135,6 +164,26 @@ public final class NareChannel implements PluginMessageListener {
             out.writeBoolean(plugin.ruleEspMobs());
             out.writeBoolean(plugin.ruleBright());
             out.writeBoolean(plugin.ruleZoom());
+        });
+    }
+
+    /** Открыть у игрока окно настройки прыжковой плиты. */
+    public void sendJumpPad(Player player, String world, int x, int y, int z, int power) {
+        send(player, out -> {
+            out.writeByte(S2C_JUMPPAD);
+            out.writeUTF(world);
+            out.writeInt(x);
+            out.writeInt(y);
+            out.writeInt(z);
+            out.writeInt(power);
+        });
+    }
+
+    /** Что из файлов мода лежит на сервере у этого игрока. */
+    public void sendFiles(Player player, String names) {
+        send(player, out -> {
+            out.writeByte(S2C_FILES);
+            out.writeUTF(names == null ? "" : names);
         });
     }
 

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.winnigames2024.forge_narevisuals.Config;
 import com.winnigames2024.forge_narevisuals.Forge_narevisuals;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -35,7 +36,7 @@ public class NareSettingsScreen extends Screen {
             0xFFF0B446, 0xFFFF5C5C, 0xFF36C8D8, 0xFFE8EEF8
     };
 
-    private static final String[] TABS = { "Быстро", "Функции", "Элементы", "Вид", "Меню", "Мир", "Камера", "Бинды", "Ещё" };
+    private static final String[] TABS = { "Быстро", "Функции", "Элементы", "Вид", "Меню", "Мир", "Камера", "Инвентарь", "Бинды", "Ещё" };
 
     private static final String[] SKY_PRESETS = { "nebula", "sunset", "aurora", "dawn", "void" };
     private static final String[] SKY_TITLES = { "Туманность", "Закат", "Сияние", "Рассвет", "Пустота" };
@@ -425,6 +426,72 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.skyKeepSun, () -> { cfg.skyKeepSun = !cfg.skyKeepSun; Config.save(); }));
             }
             case 7 -> {
+                Minecraft game = Minecraft.getInstance();
+
+                list.add(Row.label("В бою"));
+                list.add(Row.toggle("Авто-тотем",
+                        "Достаёт тотем во вторую руку, когда здоровья мало",
+                        () -> cfg.autoTotem, () -> { cfg.autoTotem = !cfg.autoTotem; Config.save(); }));
+                list.add(Row.slider("Доставать при", 1, 15,
+                        () -> cfg.autoTotemAt, v -> { cfg.autoTotemAt = v; Config.save(); },
+                        v -> v + " сердцах"));
+
+                list.add(Row.toggle("Авто-броня", "Надевает лучшую броню из инвентаря",
+                        () -> cfg.autoArmor, () -> { cfg.autoArmor = !cfg.autoArmor; Config.save(); }));
+                list.add(Row.toggle("Менять на лучшую", "Иначе только занимает пустые слоты",
+                        () -> cfg.autoArmorUpgrade,
+                        () -> { cfg.autoArmorUpgrade = !cfg.autoArmorUpgrade; Config.save(); }));
+
+                list.add(Row.label("Эффекты"));
+                list.add(Row.toggle("Показывать только выбранные",
+                        "Сам эффект остаётся — прячем только показ",
+                        () -> cfg.effectsFilter,
+                        () -> { cfg.effectsFilter = !cfg.effectsFilter; Config.save(); }));
+
+                if (cfg.effectsFilter) {
+                    boolean any = false;
+
+                    if (game.player != null)
+                        for (var effect : game.player.getActiveEffects()) {
+                            String key = NareLook.keyOf(effect);
+                            if (key.isEmpty()) continue;
+                            any = true;
+
+                            list.add(Row.toggle(NareLook.nameOf(effect), key,
+                                    () -> cfg.effectsKeep.contains(key),
+                                    () -> {
+                                        if (!cfg.effectsKeep.remove(key)) cfg.effectsKeep.add(key);
+                                        Config.save();
+                                    }));
+                        }
+
+                    if (!any)
+                        list.add(Row.label("Эффектов сейчас нет — загляните, когда будут"));
+
+                    list.add(Row.action("Оставить только то, что висит сейчас",
+                            "Остальное перестанет показываться",
+                            () -> {
+                                cfg.effectsKeep.clear();
+                                if (game.player != null)
+                                    for (var effect : game.player.getActiveEffects()) {
+                                        String key = NareLook.keyOf(effect);
+                                        if (!key.isEmpty()) cfg.effectsKeep.add(key);
+                                    }
+                                Config.save();
+                            }));
+                }
+
+                list.add(Row.label("Обзор"));
+                list.add(Row.toggle("Убрать огонь с экрана", "Гореть не перестанете",
+                        () -> cfg.fireOff, () -> { cfg.fireOff = !cfg.fireOff; Config.save(); }));
+                list.add(Row.slider("Размер огня", 10, 100,
+                        () -> cfg.fireSize, v -> { cfg.fireSize = v; Config.save(); },
+                        v -> v >= 100 ? "как в игре" : v + "%"));
+                list.add(Row.slider("Размер щита в руке", 30, 100,
+                        () -> cfg.shieldSize, v -> { cfg.shieldSize = v; Config.save(); },
+                        v -> v >= 100 ? "как в игре" : v + "%"));
+            }
+            case 8 -> {
                 list.add(Row.label("Клавиши мода"));
                 for (int i = 0; i < NareKeys.ALL.length; i++)
                     list.add(Row.key(NareKeys.TITLES[i], NareKeys.ALL[i]));
@@ -448,6 +515,14 @@ public class NareSettingsScreen extends Screen {
                         () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
                         v -> v + " бл."));
                 list.add(Row.action("Правила сервера", NareRules.text(), () -> { }));
+                list.add(Row.toggle("Настройки на сервере", NareCloud.state(),
+                        () -> cfg.syncToServer,
+                        () -> {
+                            cfg.syncToServer = !cfg.syncToServer;
+                            Config.save();
+                            if (cfg.syncToServer) NareCloud.push();
+                            else NareCloud.drop("config.json");
+                        }));
 
                 if (!NareErrors.ignored().isEmpty())
                     list.add(Row.action("Скрытые ошибки",

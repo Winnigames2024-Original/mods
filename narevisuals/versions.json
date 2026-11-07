@@ -1,6 +1,14 @@
 {
-  "latest": "2.5.0",
+  "latest": "2.7.0",
   "releases": [
+    {
+      "version": "2.7.0",
+      "file": "forge_narevisuals-2.7.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.7.0.jar",
+      "sha1": "535b08352e50e2be2fba21b99d1aa0f38e5b059d",
+      "size": 795149,
+      "notes": "инвентарь в бою, огонь и щит, плитки паркура"
+    },
     {
       "version": "2.5.0",
       "file": "forge_narevisuals-2.5.0.jar",

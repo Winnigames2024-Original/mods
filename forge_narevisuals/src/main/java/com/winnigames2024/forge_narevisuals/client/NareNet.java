@@ -46,6 +46,8 @@ public final class NareNet {
     private static final byte C2S_TP = 5;
     private static final byte C2S_VOICE = 6;
     private static final byte C2S_PANIC = 7;
+    private static final byte C2S_JUMPPAD = 8;
+    private static final byte C2S_FILE = 9;
 
     private static final byte S2C_WELCOME = 1;
     private static final byte S2C_PLAYERS = 2;
@@ -54,6 +56,8 @@ public final class NareNet {
     private static final byte S2C_INFO = 5;
     private static final byte S2C_VOICE = 6;
     private static final byte S2C_RULES = 7;
+    private static final byte S2C_JUMPPAD = 8;
+    private static final byte S2C_FILES = 9;
 
     /** Одна метка сломанного блока. */
     public record Mark(String who, int x, int y, int z, long at) { }
@@ -180,6 +184,20 @@ public final class NareNet {
                         Forge_narevisuals.NAME, NareRules.text());
             }
 
+            case S2C_JUMPPAD -> {
+                String world = takeText(buf);
+                int x = buf.readInt(), y = buf.readInt(), z = buf.readInt();
+                int power = buf.readInt();
+
+                Minecraft mc = Minecraft.getInstance();
+                mc.execute(() -> mc.setScreen(
+                        new NareJumpPadScreen(mc.screen, world, x, y, z, power)));
+            }
+
+            case S2C_FILES -> {
+                NareCloud.listed(takeText(buf));
+            }
+
             case S2C_VOICE -> {
                 String who = takeText(buf);
                 double x = buf.readDouble();
@@ -270,6 +288,51 @@ public final class NareNet {
             out.send(buf, PacketDistributor.SERVER.noArg());
         }
         catch (Exception ignored) { }
+    }
+
+    /** Новая сила прыжковой плиты. */
+    public static void sendJumpPad(String world, int x, int y, int z, int power) {
+        if (out == null || !serverHasPlugin) return;
+
+        try {
+            var buf = new FriendlyByteBuf(Unpooled.buffer(64));
+            buf.writeByte(C2S_JUMPPAD);
+            putText(buf, world);
+            buf.writeInt(x);
+            buf.writeInt(y);
+            buf.writeInt(z);
+            buf.writeInt(power);
+            out.send(buf, PacketDistributor.SERVER.noArg());
+        }
+        catch (Exception ignored) { }
+    }
+
+    /**
+     * Файл мода на сервер: 0 — записать, 1 — удалить, 2 — спросить список.
+     * Сервер кладёт его в свою папку, по игроку.
+     */
+    public static void sendFile(int action, String name, byte[] data) {
+        if (out == null || !serverHasPlugin) return;
+
+        try {
+            int size = data == null ? 0 : data.length;
+            var buf = new FriendlyByteBuf(Unpooled.buffer(size + 96));
+
+            buf.writeByte(C2S_FILE);
+            buf.writeByte(action);
+            putText(buf, name);
+
+            if (action == 0) {
+                buf.writeInt(size);
+                if (size > 0) buf.writeBytes(data);
+            }
+
+            out.send(buf, PacketDistributor.SERVER.noArg());
+        }
+        catch (Exception e) {
+            Forge_narevisuals.LOGGER.warn("{}: файл не ушёл на сервер: {}",
+                    Forge_narevisuals.NAME, e.getMessage());
+        }
     }
 
     public static void sendVoice(byte[] data) {

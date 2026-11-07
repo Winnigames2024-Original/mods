@@ -7,6 +7,12 @@ description: Серверная половина NareVisuals — значок м
 authors:
   - Winnigames2024
 
+commands:
+  nare:
+    description: Плитки паркура — выдать и посмотреть, сколько стоит
+    usage: /nare give checkpoint|uncheckpoint|jumppad [сила] [ник]
+    permission: narevisuals.parkour
+
 permissions:
   narevisuals.reach:
     description: Разрешить расширенную дальность ломания и удара
@@ -16,4 +22,7 @@ permissions:
     default: true
   narevisuals.bypass:
     description: Пускать на сервер без мода, когда require-mod включён
+    default: op
+  narevisuals.parkour:
+    description: Выдавать и настраивать плитки паркура
     default: op
