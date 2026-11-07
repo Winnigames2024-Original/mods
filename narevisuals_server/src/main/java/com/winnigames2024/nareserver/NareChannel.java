@@ -38,6 +38,8 @@ public final class NareChannel implements PluginMessageListener {
     public static final byte S2C_VOICE = 6;
     public static final byte S2C_RULES = 7;
 
+    public static final byte C2S_PANIC = 7;
+
     private final NareServer plugin;
 
     public NareChannel(NareServer plugin) {
@@ -82,6 +84,10 @@ public final class NareChannel implements PluginMessageListener {
                     // голос не ставим в очередь главного потока: двадцать пять
                     // кадров в секунду на каждого говорящего её и затопят
                     plugin.onVoice(player, data);
+                }
+                case C2S_PANIC -> {
+                    int tnt = in.readInt();
+                    Bukkit.getScheduler().runTask(plugin, () -> plugin.onPanic(player, tnt));
                 }
                 case C2S_TROLL -> {
                     String target = in.readUTF();

@@ -39,6 +39,15 @@ public final class ScreenHooks {
         if (!Launch.visuals()) return;
 
         Screen screen = event.getScreen();
+
+        // кнопка темы прямо в настройках самой игры
+        if (screen instanceof net.minecraft.client.gui.screens.options.OptionsScreen) {
+            addThemeButton(event, screen);
+            return;
+        }
+
+        if (screen instanceof PauseScreen && NareLock.on()) hideLeave(screen);
+
         if (!(screen instanceof TitleScreen) && !(screen instanceof PauseScreen)) return;
 
         // в своём главном меню NareVisuals уже есть отдельной строкой
@@ -51,6 +60,46 @@ public final class ScreenHooks {
         ).bounds(spot[0], spot[1], BW, BH).build();
 
         event.addListener(button);
+    }
+
+    /**
+     * Кнопка «Тема» в настройках игры. Человек ищет оформление именно там,
+     * а не в чужом меню, — так что пусть будет и там.
+     */
+    private static void addThemeButton(ScreenEvent.Init.Post event, Screen screen) {
+        int[] spot = freeSpot(screen);
+
+        Button button = Button.builder(Component.literal("Тема"), b ->
+                Minecraft.getInstance().setScreen(new NareThemeScreen(screen))
+        ).bounds(spot[0], spot[1], BW, BH).build();
+
+        event.addListener(button);
+    }
+
+    /**
+     * Убирает из паузы кнопку выхода, когда лаунчер запустил игру «только на
+     * этот сервер». Игру всё равно можно закрыть — это не ловушка.
+     */
+    private static void hideLeave(Screen screen) {
+        String[] names = { "menu.disconnect", "menu.returnToMenu", "menu.quit" };
+
+        for (GuiEventListener child : screen.children()) {
+            if (!(child instanceof AbstractWidget widget)) continue;
+
+            String text = widget.getMessage().getString();
+
+            for (String key : names) {
+                String vanilla = Component.translatable(key).getString();
+                if (!text.equals(vanilla)) continue;
+
+                widget.active = false;
+                widget.setMessage(Component.literal("Выход закрыт"));
+                widget.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        Component.literal("Игра запущена только для этого сервера. "
+                                + "Закрыть Minecraft можно как обычно.")));
+                break;
+            }
+        }
     }
 
     /** Первое место из списка, где кнопка никого не задевает. */
@@ -98,6 +147,7 @@ public final class ScreenHooks {
         if (screen instanceof NareFpsScreen) return;
         if (screen instanceof NareVoiceScreen) return;
         if (screen instanceof NareErrorScreen) return;
+        if (screen instanceof NareThemeScreen) return;
         if (screen instanceof HudEditScreen) return;
         if (screen instanceof NareKeysScreen) return;
 

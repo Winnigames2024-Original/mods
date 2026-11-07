@@ -14,3 +14,6 @@ permissions:
   narevisuals.voice:
     description: Разрешить голосовой чат
     default: true
+  narevisuals.bypass:
+    description: Пускать на сервер без мода, когда require-mod включён
+    default: op

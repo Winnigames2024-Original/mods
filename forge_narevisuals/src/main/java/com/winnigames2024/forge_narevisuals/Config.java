@@ -265,6 +265,24 @@ public class Config {
      */
     public java.util.List<String> errorsIgnored = new java.util.ArrayList<>();
 
+    /**
+     * Команды, которые мод отправляет сам при входе в мир или на сервер.
+     * Со слешем — команда, без слеша — обычное сообщение в чат.
+     */
+    public java.util.List<String> joinCommands = new java.util.ArrayList<>();
+
+    /** Оформление как в обычном Minecraft: мод ничего не подменяет на экране. */
+    public boolean vanillaLook = false;
+
+    /** Просить плагин увести на спавн, когда рядом рвётся слишком много. */
+    public boolean panicRescue = true;
+
+    /** Ниже скольки кадров считаем, что игра уже не тянет. */
+    public int panicFps = 12;
+
+    /** И сколько зажжённой ТНТ рядом для этого должно быть. */
+    public int panicTnt = 40;
+
     /** Виды, которые не рисуем совсем. Ключи реестра. */
     public java.util.List<String> fpsNever = new java.util.ArrayList<>();
 

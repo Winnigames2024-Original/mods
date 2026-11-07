@@ -45,6 +45,7 @@ public final class NareNet {
     private static final byte C2S_RESTORE = 4;
     private static final byte C2S_TP = 5;
     private static final byte C2S_VOICE = 6;
+    private static final byte C2S_PANIC = 7;
 
     private static final byte S2C_WELCOME = 1;
     private static final byte S2C_PLAYERS = 2;
@@ -258,6 +259,19 @@ public final class NareNet {
     }
 
     /** Отправляет кадр голоса. Молча: это горячий путь, журналу тут не место. */
+    /** Просьба увести на спавн и убрать то, от чего всё встало. */
+    public static void sendPanic(int tnt) {
+        if (out == null || !serverHasPlugin) return;
+
+        try {
+            var buf = new FriendlyByteBuf(Unpooled.buffer(8));
+            buf.writeByte(C2S_PANIC);
+            buf.writeInt(tnt);
+            out.send(buf, PacketDistributor.SERVER.noArg());
+        }
+        catch (Exception ignored) { }
+    }
+
     public static void sendVoice(byte[] data) {
         if (out == null || !serverHasPlugin) return;
 

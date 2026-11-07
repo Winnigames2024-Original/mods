@@ -49,6 +49,15 @@ public final class NareServer extends JavaPlugin implements Listener {
     private int voiceDistance;
     private int voicePort;
 
+    private boolean requireMod;
+    private int requireSeconds;
+    private String requireMessage = "";
+
+    private int tntMaxNearby;
+    private int tntRadius;
+    private boolean tntRescue;
+    private String tntRescueCommand = "";
+
     private boolean ruleFreecam = true;
     private int ruleFreecamRange;
     private boolean ruleEspPlayers = true;
@@ -162,7 +171,11 @@ public final class NareServer extends JavaPlugin implements Listener {
                                          "voice.port", "voice.bind",
                                          "limits.freecam", "limits.freecam-distance",
                                          "limits.esp-players", "limits.esp-mobs",
-                                         "limits.bright", "limits.zoom" }) {
+                                         "limits.bright", "limits.zoom",
+                                         "require-mod.enabled", "require-mod.seconds",
+                                         "require-mod.message",
+                                         "tnt.max-nearby", "tnt.radius",
+                                         "tnt.rescue", "tnt.rescue-command" }) {
             if (getConfig().isSet(key)) continue;
             changed = true;
             getLogger().info("NareVisuals: дописал в config.yml настройку " + key);
@@ -182,6 +195,16 @@ public final class NareServer extends JavaPlugin implements Listener {
         voice = getConfig().getBoolean("voice.enabled", true);
         voiceDistance = getConfig().getInt("voice.distance", 48);
         voicePort = getConfig().getInt("voice.port", 0);
+
+        requireMod = getConfig().getBoolean("require-mod.enabled", false);
+        requireSeconds = Math.max(5, getConfig().getInt("require-mod.seconds", 20));
+        requireMessage = getConfig().getString("require-mod.message",
+                "Сюда пускают только с модом NareVisuals.");
+
+        tntMaxNearby = Math.max(0, getConfig().getInt("tnt.max-nearby", 24));
+        tntRadius = Math.max(1, getConfig().getInt("tnt.radius", 8));
+        tntRescue = getConfig().getBoolean("tnt.rescue", true);
+        tntRescueCommand = getConfig().getString("tnt.rescue-command", "spawn");
 
         ruleFreecam = getConfig().getBoolean("limits.freecam", true);
         ruleFreecamRange = Math.max(0, getConfig().getInt("limits.freecam-distance", 0));
@@ -272,6 +295,76 @@ public final class NareServer extends JavaPlugin implements Listener {
 
             channel.sendVoice(to, who, at[0], at[1], at[2], data);
         }
+    }
+
+    /**
+     * Пускаем только с модом: ждём, пока клиент поздоровается, и если не
+     * дождались — отправляем с объяснением. Проверяем отложенно, потому что
+     * вход на плохой связи бывает долгим.
+     */
+    @EventHandler
+    public void onJoinCheck(org.bukkit.event.player.PlayerJoinEvent event) {
+        if (!requireMod) return;
+
+        Player player = event.getPlayer();
+        if (player.hasPermission("narevisuals.bypass")) return;
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!player.isOnline()) return;
+            if (guests.containsKey(player.getUniqueId())) return;
+
+            player.kick(net.kyori.adventure.text.Component.text(requireMessage));
+            getLogger().info("NareVisuals: " + player.getName() + " без мода — отправлен");
+        }, requireSeconds * 20L);
+    }
+
+    /**
+     * Зажечь ТНТ рядом с кучей такой же нельзя. Блок остаётся лежать: человек
+     * видит, что не поджигается, и это понятнее, чем десять секунд тишины у
+     * всех на сервере.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onTntSpawn(org.bukkit.event.entity.EntitySpawnEvent event) {
+        if (tntMaxNearby <= 0) return;
+        if (!(event.getEntity() instanceof org.bukkit.entity.TNTPrimed)) return;
+
+        var at = event.getLocation();
+        int near = 0;
+
+        for (var other : at.getWorld().getNearbyEntities(at, tntRadius, tntRadius, tntRadius)) {
+            if (!(other instanceof org.bukkit.entity.TNTPrimed)) continue;
+            if (++near < tntMaxNearby) continue;
+
+            event.setCancelled(true);
+            return;
+        }
+    }
+
+    /**
+     * Клиент говорит, что уже не тянет. Уводим человека и убираем то, из-за
+     * чего всё встало: ему всё равно не видно и не нажать.
+     */
+    public void onPanic(Player player, int tnt) {
+        if (!tntRescue) return;
+        if (!guests.containsKey(player.getUniqueId())) return;
+
+        var at = player.getLocation();
+        int removed = 0;
+
+        for (var entity : at.getWorld().getNearbyEntities(at, 48, 48, 48)) {
+            if (!(entity instanceof org.bukkit.entity.TNTPrimed)) continue;
+            entity.remove();
+            removed++;
+        }
+
+        boolean moved = false;
+        if (!tntRescueCommand.isBlank())
+            moved = Bukkit.dispatchCommand(player, tntRescueCommand);
+
+        if (!moved) player.teleport(at.getWorld().getSpawnLocation());
+
+        getLogger().info("NareVisuals: увёл " + player.getName()
+                + " (говорит, рядом " + tnt + " ТНТ), убрал " + removed);
     }
 
     @EventHandler

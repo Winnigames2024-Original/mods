@@ -1,8 +1,8 @@
 {
-  "version": "2.4.0",
-  "file": "forge_narevisuals-2.4.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.4.0.jar",
-  "sha1": "5f3b173859fc393f8e40750ec3790883c08592ab",
-  "size": 758319,
-  "notes": "сервер может ограничить камеру, подсветку, яркость и зум"
+  "version": "2.5.0",
+  "file": "forge_narevisuals-2.5.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.5.0.jar",
+  "sha1": "ff371878609fd638bb6184954b073732df478c52",
+  "size": 768460,
+  "notes": "кнопка WMine, команды при входе, тема в настройках игры"
 }
