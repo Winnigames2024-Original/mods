@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "file": "NareInstaller.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/nareinstaller/NareInstaller.exe",
-  "sha1": "fe12880bea30f54f266e559831a9a10f95164641",
-  "size": 453120,
-  "notes": "онлайн и оффлайн установка, ярлыки, update.exe рядом с лаунчером"
+  "sha1": "8d32778aa71b8af3674e3027ae7713d453d3efbb",
+  "size": 462336,
+  "notes": "ставит лаунчер 1.7.0 и привязывает ссылки narelauncher://"
 }

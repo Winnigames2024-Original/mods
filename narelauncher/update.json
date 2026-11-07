@@ -1,8 +1,8 @@
 {
-  "version": "1.6.2",
+  "version": "1.7.0",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "9b2f531bef9e051780de63bc279aa84df78ca322",
-  "size": 396800,
-  "notes": "персонаж во весь экран, эффекты щелчка, вкладка «Вещи»"
+  "sha1": "eadf50aff5a3ad65835636bfc673e9042f13cb5d",
+  "size": 404992,
+  "notes": "кнопка «Играть» с сайта, картинки модов в поиске"
 }
