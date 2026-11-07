@@ -5,7 +5,6 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
-import org.bukkit.block.data.Directional;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -31,10 +30,28 @@ import java.util.Map;
  */
 public final class NareParkour {
 
-    /** Из чего делаем плитки. Керамика — чтобы не портить обычные стройблоки. */
-    public static final Material CHECKPOINT = Material.LIME_GLAZED_TERRACOTTA;
-    public static final Material UNCHECKPOINT = Material.RED_GLAZED_TERRACOTTA;
-    public static final Material JUMPPAD = Material.MAGENTA_GLAZED_TERRACOTTA;
+    /**
+     * Все три плитки — нотный блок, отличаются только нотой.
+     *
+     * Почему так: ресурспак умеет давать разный вид разным состояниям
+     * одного блока. Нота 1, 2 и 3 получают наши картинки, остальные 22
+     * остаются обычным нотным блоком. Если бы мы взяли, скажем, зелёную
+     * керамику, перекрасилась бы вся керамика в мире — а плитка должна
+     * быть только плиткой.
+     */
+    public static final Material TILE = Material.NOTE_BLOCK;
+
+    public static final int NOTE_CHECKPOINT = 1;
+    public static final int NOTE_UNCHECKPOINT = 2;
+    public static final int NOTE_JUMPPAD = 3;
+
+    public static int noteOf(String kind) {
+        return switch (kind) {
+            case "checkpoint" -> NOTE_CHECKPOINT;
+            case "uncheckpoint" -> NOTE_UNCHECKPOINT;
+            default -> NOTE_JUMPPAD;
+        };
+    }
 
     private static final int DEFAULT_POWER = 12;
 
@@ -117,13 +134,7 @@ public final class NareParkour {
 
     /** Помеченная вещь: при установке блок сам станет плиткой. */
     public ItemStack item(String kind, int power) {
-        Material material = switch (kind) {
-            case "checkpoint" -> CHECKPOINT;
-            case "uncheckpoint" -> UNCHECKPOINT;
-            default -> JUMPPAD;
-        };
-
-        ItemStack stack = new ItemStack(material);
+        ItemStack stack = new ItemStack(TILE);
         ItemMeta meta = stack.getItemMeta();
 
         meta.displayName(net.kyori.adventure.text.Component.text(switch (kind) {
@@ -161,19 +172,19 @@ public final class NareParkour {
      * Обычную керамику они не трогают: на выходе помеченная вещь.
      */
     public void recipes() {
-        add("checkpoint", CHECKPOINT, Material.ENDER_PEARL, "Чекпоинт");
-        add("uncheckpoint", UNCHECKPOINT, Material.REDSTONE, "Сброс чекпоинта");
-        add("jumppad", JUMPPAD, Material.SLIME_BALL, "Прыжковая плита");
+        add("checkpoint", Material.ENDER_PEARL, "Чекпоинт");
+        add("uncheckpoint", Material.REDSTONE, "Сброс чекпоинта");
+        add("jumppad", Material.SLIME_BALL, "Прыжковая плита");
     }
 
-    private void add(String kind, Material base, Material extra, String title) {
+    private void add(String kind, Material extra, String title) {
         var key = new NamespacedKey(plugin, "nare_" + kind);
 
         try { Bukkit.removeRecipe(key); } catch (Exception ignored) { }
 
         var recipe = new ShapedRecipe(key, item(kind, DEFAULT_POWER));
         recipe.shape(" e ", "ebe", " e ");
-        recipe.setIngredient('b', base);
+        recipe.setIngredient('b', TILE);
         recipe.setIngredient('e', extra);
 
         try { Bukkit.addRecipe(recipe); }
@@ -184,20 +195,42 @@ public final class NareParkour {
 
     // ------------------------------------------------------------ работа
 
-    /** Поставили помеченный блок — запоминаем и разворачиваем, чтобы текст читался. */
+    /**
+     * Поставили помеченный блок — запоминаем и выставляем ноту: именно по
+     * ней ресурспак и понимает, какую картинку рисовать.
+     */
     public void placed(Block block, Tile tile) {
         put(block.getLocation(), tile.kind(), tile.power());
+        paint(block, tile.kind());
+    }
 
-        // у глазурованной керамики картинка поворачивается за установкой,
-        // а надпись должна читаться всегда одинаково
+    /** Ставит блоку ноту, по которой у него появляется своя картинка. */
+    public void paint(Block block, String kind) {
         try {
             var data = block.getBlockData();
-            if (data instanceof Directional directional) {
-                directional.setFacing(org.bukkit.block.BlockFace.NORTH);
-                block.setBlockData(directional, false);
-            }
+            if (!(data instanceof org.bukkit.block.data.type.NoteBlock note)) return;
+
+            note.setNote(new org.bukkit.Note(noteOf(kind)));
+            block.setBlockData(note, false);
         }
-        catch (Exception ignored) { }
+        catch (Exception e) {
+            plugin.getLogger().warning("Плитке не выставилась нота: " + e.getMessage());
+        }
+    }
+
+    /** Вернуть ноту на место — её могли сбить ударом или редстоуном. */
+    public void repaint(Block block) {
+        Tile tile = tileAt(block.getLocation());
+        if (tile == null) return;
+
+        try {
+            var data = block.getBlockData();
+            if (!(data instanceof org.bukkit.block.data.type.NoteBlock note)) return;
+            if (note.getNote().getId() == noteOf(tile.kind())) return;
+        }
+        catch (Exception ignored) { return; }
+
+        paint(block, tile.kind());
     }
 
     /**

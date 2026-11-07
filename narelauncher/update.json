@@ -1,8 +1,8 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "1158259a1f4348c5334ba3b3463bfcc4e9b91265",
+  "sha1": "c6e27c2b282ce027b27f05fb5143aca1bcb3c0fa",
   "size": 406528,
-  "notes": "кнопка WMine, команды при входе, мод ставится в любую сборку с Forge"
+  "notes": "кнопка WMine сама ставит сборку Forge Visuals 1.21.4"
 }

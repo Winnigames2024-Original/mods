@@ -514,6 +514,8 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.slider("Возвращать пачкой", 1, 128,
                         () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
                         v -> v + " бл."));
+                list.add(Row.action("Что умеет мод", "Все возможности с картинками",
+                        () -> minecraft.setScreen(new NareAboutScreen(this))));
                 list.add(Row.action("Правила сервера", NareRules.text(), () -> { }));
                 list.add(Row.toggle("Настройки на сервере", NareCloud.state(),
                         () -> cfg.syncToServer,

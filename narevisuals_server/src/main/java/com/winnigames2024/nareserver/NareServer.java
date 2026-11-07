@@ -148,7 +148,8 @@ public final class NareServer extends JavaPlugin implements Listener {
         }
 
         if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            sender.sendMessage(net.kyori.adventure.text.Component.text("/nare give checkpoint|uncheckpoint|jumppad [сила] [ник]"));
+            sender.sendMessage(net.kyori.adventure.text.Component.text(
+                    "/nare give [ник] checkpoint|uncheckpoint|jumppad [сила] — порядок слов любой"));
             sender.sendMessage(net.kyori.adventure.text.Component.text("/nare count — сколько плиток стоит"));
             sender.sendMessage(net.kyori.adventure.text.Component.text("Плитки ещё и крафтятся: керамика в кольце из"));
             sender.sendMessage(net.kyori.adventure.text.Component.text("жемчуга Края, редстоуна или слизи."));
@@ -165,20 +166,41 @@ public final class NareServer extends JavaPlugin implements Listener {
             return true;
         }
 
-        String kind = args[1].toLowerCase(java.util.Locale.ROOT);
-        if (!kind.equals("checkpoint") && !kind.equals("uncheckpoint") && !kind.equals("jumppad")) {
-            sender.sendMessage(net.kyori.adventure.text.Component.text("Плитки бывают: checkpoint, uncheckpoint, jumppad"));
+        // порядок слов не важен: и «give ник плитка», и «give плитка ник»
+        String kind = null;
+        String nick = null;
+        int power = 12;
+
+        for (int i = 1; i < args.length; i++) {
+            String word = args[i];
+            String low = word.toLowerCase(java.util.Locale.ROOT);
+
+            if (low.equals("checkpoint") || low.equals("uncheckpoint") || low.equals("jumppad")) {
+                kind = low;
+                continue;
+            }
+
+            if (word.chars().allMatch(Character::isDigit)) {
+                try { power = Integer.parseInt(word); } catch (Exception ignored) { }
+                continue;
+            }
+
+            nick = word;
+        }
+
+        if (kind == null) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text(
+                    "Плитки бывают: checkpoint, uncheckpoint, jumppad"));
             return true;
         }
 
-        int power = 12;
-        if (args.length > 2) try { power = Integer.parseInt(args[2]); } catch (Exception ignored) { }
-
-        Player target = args.length > 3 ? Bukkit.getPlayerExact(args[3])
+        Player target = nick != null ? Bukkit.getPlayerExact(nick)
                 : (sender instanceof Player self ? self : null);
 
         if (target == null) {
-            sender.sendMessage(net.kyori.adventure.text.Component.text("Кому выдавать? Укажите ник."));
+            sender.sendMessage(net.kyori.adventure.text.Component.text(
+                    nick == null ? "Кому выдавать? Укажите ник."
+                                 : "Игрока " + nick + " нет на сервере"));
             return true;
         }
 
@@ -467,6 +489,26 @@ public final class NareServer extends JavaPlugin implements Listener {
         hint(event.getPlayer(), "Плитка поставлена: " + title(tile.kind()));
     }
 
+    /** Ударили по плитке: игра сыграет ноту, а нам важно, чтобы вид не съехал. */
+    @EventHandler(ignoreCancelled = true)
+    public void onHitTile(org.bukkit.event.block.BlockDamageEvent event) {
+        if (parkour == null) return;
+        if (parkour.tileAt(event.getBlock().getLocation()) == null) return;
+
+        var block = event.getBlock();
+        Bukkit.getScheduler().runTask(this, () -> parkour.repaint(block));
+    }
+
+    /** Редстоун тоже умеет трогать нотный блок. */
+    @EventHandler(ignoreCancelled = true)
+    public void onTilePower(org.bukkit.event.block.BlockRedstoneEvent event) {
+        if (parkour == null) return;
+        if (parkour.tileAt(event.getBlock().getLocation()) == null) return;
+
+        var block = event.getBlock();
+        Bukkit.getScheduler().runTask(this, () -> parkour.repaint(block));
+    }
+
     /** Сломали — забываем, иначе на этом месте потом «призрак». */
     @EventHandler(ignoreCancelled = true)
     public void onBreakTile(org.bukkit.event.block.BlockBreakEvent event) {
@@ -502,14 +544,17 @@ public final class NareServer extends JavaPlugin implements Listener {
         if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
 
         var tile = parkour.tileAt(event.getClickedBlock().getLocation());
-        if (tile == null || !tile.kind().equals("jumppad")) return;
+        if (tile == null) return;
+
+        // по нотному блоку щелчок меняет ноту, а нота — это наша картинка
+        event.setCancelled(true);
+
+        if (!tile.kind().equals("jumppad")) return;
         if (!event.getPlayer().hasPermission("narevisuals.parkour")) return;
         if (!guests.containsKey(event.getPlayer().getUniqueId())) {
             hint(event.getPlayer(), "Настроить плиту можно только с модом");
             return;
         }
-
-        event.setCancelled(true);
 
         var at = event.getClickedBlock().getLocation();
         channel.sendJumpPad(event.getPlayer(), at.getWorld().getName(),
