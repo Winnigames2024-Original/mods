@@ -92,6 +92,7 @@
     <Compile Include="Core\ModrinthApi.cs" />
     <Compile Include="Core\ModJar.cs" />
     <Compile Include="Core\ModCheck.cs" />
+    <Compile Include="Core\BlockModel.cs" />
     <Compile Include="Core\ModSourcesExtra.cs" />
     <Compile Include="Core\Net.cs" />
     <Compile Include="Core\Paths.cs" />
@@ -140,6 +141,15 @@
     </Compile>
     <Compile Include="UI\WelcomeForm.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\ModelEditorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\ModelPackForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\ModelView3D.cs">
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="UI\ModCheckForm.cs">
       <SubType>Form</SubType>

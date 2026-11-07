@@ -34,6 +34,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _toggle = new NareButton { Text = "Вкл / Выкл", Style = BtnStyle.Ghost, Size = new Size(134, 42) };
         private readonly NareButton _delete = new NareButton { Text = "Удалить", Style = BtnStyle.Danger, Icon = Ico.Trash, Size = new Size(134, 42) };
         private readonly NareButton _check = new NareButton { Text = "Проверить", Style = BtnStyle.Ghost, Size = new Size(126, 42) };
+        private readonly NareButton _models = new NareButton { Text = "3D-модели", Style = BtnStyle.Ghost, Size = new Size(150, 34), Radius = 9, Font = Theme.F(9.5f, FontStyle.Bold) };
 
         private readonly NareProgress _progress = new NareProgress();
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
@@ -200,6 +201,13 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_toggle);
             Controls.Add(_delete);
             Controls.Add(_check);
+
+            _models.Click += delegate
+            {
+                using (var editor = new ModelEditorForm()) editor.ShowDialog(FindForm());
+                RefreshLocal();
+            };
+            Controls.Add(_models);
             Controls.Add(_progress);
             Controls.Add(_status);
         }
@@ -749,6 +757,8 @@ namespace NareLauncher.UI.Pages
                 t.Location = new Point(tx, 118);
                 tx += t.Width + 8;
             }
+
+            _models.Location = new Point(Math.Max(tx + 12, Width - pad - _models.Width), 118);
 
             int searchY = 160;
             _search.SetBounds(pad, searchY, 300, 38);
