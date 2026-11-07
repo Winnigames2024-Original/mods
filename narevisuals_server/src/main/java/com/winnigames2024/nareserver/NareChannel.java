@@ -28,12 +28,14 @@ public final class NareChannel implements PluginMessageListener {
     // от клиента
     public static final byte C2S_HELLO = 1;
     public static final byte C2S_TROLL = 2;
+    public static final byte C2S_VOICE = 6;
 
     // к клиенту
     public static final byte S2C_WELCOME = 1;
     public static final byte S2C_PLAYERS = 2;
     public static final byte S2C_MARK = 3;
     public static final byte S2C_TROLL = 4;
+    public static final byte S2C_VOICE = 6;
 
     private final NareServer plugin;
 
@@ -69,6 +71,17 @@ public final class NareChannel implements PluginMessageListener {
                     Bukkit.getScheduler().runTask(plugin,
                             () -> plugin.onHello(player, version, funTrolls));
                 }
+                case C2S_VOICE -> {
+                    int size = in.readUnsignedShort();
+                    if (size <= 0 || size > 4096) return;
+
+                    byte[] data = new byte[size];
+                    in.readFully(data);
+
+                    // голос не ставим в очередь главного потока: двадцать пять
+                    // кадров в секунду на каждого говорящего её и затопят
+                    plugin.onVoice(player, data);
+                }
                 case C2S_TROLL -> {
                     String target = in.readUTF();
                     byte kind = in.readByte();
@@ -102,6 +115,18 @@ public final class NareChannel implements PluginMessageListener {
                 out.writeUTF(guest.name());
                 out.writeBoolean(guest.funTrolls());
             }
+        });
+    }
+
+    public void sendVoice(Player to, String who, double x, double y, double z, byte[] data) {
+        send(to, out -> {
+            out.writeByte(S2C_VOICE);
+            out.writeUTF(who);
+            out.writeDouble(x);
+            out.writeDouble(y);
+            out.writeDouble(z);
+            out.writeShort(data.length);
+            out.write(data);
         });
     }
 

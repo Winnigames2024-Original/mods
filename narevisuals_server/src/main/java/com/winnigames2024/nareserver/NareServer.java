@@ -19,6 +19,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Серверная половина NareVisuals.
@@ -44,6 +45,19 @@ public final class NareServer extends JavaPlugin implements Listener {
     private boolean marks;
     private boolean trolls;
 
+    private boolean voice;
+    private int voiceDistance;
+
+    /**
+     * Где кто стоит — снимок, обновляемый каждый тик.
+     *
+     * Голос приходит сетевым потоком, а спрашивать у Bukkit координаты не из
+     * главного потока нельзя. Поэтому читаем их заранее и раздаём по снимку:
+     * опоздание на один тик для звука незаметно.
+     */
+    private final Map<UUID, double[]> where = new ConcurrentHashMap<>();
+    private final Map<UUID, String> worlds = new ConcurrentHashMap<>();
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
@@ -54,10 +68,26 @@ public final class NareServer extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(this, this);
 
+        // снимок координат для голоса
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            where.clear();
+            worlds.clear();
+
+            for (UUID id : guests.keySet()) {
+                Player player = Bukkit.getPlayer(id);
+                if (player == null) continue;
+
+                var at = player.getEyeLocation();
+                where.put(id, new double[] { at.getX(), at.getY(), at.getZ() });
+                worlds.put(id, at.getWorld().getName());
+            }
+        }, 1L, 1L);
+
         getLogger().info("NareVisuals: сервер готов. Дальность "
                 + (reachBlocks > 0 ? reachBlocks + "/" + reachEntities : "не меняем")
                 + ", метки " + (marks ? "включены" : "выключены")
-                + ", шутки " + (trolls ? "разрешены" : "запрещены"));
+                + ", шутки " + (trolls ? "разрешены" : "запрещены")
+                + ", голос " + (voice ? "включён, слышно " + voiceDistance + " бл." : "выключен"));
     }
 
     @Override
@@ -74,6 +104,8 @@ public final class NareServer extends JavaPlugin implements Listener {
         reachEntities = getConfig().getDouble("reach.entities", 0);
         marks = getConfig().getBoolean("marks", true);
         trolls = getConfig().getBoolean("trolls", true);
+        voice = getConfig().getBoolean("voice.enabled", true);
+        voiceDistance = getConfig().getInt("voice.distance", 48);
     }
 
     public boolean trollsAllowed() {
@@ -104,8 +136,50 @@ public final class NareServer extends JavaPlugin implements Listener {
                 + (funTrolls ? " (шутки разрешил)" : ""));
     }
 
+    /**
+     * Кадр голоса от игрока с модом — раздаём тем, кто рядом и тоже с модом.
+     *
+     * Зовётся из сетевого потока, поэтому работаем только со снимком координат
+     * и ничего в состоянии плагина не меняем.
+     */
+    public void onVoice(Player from, byte[] data) {
+        if (!voice) return;
+        if (!guests.containsKey(from.getUniqueId())) return;
+        if (!from.hasPermission("narevisuals.voice")) return;
+
+        double[] at = where.get(from.getUniqueId());
+        String world = worlds.get(from.getUniqueId());
+        if (at == null || world == null) return;
+
+        String who = from.getName();
+        long limit = (long) voiceDistance * voiceDistance;
+
+        for (UUID id : guests.keySet()) {
+            if (id.equals(from.getUniqueId())) continue;
+
+            String theirWorld = worlds.get(id);
+            if (theirWorld == null || !theirWorld.equals(world)) continue;
+
+            double[] theirs = where.get(id);
+            if (theirs == null) continue;
+
+            double dx = theirs[0] - at[0];
+            double dy = theirs[1] - at[1];
+            double dz = theirs[2] - at[2];
+            if (dx * dx + dy * dy + dz * dz > limit) continue;
+
+            Player to = Bukkit.getPlayer(id);
+            if (to == null) continue;
+
+            channel.sendVoice(to, who, at[0], at[1], at[2], data);
+        }
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        where.remove(event.getPlayer().getUniqueId());
+        worlds.remove(event.getPlayer().getUniqueId());
+
         if (guests.remove(event.getPlayer().getUniqueId()) == null) return;
         reach(event.getPlayer(), 0, 0);
         broadcastPlayers();

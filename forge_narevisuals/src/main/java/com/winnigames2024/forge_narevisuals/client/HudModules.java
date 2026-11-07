@@ -522,4 +522,70 @@ public final class HudModules {
                         x + 18, ry, NareTheme.DIM);
         }
     }
+    // ------------------------------------------------------------- Голос
+
+    /**
+     * Кто говорит рядом. Сверху — своя полоска микрофона, чтобы было видно,
+     * что вас слышно, ещё до того как кто-то ответит.
+     */
+    public static class Voice extends HudModule {
+
+        private static final int MAX_ROWS = 4, HEAD = 17, ROW_H = 10;
+
+        public Voice() { super("voice", "Голосовой чат", 0.006f, 0.47f); }
+
+        @Override public int width(Minecraft mc) { return 132; }
+
+        @Override
+        public int height(Minecraft mc) {
+            int rows = Math.max(1, Math.min(MAX_ROWS, NareVoice.talkers().size()));
+            return HEAD + rows * ROW_H + 5;
+        }
+
+        @Override
+        public void render(GuiGraphics g, Minecraft mc, int x, int y) {
+            List<String> list = NareVoice.talkers();
+            boolean me = NareVoice.sending();
+
+            int w = width(mc), h = height(mc);
+            NareTheme.card(g, x, y, w, h);
+
+            NareTheme.text(g, mc.font, "ГОЛОС", x + 9, y + 5, NareTheme.MUTED);
+
+            // своя полоска: заполняется громкостью, пока держите клавишу
+            int bx = x + w - 8 - 34, by = y + 7;
+            NareTheme.roundRect(g, bx, by, 34, 4, 2, NareTheme.LINE_SOFT);
+            if (me) {
+                int fill = Math.max(2, Math.round(34 * Math.min(1f, NareVoice.level())));
+                NareTheme.roundRect(g, bx, by, fill, 4, 2, NareTheme.accent());
+            }
+
+            g.fill(x + 9, y + HEAD - 2, x + w - 8, y + HEAD - 1, NareTheme.LINE_SOFT);
+
+            int ry = y + HEAD + 2;
+
+            if (list.isEmpty()) {
+                String why = !NareVoice.running()
+                        ? (NareVoice.trouble().isEmpty() ? "выключен" : NareVoice.trouble())
+                        : (me ? "вас слышно" : "тихо");
+                NareTheme.text(g, mc.font, why, x + 9, ry, NareTheme.DIM);
+                return;
+            }
+
+            int shown = Math.min(MAX_ROWS, list.size());
+            for (int i = 0; i < shown; i++) {
+                String who = list.get(i);
+                if (who.length() > 14) who = who.substring(0, 13) + "\u2026";
+
+                NareTheme.roundRect(g, x + 9, ry + 1, 5, 5, 2, NareTheme.accent());
+                NareTheme.text(g, mc.font, who, x + 19, ry, NareTheme.TEXT);
+
+                ry += ROW_H;
+            }
+
+            if (list.size() > shown)
+                NareTheme.text(g, mc.font, "\u0438 \u0435\u0449\u0451 " + (list.size() - shown),
+                        x + 19, ry, NareTheme.DIM);
+        }
+    }
 }

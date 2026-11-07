@@ -46,16 +46,21 @@ public final class NareKeys {
     public static final KeyMapping MOVE_HUD = new KeyMapping(
             "key.narevisuals.movehud", InputConstants.KEY_RBRACKET, CATEGORY);
 
+    /** Говорить: держать, нажимать или просто индикатор — смотря какой режим. */
+    public static final KeyMapping VOICE = new KeyMapping(
+            "key.narevisuals.voice", InputConstants.KEY_V, CATEGORY);
+
     /** Для экрана назначения клавиш: сами привязки и их подписи. */
     public static final KeyMapping[] ALL = {
             OPEN_SETTINGS, TOGGLE_HUD, TOGGLE_ESP, TOGGLE_BRIGHT,
-            TOGGLE_FREECAM, TOGGLE_SKY, ZOOM, TOGGLE_NEAR, MOVE_HUD
+            TOGGLE_FREECAM, TOGGLE_SKY, ZOOM, TOGGLE_NEAR, MOVE_HUD, VOICE
     };
 
     public static final String[] TITLES = {
             "Открыть настройки", "Спрятать HUD", "Подсветка игроков",
             "Яркость", "Свободная камера", "Своё небо",
-            "Приближение (держать)", "Игроки рядом", "Передвинуть элементы"
+            "Приближение (держать)", "Игроки рядом", "Передвинуть элементы",
+            "Говорить"
     };
 
     private static boolean migrated;

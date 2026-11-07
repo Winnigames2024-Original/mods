@@ -43,6 +43,23 @@ public final class InputTracker {
         if (Freecam.scrolled(event.getDeltaY())) event.setCanceled(true);
     }
 
+    /**
+     * Голос слушаем отдельно: нужны и нажатие, и отпускание, а общий
+     * обработчик ниже реагирует только на нажатие.
+     */
+    @SubscribeEvent
+    public static void onVoiceKey(InputEvent.Key event) {
+        if (event.getAction() == 2) return;          // авто-повтор не нужен
+        if (!Launch.visuals()) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen != null) return;
+
+        if (event.getKey() != NareKeys.VOICE.getKey().getValue()) return;
+
+        NareVoice.hold(event.getAction() == 1);
+    }
+
     @SubscribeEvent
     public static void onKey(InputEvent.Key event) {
         if (event.getAction() != 1) return;

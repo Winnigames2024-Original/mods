@@ -217,6 +217,29 @@ public class Config {
     /** Прятать и игроков тоже. По умолчанию их не трогаем. */
     public boolean fpsHidePlayers = false;
 
+    // ----------------------------------------------------------- голос
+
+    /** Голосовой чат. */
+    public boolean voiceEnabled = true;
+
+    /** 0 — говорить, пока держишь клавишу; 1 — нажал и говоришь; 2 — по голосу. */
+    public int voiceMode = 0;
+
+    /** Усиление микрофона в процентах. */
+    public int voiceMicGain = 100;
+
+    /** Громкость чужих голосов в процентах. */
+    public int voiceVolume = 100;
+
+    /** Порог срабатывания в режиме «по голосу», 0..100. */
+    public int voiceThreshold = 12;
+
+    /** За сколько блоков ещё слышно. Сервер может урезать. */
+    public int voiceDistance = 48;
+
+    /** Имя микрофона. Пусто — системный по умолчанию. */
+    public String voiceDevice = "";
+
     /** Виды, которые не рисуем совсем. Ключи реестра. */
     public java.util.List<String> fpsNever = new java.util.ArrayList<>();
 

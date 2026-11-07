@@ -11,3 +11,6 @@ permissions:
   narevisuals.reach:
     description: Разрешить расширенную дальность ломания и удара
     default: op
+  narevisuals.voice:
+    description: Разрешить голосовой чат
+    default: true

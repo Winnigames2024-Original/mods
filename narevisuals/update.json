@@ -1,8 +1,8 @@
 {
-  "version": "1.9.0",
-  "file": "forge_narevisuals-1.9.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-1.9.0.jar",
-  "sha1": "9391622e7d32807d9ddf51361ce996662c09abcf",
-  "size": 715602,
-  "notes": "взрывы не вешают игру, меню стало удобнее"
+  "version": "2.0.0",
+  "file": "forge_narevisuals-2.0.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.0.0.jar",
+  "sha1": "213dc011f054a1d0751766c8c4e07cccb46b40a5",
+  "size": 739220,
+  "notes": "свой голосовой чат — клавиша V, слышно по расстоянию"
 }

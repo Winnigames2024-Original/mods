@@ -141,6 +141,15 @@ public class NareClickScreen extends Screen {
                 () -> { cfg.autoLogin = !cfg.autoLogin; Config.save(); }));
         more.rows.add(Row.action("Передвинуть элементы",
                 () -> minecraft.setScreen(new HudEditScreen(this))));
+        more.rows.add(Row.toggle("Голос", () -> cfg.voiceEnabled,
+                () -> {
+                    cfg.voiceEnabled = !cfg.voiceEnabled;
+                    Config.save();
+                    if (cfg.voiceEnabled) NareVoice.start();
+                    else NareVoice.stop();
+                }));
+        more.rows.add(Row.action("Настроить голос",
+                () -> minecraft.setScreen(new NareVoiceScreen(this))));
         more.rows.add(Row.action("Свои и телепорт",
                 () -> minecraft.setScreen(new NarePanelScreen(this))));
         more.rows.add(Row.action("Обычное меню",

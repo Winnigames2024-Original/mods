@@ -44,12 +44,14 @@ public final class NareNet {
     private static final byte C2S_TROLL = 2;
     private static final byte C2S_RESTORE = 4;
     private static final byte C2S_TP = 5;
+    private static final byte C2S_VOICE = 6;
 
     private static final byte S2C_WELCOME = 1;
     private static final byte S2C_PLAYERS = 2;
     private static final byte S2C_MARK = 3;
     private static final byte S2C_TROLL = 4;
     private static final byte S2C_INFO = 5;
+    private static final byte S2C_VOICE = 6;
 
     /** Одна метка сломанного блока. */
     public record Mark(String who, int x, int y, int z, long at) { }
@@ -138,8 +140,6 @@ public final class NareNet {
                     }
 
                     try {
-                        Forge_narevisuals.LOGGER.info("{}: пакет с сервера, {} байт",
-                                Forge_narevisuals.NAME, buf.readableBytes());
                         read(buf);
                     } catch (Exception e) {
                         Forge_narevisuals.LOGGER.warn("{}: битый пакет с сервера: {}",
@@ -156,7 +156,26 @@ public final class NareNet {
     private static void read(FriendlyByteBuf buf) {
         byte type = buf.readByte();
 
+        // голос идёт потоком — о нём в журнал не пишем, иначе он утонет
+        if (type != S2C_VOICE)
+            Forge_narevisuals.LOGGER.info("{}: пакет с сервера, тип {}",
+                    Forge_narevisuals.NAME, type);
+
         switch (type) {
+            case S2C_VOICE -> {
+                String who = takeText(buf);
+                double x = buf.readDouble();
+                double y = buf.readDouble();
+                double z = buf.readDouble();
+
+                int size = buf.readUnsignedShort();
+                if (size <= 0 || size > 4096) return;
+
+                byte[] data = new byte[size];
+                buf.readBytes(data);
+
+                NareVoice.incoming(who, x, y, z, data);
+            }
             case S2C_WELCOME -> {
                 int proto = buf.readInt();
                 double blocks = buf.readDouble();
@@ -209,6 +228,20 @@ public final class NareNet {
             }
             default -> { }
         }
+    }
+
+    /** Отправляет кадр голоса. Молча: это горячий путь, журналу тут не место. */
+    public static void sendVoice(byte[] data) {
+        if (out == null || !serverHasPlugin) return;
+
+        try {
+            var buf = new FriendlyByteBuf(Unpooled.buffer(data.length + 8));
+            buf.writeByte(C2S_VOICE);
+            buf.writeShort(data.length);
+            buf.writeBytes(data);
+
+            out.send(buf, PacketDistributor.SERVER.noArg());
+        } catch (Exception ignored) { }
     }
 
     // ------------------------------------------------------------ отправка
@@ -319,6 +352,8 @@ public final class NareNet {
 
         helloRetry = 60;      // повторим через три секунды, вдруг рано
         loginTicks = Config.get().autoLogin ? 80 : -1;
+
+        NareVoice.start();
     }
 
     @SubscribeEvent
@@ -329,6 +364,8 @@ public final class NareNet {
         serverHasPlugin = false;
         loginTicks = -1;
         helloRetry = -1;
+
+        NareVoice.stop();
     }
 
     /**

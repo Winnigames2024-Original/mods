@@ -447,6 +447,10 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.slider("Возвращать пачкой", 1, 128,
                         () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
                         v -> v + " бл."));
+                list.add(Row.action("Голосовой чат", NareVoice.running()
+                                ? "Работает · " + NareKeys.VOICE.getTranslatedKeyMessage().getString()
+                                : "Настроить микрофон и громкость",
+                        () -> minecraft.setScreen(new NareVoiceScreen(this))));
                 list.add(Row.action("Автовход на сервер", "Команда и пароль для /login",
                         () -> minecraft.setScreen(new NareLoginScreen(this))));
                 list.add(Row.action("Свои текстуры", "Заменить блок или предмет своей картинкой",

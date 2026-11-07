@@ -45,6 +45,7 @@ public final class NareHud {
         MODULES.add(new HudModules.Pointer());
         MODULES.add(new HudModules.Broken());
         MODULES.add(new HudModules.HitMarker());
+        MODULES.add(new HudModules.Voice());
     }
 
     private NareHud() { }
