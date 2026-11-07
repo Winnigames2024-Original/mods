@@ -1,6 +1,14 @@
 {
-  "latest": "2.1.0",
+  "latest": "2.2.0",
   "releases": [
+    {
+      "version": "2.2.0",
+      "file": "forge_narevisuals-2.2.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.2.0.jar",
+      "sha1": "5a48f6d0247c82ba4dd7584bcd3cefff0a293e7f",
+      "size": 751384,
+      "notes": "дальность голоса задаёт сервер, можно слышать везде"
+    },
     {
       "version": "2.1.0",
       "file": "forge_narevisuals-2.1.0.jar",

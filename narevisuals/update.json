@@ -1,8 +1,8 @@
 {
-  "version": "2.1.0",
-  "file": "forge_narevisuals-2.1.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.1.0.jar",
-  "sha1": "25f28c813948198b805f39a149e5594b3af117dc",
-  "size": 750611,
-  "notes": "меню голоса на V, громкость по людям, окно ошибок"
+  "version": "2.2.0",
+  "file": "forge_narevisuals-2.2.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.2.0.jar",
+  "sha1": "5a48f6d0247c82ba4dd7584bcd3cefff0a293e7f",
+  "size": 751384,
+  "notes": "дальность голоса задаёт сервер, можно слышать везде"
 }

@@ -88,7 +88,9 @@ public final class NareServer extends JavaPlugin implements Listener {
                 + (reachBlocks > 0 ? reachBlocks + "/" + reachEntities : "не меняем")
                 + ", метки " + (marks ? "включены" : "выключены")
                 + ", шутки " + (trolls ? "разрешены" : "запрещены")
-                + ", голос " + (voice ? "включён, слышно " + voiceDistance + " бл." : "выключен"));
+                + ", голос " + (voice
+                        ? "включён, слышно " + (voiceDistance <= 0 ? "везде" : voiceDistance + " бл.")
+                        : "выключен"));
     }
 
     @Override
@@ -173,6 +175,11 @@ public final class NareServer extends JavaPlugin implements Listener {
      * Зовётся из сетевого потока, поэтому работаем только со снимком координат
      * и ничего в состоянии плагина не меняем.
      */
+    /** Дальность голоса, как её задали в config.yml. 0 и меньше — слышно везде. */
+    public int voiceDistance() {
+        return voiceDistance;
+    }
+
     public void onVoice(Player from, byte[] data) {
         if (!voice) return;
         if (!guests.containsKey(from.getUniqueId())) return;
@@ -183,21 +190,26 @@ public final class NareServer extends JavaPlugin implements Listener {
         if (at == null || world == null) return;
 
         String who = from.getName();
-        long limit = (long) voiceDistance * voiceDistance;
+
+        // 0 и меньше — слышно всем и в любом мире, расстояние не считаем
+        boolean everywhere = voiceDistance <= 0;
+        long limit = everywhere ? 0L : (long) voiceDistance * voiceDistance;
 
         for (UUID id : guests.keySet()) {
             if (id.equals(from.getUniqueId())) continue;
 
-            String theirWorld = worlds.get(id);
-            if (theirWorld == null || !theirWorld.equals(world)) continue;
-
             double[] theirs = where.get(id);
             if (theirs == null) continue;
 
-            double dx = theirs[0] - at[0];
-            double dy = theirs[1] - at[1];
-            double dz = theirs[2] - at[2];
-            if (dx * dx + dy * dy + dz * dz > limit) continue;
+            if (!everywhere) {
+                String theirWorld = worlds.get(id);
+                if (theirWorld == null || !theirWorld.equals(world)) continue;
+
+                double dx = theirs[0] - at[0];
+                double dy = theirs[1] - at[1];
+                double dz = theirs[2] - at[2];
+                if (dx * dx + dy * dy + dz * dz > limit) continue;
+            }
 
             Player to = Bukkit.getPlayer(id);
             if (to == null) continue;

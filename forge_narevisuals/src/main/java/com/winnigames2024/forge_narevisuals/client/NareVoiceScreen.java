@@ -115,9 +115,23 @@ public class NareVoiceScreen extends Screen {
                     () -> cfg.voiceThreshold, v -> { cfg.voiceThreshold = v; Config.save(); },
                     v -> v + "%"));
 
-        list.add(slider("Слышно за", "Сервер может урезать", 8, 128,
-                () -> cfg.voiceDistance, v -> { cfg.voiceDistance = v; Config.save(); },
+        list.add(slider("Слышно за", distanceHint(), 8, 256,
+                () -> cfg.voiceDistance,
+                v -> {
+                    cfg.voiceDistance = v;
+                    cfg.voiceDistanceCustom = true;
+                    Config.save();
+                },
                 v -> v + " бл."));
+
+        if (cfg.voiceDistanceCustom && NareNet.voiceDistance() >= 0) {
+            Row back = new Row(Row.Kind.ACTION, "Вернуть как на сервере", null);
+            back.act = () -> {
+                cfg.voiceDistanceCustom = false;
+                Config.save();
+            };
+            list.add(back);
+        }
 
         list.add(new Row(Row.Kind.LABEL, "Кто рядом", null));
 
@@ -150,6 +164,21 @@ public class NareVoiceScreen extends Screen {
             list.add(new Row(Row.Kind.LABEL, "Система не показала ни одного микрофона", null));
 
         return list;
+    }
+
+    /** Подсказка под ползунком дальности — что сейчас на самом деле. */
+    private static String distanceHint() {
+        int server = NareNet.voiceDistance();
+
+        if (server < 0) return "сервер про дальность молчит";
+        if (!Config.get().voiceDistanceCustom)
+            return server == 0 ? "сейчас по-серверному: слышно везде"
+                               : "сейчас по-серверному: " + server + " бл.";
+
+        if (server == 0) return "на сервере слышно везде, вы убавили";
+        if (Config.get().voiceDistance > server) return "сервер всё равно режет до " + server + " бл.";
+
+        return "на сервере " + server + " бл.";
     }
 
     private static int clampMode(int value) {

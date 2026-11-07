@@ -17,7 +17,7 @@ public class Forge_narevisuals {
 
     public static final String MODID = "forge_narevisuals";
     public static final String NAME = "NareVisuals";
-    public static final String VERSION = "2.1.0";
+    public static final String VERSION = "2.2.0";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public Forge_narevisuals(FMLJavaModLoadingContext context) {

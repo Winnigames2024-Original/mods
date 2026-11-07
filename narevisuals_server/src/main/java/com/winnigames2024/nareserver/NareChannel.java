@@ -104,6 +104,10 @@ public final class NareChannel implements PluginMessageListener {
             out.writeDouble(blocks);
             out.writeDouble(entities);
             out.writeBoolean(trolls);
+
+            // дальность голоса: решает сервер, клиент может только убавить.
+            // дописано в конец — старые клиенты это поле просто не читают
+            out.writeInt(plugin.voiceDistance());
         });
     }
 

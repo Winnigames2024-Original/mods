@@ -138,6 +138,29 @@ public final class NareVoice {
     /** Уровень микрофона 0..1 — для полоски в настройках. */
     public static float level() { return lastLevel; }
 
+    /**
+     * За сколько блоков мы сейчас слышим. Решает сервер: его слово — потолок,
+     * игрок может только убавить. 0 от сервера значит «везде», и тогда
+     * расстояние вообще не глушит голос.
+     */
+    public static int hearing() {
+        Config cfg = Config.get();
+        int server = NareNet.voiceDistance();
+
+        // сервер молчит (старый плагин или одиночная игра) — как настроено у себя
+        if (server < 0) return Math.max(1, cfg.voiceDistance);
+
+        int limit = server == 0 ? Integer.MAX_VALUE : server;
+
+        if (cfg.voiceDistanceCustom) return Math.max(1, Math.min(cfg.voiceDistance, limit));
+        return limit;
+    }
+
+    /** Слышно ли везде — для подписи в меню. */
+    public static boolean hearingEverywhere() {
+        return hearing() == Integer.MAX_VALUE;
+    }
+
     // --------------------------------------------------------- по людям
 
     /** Громкость человека в процентах: 100 — обычная, 0 — заглушён. */
@@ -424,7 +447,7 @@ public final class NareVoice {
                 float yaw = mc.player == null ? 0f : mc.player.getYRot();
                 float volume = Config.get().voiceMuteAll
                         ? 0f : Math.max(0f, Config.get().voiceVolume / 100f);
-                int hearing = Math.max(1, Config.get().voiceDistance);
+                int hearing = hearing();
 
                 synchronized (speakers) {
                     var it = speakers.values().iterator();
@@ -452,7 +475,10 @@ public final class NareVoice {
                         double dz = speaker.z - ear.z;
                         double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-                        float near = (float) Math.max(0.0, 1.0 - dist / hearing);
+                        // «везде» — громкость одинаковая, панорама всё равно остаётся
+                        float near = hearing == Integer.MAX_VALUE
+                                ? 1f
+                                : (float) Math.max(0.0, 1.0 - dist / hearing);
                         near *= near;                       // вблизи громко, вдали быстро тише
 
                         // своя громкость этого человека поверх общей

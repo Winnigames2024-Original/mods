@@ -63,6 +63,9 @@ public final class NareNet {
     private static final List<Mark> marks = Collections.synchronizedList(new ArrayList<>());
 
     private static boolean serverHasPlugin;
+
+    /** Дальность голоса с сервера: 0 — везде, -1 — сервер не сказал. */
+    private static int serverVoice = -1;
     private static int loginTicks = -1;
     private static int helloRetry = -1;
 
@@ -77,6 +80,11 @@ public final class NareNet {
 
     public static boolean plugged() {
         return serverHasPlugin;
+    }
+
+    /** Что про дальность голоса сказал сервер. -1 — не сказал (старый плагин). */
+    public static int voiceDistance() {
+        return serverHasPlugin ? serverVoice : -1;
     }
 
     public static List<Mark> marks() {
@@ -181,6 +189,9 @@ public final class NareNet {
                 double blocks = buf.readDouble();
                 double entities = buf.readDouble();
                 buf.readBoolean();
+
+                // дальность голоса дописана в конец: у старых плагинов её нет
+                serverVoice = buf.isReadable(4) ? buf.readInt() : -1;
 
                 serverHasPlugin = true;
                 Forge_narevisuals.LOGGER.info(
