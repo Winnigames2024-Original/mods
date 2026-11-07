@@ -190,7 +190,7 @@ h1 {
 
 /* ------------------------------------------------- окно мода из вёрстки */
 
-.hero-art { position: relative; }
+.hero-art { position: relative; padding: 32px 34px; }
 
 .win {
   background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
@@ -277,9 +277,9 @@ h1 {
 .hud-v { font-weight: 700; }
 .hud-v.good { color: var(--good); }
 
-.hud-a { top: -22px;  left: -34px; }
-.hud-b { top: 44%;    right: -42px; animation-delay: -2.3s; }
-.hud-c { bottom: -26px; left: 18%;  animation-delay: -4.6s; }
+.hud-a { top: 0; left: 0; }
+.hud-b { top: 2px; right: 0; animation-delay: -2.3s; }
+.hud-c { bottom: 0; left: 24%; animation-delay: -4.6s; }
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }
@@ -587,9 +587,7 @@ footer .small { color: var(--dim); font-size: 12.5px; }
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; gap: 54px; padding-top: 48px; }
-  .hero-art { order: 2; margin: 0 auto; max-width: 420px; width: 100%; }
-  .hud-a { left: -8px; }
-  .hud-b { right: -8px; }
+  .hero-art { order: 2; margin: 0 auto; max-width: 440px; width: 100%; padding: 30px 8px; }
   .voice-wrap { grid-template-columns: 1fr; gap: 32px; }
   .band-voice { padding-left: 24px; padding-right: 24px; border-radius: 18px; }
   .top-nav { display: none; }
