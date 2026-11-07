@@ -219,7 +219,7 @@ public final class NareParkour {
                         && was.getBlockZ() == now.getBlockZ()) return null;
 
                 saved.put(player.getUniqueId(), now);
-                return "Чекпоинт сохранён";
+                return "Чекпоинт сохранён — сюда вернётесь после смерти";
             }
 
             case "uncheckpoint" -> {
@@ -241,9 +241,33 @@ public final class NareParkour {
         }
     }
 
-    /** Куда вернуть игрока: его чекпоинт или null. */
+    /**
+     * Куда вернуть игрока после смерти: его чекпоинт или null.
+     *
+     * Заодно проверяем, что плитка ещё на месте: её могли сломать, пока
+     * человек бежал дальше, и возрождать его в воздухе посреди карты —
+     * худшее, что можно сделать.
+     */
     public Location checkpointOf(Player player) {
-        return saved.get(player.getUniqueId());
+        Location where = saved.get(player.getUniqueId());
+        if (where == null) return null;
+
+        if (where.getWorld() == null) { saved.remove(player.getUniqueId()); return null; }
+
+        Location block = where.clone().add(0, -1, 0);
+        Tile tile = tileAt(block);
+
+        if (tile == null || !tile.kind().equals("checkpoint")) {
+            saved.remove(player.getUniqueId());
+            return null;
+        }
+
+        return where;
+    }
+
+    /** Есть ли вообще у кого-то сохранённое место. */
+    public boolean hasCheckpoint(Player player) {
+        return saved.containsKey(player.getUniqueId());
     }
 
     public void forget(java.util.UUID id) {

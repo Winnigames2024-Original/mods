@@ -70,6 +70,8 @@ public final class NareServer extends JavaPlugin implements Listener {
     private NareVoicePort voicePipe;
 
     private NareParkour parkour;
+    private boolean parkourRespawn;
+    private boolean parkourKeep;
     private NareFiles files;
 
     /**
@@ -240,7 +242,8 @@ public final class NareServer extends JavaPlugin implements Listener {
                                          "require-mod.enabled", "require-mod.seconds",
                                          "require-mod.message",
                                          "tnt.max-nearby", "tnt.radius",
-                                         "tnt.rescue", "tnt.rescue-command" }) {
+                                         "tnt.rescue", "tnt.rescue-command",
+                                         "parkour.respawn", "parkour.keep-on-quit" }) {
             if (getConfig().isSet(key)) continue;
             changed = true;
             getLogger().info("NareVisuals: дописал в config.yml настройку " + key);
@@ -265,6 +268,9 @@ public final class NareServer extends JavaPlugin implements Listener {
         requireSeconds = Math.max(5, getConfig().getInt("require-mod.seconds", 20));
         requireMessage = getConfig().getString("require-mod.message",
                 "Сюда пускают только с модом NareVisuals.");
+
+        parkourRespawn = getConfig().getBoolean("parkour.respawn", true);
+        parkourKeep = getConfig().getBoolean("parkour.keep-on-quit", false);
 
         tntMaxNearby = Math.max(0, getConfig().getInt("tnt.max-nearby", 24));
         tntRadius = Math.max(1, getConfig().getInt("tnt.radius", 8));
@@ -434,6 +440,21 @@ public final class NareServer extends JavaPlugin implements Listener {
 
     // ------------------------------------------------------------ паркур
 
+    /**
+     * Смерть на паркуре возвращает к последнему чекпоинту, а не на спавн.
+     * Ради этого плитки и ставят, иначе от них никакого толку.
+     */
+    @EventHandler
+    public void onRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        if (parkour == null || !parkourRespawn) return;
+
+        var where = parkour.checkpointOf(event.getPlayer());
+        if (where == null) return;
+
+        event.setRespawnLocation(where);
+        hint(event.getPlayer(), "Вернулись к чекпоинту");
+    }
+
     /** Поставили помеченную плитку — запоминаем её. */
     @EventHandler(ignoreCancelled = true)
     public void onPlaceTile(org.bukkit.event.block.BlockPlaceEvent event) {
@@ -545,7 +566,7 @@ public final class NareServer extends JavaPlugin implements Listener {
         worlds.remove(event.getPlayer().getUniqueId());
 
         if (voicePipe != null) voicePipe.forget(event.getPlayer().getUniqueId());
-        if (parkour != null) parkour.forget(event.getPlayer().getUniqueId());
+        if (parkour != null && !parkourKeep) parkour.forget(event.getPlayer().getUniqueId());
 
         if (guests.remove(event.getPlayer().getUniqueId()) == null) return;
         reach(event.getPlayer(), 0, 0);
