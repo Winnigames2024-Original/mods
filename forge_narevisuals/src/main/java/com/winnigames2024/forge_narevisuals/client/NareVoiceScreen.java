@@ -77,6 +77,24 @@ public class NareVoiceScreen extends Screen {
         };
         list.add(on);
 
+        Row mic = new Row(Row.Kind.TOGGLE, "Мой микрофон",
+                cfg.voiceMuteMic ? "выключен — вас не слышно" : "включён");
+        mic.state = () -> !cfg.voiceMuteMic;
+        mic.act = () -> {
+            cfg.voiceMuteMic = !cfg.voiceMuteMic;
+            Config.save();
+        };
+        list.add(mic);
+
+        Row ears = new Row(Row.Kind.TOGGLE, "Слышать других",
+                cfg.voiceMuteAll ? "выключено — тишина" : "включено");
+        ears.state = () -> !cfg.voiceMuteAll;
+        ears.act = () -> {
+            cfg.voiceMuteAll = !cfg.voiceMuteAll;
+            Config.save();
+        };
+        list.add(ears);
+
         Row mode = new Row(Row.Kind.ACTION, "Режим", MODES[clampMode(cfg.voiceMode)]);
         mode.act = () -> {
             cfg.voiceMode = (clampMode(cfg.voiceMode) + 1) % MODES.length;
@@ -100,6 +118,21 @@ public class NareVoiceScreen extends Screen {
         list.add(slider("Слышно за", "Сервер может урезать", 8, 128,
                 () -> cfg.voiceDistance, v -> { cfg.voiceDistance = v; Config.save(); },
                 v -> v + " бл."));
+
+        list.add(new Row(Row.Kind.LABEL, "Кто рядом", null));
+
+        var people = NareVoice.known();
+        if (people.isEmpty())
+            list.add(new Row(Row.Kind.LABEL, "никого не слышно", null));
+
+        for (String who : people) {
+            boolean talking = NareVoice.talkers().contains(who);
+
+            list.add(slider(who, talking ? "говорит" : null, 0, 200,
+                    () -> NareVoice.personVolume(who),
+                    v -> NareVoice.setPersonVolume(who, v),
+                    v -> v == 0 ? "тихо" : v + "%"));
+        }
 
         list.add(new Row(Row.Kind.LABEL, "Микрофон", null));
 
@@ -172,7 +205,7 @@ public class NareVoiceScreen extends Screen {
         NareTheme.roundRect(g, px, py, pw, ph, 8, 0xF40D1018);
         NareTheme.outline(g, px, py, pw, ph, 8, 0x2EFFFFFF);
 
-        NareTheme.bold(g, font, "Голос", px + 14, py + 13, NareTheme.TEXT);
+        NareTheme.bold(g, font, "Голосовой чат", px + 14, py + 13, NareTheme.TEXT);
 
         // живая полоска: видно, доходит ли звук до мода
         int barX = px + 70;
@@ -232,8 +265,8 @@ public class NareVoiceScreen extends Screen {
             }
         }
 
-        String key = NareKeys.VOICE.getTranslatedKeyMessage().getString();
-        g.drawString(font, "Говорить — " + key + " · Esc — назад",
+        String talk = NareKeys.TALK.getTranslatedKeyMessage().getString();
+        g.drawString(font, "Говорить — " + talk + " · Esc — назад",
                 px + 14, py + ph - 16, NareTheme.DIM, false);
     }
 

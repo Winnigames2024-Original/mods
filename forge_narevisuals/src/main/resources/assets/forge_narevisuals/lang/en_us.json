@@ -9,5 +9,6 @@
   "key.narevisuals.zoom": "Zoom",
   "key.narevisuals.near": "Players nearby",
   "key.narevisuals.movehud": "Move HUD elements",
-  "key.narevisuals.voice": "Talk"
+  "key.narevisuals.voice": "Voice menu",
+  "key.narevisuals.talk": "Talk"
 }

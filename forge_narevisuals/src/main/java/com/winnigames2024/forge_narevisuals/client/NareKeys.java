@@ -46,21 +46,28 @@ public final class NareKeys {
     public static final KeyMapping MOVE_HUD = new KeyMapping(
             "key.narevisuals.movehud", InputConstants.KEY_RBRACKET, CATEGORY);
 
-    /** Говорить: держать, нажимать или просто индикатор — смотря какой режим. */
+    /** Открыть меню голоса: микрофон, громкости, кто говорит. */
     public static final KeyMapping VOICE = new KeyMapping(
             "key.narevisuals.voice", InputConstants.KEY_V, CATEGORY);
+
+    /**
+     * Говорить. Отдельно от меню: V открывает окно, а эта клавиша держится
+     * во время разговора. По умолчанию левый Alt — игра его ничем не занимает.
+     */
+    public static final KeyMapping TALK = new KeyMapping(
+            "key.narevisuals.talk", org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT, CATEGORY);
 
     /** Для экрана назначения клавиш: сами привязки и их подписи. */
     public static final KeyMapping[] ALL = {
             OPEN_SETTINGS, TOGGLE_HUD, TOGGLE_ESP, TOGGLE_BRIGHT,
-            TOGGLE_FREECAM, TOGGLE_SKY, ZOOM, TOGGLE_NEAR, MOVE_HUD, VOICE
+            TOGGLE_FREECAM, TOGGLE_SKY, ZOOM, TOGGLE_NEAR, MOVE_HUD, VOICE, TALK
     };
 
     public static final String[] TITLES = {
             "Открыть настройки", "Спрятать HUD", "Подсветка игроков",
             "Яркость", "Свободная камера", "Своё небо",
             "Приближение (держать)", "Игроки рядом", "Передвинуть элементы",
-            "Говорить"
+            "Меню голоса", "Говорить (держать)"
     };
 
     private static boolean migrated;

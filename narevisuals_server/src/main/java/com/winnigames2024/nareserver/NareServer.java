@@ -61,6 +61,7 @@ public final class NareServer extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        mergeConfig();
         readConfig();
 
         channel = new NareChannel(this);
@@ -97,6 +98,36 @@ public final class NareServer extends JavaPlugin implements Listener {
             if (player != null) reach(player, 0, 0);
         }
         guests.clear();
+    }
+
+    /**
+     * Дописывает в уже существующий config.yml то, что появилось в новых
+     * версиях плагина, и убирает то, чего больше нет. Без этого сервер,
+     * обновлённый с прошлой версии, живёт со старым файлом: новых настроек в
+     * нём просто нет, и человек их не видит.
+     */
+    private void mergeConfig() {
+        boolean changed = false;
+
+        // раздела area больше нет: ломание области из плагина убрано
+        if (getConfig().contains("area")) {
+            getConfig().set("area", null);
+            changed = true;
+            getLogger().info("NareVisuals: убрал из config.yml раздел area — такой возможности больше нет");
+        }
+
+        // что из новых настроек в файле ещё не записано — смотрим до слияния,
+        // потому что после copyDefaults всё выглядит записанным
+        for (String key : new String[] { "voice.enabled", "voice.distance" }) {
+            if (getConfig().isSet(key)) continue;
+            changed = true;
+            getLogger().info("NareVisuals: дописал в config.yml настройку " + key);
+        }
+
+        // добавляем всё, что есть в зашитом config.yml, но нет в файле на диске
+        getConfig().options().copyDefaults(true);
+
+        if (changed) saveConfig();
     }
 
     private void readConfig() {

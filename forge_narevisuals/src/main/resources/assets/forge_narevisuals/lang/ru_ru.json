@@ -9,5 +9,6 @@
   "key.narevisuals.zoom": "Приближение",
   "key.narevisuals.near": "Игроки рядом",
   "key.narevisuals.movehud": "Передвинуть элементы",
-  "key.narevisuals.voice": "Говорить"
+  "key.narevisuals.voice": "Меню голоса",
+  "key.narevisuals.talk": "Говорить"
 }

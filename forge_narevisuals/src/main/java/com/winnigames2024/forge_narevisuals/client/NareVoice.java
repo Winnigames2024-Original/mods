@@ -129,6 +129,7 @@ public final class NareVoice {
         if (!running) return false;
 
         Config cfg = Config.get();
+        if (cfg.voiceMuteMic) return false;
         if (cfg.voiceMode == 1) return toggled;
         if (cfg.voiceMode == 2) return lastLevel * 100f >= cfg.voiceThreshold;
         return talking;
@@ -137,19 +138,89 @@ public final class NareVoice {
     /** Уровень микрофона 0..1 — для полоски в настройках. */
     public static float level() { return lastLevel; }
 
+    // --------------------------------------------------------- по людям
+
+    /** Громкость человека в процентах: 100 — обычная, 0 — заглушён. */
+    public static int personVolume(String who) {
+        Integer value = Config.get().voicePeople.get(who);
+        if (value == null) return 100;
+        return value < 0 ? 0 : Math.min(200, value);
+    }
+
+    public static boolean muted(String who) {
+        Integer value = Config.get().voicePeople.get(who);
+        return value != null && value <= 0;
+    }
+
+    public static void setPersonVolume(String who, int percent) {
+        if (who == null || who.isEmpty()) return;
+
+        percent = Math.max(0, Math.min(200, percent));
+
+        if (percent == 100) Config.get().voicePeople.remove(who);
+        else Config.get().voicePeople.put(who, percent);
+
+        Config.save();
+    }
+
+    public static void toggleMuted(String who) {
+        setPersonVolume(who, muted(who) ? 100 : 0);
+    }
+
+    /**
+     * Кого показываем в меню: тех, кого слышно сейчас, плюс тех, кому уже
+     * выкрутили свою громкость — иначе её нельзя вернуть, пока человек молчит.
+     */
+    public static List<String> known() {
+        var list = new ArrayList<String>();
+
+        synchronized (speakers) {
+            for (Speaker speaker : speakers.values()) list.add(speaker.name);
+        }
+
+        for (String who : Config.get().voicePeople.keySet())
+            if (!list.contains(who)) list.add(who);
+
+        return list;
+    }
+
     // ----------------------------------------------------------- микрофон
 
     private static void micLoop() {
+        // микрофон мог быть занят другой программой или воткнут секунду назад:
+        // не сдаёмся с первой попытки, ждём и пробуем ещё
         TargetDataLine line = null;
+        String why = null;
+
+        for (int attempt = 1; attempt <= 3 && running && line == null; attempt++) {
+            try { line = openMic(); }
+            catch (Exception e) { why = reason(e); }
+
+            if (line != null) break;
+
+            try { Thread.sleep(attempt * 700L); }
+            catch (InterruptedException stop) { return; }
+        }
+
+        if (line == null) {
+            if (!running) return;
+
+            trouble = why == null ? "микрофон не открылся" : why;
+
+            NareErrors.report("voice.mic",
+                    "Микрофон не открылся",
+                    (why == null ? "Windows не дала мод доступ к микрофону." : why)
+                    + "\n\nЧаще всего помогает одно из трёх: разрешить приложениям микрофон "
+                    + "в настройках Windows, закрыть программу, которая его занимает "
+                    + "(Discord, браузер, OBS), или выбрать другой микрофон в меню голоса "
+                    + "по клавише " + NareKeys.VOICE.getTranslatedKeyMessage().getString()
+                    + ". Остальное в моде работает как обычно — просто вас не слышно.");
+            return;
+        }
 
         try {
-            line = openMic();
-            if (line == null) {
-                trouble = "микрофон не открылся";
-                return;
-            }
-
             line.start();
+            trouble = "";
 
             byte[] raw = new byte[FRAME * 2];
             short[] pcm = new short[FRAME];
@@ -191,12 +262,31 @@ public final class NareVoice {
             }
         }
         catch (Exception e) {
-            trouble = e.getMessage() == null ? e.toString() : e.getMessage();
+            if (!running) return;
+
+            trouble = reason(e);
             Forge_narevisuals.LOGGER.warn("{}: микрофон: {}", Forge_narevisuals.NAME, trouble);
+
+            NareErrors.report("voice.mic.lost",
+                    "Микрофон замолчал",
+                    trouble + "\n\nПохоже, устройство отключили или его забрала другая программа. "
+                    + "Выберите микрофон заново в меню голоса — клавиша "
+                    + NareKeys.VOICE.getTranslatedKeyMessage().getString() + ".");
         }
         finally {
             if (line != null) { try { line.stop(); line.close(); } catch (Exception ignored) { } }
         }
+    }
+
+    /** Сообщение исключения, а если его нет — хотя бы имя класса. */
+    private static String reason(Exception e) {
+        String text = e.getMessage();
+        if (text != null && !text.isBlank()) return text;
+
+        if (e instanceof javax.sound.sampled.LineUnavailableException)
+            return "микрофон занят другой программой";
+
+        return e.getClass().getSimpleName();
     }
 
     private static TargetDataLine openMic() throws Exception {
@@ -214,11 +304,31 @@ public final class NareVoice {
             }
         }
 
-        if (!AudioSystem.isLineSupported(info)) return null;
+        // системный по умолчанию
+        if (AudioSystem.isLineSupported(info)) {
+            try {
+                var line = (TargetDataLine) AudioSystem.getLine(info);
+                line.open(MIC, FRAME * 4);
+                return line;
+            } catch (Exception ignored) { }
+        }
 
-        var line = (TargetDataLine) AudioSystem.getLine(info);
-        line.open(MIC, FRAME * 4);
-        return line;
+        // и наконец просто любой, который согласится открыться
+        for (Mixer.Info mixer : AudioSystem.getMixerInfo()) {
+            try {
+                var candidate = AudioSystem.getMixer(mixer);
+                if (!candidate.isLineSupported(info)) continue;
+
+                var line = (TargetDataLine) candidate.getLine(info);
+                line.open(MIC, FRAME * 4);
+
+                Forge_narevisuals.LOGGER.info("{}: микрофон — {}",
+                        Forge_narevisuals.NAME, mixer.getName());
+                return line;
+            } catch (Exception ignored) { }
+        }
+
+        return null;
     }
 
     /** Все микрофоны, какие видит система. */
@@ -289,6 +399,12 @@ public final class NareVoice {
             var info = new DataLine.Info(SourceDataLine.class, OUT);
             if (!AudioSystem.isLineSupported(info)) {
                 trouble = "вывод звука не открылся";
+
+                NareErrors.report("voice.out",
+                        "Голос некуда выводить",
+                        "Система не дала моду звуковой выход на 16 кГц. Говорить вы сможете, "
+                        + "а вот других слышно не будет. Обычно это лечится выбором рабочего "
+                        + "устройства вывода в настройках звука Windows.");
                 return;
             }
 
@@ -306,7 +422,8 @@ public final class NareVoice {
                 Minecraft mc = Minecraft.getInstance();
                 Vec3 ear = mc.player == null ? Vec3.ZERO : mc.player.getEyePosition();
                 float yaw = mc.player == null ? 0f : mc.player.getYRot();
-                float volume = Math.max(0f, Config.get().voiceVolume / 100f);
+                float volume = Config.get().voiceMuteAll
+                        ? 0f : Math.max(0f, Config.get().voiceVolume / 100f);
                 int hearing = Math.max(1, Config.get().voiceDistance);
 
                 synchronized (speakers) {
@@ -337,7 +454,9 @@ public final class NareVoice {
 
                         float near = (float) Math.max(0.0, 1.0 - dist / hearing);
                         near *= near;                       // вблизи громко, вдали быстро тише
-                        float gain = near * volume;
+
+                        // своя громкость этого человека поверх общей
+                        float gain = near * volume * (personVolume(speaker.name) / 100f);
                         if (gain <= 0.001f) continue;
 
                         // слева или справа: угол между взглядом и направлением на голос
@@ -369,8 +488,14 @@ public final class NareVoice {
             }
         }
         catch (Exception e) {
-            trouble = e.getMessage() == null ? e.toString() : e.getMessage();
+            if (!running) return;
+
+            trouble = reason(e);
             Forge_narevisuals.LOGGER.warn("{}: вывод голоса: {}", Forge_narevisuals.NAME, trouble);
+
+            NareErrors.report("voice.out.lost", "Звук голоса пропал",
+                    trouble + "\n\nВывод звука закрылся на ходу — бывает, когда меняют "
+                    + "устройство вывода. Переоткройте меню голоса, чтобы попробовать снова.");
         }
         finally {
             if (line != null) { try { line.stop(); line.close(); } catch (Exception ignored) { } }

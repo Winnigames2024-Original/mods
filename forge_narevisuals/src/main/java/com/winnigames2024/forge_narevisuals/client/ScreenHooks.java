@@ -97,6 +97,7 @@ public final class ScreenHooks {
         if (screen instanceof NareClickScreen) return;
         if (screen instanceof NareFpsScreen) return;
         if (screen instanceof NareVoiceScreen) return;
+        if (screen instanceof NareErrorScreen) return;
         if (screen instanceof HudEditScreen) return;
         if (screen instanceof NareKeysScreen) return;
 

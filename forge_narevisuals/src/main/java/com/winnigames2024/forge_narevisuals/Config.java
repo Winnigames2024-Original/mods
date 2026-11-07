@@ -240,6 +240,24 @@ public class Config {
     /** Имя микрофона. Пусто — системный по умолчанию. */
     public String voiceDevice = "";
 
+    /** Свой микрофон выключен — вас не слышно, но вы слышите. */
+    public boolean voiceMuteMic = false;
+
+    /** Выключен звук: никого не слышно. */
+    public boolean voiceMuteAll = false;
+
+    /**
+     * Громкость отдельных людей, 0..200 процентов. -1 — заглушён совсем.
+     * Ключ — ник, как его прислал сервер.
+     */
+    public java.util.Map<String, Integer> voicePeople = new java.util.LinkedHashMap<>();
+
+    /**
+     * Ошибки, которые человек попросил больше не показывать. Хранятся по
+     * короткому ключу, а не по тексту: текст может меняться от случая к случаю.
+     */
+    public java.util.List<String> errorsIgnored = new java.util.ArrayList<>();
+
     /** Виды, которые не рисуем совсем. Ключи реестра. */
     public java.util.List<String> fpsNever = new java.util.ArrayList<>();
 

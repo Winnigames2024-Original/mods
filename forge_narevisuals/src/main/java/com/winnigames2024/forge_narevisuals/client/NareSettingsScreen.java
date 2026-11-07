@@ -447,6 +447,12 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.slider("Возвращать пачкой", 1, 128,
                         () -> cfg.restoreBatch, v -> { cfg.restoreBatch = v; Config.save(); },
                         v -> v + " бл."));
+                if (!NareErrors.ignored().isEmpty())
+                    list.add(Row.action("Скрытые ошибки",
+                            "Сейчас молчим о " + NareErrors.ignored().size()
+                                    + " · нажмите, чтобы показывать снова",
+                            NareErrors::unignoreAll));
+
                 list.add(Row.action("Голосовой чат", NareVoice.running()
                                 ? "Работает · " + NareKeys.VOICE.getTranslatedKeyMessage().getString()
                                 : "Настроить микрофон и громкость",

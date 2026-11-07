@@ -44,20 +44,36 @@ public final class InputTracker {
     }
 
     /**
-     * Голос слушаем отдельно: нужны и нажатие, и отпускание, а общий
-     * обработчик ниже реагирует только на нажатие.
+     * Клавишу разговора слушаем отдельно: нужны и нажатие, и отпускание, а
+     * общий обработчик ниже реагирует только на нажатие.
      */
     @SubscribeEvent
-    public static void onVoiceKey(InputEvent.Key event) {
+    public static void onTalkKey(InputEvent.Key event) {
         if (event.getAction() == 2) return;          // авто-повтор не нужен
         if (!Launch.visuals()) return;
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen != null) return;
+        if (mc.screen != null) {
+            NareVoice.hold(false);                   // ушли в меню — отпускаем
+            return;
+        }
 
-        if (event.getKey() != NareKeys.VOICE.getKey().getValue()) return;
+        if (event.getKey() != NareKeys.TALK.getKey().getValue()) return;
 
         NareVoice.hold(event.getAction() == 1);
+    }
+
+    /** Накопившиеся ошибки показываем, когда человек не занят другим экраном. */
+    @SubscribeEvent
+    public static void onTick(net.minecraftforge.event.TickEvent.ClientTickEvent event) {
+        if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+        if (!Launch.visuals()) return;
+        if (!NareErrors.waiting()) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen != null || mc.player == null) return;
+
+        mc.setScreen(new NareErrorScreen(null));
     }
 
     @SubscribeEvent
@@ -90,6 +106,8 @@ public final class InputTracker {
             cfg.customSky = !cfg.customSky;
             Config.save();
             note(mc, "Своё небо: " + onOff(cfg.customSky));
+        } else if (NareKeys.VOICE.isDown()) {
+            mc.setScreen(new NareVoiceScreen(null));
         } else if (NareKeys.MOVE_HUD.isDown()) {
             mc.setScreen(new HudEditScreen(null));
         } else if (NareKeys.TOGGLE_NEAR.isDown()) {
