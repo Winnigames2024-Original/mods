@@ -1,8 +1,8 @@
 {
-  "version": "1.10",
+  "version": "1.11",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "0c2d847c79e340037738ef713cdf3d59547bff39",
-  "size": 423936,
-  "notes": "версия игры читается из jar, понятное «выберите другую версию», источники GitHub и «Наш список»"
+  "sha1": "a8d2e63ab774cbb190e60cf2665025af68214820",
+  "size": 436224,
+  "notes": "проверка модов перед запуском, кнопка «Проверить», перетаскивание jar в окно, источник «Прямая ссылка»"
 }
