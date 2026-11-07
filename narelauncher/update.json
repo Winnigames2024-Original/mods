@@ -1,8 +1,8 @@
 {
-  "version": "1.9.0",
+  "version": "1.9.1",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "c6e27c2b282ce027b27f05fb5143aca1bcb3c0fa",
+  "sha1": "e1ceb4377a74ddabd3dcedbe9814c88bf4fc7dec",
   "size": 406528,
-  "notes": "кнопка WMine сама ставит сборку Forge Visuals 1.21.4"
+  "notes": "кнопка WMine больше не налезает на «Папка версии»"
 }
