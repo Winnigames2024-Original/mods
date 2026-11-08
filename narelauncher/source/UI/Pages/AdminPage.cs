@@ -58,6 +58,7 @@ namespace NareLauncher.UI.Pages
 
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
         private readonly NareLabel[] _heads = new NareLabel[8];
+        private readonly System.Collections.Generic.List<NareLabel> _caps = new System.Collections.Generic.List<NareLabel>();
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly NareLabel _usersHead = new NareLabel("ПОЛЬЗОВАТЕЛИ — выберите, чтобы подставить ник", 8.5f, FontStyle.Bold, Theme.Accent);
         private readonly VirtualList _users = new VirtualList { ItemHeight = 40, EmptyText = "Список придёт с сервера" };
@@ -79,6 +80,23 @@ namespace NareLauncher.UI.Pages
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
                 _scroll.Controls.Add(_heads[i]);
+            }
+
+            // мини-подписи над полями — в том же порядке, как поля в вёрстке
+            string[] caps = {
+                "Игрок", "Тип бана", "Минуты (для временного)", "Причина",
+                "Игрок", "Текст предупреждения",
+                "Текст объявления всем", "Команда серверу",
+                "Игрок",
+                "ID мода (например xray)", "Версия игры или * для всех",
+                "ID заявки сервера (из сводки справа)",
+                "Версия обновления", "Что нового (changelog)"
+            };
+            foreach (var c in caps)
+            {
+                var label = new NareLabel(c, 8f, FontStyle.Regular, Theme.Dim);
+                _caps.Add(label);
+                _scroll.Controls.Add(label);
             }
             _scroll.Controls.Add(_title);
 
@@ -326,45 +344,55 @@ namespace NareLauncher.UI.Pages
 
         protected override void OnResize(EventArgs e) { base.OnResize(e); Layout1(); }
 
+        private int _cap;
+        private void Field(Control field, int pad, int w, ref int y)
+        {
+            if (_cap < _caps.Count) _caps[_cap].SetBounds(pad, y, w, 14);
+            _cap++;
+            field.SetBounds(pad, y + 16, w, 36);
+            y += 16 + 36 + 8;
+        }
+
         private void Layout1()
         {
             if (_scroll == null) return;
             _head = 0;
+            _cap = 0;
             _title.SetBounds(28, 22, 500, 32);
             int pad = 28, w = Math.Min(560, Width - pad * 2 - 360), y = 64;
 
             Row("БАН ИГРОКА", ref y);
-            _banNick.SetBounds(pad, y, w, 36); y += 42;
-            _banType.SetBounds(pad, y, w, 36); y += 42;
-            _banMinutes.SetBounds(pad, y, w, 36); y += 42;
-            _banReason.SetBounds(pad, y, w, 36); y += 42;
+            Field(_banNick, pad, w, ref y);
+            Field(_banType, pad, w, ref y);
+            Field(_banMinutes, pad, w, ref y);
+            Field(_banReason, pad, w, ref y);
             _ban.Location = new Point(pad, y); _unban.Location = new Point(pad + 150, y); y += 54;
 
             Row("ПРЕДУПРЕЖДЕНИЕ", ref y);
-            _warnNick.SetBounds(pad, y, w, 36); y += 42;
-            _warnText.SetBounds(pad, y, w, 36); y += 42;
+            Field(_warnNick, pad, w, ref y);
+            Field(_warnText, pad, w, ref y);
             _warn.Location = new Point(pad, y); y += 54;
 
             Row("ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ", ref y);
-            _broadcast.SetBounds(pad, y, w, 36); _broadcastGo.Location = new Point(pad + w + 10, y); y += 44;
-            _command.SetBounds(pad, y, w, 36); _commandGo.Location = new Point(pad + w + 10, y); y += 54;
+            Field(_broadcast, pad, w, ref y); _broadcastGo.Location = new Point(pad + w + 10, _broadcast.Top);
+            Field(_command, pad, w, ref y); _commandGo.Location = new Point(pad + w + 10, _command.Top); y += 6;
 
             Row("ЗАПРЕТ «ВМЕСТЕ»", ref y);
-            _togNick.SetBounds(pad, y, w, 36); y += 42;
+            Field(_togNick, pad, w, ref y);
             _togOff.Location = new Point(pad, y); _togOn.Location = new Point(pad + 200, y); y += 54;
 
             Row("БЛОКИРОВКА МОДОВ", ref y);
-            _modId.SetBounds(pad, y, w, 36); y += 42;
-            _modVer.SetBounds(pad, y, w, 36); y += 42;
+            Field(_modId, pad, w, ref y);
+            Field(_modVer, pad, w, ref y);
             _modBlock.Location = new Point(pad, y); _modUnblock.Location = new Point(pad + 200, y); y += 54;
 
             Row("МОДЕРАЦИЯ СЕРВЕРОВ", ref y);
-            _srvId.SetBounds(pad, y, w, 36); y += 42;
+            Field(_srvId, pad, w, ref y);
             _srvOk.Location = new Point(pad, y); _srvNo.Location = new Point(pad + 196, y); y += 54;
 
             Row("ОБНОВЛЕНИЕ", ref y);
-            _updVer.SetBounds(pad, y, w, 36); y += 42;
-            _updLog.SetBounds(pad, y, w, 36); y += 42;
+            Field(_updVer, pad, w, ref y);
+            Field(_updLog, pad, w, ref y);
             _updGo.Location = new Point(pad, y); y += 44;
             _updCrit.Location = new Point(pad, y); y += 54;
 

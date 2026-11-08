@@ -1,8 +1,8 @@
 {
-  "version": "1.24",
+  "version": "1.25",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "6a41a8656dce78d0c8334ccea8d4ba1b9889d92a",
-  "size": 577536,
-  "notes": "тип бана выбирается списком: временный или навсегда"
+  "sha1": "bbe1fe258aed95caf929f925fdcf832d9c29a8db",
+  "size": 578560,
+  "notes": "над каждым полем в админке мини-подпись, что туда вписывать"
 }
