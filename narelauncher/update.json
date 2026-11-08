@@ -1,8 +1,8 @@
 {
-  "version": "1.32",
+  "version": "1.33",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "cf1f9acd472278b7fb0b70ab227b565904d3f4ef",
-  "size": 637440,
-  "notes": "Админка: статистика сверху, выдача/снятие монет, назначение админов, смена игрового ника игроку"
+  "sha1": "539bef358482be959661da4249eeb009767b76d8",
+  "size": 644608,
+  "notes": "Выход из аккаунта: на этом ПК, со всех аккаунтов на ПК, и «выйти на всех других устройствах» для защиты от взлома"
 }

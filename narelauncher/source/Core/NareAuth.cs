@@ -326,6 +326,25 @@ namespace NareLauncher.Core
             await PostAsync("/account/device/unlink", body, ct).ConfigureAwait(false);
         }
 
+        /// <summary>Выйти из аккаунта на этом устройстве (сбросить сессию).</summary>
+        public static async Task LogoutAsync(string token, CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(token)) return;
+            var body = Json.NewObject();
+            body.Set("token", token);
+            try { await PostAsync("/account/logout", body, ct).ConfigureAwait(false); }
+            catch { }   // выход локально важнее ответа сервера
+        }
+
+        /// <summary>Выйти на всех других устройствах — текущее остаётся.</summary>
+        public static async Task<int> LogoutOthersAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject();
+            body.Set("token", token);
+            var j = await PostAsync("/account/logout/others", body, ct).ConfigureAwait(false);
+            return (int)j["kicked"].AsLong(0);
+        }
+
         public static Task<Json> StateAsync(string token, CancellationToken ct)
         {
             return PostAsync("/admin/state", Admin(token), ct);

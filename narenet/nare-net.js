@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.9';
+const VERSION = '1.10';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -922,6 +922,47 @@ function devicesList(req, res) {
     });
 }
 
+/** Выйти из аккаунта на этом устройстве (сбросить текущую сессию). */
+function accountLogout(req, res) {
+    readJsonBody(req, body => {
+        const tok = body && body.token;
+        const nick = sessionNick(tok);
+        if (!nick) return send(res, 200, { ok: true });   // уже вышли
+        const a = acc(nick);
+        const sess = sessions.get(tok);
+        const id = sess ? sess.device : null;
+        if (id && a.devices[id]) delete a.devices[id];
+        sessions.delete(tok);
+        saveAccounts();
+        log('выход из аккаунта', nick);
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Выйти на всех ДРУГИХ устройствах — текущее остаётся. Так выкидывают
+ *  взломщика, не теряя доступ у себя. */
+function accountLogoutOthers(req, res) {
+    readJsonBody(req, body => {
+        const tok = body && body.token;
+        const nick = sessionNick(tok);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const sess = sessions.get(tok);
+        const keep = sess ? sess.device : null;
+        let kicked = 0;
+        for (const id of Object.keys(a.devices)) {
+            if (id === keep) continue;
+            const d = a.devices[id];
+            if (d && d.token) sessions.delete(d.token);
+            delete a.devices[id];
+            kicked++;
+        }
+        saveAccounts();
+        log('выход на других устройствах', nick, '— отключено', kicked);
+        send(res, 200, { ok: true, kicked });
+    });
+}
+
 /** Отвязать устройство: его токен перестаёт работать, и на том устройстве
  *  лаунчер при следующей проверке увидит loggedOut и выйдет из аккаунта. */
 function deviceUnlink(req, res) {
@@ -1371,6 +1412,8 @@ const server = http.createServer((req, res) => {
     if (route === '/account/delete' && req.method === 'POST') return accountDelete(req, res);
     if (route === '/account/devices' && req.method === 'POST') return devicesList(req, res);
     if (route === '/account/device/unlink' && req.method === 'POST') return deviceUnlink(req, res);
+    if (route === '/account/logout' && req.method === 'POST') return accountLogout(req, res);
+    if (route === '/account/logout/others' && req.method === 'POST') return accountLogoutOthers(req, res);
 
     // --- лаунчер спрашивает про себя
     if (route === '/status') return status(req, res);

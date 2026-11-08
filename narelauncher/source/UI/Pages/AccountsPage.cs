@@ -29,6 +29,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _devices = new NareButton
         { Text = "Устройства", Style = BtnStyle.Ghost, Size = new Size(190, 42) };
 
+        private readonly NareButton _logoutAll = new NareButton
+        { Text = "Выйти со всех аккаунтов", Style = BtnStyle.Danger, Size = new Size(260, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -47,6 +50,7 @@ namespace NareLauncher.UI.Pages
             _delete.Click += async (s, e) => await DeleteAccount();
             _rename.Click += async (s, e) => await RenameUser();
             _devices.Click += (s, e) => OpenDevices();
+            _logoutAll.Click += async (s, e) => await LogoutAll();
 
             Controls.Add(_select);
             Controls.Add(_manage);
@@ -54,6 +58,7 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_delete);
             Controls.Add(_rename);
             Controls.Add(_devices);
+            Controls.Add(_logoutAll);
             Controls.Add(_status);
         }
 
@@ -264,11 +269,35 @@ namespace NareLauncher.UI.Pages
             using (var form = new DevicesForm(acc)) form.ShowDialog(FindForm());
         }
 
+        private async System.Threading.Tasks.Task LogoutAll()
+        {
+            int n = 0;
+            foreach (var a in AccountStore.Accounts)
+                if (!string.IsNullOrEmpty(a.Token)) n++;
+            if (n == 0) { _status.Text = "Ни один аккаунт не в сети."; return; }
+
+            if (System.Windows.Forms.MessageBox.Show(FindForm(),
+                "Выйти со всех аккаунтов NareLauncher на этом компьютере? Чтобы вернуться, нужно будет вводить пароли.",
+                "Выход", System.Windows.Forms.MessageBoxButtons.YesNo,
+                System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.Yes) return;
+
+            foreach (var a in AccountStore.Accounts)
+            {
+                if (string.IsNullOrEmpty(a.Token)) continue;
+                await NareAuth.LogoutAsync(a.Token, System.Threading.CancellationToken.None);
+                a.Token = "";
+            }
+            AccountStore.Save();
+            ReloadList();
+            _status.Text = "Вы вышли со всех аккаунтов на этом ПК.";
+            _status.ForeColor = Theme.Good;
+        }
+
         private void Layout1()
         {
             int pad = 28;
             int listY = 76;
-            int bottomH = 92;
+            int bottomH = 150;
 
             _list.SetBounds(pad, listY, Math.Max(100, Width - pad * 2),
                             Math.Max(60, Height - listY - bottomH));
@@ -280,7 +309,8 @@ namespace NareLauncher.UI.Pages
             _delete.Location = new Point(pad + 216 + 246 + 186, by);
             _rename.Location = new Point(pad, by + 50);
             _devices.Location = new Point(pad + 246, by + 50);
-            _status.SetBounds(pad + 246 + 206, by + 58, Math.Max(50, Width - pad * 2 - 246 - 206), 20);
+            _logoutAll.Location = new Point(pad, by + 100);
+            _status.SetBounds(pad + 276, by + 108, Math.Max(50, Width - pad * 2 - 276), 20);
 
             Invalidate();
         }
