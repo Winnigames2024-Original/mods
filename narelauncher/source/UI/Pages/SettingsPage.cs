@@ -48,6 +48,9 @@ namespace NareLauncher.UI.Pages
 
         private readonly NareTextBox _onJoin = new NareTextBox
         { Placeholder = "Команды при входе, через ; — например /login 1234; /spawn" };
+
+        private readonly NareTextBox _netHost = new NareTextBox
+        { Placeholder = "Сборный пункт для вкладки «Вместе» — адрес:порт" };
         private readonly NareButton _browseLocal = new NareButton { Text = "Обзор", Style = BtnStyle.Ghost, Size = new Size(110, 38) };
 
         private readonly NareButton _save = new NareButton { Text = "Сохранить", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(180, 42) };
@@ -116,6 +119,7 @@ namespace NareLauncher.UI.Pages
             _scroll.Controls.Add(_cfKey);
             _scroll.Controls.Add(_localFolder);
             _scroll.Controls.Add(_onJoin);
+            _scroll.Controls.Add(_netHost);
             _scroll.Controls.Add(_browseLocal);
 
             _scroll.Controls.Add(_save);
@@ -221,6 +225,7 @@ namespace NareLauncher.UI.Pages
             _cfKey.Text = s.CurseForgeKey;
             _localFolder.Text = s.LocalModsFolder;
             _onJoin.Text = s.JoinCommands;
+            _netHost.Text = s.NareNetHost;
             ReloadJava();
         }
 
@@ -292,6 +297,9 @@ namespace NareLauncher.UI.Pages
             s.CurseForgeKey = (_cfKey.Text ?? "").Trim();
             s.LocalModsFolder = (_localFolder.Text ?? "").Trim();
             s.JoinCommands = (_onJoin.Text ?? "").Trim();
+
+            string net = (_netHost.Text ?? "").Trim();
+            s.NareNetHost = net.Length == 0 ? "166.1.161.200:2445" : net;
 
             int w, h;
             if (int.TryParse((_winW.Text ?? "").Trim(), out w) && w >= 320) s.WindowWidth = w;
@@ -420,6 +428,9 @@ namespace NareLauncher.UI.Pages
             y += 48;
 
             _onJoin.SetBounds(pad, y, w, 38);
+            y += 48;
+
+            _netHost.SetBounds(pad, y, w, 38);
             y += 58;
 
             _save.Location = new Point(pad, y);

@@ -92,6 +92,7 @@
     <Compile Include="Core\ModrinthApi.cs" />
     <Compile Include="Core\ModJar.cs" />
     <Compile Include="Core\ModCheck.cs" />
+    <Compile Include="Core\NareNet.cs" />
     <Compile Include="Core\BlockModel.cs" />
     <Compile Include="Core\ModSourcesExtra.cs" />
     <Compile Include="Core\Net.cs" />
@@ -178,6 +179,9 @@
     </Compile>
     <Compile Include="UI\Pages\InstancePage.cs">
       <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="UI\Pages\TogetherPage.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="UI\Pages\ServersPage.cs">
       <SubType>Code</SubType>

@@ -60,6 +60,9 @@ namespace NareLauncher.Core
         /// <summary>Команды, которые мод отправит сам при входе в мир или на сервер.</summary>
         public string JoinCommands = "";
 
+        /// <summary>Адрес сборного пункта NareNet: откуда берём список открытых миров.</summary>
+        public string NareNetHost = "166.1.161.200:2445";
+
         public static Settings Current = new Settings();
 
         public static void Load()

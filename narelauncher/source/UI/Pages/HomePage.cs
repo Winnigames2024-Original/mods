@@ -205,6 +205,13 @@ namespace NareLauncher.UI.Pages
         }
 
         /// <summary>Запуск с немедленным заходом на сервер — зовётся со вкладки «Серверы».</summary>
+        /// <summary>
+        /// Что сделать со сборкой перед самым запуском. Вкладка «Вместе»
+        /// доносит сюда моды хозяина, когда сборка уже готова, но игра ещё
+        /// не пошла. Срабатывает один раз.
+        /// </summary>
+        public Func<string, IProgress<InstallStatus>, CancellationToken, Task> BeforeLaunch;
+
         public void LaunchOn(string address)
         {
             if (_busy) { SetStatus("Подождите, запуск уже идёт."); return; }
@@ -250,6 +257,13 @@ namespace NareLauncher.UI.Pages
                 Settings.Current.SelectedVersion = id;
                 Settings.Save();
                 ReloadVersions();
+
+                if (BeforeLaunch != null)
+                {
+                    var hook = BeforeLaunch;
+                    BeforeLaunch = null;
+                    await hook(id, progress, _cts.Token);
+                }
 
                 // вход одним щелчком — значит без вопросов: мод, который
                 // этой сборке не подходит, просто отключаем, иначе падение
@@ -384,7 +398,7 @@ namespace NareLauncher.UI.Pages
         }
 
         /// <summary>Уже поставленная версия с той же основой и тем же загрузчиком.</summary>
-        private static InstalledVersion FindInstalled(PlayLink.Request request)
+        public static InstalledVersion FindInstalled(PlayLink.Request request)
         {
             bool wantVisuals = request.Loader == "visuals";
             string loader = wantVisuals ? "forge" : request.Loader;

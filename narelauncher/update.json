@@ -1,8 +1,8 @@
 {
-  "version": "1.12",
+  "version": "1.13",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "1c7ae3b31676cc4458906cb3692228ede84035ca",
-  "size": 470528,
-  "notes": "редактор моделей Minecraft: кубы, повороты, текстуры по граням, 3D-просмотр, запись в ресурспак"
+  "sha1": "6ddae3659924425b62b907c287daa1bda08272c2",
+  "size": 496640,
+  "notes": "вкладка «Вместе»: кто открыл свой мир, доставка его модов и заход одной кнопкой"
 }

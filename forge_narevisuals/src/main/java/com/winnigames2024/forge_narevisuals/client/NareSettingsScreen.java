@@ -36,7 +36,7 @@ public class NareSettingsScreen extends Screen {
             0xFFF0B446, 0xFFFF5C5C, 0xFF36C8D8, 0xFFE8EEF8
     };
 
-    private static final String[] TABS = { "Быстро", "Функции", "Элементы", "Вид", "Меню", "Мир", "Камера", "Инвентарь", "Бинды", "Ещё" };
+    private static final String[] TABS = { "Быстро", "Функции", "Элементы", "Вид", "Меню", "Мир", "Камера", "Инвентарь", "Бинды", "Ещё", "Вместе" };
 
     private static final String[] SKY_PRESETS = { "nebula", "sunset", "aurora", "dawn", "void" };
     private static final String[] SKY_TITLES = { "Туманность", "Закат", "Сияние", "Рассвет", "Пустота" };
@@ -504,7 +504,7 @@ public class NareSettingsScreen extends Screen {
                         () -> minecraft.setScreen(new net.minecraft.client.gui.screens.options.controls.ControlsScreen(
                                 this, minecraft.options))));
             }
-            default -> {
+            case 9 -> {
                 list.add(Row.action("Клавиши отдельным окном", "То же самое, но поверх игры",
                         () -> minecraft.setScreen(new NareKeysScreen(this))));
                 list.add(Row.action("Панель: свои и телепорт", "Кто с модом, перенос к ним, возврат блоков",
@@ -549,6 +549,38 @@ public class NareSettingsScreen extends Screen {
                 list.add(Row.toggle("Показывать HUD", "Быстрый выключатель всего разом",
                         () -> Config.get().hudEnabled,
                         () -> { Config.get().hudEnabled = !Config.get().hudEnabled; Config.save(); }));
+            }
+            default -> {
+                list.add(Row.label("Свой мир для друзей"));
+
+                list.add(Row.action(
+                        NareTogether.running() ? "Закрыть мир" : "Открыть мир для друзей",
+                        NareTogether.state(),
+                        NareTogether::toggle));
+
+                if (NareTogether.running() && !NareTogether.address().isEmpty())
+                    list.add(Row.action("Адрес для гостей", NareTogether.address(), () -> { }));
+
+                list.add(Row.action("Выложить мои моды",
+                        NareTogether.uploads().isEmpty()
+                                ? "Чтобы гости скачали ровно такие же"
+                                : NareTogether.uploads(),
+                        NareTogether::share));
+
+                list.add(Row.label("Куда объявляемся"));
+                list.add(Row.action("Сборный пункт", cfg.togetherHost, () -> { }));
+                list.add(Row.slider("Порт мира", 0, 10,
+                        () -> cfg.togetherPort == 0 ? 0 : Math.max(1, (cfg.togetherPort - 25560) / 5),
+                        v -> { cfg.togetherPort = v == 0 ? 0 : 25560 + v * 5; Config.save(); },
+                        v -> v == 0 ? "свободный сам" : String.valueOf(25560 + v * 5)));
+
+                list.add(Row.label("Как это работает"));
+                list.add(Row.action("Гости и порт",
+                        "Открыт порт — идут напрямую. Закрыт — через наш сервер.",
+                        () -> { }));
+                list.add(Row.action("Это не Radmin VPN",
+                        "Виртуальной сети нет, вместо неё туннель через сервер.",
+                        () -> { }));
             }
         }
 
