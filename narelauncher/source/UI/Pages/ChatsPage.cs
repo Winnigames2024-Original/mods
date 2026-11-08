@@ -16,7 +16,7 @@ namespace NareLauncher.UI
     public class ChatsPage : PageBase
     {
         // --- общий ввод/лента
-        private readonly VirtualList _msgs = new VirtualList { ItemHeight = 46, EmptyText = "Сообщений пока нет." };
+        private readonly ChatView _msgs = new ChatView();
         private readonly NareTextBox _input = new NareTextBox { Placeholder = "Написать сообщение…" };
         private readonly NareButton _send = new NareButton { Text = "Отправить", Style = BtnStyle.Accent, Size = new Size(150, 40) };
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
@@ -45,7 +45,6 @@ namespace NareLauncher.UI
             Controls.Add(_who);
             Controls.Add(_status);
 
-            _msgs.Renderer = DrawMsg;
             _list.Renderer = DrawSummary;
             _list.ItemActivated += async (s, e) => await OpenSelected();
             _list.SelectionChanged += async (s, e) => await OpenSelected();
@@ -114,10 +113,7 @@ namespace NareLauncher.UI
 
         private void ShowChat()
         {
-            var items = new List<object>();
-            foreach (var m in _chat) items.Add(m);
-            _msgs.SetItems(items);
-            if (items.Count > 0) _msgs.SelectedIndex = items.Count - 1;
+            _msgs.SetMessages(_chat, _admin, MyNick);
             if (_admin)
             {
                 _who.Text = _openNick.Length > 0
@@ -215,26 +211,6 @@ namespace NareLauncher.UI
             if (!string.IsNullOrEmpty(c.Assigned))
                 Theme.Text1(g, "→ " + c.Assigned, Theme.F(7.5f), Theme.Warn,
                     new Rectangle(box.Right - 90, box.Y + 30, 82, 16), StringAlignment.Far, StringAlignment.Center);
-        }
-
-        private void DrawMsg(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
-        {
-            var m = item as NareAuth.ChatMessage;
-            if (m == null) return;
-
-            // своё справа: у игрока — его сообщения, у админа — админские
-            bool mine = _admin ? m.Admin : !m.Admin;
-            int w = Math.Min(r.Width - 80, 380);
-            var bubble = mine
-                ? new Rectangle(r.Right - w - 10, r.Y + 4, w, r.Height - 10)
-                : new Rectangle(r.X + 10, r.Y + 4, w, r.Height - 10);
-
-            Theme.FillRound(g, bubble, 10, mine ? Color.FromArgb(60, Theme.Accent) : Theme.Panel);
-            string name = m.Admin ? (m.From + " · админ") : m.From;
-            Theme.Text1(g, name, Theme.F(7.6f, FontStyle.Bold), m.Admin ? Theme.Accent : Theme.Warn,
-                new Rectangle(bubble.X + 10, bubble.Y + 4, bubble.Width - 20, 12));
-            Theme.Text1(g, m.Text, Theme.F(9f), Theme.Text,
-                new Rectangle(bubble.X + 10, bubble.Y + 18, bubble.Width - 20, bubble.Height - 22));
         }
 
         protected override void OnResize(EventArgs e) { base.OnResize(e); Layout1(); }

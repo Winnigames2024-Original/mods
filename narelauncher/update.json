@@ -1,8 +1,8 @@
 {
-  "version": "1.30",
+  "version": "1.31",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "fd9abf5c99fd45f75b8f4ef9517c908835a84ac1",
-  "size": 627712,
-  "notes": "Уведомления о новых сообщениях в чате, как в Steam (правый нижний угол, клик открывает Чаты)"
+  "sha1": "6edd1b538ffa62265b09d86b2983ef66f5287ec9",
+  "size": 629248,
+  "notes": "Чат показывает сообщения целиком (перенос строк, прокрутка) + кнопка «Разбанить» в чате с игроком"
 }

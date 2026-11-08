@@ -18,7 +18,7 @@ namespace NareLauncher.UI
         private string _left = "";
         private string _nick = "";
 
-        private readonly VirtualList _chat = new VirtualList { ItemHeight = 46, EmptyText = "Напишите администратору — он ответит здесь" };
+        private readonly ChatView _chat = new ChatView();
         private readonly NareTextBox _input = new NareTextBox { Placeholder = "Сообщение администратору…" };
         private readonly NareButton _send = new NareButton { Text = "Отправить", Style = BtnStyle.Accent, Size = new Size(140, 38) };
 
@@ -33,7 +33,6 @@ namespace NareLauncher.UI
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
 
-            _chat.Renderer = DrawMsg;
             Controls.Add(_chat);
             Controls.Add(_input);
             Controls.Add(_send);
@@ -79,10 +78,7 @@ namespace NareLauncher.UI
 
         private void Fill(System.Collections.Generic.List<NareAuth.ChatMessage> msgs)
         {
-            var items = new System.Collections.Generic.List<object>();
-            foreach (var m in msgs) items.Add(m);
-            _chat.SetItems(items);
-            if (items.Count > 0) _chat.SelectedIndex = items.Count - 1;   // прокрутка вниз
+            _chat.SetMessages(msgs, false, _nick);
         }
 
         private async void Send()
@@ -101,26 +97,6 @@ namespace NareLauncher.UI
                 MessageBox.Show(FindForm(), "Не отправилось: " + ex.Message, "Чат",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-        }
-
-        private void DrawMsg(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
-        {
-            var m = item as NareAuth.ChatMessage;
-            if (m == null) return;
-
-            bool mine = !m.Admin;
-            int w = Math.Min(r.Width - 80, 420);
-            var bubble = mine
-                ? new Rectangle(r.Right - w - 12, r.Y + 4, w, r.Height - 10)
-                : new Rectangle(r.X + 12, r.Y + 4, w, r.Height - 10);
-
-            Theme.FillRound(g, bubble, 10, mine ? Color.FromArgb(60, Theme.Accent) : Theme.Panel);
-
-            Theme.Text1(g, m.Admin ? "Администратор" : "Вы", Theme.F(7.6f, FontStyle.Bold),
-                m.Admin ? Theme.Warn : Theme.Accent,
-                new Rectangle(bubble.X + 10, bubble.Y + 4, bubble.Width - 20, 12));
-            Theme.Text1(g, m.Text, Theme.F(9f), Theme.Text,
-                new Rectangle(bubble.X + 10, bubble.Y + 18, bubble.Width - 20, bubble.Height - 22));
         }
 
         private void Place()
