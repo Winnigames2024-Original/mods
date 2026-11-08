@@ -273,6 +273,7 @@ namespace NareLauncher.UI.Pages
                     foreach (var build in VersionCatalog.Scan())
                     {
                         if (build.Id != id) continue;
+                        off += DisableBlockedMods(build);
                         foreach (var problem in ModCheck.Scan("mod", build))
                             if (problem.Bad) { ModCheck.TurnOff(problem); off++; }
                         break;
@@ -577,6 +578,10 @@ namespace NareLauncher.UI.Pages
         {
             if (version == null || !version.SupportsMods) return true;
 
+            // моды, запрещённые администратором для этой версии, отключаем сразу
+            int adminOff = DisableBlockedMods(version);
+            if (adminOff > 0) SetStatus("Отключено модов по запрету администратора: " + adminOff + "…");
+
             List<ModCheck.Problem> bad;
             try
             {
@@ -620,6 +625,36 @@ namespace NareLauncher.UI.Pages
             }
 
             return true;
+        }
+
+        /// <summary>Отключает моды, которые админ заблокировал для этой сборки.</summary>
+        private int DisableBlockedMods(InstalledVersion version)
+        {
+            var policy = NareAuth.Last;
+            if (policy == null || policy.BlockedMods.Count == 0) return 0;
+
+            int off = 0;
+            try
+            {
+                foreach (var mod in ModManager.List("mod", version.Id))
+                {
+                    if (!mod.Enabled) continue;
+
+                    var about = ModJar.Read(mod.Path);
+                    string id = about.Id;
+                    if (string.IsNullOrEmpty(id)) continue;
+
+                    if (policy.ModBlocked(id, version.BaseVersion))
+                    {
+                        ModManager.Toggle(mod);
+                        off++;
+                        Log.Info("Мод " + mod.FileName + " отключён: запрещён администратором");
+                    }
+                }
+            }
+            catch (Exception ex) { Log.Warn("Проверка запрещённых модов: " + ex.Message); }
+
+            return off;
         }
 
         private void OpenInstanceFolder()

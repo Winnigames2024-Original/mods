@@ -33,8 +33,16 @@ namespace NareLauncher.UI
         public SettingsPage SettingsTab;
         public ConsolePage ConsoleTab;
         public TogetherPage TogetherTab;
+        public AdminPage AdminTab;
 
         private NareLabel _accountChip;
+
+        private BanOverlay _banOverlay;
+        private readonly System.Windows.Forms.Timer _guard = new System.Windows.Forms.Timer { Interval = 15000 };
+        private int _warnShown;          // сколько предупреждений уже показали за сессию
+        private long _broadcastShown;    // время последнего показанного объявления
+        private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
+        private string _guardNick = "";  // чей статус мы отслеживаем
 
         public MainForm()
         {
@@ -64,6 +72,9 @@ namespace NareLauncher.UI
             _sidebar = new Panel { Dock = DockStyle.Left, Width = SidebarWidth, BackColor = Theme.Sidebar };
             _titleBar = new Panel { Dock = DockStyle.Top, Height = TitleHeight, BackColor = Theme.Sidebar };
 
+            _banOverlay = new BanOverlay();
+            _content.Controls.Add(_banOverlay);
+
             // порядок важен: Fill добавляется первым
             Controls.Add(_content);
             Controls.Add(_sidebar);
@@ -78,6 +89,7 @@ namespace NareLauncher.UI
             InstanceTab = new InstancePage { Host = this };
             ServersTab = new ServersPage { Host = this };
             TogetherTab = new TogetherPage { Host = this };
+            AdminTab = new AdminPage { Host = this };
             SkinTab = new SkinPage { Host = this };
             CosmeticsTab = new CosmeticsPage { Host = this };
             AccountsTab = new AccountsPage { Host = this };
@@ -95,6 +107,7 @@ namespace NareLauncher.UI
             _pages.Add(AccountsTab);
             _pages.Add(SettingsTab);
             _pages.Add(ConsoleTab);
+            _pages.Add(AdminTab);
 
             foreach (var p in _pages)
             {
@@ -170,8 +183,8 @@ namespace NareLauncher.UI
 
         private void BuildSidebar()
         {
-            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль" };
-            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console };
+            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Админ" };
+            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Settings };
 
             int y = 18;
             for (int i = 0; i < titles.Length; i++)
@@ -249,6 +262,21 @@ namespace NareLauncher.UI
             var acc = AccountStore.Selected;
             _accountChip.Text = acc == null ? "Аккаунт не выбран" : "Вы вошли как  " + acc.Name;
             _accountChip.ForeColor = acc == null ? Theme.Warn : Theme.Muted;
+            RefreshAdminNav();
+        }
+
+        /// <summary>Кнопка «Админ» видна только администратору.</summary>
+        public void RefreshAdminNav()
+        {
+            var acc = AccountStore.Selected;
+            bool admin = acc != null && acc.Admin;
+
+            int adminIndex = _pages.IndexOf(AdminTab);
+            if (adminIndex >= 0 && adminIndex < _nav.Count)
+            {
+                _nav[adminIndex].Visible = admin;
+                _nav[adminIndex].Invalidate();
+            }
         }
 
         /// <summary>Открывает окно управления аккаунтами и обновляет интерфейс после закрытия.</summary>
@@ -334,6 +362,75 @@ namespace NareLauncher.UI
             // Первый запуск: без аккаунта играть нельзя — сразу открываем окно
             if (AccountStore.Accounts.Count == 0)
                 ManageAccounts();
+
+            _guard.Tick += delegate { CheckPolicy(); };
+            _guard.Start();
+            CheckPolicy();
+        }
+
+        /// <summary>
+        /// Спрашивает сервер про текущий аккаунт: бан, предупреждения,
+        /// объявление и экстренное обновление. Если сервер молчит — живём
+        /// как обычно, из-за недоступного сервера никого не запираем.
+        /// </summary>
+        private async void CheckPolicy()
+        {
+            var acc = AccountStore.Selected;
+            string nick = acc == null ? "" : acc.Name;
+
+            if (nick != _guardNick)      // сменили аккаунт — показываем всё заново
+            {
+                _guardNick = nick;
+                _warnShown = 0;
+                _broadcastShown = 0;
+            }
+
+            if (string.IsNullOrEmpty(nick)) { _banOverlay.Hide1(); return; }
+
+            PlayerPolicy policy;
+            try { policy = await NareAuth.StatusAsync(nick, System.Threading.CancellationToken.None); }
+            catch { return; }            // сервер недоступен — не трогаем ничего
+
+            if (!policy.Known) return;
+
+            NareAuth.Last = policy;
+            RefreshAdminNav();
+
+            // бан
+            if (policy.Banned)
+            {
+                _banOverlay.Show(nick, policy.BanReason, policy.BanLeft);
+            }
+            else
+            {
+                _banOverlay.Hide1();
+            }
+
+            // предупреждения — показываем новые
+            for (int i = _warnShown; i < policy.Warnings.Count; i++)
+            {
+                MessageBox.Show(this, policy.Warnings[i],
+                    "Предупреждение от администратора", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            _warnShown = policy.Warnings.Count;
+
+            // объявление для всех
+            if (policy.HasBroadcast && policy.BroadcastAt > _broadcastShown)
+            {
+                _broadcastShown = policy.BroadcastAt;
+                MessageBox.Show(this, policy.Broadcast,
+                    "Объявление", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            // экстренное обновление
+            if (policy.HasUpdate && policy.Critical && !_updatePrompting
+                && SelfUpdate.IsNewer(policy.UpdateVersion))
+            {
+                _updatePrompting = true;
+                using (var form = new EmergencyUpdateForm(policy.UpdateVersion, policy.Changelog))
+                    form.ShowDialog(this);
+                _updatePrompting = false;
+            }
         }
 
         /// <summary>

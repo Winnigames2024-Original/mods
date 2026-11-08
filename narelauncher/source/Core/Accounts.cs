@@ -16,6 +16,12 @@ namespace NareLauncher.Core
         /// <summary>Путь к PNG со скином, выбранным в редакторе.</summary>
         public string SkinPath = "";
 
+        /// <summary>Сессия на сервере NareNet. Пустая — надо войти паролем.</summary>
+        public string Token = "";
+
+        /// <summary>Этот аккаунт — администратор.</summary>
+        public bool Admin;
+
         public bool IsOffline { get { return Type != "microsoft"; } }
 
         public string UserType { get { return IsOffline ? "legacy" : "msa"; } }
@@ -55,7 +61,9 @@ namespace NareLauncher.Core
                     Type = a["type"].AsString("offline"),
                     AccessToken = a["accessToken"].AsString("0"),
                     RefreshToken = a["refreshToken"].AsString(""),
-                    SkinPath = a["skinPath"].AsString("")
+                    SkinPath = a["skinPath"].AsString(""),
+                    Token = a["token"].AsString(""),
+                    Admin = a["admin"].AsBool(false)
                 };
                 DateTime exp;
                 if (DateTime.TryParse(a["expiresAt"].AsString(""), out exp)) acc.ExpiresAt = exp;
@@ -83,6 +91,8 @@ namespace NareLauncher.Core
                     o.Set("refreshToken", a.RefreshToken);
                     o.Set("expiresAt", a.ExpiresAt.ToString("o"));
                     o.Set("skinPath", a.SkinPath);
+                    o.Set("token", a.Token);
+                    o.Set("admin", a.Admin);
                     arr.Add(o);
                 }
                 root["accounts"] = arr;

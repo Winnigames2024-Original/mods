@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.1';
+const VERSION = '1.2';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -59,6 +59,19 @@ function log() {
 }
 
 function token() { return crypto.randomBytes(16).toString('hex'); }
+
+function query(req) {
+    const i = req.url.indexOf('?');
+    if (i < 0) return {};
+    const out = {};
+    for (const pair of req.url.slice(i + 1).split('&')) {
+        const eq = pair.indexOf('=');
+        if (eq < 0) continue;
+        try { out[decodeURIComponent(pair.slice(0, eq))] = decodeURIComponent(pair.slice(eq + 1)); }
+        catch (e) { }
+    }
+    return out;
+}
 
 function plainIp(socket) {
     let ip = socket.remoteAddress || '';
@@ -236,6 +249,12 @@ function announce(req, res) {
         try { body = JSON.parse(buffer.toString('utf8')); }
         catch (e) { return send(res, 400, { error: 'это не JSON' }); }
 
+        // забаненный или лишённый «Вместе» хозяином быть не может
+        const who = clean(body.nick, 32);
+        const ban = banOf(who);
+        if (ban) return send(res, 403, { error: 'together-banned', reason: ban.reason || '', until: ban.until || 0 });
+        if (policy.together[who]) return send(res, 403, { error: 'together-blocked' });
+
         const ip = plainIp(req.socket);
         const key = isSha1(body.token) || (typeof body.token === 'string' && body.token.length === 32)
             ? body.token : null;
@@ -400,11 +419,439 @@ function filePut(req, res, sha1) {
     });
 }
 
+
+// =====================================================================
+//  Аккаунты, баны и админ-панель.
+//
+//  Всё честно и на виду: пароли хранятся только как соль+хэш (scrypt),
+//  бан просто запрещает лаунчеру работать и говорит об этом игроку,
+//  ничего не прячется и в фоне не крутится. Админ — один ник, он
+//  задаётся заранее и защищён своим паролем.
+// =====================================================================
+
+const ADMIN = (process.env.NARENET_ADMIN || 'Winnigames2024');
+
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const BANS_FILE = path.join(DATA_DIR, 'bans.json');
+const WARNS_FILE = path.join(DATA_DIR, 'warns.json');
+const POLICY_FILE = path.join(DATA_DIR, 'policy.json');
+
+function loadJson(file, fallback) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+    catch (e) { return fallback; }
+}
+
+function saveJson(file, data) {
+    const tmp = file + '.' + process.pid + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, file);
+}
+
+const accounts = loadJson(ACCOUNTS_FILE, {});   // nick -> { salt, hash, created }
+const bans = loadJson(BANS_FILE, {});           // nick -> { until, reason, by, at }
+const warns = loadJson(WARNS_FILE, {});         // nick -> [ { text, at, by } ]
+const policy = loadJson(POLICY_FILE, {
+    together: {},                               // nick -> true: нельзя «Вместе»
+    mods: [],                                   // [ { id, version } ], version "*" = все
+    update: null,                               // { version, changelog, critical, at }
+    broadcast: null,                            // { text, at }
+    commands: [],                               // очередь команд серверу
+    appeals: []                                 // [ { nick, text, at } ]
+});
+
+function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
+function saveBans() { saveJson(BANS_FILE, bans); }
+function saveWarns() { saveJson(WARNS_FILE, warns); }
+function savePolicy() { saveJson(POLICY_FILE, policy); }
+
+// ---- пароли: scrypt, без сторонних библиотек
+
+function makeHash(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(String(password), salt, 32).toString('hex');
+    return { salt, hash };
+}
+
+function checkPassword(password, record) {
+    if (!record || !record.salt || !record.hash) return false;
+    const hash = crypto.scryptSync(String(password), record.salt, 32).toString('hex');
+    // сравнение постоянного времени, чтобы по скорости ответа не угадывали пароль
+    const a = Buffer.from(hash, 'hex');
+    const b = Buffer.from(record.hash, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function goodNick(nick) {
+    return typeof nick === 'string' && /^[A-Za-z0-9_]{3,16}$/.test(nick);
+}
+
+function goodPassword(password) {
+    return typeof password === 'string' && password.length >= 4 && password.length <= 100;
+}
+
+// ---- сессии: токен живёт в памяти, переживать перезапуск ему незачем
+
+const sessions = new Map();                     // token -> { nick, exp }
+const SESSION_LIFE = 12 * 60 * 60 * 1000;
+
+function openSession(nick) {
+    const tok = token();
+    sessions.set(tok, { nick, exp: now() + SESSION_LIFE });
+    return tok;
+}
+
+function sessionNick(tok) {
+    const s = sessions.get(tok);
+    if (!s) return null;
+    if (now() > s.exp) { sessions.delete(tok); return null; }
+    return s.nick;
+}
+
+setInterval(() => {
+    for (const [tok, s] of sessions) if (now() > s.exp) sessions.delete(tok);
+}, 60 * 1000);
+
+// на старте можно завести админа переменной окружения, чтобы ник не занял чужой
+if (process.env.NARENET_ADMIN_PASSWORD && !accounts[ADMIN]) {
+    const made = makeHash(process.env.NARENET_ADMIN_PASSWORD);
+    accounts[ADMIN] = { salt: made.salt, hash: made.hash, created: now() };
+    saveAccounts();
+    log('админ', ADMIN, 'заведён из NARENET_ADMIN_PASSWORD');
+}
+
+// ---- баны
+
+/** Активен ли бан сейчас. Просроченный снимаем на месте. */
+function banOf(nick) {
+    const ban = bans[nick];
+    if (!ban) return null;
+    if (ban.until && ban.until > 0 && now() > ban.until) {
+        delete bans[nick];
+        saveBans();
+        return null;
+    }
+    return ban;
+}
+
+function banText(ban) {
+    if (!ban) return '';
+    if (!ban.until || ban.until <= 0) return 'навсегда';
+    const left = Math.max(0, ban.until - now());
+    const days = Math.floor(left / 86400000);
+    const hours = Math.floor((left % 86400000) / 3600000);
+    const mins = Math.floor((left % 3600000) / 60000);
+    if (days > 0) return 'ещё ' + days + ' д ' + hours + ' ч';
+    if (hours > 0) return 'ещё ' + hours + ' ч ' + mins + ' мин';
+    return 'ещё ' + Math.max(1, mins) + ' мин';
+}
+
+// ---- маленькие ответы-помощники
+
+function readJsonBody(req, done) {
+    readBody(req, BODY_MAX, buffer => {
+        if (!buffer) return done(null);
+        try { done(JSON.parse(buffer.toString('utf8'))); }
+        catch (e) { done(null); }
+    });
+}
+
+function needAdmin(body, res) {
+    const nick = sessionNick(body && body.token);
+    if (nick !== ADMIN) {
+        send(res, 403, { error: 'нужен вход администратором' });
+        return false;
+    }
+    return true;
+}
+
+// --------------------------------------------------------- аккаунты
+
+function accountRegister(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+
+        const nick = clean(body.nick, 16);
+        if (!goodNick(nick)) return send(res, 400, { error: 'ник: 3–16 латинских букв, цифр и _' });
+        if (!goodPassword(body.password)) return send(res, 400, { error: 'пароль: от 4 до 100 знаков' });
+        if (accounts[nick]) return send(res, 409, { error: 'такой ник уже занят' });
+
+        const made = makeHash(body.password);
+        accounts[nick] = { salt: made.salt, hash: made.hash, created: now() };
+        saveAccounts();
+        log('аккаунт заведён:', nick);
+
+        send(res, 200, { ok: true, nick, token: openSession(nick), admin: nick === ADMIN });
+    });
+}
+
+function accountLogin(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+
+        const nick = clean(body.nick, 16);
+        const record = accounts[nick];
+        if (!record || !checkPassword(body.password, record))
+            return send(res, 403, { error: 'ник или пароль не подходят' });
+
+        send(res, 200, { ok: true, nick, token: openSession(nick), admin: nick === ADMIN });
+    });
+}
+
+function accountPassword(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+
+        const nick = clean(body.nick, 16);
+        const record = accounts[nick];
+        if (!record || !checkPassword(body.password, record))
+            return send(res, 403, { error: 'старый пароль не подходит' });
+        if (!goodPassword(body.newPassword))
+            return send(res, 400, { error: 'новый пароль: от 4 до 100 знаков' });
+
+        const made = makeHash(body.newPassword);
+        accounts[nick] = { salt: made.salt, hash: made.hash, created: record.created };
+        saveAccounts();
+        log('пароль сменён:', nick);
+
+        send(res, 200, { ok: true, token: openSession(nick) });
+    });
+}
+
+function accountDelete(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+
+        const nick = clean(body.nick, 16);
+        const record = accounts[nick];
+        if (!record || !checkPassword(body.password, record))
+            return send(res, 403, { error: 'ник или пароль не подходят' });
+        if (nick === ADMIN) return send(res, 403, { error: 'администратора удалять нельзя' });
+
+        delete accounts[nick];
+        saveAccounts();
+        log('аккаунт удалён:', nick);
+
+        send(res, 200, { ok: true });
+    });
+}
+
+// --------------------------------------------------------- статус (лаунчер)
+
+function statusFor(nick) {
+    const ban = banOf(nick);
+    const list = warns[nick] || [];
+
+    return {
+        nick,
+        banned: !!ban,
+        until: ban ? (ban.until || 0) : 0,
+        banReason: ban ? (ban.reason || '') : '',
+        banLeft: ban ? banText(ban) : '',
+        appealOnly: !!ban,                       // в бане работает только апелляция
+        blockedTogether: !!policy.together[nick],
+        warnings: list,
+        broadcast: policy.broadcast,
+        update: policy.update,
+        blockedMods: policy.mods
+    };
+}
+
+function status(req, res) {
+    const q = query(req);
+    const nick = clean(q.nick, 16);
+    if (!nick) return send(res, 400, { error: 'не указан ник' });
+    send(res, 200, statusFor(nick));
+}
+
+function appeal(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+
+        const nick = clean(body.nick, 16);
+        const text = clean(body.text, 500);
+        if (!nick || !text) return send(res, 400, { error: 'нужен ник и текст' });
+
+        policy.appeals.push({ nick, text, at: now() });
+        if (policy.appeals.length > 500) policy.appeals.shift();
+        savePolicy();
+        log('апелляция от', nick);
+
+        send(res, 200, { ok: true });
+    });
+}
+
+// --------------------------------------------------------- админ-панель
+
+function adminBan(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан ник' });
+        if (nick === ADMIN) return send(res, 400, { error: 'себя банить нельзя' });
+
+        const minutes = Number(body.minutes) || 0;      // 0 = навсегда
+        const until = minutes > 0 ? now() + minutes * 60000 : 0;
+
+        bans[nick] = { until, reason: clean(body.reason, 300), by: ADMIN, at: now() };
+        saveBans();
+        log('бан:', nick, minutes > 0 ? ('на ' + minutes + ' мин') : 'навсегда');
+
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminUnban(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (bans[nick]) { delete bans[nick]; saveBans(); log('разбан:', nick); }
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminWarn(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        const text = clean(body.text, 300);
+        if (!nick || !text) return send(res, 400, { error: 'нужен ник и текст' });
+
+        if (!warns[nick]) warns[nick] = [];
+        warns[nick].push({ text, at: now(), by: ADMIN });
+        if (warns[nick].length > 50) warns[nick].shift();
+        saveWarns();
+        log('предупреждение', nick);
+
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminBroadcast(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const text = clean(body.text, 300);
+        policy.broadcast = text ? { text, at: now() } : null;
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminCommand(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const text = clean(body.text, 300);
+        if (!text) return send(res, 400, { error: 'пустая команда' });
+
+        policy.commands.push({ text, at: now(), by: ADMIN });
+        if (policy.commands.length > 200) policy.commands.shift();
+        savePolicy();
+        log('команда серверу поставлена в очередь:', text);
+
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminTogether(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан ник' });
+
+        if (body.on === false) delete policy.together[nick];
+        else policy.together[nick] = true;
+        savePolicy();
+
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminBlockMod(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const id = clean(body.id, 80);
+        const version = clean(body.version, 32) || '*';
+        if (!id) return send(res, 400, { error: 'не указан мод' });
+
+        const has = policy.mods.some(m => m.id === id && m.version === version);
+
+        if (body.on === false) policy.mods = policy.mods.filter(m => !(m.id === id && m.version === version));
+        else if (!has) policy.mods.push({ id, version });
+
+        savePolicy();
+        send(res, 200, { ok: true, mods: policy.mods });
+    });
+}
+
+function adminUpdate(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const version = clean(body.version, 32);
+        if (!version) return send(res, 400, { error: 'не указана версия' });
+
+        policy.update = {
+            version,
+            changelog: clean(body.changelog, 4000),
+            critical: body.critical === true,
+            at: now()
+        };
+        savePolicy();
+        log('объявлено обновление', version, policy.update.critical ? '(экстренное)' : '');
+
+        send(res, 200, { ok: true });
+    });
+}
+
+function adminState(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+
+        // просроченные баны заодно подчистим
+        for (const nick of Object.keys(bans)) banOf(nick);
+
+        send(res, 200, {
+            ok: true,
+            accounts: Object.keys(accounts).map(n => ({ nick: n, admin: n === ADMIN })),
+            bans: Object.keys(bans).map(n => ({
+                nick: n, until: bans[n].until || 0, reason: bans[n].reason || '', left: banText(bans[n])
+            })),
+            together: Object.keys(policy.together),
+            mods: policy.mods,
+            update: policy.update,
+            broadcast: policy.broadcast,
+            appeals: policy.appeals.slice(-100),
+            commands: policy.commands.slice(-50)
+        });
+    });
+}
+
+
 const server = http.createServer((req, res) => {
     const at = req.url.indexOf('?');
     const route = at >= 0 ? req.url.slice(0, at) : req.url;
 
     res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // --- аккаунты
+    if (route === '/account/register' && req.method === 'POST') return accountRegister(req, res);
+    if (route === '/account/login' && req.method === 'POST') return accountLogin(req, res);
+    if (route === '/account/password' && req.method === 'POST') return accountPassword(req, res);
+    if (route === '/account/delete' && req.method === 'POST') return accountDelete(req, res);
+
+    // --- лаунчер спрашивает про себя
+    if (route === '/status') return status(req, res);
+    if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
+
+    // --- админ-панель
+    if (route === '/admin/state' && req.method === 'POST') return adminState(req, res);
+    if (route === '/admin/ban' && req.method === 'POST') return adminBan(req, res);
+    if (route === '/admin/unban' && req.method === 'POST') return adminUnban(req, res);
+    if (route === '/admin/warn' && req.method === 'POST') return adminWarn(req, res);
+    if (route === '/admin/broadcast' && req.method === 'POST') return adminBroadcast(req, res);
+    if (route === '/admin/command' && req.method === 'POST') return adminCommand(req, res);
+    if (route === '/admin/together' && req.method === 'POST') return adminTogether(req, res);
+    if (route === '/admin/blockmod' && req.method === 'POST') return adminBlockMod(req, res);
+    if (route === '/admin/update' && req.method === 'POST') return adminUpdate(req, res);
 
     if (route === '/ping') {
         return send(res, 200, {

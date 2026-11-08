@@ -93,6 +93,8 @@
     <Compile Include="Core\ModJar.cs" />
     <Compile Include="Core\ModCheck.cs" />
     <Compile Include="Core\NareNet.cs" />
+    <Compile Include="Core\NareAuth.cs" />
+    <Compile Include="Core\SelfUpdate.cs" />
     <Compile Include="Core\BlockModel.cs" />
     <Compile Include="Core\ModSourcesExtra.cs" />
     <Compile Include="Core\Net.cs" />
@@ -140,6 +142,12 @@
     <Compile Include="UI\ErrorForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\EmergencyUpdateForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\BanOverlay.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="UI\WelcomeForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -179,6 +187,9 @@
     </Compile>
     <Compile Include="UI\Pages\InstancePage.cs">
       <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="UI\Pages\AdminPage.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="UI\Pages\TogetherPage.cs">
       <SubType>UserControl</SubType>

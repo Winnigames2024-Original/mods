@@ -310,7 +310,27 @@ public final class NareTogether {
         body.addProperty("mode", "tunnel".equals(mode) ? "tunnel" : "direct");
         body.add("mods", mods());
 
-        String answer = post("/announce", body.toString());
+        String answer;
+        try {
+            answer = post("/announce", body.toString());
+        } catch (Exception e) {
+            String why = e.getMessage() == null ? "" : e.getMessage();
+            if (why.contains("together-banned")) {
+                close("вы забанены — хостить нельзя");
+                NareErrors.report("together-banned", "Вы забанены",
+                        "Администратор забанил ваш аккаунт, поэтому открыть мир для друзей нельзя. "
+                        + "Подать апелляцию можно в лаунчере.");
+                return;
+            }
+            if (why.contains("together-blocked")) {
+                close("администратор запретил «Вместе»");
+                NareErrors.report("together-blocked", "«Вместе» запрещено",
+                        "Администратор отключил вам функцию «Вместе».");
+                return;
+            }
+            throw e;
+        }
+
         JsonObject json = JsonParser.parseString(answer).getAsJsonObject();
 
         if (json.has("token")) token = json.get("token").getAsString();

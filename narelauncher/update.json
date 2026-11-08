@@ -1,8 +1,8 @@
 {
-  "version": "1.17",
+  "version": "1.18",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "2dfa00cc44b0efb4d73ab599741a576644623f9e",
-  "size": 499200,
-  "notes": "своё поле для аргументов игры — для --funtrolls2026 и подобных"
+  "sha1": "c37e4695e9773f131a763a95b0cc36b7d3e077f5",
+  "size": 543744,
+  "notes": "аккаунты с паролем, баны и апелляция, предупреждения, админ-панель, экстренное обновление с отсчётом"
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 using NareLauncher.Core;
 
@@ -17,6 +18,11 @@ namespace NareLauncher.UI
         {
             Placeholder = "Ник: 3–16 символов, латиница, цифры и _",
             Icon = Ico.Account
+        };
+
+        private readonly NareTextBox _password = new NareTextBox
+        {
+            Placeholder = "Пароль аккаунта (от 4 символов)"
         };
 
         private readonly NareButton _go = new NareButton
@@ -46,7 +52,7 @@ namespace NareLauncher.UI
             Text = "Добро пожаловать";
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(520, 272);
+            ClientSize = new Size(520, 338);
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = Theme.F(9.5f);
@@ -69,11 +75,26 @@ namespace NareLauncher.UI
             _nick.Inner.TextChanged += (s, e) =>
             {
                 _status.Text = "";
-                _go.Enabled = _nick.Text.Trim().Length > 0;
+                _go.Enabled = Ready();
+                _go.Invalidate();
+            };
+
+            _password.Inner.UseSystemPasswordChar = true;
+            _password.Inner.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode != Keys.Enter) return;
+                e.SuppressKeyPress = true;
+                Accept();
+            };
+            _password.Inner.TextChanged += (s, e) =>
+            {
+                _status.Text = "";
+                _go.Enabled = Ready();
                 _go.Invalidate();
             };
 
             Controls.Add(_nick);
+            Controls.Add(_password);
             Controls.Add(_go);
             Controls.Add(_closeX);
             Controls.Add(_status);
@@ -81,6 +102,13 @@ namespace NareLauncher.UI
             _go.Enabled = false;
             Layout1();
         }
+
+        private bool Ready()
+        {
+            return _nick.Text.Trim().Length > 0 && _password.Text.Length > 0 && !_busy;
+        }
+
+        private bool _busy;
 
         protected override void OnShown(EventArgs e)
         {
@@ -90,35 +118,75 @@ namespace NareLauncher.UI
 
         // ------------------------------------------------------------ создание
 
-        private void Accept()
+        private async void Accept()
         {
             string nick = _nick.Text.Trim();
+            string password = _password.Text;
 
             if (!AccountStore.IsValidNick(nick))
             {
                 Warn("Ник должен быть 3–16 символов: латиница, цифры и _");
                 return;
             }
-
+            if (password.Length < 4)
+            {
+                Warn("Пароль — от 4 символов. Он защищает аккаунт на сервере.");
+                return;
+            }
             if (AccountStore.NickTaken(nick))
             {
-                Warn("Такой ник уже есть в списке аккаунтов.");
+                Warn("Такой ник уже есть в списке аккаунтов на этом компьютере.");
+                return;
+            }
+
+            _busy = true;
+            _go.Enabled = false;
+            _go.Invalidate();
+            Warn("Проверяю на сервере…");
+            _status.ForeColor = Theme.Muted;
+
+            NareAuth.LoginResult result = null;
+            string problem = null;
+
+            try
+            {
+                // новый ник — регистрируем; занят — пробуем войти этим паролем
+                try
+                {
+                    result = await NareAuth.RegisterAsync(nick, password, CancellationToken.None);
+                }
+                catch
+                {
+                    result = await NareAuth.LoginAsync(nick, password, CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                problem = ex.Message;
+            }
+
+            _busy = false;
+
+            if (result == null)
+            {
+                Warn(problem != null && problem.Contains("не подходят")
+                    ? "Этот ник занят, а пароль не подходит. Выберите другой ник или вспомните пароль."
+                    : "Сервер недоступен: " + (problem ?? "нет связи") + ". Попробуйте позже.");
+                _go.Enabled = Ready();
+                _go.Invalidate();
                 return;
             }
 
             try
             {
                 MadeAccount = AccountStore.AddOffline(nick);
+                MadeAccount.Token = result.Token;
+                MadeAccount.Admin = result.Admin;
+                AccountStore.Save();
             }
             catch (Exception ex)
             {
-                Warn("Не вышло создать аккаунт: " + ex.Message);
-                return;
-            }
-
-            if (MadeAccount == null)
-            {
-                Warn("Не вышло создать аккаунт — попробуйте другой ник.");
+                Warn("Аккаунт на сервере есть, но локально не сохранился: " + ex.Message);
                 return;
             }
 
@@ -197,12 +265,13 @@ namespace NareLauncher.UI
 
             _closeX.Location = new Point(ClientSize.Width - 52, (TitleHeight - _closeX.Height) / 2);
 
-            int y = TitleHeight + 92;
+            int y = TitleHeight + 86;
             _nick.SetBounds(pad, y, w, 40);
+            _password.SetBounds(pad, y + 48, w, 40);
 
-            _status.SetBounds(pad, y + 46, w, 20);
+            _status.SetBounds(pad, y + 94, w, 20);
 
-            _go.Location = new Point(pad + (w - _go.Width) / 2, ClientSize.Height - _go.Height - 24);
+            _go.Location = new Point(pad + (w - _go.Width) / 2, ClientSize.Height - _go.Height - 22);
         }
     }
 }

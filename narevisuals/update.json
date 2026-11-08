@@ -1,8 +1,8 @@
 {
-  "version": "2.15.0",
-  "file": "forge_narevisuals-2.15.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.15.0.jar",
-  "sha1": "34ad9c6ad26e20a2fe807a4eb06c5a27258e2c9a",
-  "size": 825209,
-  "notes": "шутки включаются и аргументом игры, и свойством -Dnarevisuals.funtrolls2026"
+  "version": "2.16.0",
+  "file": "forge_narevisuals-2.16.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.16.0.jar",
+  "sha1": "c33197272c9e521490ba000f094b89491af916c3",
+  "size": 825610,
+  "notes": "бан и запрет «Вместе» от админа учитываются при открытии мира"
 }

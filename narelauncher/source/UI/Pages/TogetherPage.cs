@@ -235,6 +235,12 @@ namespace NareLauncher.UI.Pages
             var room = Current;
             if (room == null || _busy) return;
 
+            if (NareAuth.Last != null && NareAuth.Last.BlockedTogether)
+            {
+                Say("Администратор запретил вам функцию «Вместе».", Theme.Bad);
+                return;
+            }
+
             if (!room.Joinable)
             {
                 Say(room.Reachable == null
