@@ -1,8 +1,8 @@
 {
-  "version": "1.27",
+  "version": "1.28",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "ab630176b746bb7cc2f40e2d3ad4439f176cac09",
-  "size": 597504,
-  "notes": "Чат с тем, кто забанил (вместо апелляции) + подаккаунты (игровые ники) + лимит аккаунтов"
+  "sha1": "4d3fc4f9de81fc89a5795371891cf6300b1553cf",
+  "size": 609280,
+  "notes": "Экстренное обновление у всех и точечно игроку + вкладка «Устройства» с отвязкой, как в Telegram"
 }

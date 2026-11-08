@@ -30,6 +30,10 @@ namespace NareLauncher.Core
         public string UpdateVersion = "";
         public string Changelog = "";
         public bool Critical;
+        public long UpdateAt;
+
+        /// <summary>Устройство отвязали — токен больше не наш, пора выйти.</summary>
+        public bool LoggedOut;
 
         /// <summary>Заблокированные моды: пары id|version, version "*" — все.</summary>
         public readonly List<string> BlockedMods = new List<string>();
@@ -102,11 +106,21 @@ namespace NareLauncher.Core
             };
         }
 
+        /// <summary>Описание этого устройства для сервера.</summary>
+        private static void AttachDevice(Json body)
+        {
+            var dev = Json.NewObject();
+            dev.Set("id", DeviceId.Get());
+            dev.Set("name", DeviceId.Name());
+            body.Set("device", dev);
+        }
+
         public static async Task<LoginResult> RegisterAsync(string nick, string password, CancellationToken ct)
         {
             var body = Json.NewObject();
             body.Set("nick", nick);
             body.Set("password", password);
+            AttachDevice(body);
             return Result(await PostAsync("/account/register", body, ct).ConfigureAwait(false));
         }
 
@@ -115,6 +129,7 @@ namespace NareLauncher.Core
             var body = Json.NewObject();
             body.Set("nick", nick);
             body.Set("password", password);
+            AttachDevice(body);
             return Result(await PostAsync("/account/login", body, ct).ConfigureAwait(false));
         }
 
@@ -137,14 +152,17 @@ namespace NareLauncher.Core
 
         // -------------------------------------------------------------- статус
 
-        public static async Task<PlayerPolicy> StatusAsync(string nick, CancellationToken ct)
+        public static async Task<PlayerPolicy> StatusAsync(string nick, CancellationToken ct, string token = null)
         {
             var policy = new PlayerPolicy();
             if (string.IsNullOrEmpty(nick)) return policy;
 
-            var json = await Net.GetJsonAsync(Url("/status?nick=" + Net.UrlEncode(nick)), ct).ConfigureAwait(false);
+            string u = Url("/status?nick=" + Net.UrlEncode(nick));
+            if (!string.IsNullOrEmpty(token)) u += "&token=" + Net.UrlEncode(token);
+            var json = await Net.GetJsonAsync(u, ct).ConfigureAwait(false);
 
             policy.Known = true;
+            policy.LoggedOut = json["loggedOut"].AsBool(false);
             policy.Banned = json["banned"].AsBool(false);
             policy.Until = json["until"].AsLong(0);
             policy.BanReason = json["banReason"].AsString("");
@@ -173,6 +191,7 @@ namespace NareLauncher.Core
                 policy.UpdateVersion = update["version"].AsString("");
                 policy.Changelog = update["changelog"].AsString("");
                 policy.Critical = update["critical"].AsBool(false);
+                policy.UpdateAt = update["at"].AsLong(0);
             }
 
             foreach (var m in json["blockedMods"].Items)
@@ -260,13 +279,49 @@ namespace NareLauncher.Core
             await PostAsync("/admin/blockmod", body, ct).ConfigureAwait(false);
         }
 
-        public static async Task AnnounceUpdateAsync(string token, string version, string changelog, bool critical, CancellationToken ct)
+        public static async Task AnnounceUpdateAsync(string token, string version, string changelog, bool critical, CancellationToken ct, string nick = null)
         {
             var body = Admin(token);
             body.Set("version", version);
             body.Set("changelog", changelog ?? "");
             body.Set("critical", critical);
+            if (!string.IsNullOrEmpty(nick)) body.Set("nick", nick);   // точечно одному игроку
             await PostAsync("/admin/update", body, ct).ConfigureAwait(false);
+        }
+
+        // ----------------------------------------------------------- устройства
+
+        public class DeviceInfo
+        {
+            public string Id = "";
+            public string Name = "";
+            public long At;
+            public bool Current;
+        }
+
+        public static async Task<List<DeviceInfo>> DevicesAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject();
+            body.Set("token", token);
+            var json = await PostAsync("/account/devices", body, ct).ConfigureAwait(false);
+            var list = new List<DeviceInfo>();
+            foreach (var d in json["devices"].Items)
+                list.Add(new DeviceInfo
+                {
+                    Id = d["id"].AsString(""),
+                    Name = d["name"].AsString("Устройство"),
+                    At = d["at"].AsLong(0),
+                    Current = d["current"].AsBool(false)
+                });
+            return list;
+        }
+
+        public static async Task DeviceUnlinkAsync(string token, string id, CancellationToken ct)
+        {
+            var body = Json.NewObject();
+            body.Set("token", token);
+            body.Set("id", id);
+            await PostAsync("/account/device/unlink", body, ct).ConfigureAwait(false);
         }
 
         public static Task<Json> StateAsync(string token, CancellationToken ct)

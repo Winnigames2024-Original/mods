@@ -73,6 +73,8 @@
   <!-- SubType = Code: интерфейс собран в коде, конструктор форм открывать не нужно -->
   <ItemGroup>
     <Compile Include="Core\Accounts.cs" />
+    <Compile Include="Core\DeviceId.cs" />
+    <Compile Include="Core\EmergencyMark.cs" />
     <Compile Include="Core\GameLauncher.cs" />
     <Compile Include="Core\JavaLocator.cs" />
     <Compile Include="Core\Json.cs" />
@@ -149,6 +151,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\ChatForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\DevicesForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\SubAccountsForm.cs">

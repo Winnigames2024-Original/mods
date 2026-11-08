@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.5';
+const VERSION = '1.7';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -457,12 +457,16 @@ const warns = loadJson(WARNS_FILE, {});         // nick -> [ { text, at, by } ]
 const policy = loadJson(POLICY_FILE, {
     together: {},                               // nick -> true: нельзя «Вместе»
     mods: [],                                   // [ { id, version } ], version "*" = все
-    update: null,                               // { version, changelog, critical, at }
+    update: null,                               // { version, changelog, critical, at } — всем
+    updateTargets: {},                          // nick -> { version, changelog, critical, at } — точечно
     broadcast: null,                            // { text, at }
     commands: [],                               // очередь команд серверу
     appeals: [],                                // [ { nick, text, at } ]
-    servers: []                                 // рекламные серверы на модерации/одобренные
+    servers: [],                                // рекламные серверы на модерации/одобренные
+    chats: {}                                   // nick -> [ { from, text, at } ]: переписка по бану
 });
+if (!policy.chats) policy.chats = {};
+if (!policy.updateTargets) policy.updateTargets = {};
 if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
@@ -500,11 +504,38 @@ function goodPassword(password) {
 const sessions = new Map();                     // token -> { nick, exp }
 const SESSION_LIFE = 12 * 60 * 60 * 1000;
 
-function openSession(nick) {
+function openSession(nick, device) {
     const tok = token();
-    sessions.set(tok, { nick, exp: now() + SESSION_LIFE });
+    sessions.set(tok, { nick, exp: now() + SESSION_LIFE, device: device && device.id ? String(device.id) : null });
+    // привязываем токен к устройству аккаунта, чтобы его можно было отвязать
+    if (device && device.id) {
+        const a = accounts[nick];
+        if (a) {
+            if (!a.devices || typeof a.devices !== 'object') a.devices = {};
+            const id = clean(String(device.id), 64);
+            // прежний токен этого устройства больше не нужен
+            const old = a.devices[id];
+            if (old && old.token) sessions.delete(old.token);
+            a.devices[id] = { name: clean(device.name || 'Устройство', 64), at: now(), token: tok };
+            saveAccounts();
+        }
+    }
     return tok;
 }
+
+/** Переносим токены устройств из файла аккаунтов в память — чтобы вход
+ *  переживал перезапуск сервера, а отвязка устройства реально выкидывала. */
+function rehydrateSessions() {
+    for (const nick of Object.keys(accounts)) {
+        const a = accounts[nick];
+        if (!a || !a.devices) continue;
+        for (const id of Object.keys(a.devices)) {
+            const d = a.devices[id];
+            if (d && d.token) sessions.set(d.token, { nick, exp: now() + SESSION_LIFE, device: id });
+        }
+    }
+}
+rehydrateSessions();
 
 function sessionNick(tok) {
     const s = sessions.get(tok);
@@ -587,7 +618,7 @@ function accountRegister(req, res) {
         saveAccounts();
         log('аккаунт заведён:', nick);
 
-        send(res, 200, { ok: true, nick, token: openSession(nick), admin: nick === ADMIN });
+        send(res, 200, { ok: true, nick, token: openSession(nick, body.device), admin: nick === ADMIN });
     });
 }
 
@@ -600,7 +631,7 @@ function accountLogin(req, res) {
         if (!record || !checkPassword(body.password, record))
             return send(res, 403, { error: 'ник или пароль не подходят' });
 
-        send(res, 200, { ok: true, nick, token: openSession(nick), admin: nick === ADMIN });
+        send(res, 200, { ok: true, nick, token: openSession(nick, body.device), admin: nick === ADMIN });
     });
 }
 
@@ -651,16 +682,33 @@ function acc(nick) {
     if (typeof a.coins !== 'number') a.coins = 0;
     if (!a.username) a.username = nick;
     if (!a.earned) a.earned = {};
+    if (!Array.isArray(a.subs) || a.subs.length === 0) a.subs = [nick];
+    if (!a.devices || typeof a.devices !== 'object') a.devices = {};
     return a;
 }
 
-function statusFor(nick) {
+function updateFor(nick) {
+    const t = policy.updateTargets ? policy.updateTargets[nick] : null;
+    const g = policy.update;
+    if (t && (!g || (t.at || 0) >= (g.at || 0))) return t;
+    return g;
+}
+
+function statusFor(nick, tok) {
     const ban = banOf(nick);
     const list = warns[nick] || [];
     const a = acc(nick);
 
+    // токен есть, но он не из этого аккаунта — устройство отвязали, пора выйти
+    let loggedOut = false;
+    if (tok) {
+        const who = sessionNick(tok);
+        if (who !== nick) loggedOut = true;
+    }
+
     return {
         nick,
+        loggedOut,
         banned: !!ban,
         until: ban ? (ban.until || 0) : 0,
         banReason: ban ? (ban.reason || '') : '',
@@ -669,7 +717,7 @@ function statusFor(nick) {
         blockedTogether: !!policy.together[nick],
         warnings: list,
         broadcast: policy.broadcast,
-        update: policy.update,
+        update: updateFor(nick),
         blockedMods: policy.mods,
         coins: a ? a.coins : 0,
         username: a ? a.username : nick
@@ -680,7 +728,8 @@ function status(req, res) {
     const q = query(req);
     const nick = clean(q.nick, 16);
     if (!nick) return send(res, 400, { error: 'не указан ник' });
-    send(res, 200, statusFor(nick));
+    const tok = typeof q.token === 'string' ? q.token : null;
+    send(res, 200, statusFor(nick, tok));
 }
 
 function appeal(req, res) {
@@ -809,15 +858,65 @@ function adminUpdate(req, res) {
         const version = clean(body.version, 32);
         if (!version) return send(res, 400, { error: 'не указана версия' });
 
-        policy.update = {
+        const rec = {
             version,
             changelog: clean(body.changelog, 4000),
             critical: body.critical === true,
             at: now()
         };
-        savePolicy();
-        log('объявлено обновление', version, policy.update.critical ? '(экстренное)' : '');
 
+        const target = clean(body.nick, 16);
+        if (target) {
+            if (!policy.updateTargets) policy.updateTargets = {};
+            policy.updateTargets[target] = rec;
+            log('обновление для', target, rec.critical ? '(экстренное)' : '');
+        } else {
+            policy.update = rec;
+            log('объявлено обновление', version, rec.critical ? '(экстренное)' : '');
+        }
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
+// --------------------------------------------------------- устройства
+
+function deviceLabel(d) {
+    return d && d.name ? d.name : 'Устройство';
+}
+
+/** Список устройств аккаунта (как в Telegram «Устройства»). */
+function devicesList(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const here = sessions.get(body.token);
+        const hereId = here ? here.device : null;
+        const list = Object.keys(a.devices).map(id => ({
+            id,
+            name: deviceLabel(a.devices[id]),
+            at: a.devices[id].at || 0,
+            current: id === hereId
+        })).sort((x, y) => y.at - x.at);
+        send(res, 200, { ok: true, devices: list });
+    });
+}
+
+/** Отвязать устройство: его токен перестаёт работать, и на том устройстве
+ *  лаунчер при следующей проверке увидит loggedOut и выйдет из аккаунта. */
+function deviceUnlink(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const id = clean(body.id, 64);
+        const d = a.devices[id];
+        if (!d) return send(res, 404, { error: 'нет такого устройства' });
+        if (d.token) sessions.delete(d.token);
+        delete a.devices[id];
+        saveAccounts();
+        log('устройство отвязано у', nick, ':', deviceLabel(d));
         send(res, 200, { ok: true });
     });
 }
@@ -832,6 +931,144 @@ function serverCommands(req, res) {
     if (policy.commands.length > 0) { policy.commands = []; savePolicy(); }
 
     send(res, 200, { commands: out });
+}
+
+// ------------------------------------------------- подаккаунты (игровые ники)
+
+/** Занят ли игровой ник кем-то, кроме указанного владельца. */
+function nickOwned(playNick, exceptOwner) {
+    const low = playNick.toLowerCase();
+    for (const name of Object.keys(accounts)) {
+        if (name.toLowerCase() === low && name !== exceptOwner) return true;
+        const a = acc(name);
+        for (const sub of a.subs)
+            if (sub.toLowerCase() === low && name !== exceptOwner) return true;
+    }
+    return false;
+}
+
+function subList(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        send(res, 200, { ok: true, subs: a.subs, active: a.username, coins: a.coins });
+    });
+}
+
+function subAdd(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const sub = clean(body.nick, 16);
+        if (!goodNick(sub)) return send(res, 400, { error: 'ник: 3–16 латинских букв, цифр и _' });
+
+        const a = acc(nick);
+        if (a.subs.some(x => x.toLowerCase() === sub.toLowerCase()))
+            return send(res, 400, { error: 'этот ник уже ваш' });
+        if (nickOwned(sub, nick))
+            return send(res, 409, { error: 'этот ник занят другим игроком' });
+        if (a.coins < NAME_PRICE)
+            return send(res, 402, { error: 'нужно ' + NAME_PRICE + ' монет, у вас ' + a.coins });
+
+        a.coins -= NAME_PRICE;
+        a.subs.push(sub);
+        a.username = sub;
+        saveAccounts();
+        log('подаккаунт:', nick, '+', sub, '(-' + NAME_PRICE + ')');
+
+        send(res, 200, { ok: true, subs: a.subs, active: a.username, coins: a.coins });
+    });
+}
+
+function subUse(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const sub = clean(body.nick, 16);
+        const a = acc(nick);
+        if (!a.subs.some(x => x.toLowerCase() === sub.toLowerCase()))
+            return send(res, 403, { error: 'это не ваш подаккаунт' });
+
+        a.username = a.subs.find(x => x.toLowerCase() === sub.toLowerCase());
+        saveAccounts();
+        send(res, 200, { ok: true, active: a.username });
+    });
+}
+
+function subRemove(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const sub = clean(body.nick, 16);
+        const a = acc(nick);
+        if (sub.toLowerCase() === nick.toLowerCase())
+            return send(res, 400, { error: 'основной ник убрать нельзя' });
+
+        a.subs = a.subs.filter(x => x.toLowerCase() !== sub.toLowerCase());
+        if (a.username.toLowerCase() === sub.toLowerCase()) a.username = nick;
+        saveAccounts();
+        send(res, 200, { ok: true, subs: a.subs, active: a.username });
+    });
+}
+
+// --------------------------------------------------- чат по бану
+
+function chatList(nick) {
+    if (!policy.chats[nick]) policy.chats[nick] = [];
+    return policy.chats[nick];
+}
+
+function banChatGet(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        send(res, 200, { ok: true, messages: chatList(nick) });
+    });
+}
+
+function banChatSend(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const text = clean(body.text, 500);
+        if (!text) return send(res, 400, { error: 'пустое сообщение' });
+
+        const list = chatList(nick);
+        list.push({ from: nick, admin: false, text, at: now() });
+        if (list.length > 200) list.shift();
+        savePolicy();
+
+        send(res, 200, { ok: true, messages: list });
+    });
+}
+
+function adminChatGet(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        send(res, 200, { ok: true, messages: chatList(nick) });
+    });
+}
+
+function adminChatSend(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        const text = clean(body.text, 500);
+        if (!nick || !text) return send(res, 400, { error: 'нужен игрок и текст' });
+
+        const list = chatList(nick);
+        list.push({ from: ADMIN, admin: true, text, at: now() });
+        if (list.length > 200) list.shift();
+        savePolicy();
+
+        send(res, 200, { ok: true, messages: list });
+    });
 }
 
 // ------------------------------------------------- рекламные серверы и монеты
@@ -1003,10 +1240,24 @@ const server = http.createServer((req, res) => {
     if (route === '/account/login' && req.method === 'POST') return accountLogin(req, res);
     if (route === '/account/password' && req.method === 'POST') return accountPassword(req, res);
     if (route === '/account/delete' && req.method === 'POST') return accountDelete(req, res);
+    if (route === '/account/devices' && req.method === 'POST') return devicesList(req, res);
+    if (route === '/account/device/unlink' && req.method === 'POST') return deviceUnlink(req, res);
 
     // --- лаунчер спрашивает про себя
     if (route === '/status') return status(req, res);
     if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
+
+    // чат по бану
+    if (route === '/ban/chat' && req.method === 'POST') return banChatGet(req, res);
+    if (route === '/ban/send' && req.method === 'POST') return banChatSend(req, res);
+    if (route === '/admin/chat' && req.method === 'POST') return adminChatGet(req, res);
+    if (route === '/admin/chat/send' && req.method === 'POST') return adminChatSend(req, res);
+
+    // подаккаунты
+    if (route === '/subaccount/list' && req.method === 'POST') return subList(req, res);
+    if (route === '/subaccount/add' && req.method === 'POST') return subAdd(req, res);
+    if (route === '/subaccount/use' && req.method === 'POST') return subUse(req, res);
+    if (route === '/subaccount/remove' && req.method === 'POST') return subRemove(req, res);
 
     // --- админ-панель
     if (route === '/commands') return serverCommands(req, res);

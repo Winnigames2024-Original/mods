@@ -56,6 +56,8 @@ namespace NareLauncher.UI.Pages
         private readonly NareTextBox _updLog = new NareTextBox { Placeholder = "Что нового (changelog)" };
         private readonly NareButton _updGo = new NareButton { Text = "Объявить обновление", Style = BtnStyle.Accent, Size = new Size(200, 38) };
         private readonly NareButton _updCrit = new NareButton { Text = "Экстренное: закрыть всем через 30с", Style = BtnStyle.Danger, Size = new Size(300, 38) };
+        private readonly NareDropDown _updNick = new NareDropDown();
+        private readonly NareButton _updOne = new NareButton { Text = "Экстренно у выбранного (30с)", Style = BtnStyle.Danger, Size = new Size(300, 38) };
 
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
         private readonly NareLabel[] _heads = new NareLabel[8];
@@ -91,7 +93,8 @@ namespace NareLauncher.UI.Pages
                 "Игрок",
                 "ID мода (например xray)", "Версия игры или * для всех",
                 "ID заявки сервера (из сводки справа)",
-                "Версия обновления", "Что нового (changelog)"
+                "Версия обновления", "Что нового (changelog)",
+                "Игрок для точечного экстренного обновления"
             };
             foreach (var c in caps)
             {
@@ -116,6 +119,7 @@ namespace NareLauncher.UI.Pages
             Add(_modId); Add(_modVer); Add(_modBlock); Add(_modUnblock);
             Add(_srvId); Add(_srvOk); Add(_srvNo);
             Add(_updVer); Add(_updLog); Add(_updGo); Add(_updCrit);
+            Add(_updNick); Add(_updOne);
             _scroll.Controls.Add(_status);
             _scroll.Controls.Add(_usersHead);
             _scroll.Controls.Add(_users);
@@ -129,6 +133,7 @@ namespace NareLauncher.UI.Pages
                 _banNick.SetItems(_nicks, u.Nick);
                 _warnNick.SetItems(_nicks, u.Nick);
                 _togNick.SetItems(_nicks, u.Nick);
+                _updNick.SetItems(_nicks, u.Nick);
             };
 
             _ban.Click += async (s, e) =>
@@ -183,6 +188,15 @@ namespace NareLauncher.UI.Pages
                 await Announce(true);
             };
 
+            _updOne.Click += async (s, e) =>
+            {
+                string who = Pick(_updNick);
+                if (who.Length == 0) { _status.Text = "Выберите игрока для точечного обновления."; return; }
+                if (!Host.Confirm("Экстренное обновление закроет Minecraft и лаунчер у игрока " + who + " через 30 секунд. Продолжить?"))
+                    return;
+                await Announce(true, who);
+            };
+
             Layout1();
         }
 
@@ -217,13 +231,15 @@ namespace NareLauncher.UI.Pages
             await Reload();
         }
 
-        private async System.Threading.Tasks.Task Announce(bool critical)
+        private async System.Threading.Tasks.Task Announce(bool critical, string nick = null)
         {
             string version = _updVer.Text.Trim();
             if (version.Length == 0) { _status.Text = "Укажите версию обновления."; return; }
 
-            await Do(() => NareAuth.AnnounceUpdateAsync(Token, version, _updLog.Text.Trim(), critical, Ct()),
-                critical ? "Экстренное обновление объявлено" : "Обновление объявлено");
+            string ok = critical
+                ? (string.IsNullOrEmpty(nick) ? "Экстренное обновление объявлено всем" : "Экстренное обновление отправлено игроку " + nick)
+                : "Обновление объявлено";
+            await Do(() => NareAuth.AnnounceUpdateAsync(Token, version, _updLog.Text.Trim(), critical, Ct(), nick), ok);
         }
 
         private async System.Threading.Tasks.Task Do(Func<System.Threading.Tasks.Task> action, string okText)
@@ -276,10 +292,11 @@ namespace NareLauncher.UI.Pages
                 _nicks.Clear();
                 foreach (var o in users) _nicks.Add(((UserRow)o).Nick);
 
-                string keepBan = Pick(_banNick), keepWarn = Pick(_warnNick), keepTog = Pick(_togNick);
+                string keepBan = Pick(_banNick), keepWarn = Pick(_warnNick), keepTog = Pick(_togNick), keepUpd = Pick(_updNick);
                 _banNick.SetItems(_nicks, keepBan.Length > 0 ? keepBan : null);
                 _warnNick.SetItems(_nicks, keepWarn.Length > 0 ? keepWarn : null);
                 _togNick.SetItems(_nicks, keepTog.Length > 0 ? keepTog : null);
+                _updNick.SetItems(_nicks, keepUpd.Length > 0 ? keepUpd : null);
                 var items = new System.Collections.Generic.List<object>();
 
                 foreach (var b in state["bans"].Items)
@@ -402,7 +419,9 @@ namespace NareLauncher.UI.Pages
             Field(_updVer, pad, w, ref y);
             Field(_updLog, pad, w, ref y);
             _updGo.Location = new Point(pad, y); y += 44;
-            _updCrit.Location = new Point(pad, y); y += 54;
+            _updCrit.Location = new Point(pad, y); y += 48;
+            Field(_updNick, pad, w, ref y);
+            _updOne.Location = new Point(pad, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 

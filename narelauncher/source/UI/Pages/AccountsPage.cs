@@ -26,6 +26,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _rename = new NareButton
         { Text = "Ники (подаккаунты)", Style = BtnStyle.Ghost, Size = new Size(230, 42) };
 
+        private readonly NareButton _devices = new NareButton
+        { Text = "Устройства", Style = BtnStyle.Ghost, Size = new Size(190, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -43,12 +46,14 @@ namespace NareLauncher.UI.Pages
             _password.Click += async (s, e) => await ChangePassword();
             _delete.Click += async (s, e) => await DeleteAccount();
             _rename.Click += async (s, e) => await RenameUser();
+            _devices.Click += (s, e) => OpenDevices();
 
             Controls.Add(_select);
             Controls.Add(_manage);
             Controls.Add(_password);
             Controls.Add(_delete);
             Controls.Add(_rename);
+            Controls.Add(_devices);
             Controls.Add(_status);
         }
 
@@ -250,6 +255,15 @@ namespace NareLauncher.UI.Pages
             Layout1();
         }
 
+        private void OpenDevices()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+            if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
+
+            using (var form = new DevicesForm(acc)) form.ShowDialog(FindForm());
+        }
+
         private void Layout1()
         {
             int pad = 28;
@@ -265,7 +279,8 @@ namespace NareLauncher.UI.Pages
             _password.Location = new Point(pad + 216 + 246, by);
             _delete.Location = new Point(pad + 216 + 246 + 186, by);
             _rename.Location = new Point(pad, by + 50);
-            _status.SetBounds(pad + 246, by + 58, Math.Max(50, Width - pad * 2 - 246), 20);
+            _devices.Location = new Point(pad + 246, by + 50);
+            _status.SetBounds(pad + 246 + 206, by + 58, Math.Max(50, Width - pad * 2 - 246 - 206), 20);
 
             Invalidate();
         }

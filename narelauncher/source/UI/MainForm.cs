@@ -43,6 +43,8 @@ namespace NareLauncher.UI
         private int _warnShown;          // сколько предупреждений уже показали за сессию
         private long _broadcastShown;    // время последнего показанного объявления
         private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
+        private long _updateHandledAt = -1; // время последнего отработанного экстренного обновления
+        private bool _loggingOut;        // идёт выход после отвязки устройства
         private string _guardNick = "";  // чей статус мы отслеживаем
 
         public MainForm()
@@ -418,10 +420,26 @@ namespace NareLauncher.UI
             if (string.IsNullOrEmpty(nick)) { _banOverlay.Hide1(); return; }
 
             PlayerPolicy policy;
-            try { policy = await NareAuth.StatusAsync(nick, System.Threading.CancellationToken.None); }
+            string tok = acc == null ? null : acc.Token;
+            try { policy = await NareAuth.StatusAsync(nick, System.Threading.CancellationToken.None, tok); }
             catch { return; }            // сервер недоступен — не трогаем ничего
 
             if (!policy.Known) return;
+
+            // устройство отвязали в другом месте — выходим из аккаунта на этом ПК
+            if (policy.LoggedOut && acc != null && !string.IsNullOrEmpty(acc.Token) && !_loggingOut)
+            {
+                _loggingOut = true;
+                acc.Token = "";
+                AccountStore.Save();
+                _banOverlay.Hide1();
+                MessageBox.Show(this,
+                    "Это устройство отвязали от аккаунта. Войдите снова, если это были вы.",
+                    "Устройство отвязано", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _loggingOut = false;
+                EnsureAuth();
+                return;
+            }
 
             NareAuth.Last = policy;
 
@@ -462,11 +480,16 @@ namespace NareLauncher.UI
                     "Объявление", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
 
-            // экстренное обновление
+            // экстренное обновление — срабатывает по времени объявления, а не по
+            // номеру версии: смысл в том, чтобы закрыть игру у всех здесь и сейчас
+            if (_updateHandledAt < 0) _updateHandledAt = EmergencyMark.Load();
+
             if (policy.HasUpdate && policy.Critical && !_updatePrompting
-                && SelfUpdate.IsNewer(policy.UpdateVersion))
+                && policy.UpdateAt > _updateHandledAt)
             {
                 _updatePrompting = true;
+                _updateHandledAt = policy.UpdateAt;
+                EmergencyMark.Save(policy.UpdateAt);   // чтобы после перезапуска не повторялось
                 using (var form = new EmergencyUpdateForm(policy.UpdateVersion, policy.Changelog))
                     form.ShowDialog(this);
                 _updatePrompting = false;
