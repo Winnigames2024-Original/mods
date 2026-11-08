@@ -1,0 +1,28 @@
+[Unit]
+Description=NareNet — сборный пункт для игры вместе
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=narenet
+Group=narenet
+WorkingDirectory=/opt/narenet
+ExecStart=/usr/bin/node /opt/narenet/nare-net.js
+Restart=always
+RestartSec=3
+
+Environment=NARENET_PORT=2445
+Environment=NARENET_DIR=/var/lib/narenet
+Environment=NARENET_TUNNEL_FROM=30000
+Environment=NARENET_TUNNEL_TO=30060
+
+# служба не трогает ничего, кроме своей папки с файлами
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/narenet
+
+[Install]
+WantedBy=multi-user.target
