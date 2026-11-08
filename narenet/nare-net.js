@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.4';
+const VERSION = '1.5';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -971,7 +971,13 @@ function adminState(req, res) {
 
         send(res, 200, {
             ok: true,
-            accounts: Object.keys(accounts).map(n => ({ nick: n, admin: n === ADMIN })),
+            accounts: Object.keys(accounts).map(n => {
+                const a = acc(n);
+                const ban = banOf(n);
+                return { nick: n, admin: n === ADMIN,
+                         coins: a ? a.coins : 0, username: a ? a.username : n,
+                         banned: !!ban, blockedTogether: !!policy.together[n] };
+            }),
             bans: Object.keys(bans).map(n => ({
                 nick: n, until: bans[n].until || 0, reason: bans[n].reason || '', left: banText(bans[n])
             })),

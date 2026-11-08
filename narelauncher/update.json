@@ -1,8 +1,8 @@
 {
-  "version": "1.21",
+  "version": "1.22",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "e24740e372e67b53b829c02770c8de4ac278cbc3",
-  "size": 575488,
-  "notes": "вкладка «Публичные»: рекламные серверы, монеты за заход, заявки; модерация в админ-панели"
+  "sha1": "ab3019ff0f380ff8ee7241592d219c59667952ec",
+  "size": 577024,
+  "notes": "список пользователей в админ-панели: выбираешь игрока из списка, ник подставляется сам"
 }

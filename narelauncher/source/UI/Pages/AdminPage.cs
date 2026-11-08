@@ -58,6 +58,8 @@ namespace NareLauncher.UI.Pages
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
         private readonly NareLabel[] _heads = new NareLabel[8];
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
+        private readonly NareLabel _usersHead = new NareLabel("ПОЛЬЗОВАТЕЛИ — выберите, чтобы подставить ник", 8.5f, FontStyle.Bold, Theme.Accent);
+        private readonly VirtualList _users = new VirtualList { ItemHeight = 40, EmptyText = "Список придёт с сервера" };
         private readonly VirtualList _info = new VirtualList { ItemHeight = 26, EmptyText = "Пусто" };
 
         private string Token { get { var a = AccountStore.Selected; return a == null ? "" : a.Token; } }
@@ -83,8 +85,19 @@ namespace NareLauncher.UI.Pages
             Add(_srvId); Add(_srvOk); Add(_srvNo);
             Add(_updVer); Add(_updLog); Add(_updGo); Add(_updCrit);
             _scroll.Controls.Add(_status);
+            _scroll.Controls.Add(_usersHead);
+            _scroll.Controls.Add(_users);
             _scroll.Controls.Add(_info);
             _info.Renderer = DrawInfo;
+            _users.Renderer = DrawUser;
+            _users.SelectionChanged += delegate
+            {
+                var u = _users.SelectedItem as UserRow;
+                if (u == null) return;
+                _banNick.Text = u.Nick;
+                _warnNick.Text = u.Nick;
+                _togNick.Text = u.Nick;
+            };
 
             _ban.Click += async (s, e) => await Do(() => NareAuth.BanAsync(Token, _banNick.Text.Trim(),
                 ParseInt(_banMinutes.Text), _banReason.Text.Trim(), Ct()), "Забанен " + _banNick.Text.Trim());
@@ -183,11 +196,34 @@ namespace NareLauncher.UI.Pages
             }
         }
 
+        private class UserRow
+        {
+            public string Nick = "";
+            public bool Admin;
+            public bool Banned;
+            public bool BlockedTogether;
+            public long Coins;
+            public string Username = "";
+        }
+
         private async System.Threading.Tasks.Task Reload()
         {
             try
             {
                 var state = await NareAuth.StateAsync(Token, Ct());
+
+                var users = new System.Collections.Generic.List<object>();
+                foreach (var a in state["accounts"].Items)
+                    users.Add(new UserRow
+                    {
+                        Nick = a["nick"].AsString(""),
+                        Admin = a["admin"].AsBool(false),
+                        Banned = a["banned"].AsBool(false),
+                        BlockedTogether = a["blockedTogether"].AsBool(false),
+                        Coins = a["coins"].AsLong(0),
+                        Username = a["username"].AsString("")
+                    });
+                _users.SetItems(users);
                 var items = new System.Collections.Generic.List<object>();
 
                 foreach (var b in state["bans"].Items)
@@ -215,6 +251,34 @@ namespace NareLauncher.UI.Pages
                 _info.SetItems(items);
             }
             catch (Exception ex) { _status.Text = "Сводка не пришла: " + ex.Message; }
+        }
+
+        private void DrawUser(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
+        {
+            var u = item as UserRow;
+            if (u == null) return;
+            var box = Rectangle.Inflate(r, -3, -2);
+            if (box.Width <= 0 || box.Height <= 0) return;
+
+            if (selected) Theme.FillRound(g, box, 7, Color.FromArgb(46, Theme.Accent));
+            else if (hover) Theme.FillRound(g, box, 7, Color.FromArgb(16, 255, 255, 255));
+
+            Theme.Text1(g, u.Nick, Theme.F(9.6f, FontStyle.Bold),
+                u.Banned ? Theme.Bad : Theme.Text,
+                new Rectangle(box.X + 8, box.Y + 3, box.Width - 90, 18));
+
+            string sub = u.Coins + " монет";
+            if (!string.Equals(u.Username, u.Nick, StringComparison.Ordinal) && u.Username.Length > 0)
+                sub += " · в игре " + u.Username;
+            Theme.Text1(g, sub, Theme.F(8f), Theme.Dim,
+                new Rectangle(box.X + 8, box.Y + 20, box.Width - 90, 16));
+
+            string tag = u.Admin ? "АДМИН" : u.Banned ? "БАН" : u.BlockedTogether ? "БЕЗ ВМЕСТЕ" : "";
+            if (tag.Length > 0)
+                Theme.Text1(g, tag, Theme.F(7.6f, FontStyle.Bold),
+                    u.Admin ? Theme.Good : u.Banned ? Theme.Bad : Theme.Warn,
+                    new Rectangle(box.Right - 86, box.Y, 80, box.Height),
+                    StringAlignment.Far, StringAlignment.Center);
         }
 
         private void DrawInfo(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
@@ -274,9 +338,15 @@ namespace NareLauncher.UI.Pages
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 
-            // правая колонка: сводка
+            // правая колонка: пользователи сверху, сводка снизу
             int infoX = pad + w + 180;
-            _info.SetBounds(infoX, 64, Math.Max(220, Width - infoX - pad), Math.Max(200, Height - 100));
+            int colW = Math.Max(220, Width - infoX - pad);
+            int colH = Math.Max(200, Height - 100);
+            int usersH = Math.Max(120, colH * 55 / 100);
+
+            _usersHead.SetBounds(infoX, 46, colW, 16);
+            _users.SetBounds(infoX, 64, colW, usersH);
+            _info.SetBounds(infoX, 64 + usersH + 12, colW, colH - usersH - 12);
         }
 
         private int _head;
