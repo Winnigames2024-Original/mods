@@ -1,8 +1,8 @@
 {
-  "version": "1.25",
+  "version": "1.26",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "bbe1fe258aed95caf929f925fdcf832d9c29a8db",
+  "sha1": "7a321f167c63b782b6de913a44dee0d9acc09313",
   "size": 578560,
-  "notes": "над каждым полем в админке мини-подпись, что туда вписывать"
+  "notes": "подписи над полями в форме добавления сервера"
 }

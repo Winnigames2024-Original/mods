@@ -240,15 +240,26 @@ namespace NareLauncher.UI.Pages
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(480, 300);
+            ClientSize = new Size(480, 344);
             BackColor = Theme.Bg; ForeColor = Theme.Text; Font = Theme.F(10f);
 
-            _name.SetBounds(20, 24, 440, 38);
-            _ip.SetBounds(20, 74, 440, 38);
-            _version.SetBounds(20, 124, 440, 38);
-            _desc.SetBounds(20, 174, 440, 38);
-            _ok.Location = new Point(20, 238);
-            _cancel.Location = new Point(340, 238);
+            void Cap(string text, int y)
+            {
+                var l = new NareLabel(text, 8f, FontStyle.Regular, Theme.Dim)
+                { Bounds = new Rectangle(20, y, 440, 14) };
+                Controls.Add(l);
+            }
+
+            Cap("Название сервера", 16);
+            _name.SetBounds(20, 32, 440, 38);
+            Cap("Адрес: ip или ip:порт", 78);
+            _ip.SetBounds(20, 94, 440, 38);
+            Cap("Версия игры (необязательно)", 140);
+            _version.SetBounds(20, 156, 440, 38);
+            Cap("Короткое описание", 202);
+            _desc.SetBounds(20, 218, 440, 38);
+            _ok.Location = new Point(20, 280);
+            _cancel.Location = new Point(340, 280);
 
             _ok.Click += (s, e) =>
             {
