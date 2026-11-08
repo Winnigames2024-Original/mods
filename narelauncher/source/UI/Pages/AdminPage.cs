@@ -17,6 +17,7 @@ namespace NareLauncher.UI.Pages
 
         // бан
         private readonly NareDropDown _banNick = new NareDropDown();
+        private readonly NareDropDown _banType = new NareDropDown();
         private readonly NareTextBox _banMinutes = new NareTextBox { Placeholder = "Минут (0 или пусто — навсегда)" };
         private readonly NareTextBox _banReason = new NareTextBox { Placeholder = "Причина" };
         private readonly NareButton _ban = new NareButton { Text = "Забанить", Style = BtnStyle.Danger, Size = new Size(140, 38) };
@@ -81,7 +82,15 @@ namespace NareLauncher.UI.Pages
             }
             _scroll.Controls.Add(_title);
 
-            Add(_banNick); Add(_banMinutes); Add(_banReason); Add(_ban); Add(_unban);
+            Add(_banNick); Add(_banType); Add(_banMinutes); Add(_banReason); Add(_ban); Add(_unban);
+            _banType.SetItems(new object[] { "Временный (указать минуты)", "Навсегда" });
+            _banType.SelectedIndex = 0;
+            _banType.SelectedIndexChanged += delegate
+            {
+                bool temp = _banType.SelectedIndex == 0;
+                _banMinutes.Enabled = temp;
+                _banMinutes.Invalidate();
+            };
             Add(_warnNick); Add(_warnText); Add(_warn);
             Add(_broadcast); Add(_broadcastGo); Add(_command); Add(_commandGo);
             Add(_togNick); Add(_togOff); Add(_togOn);
@@ -103,8 +112,18 @@ namespace NareLauncher.UI.Pages
                 _togNick.SetItems(_nicks, u.Nick);
             };
 
-            _ban.Click += async (s, e) => await Do(() => NareAuth.BanAsync(Token, Pick(_banNick),
-                ParseInt(_banMinutes.Text), _banReason.Text.Trim(), Ct()), "Забанен " + Pick(_banNick));
+            _ban.Click += async (s, e) =>
+            {
+                int minutes = _banType.SelectedIndex == 1 ? 0 : ParseInt(_banMinutes.Text);
+                if (_banType.SelectedIndex == 0 && minutes <= 0)
+                {
+                    _status.Text = "Для временного бана укажите минуты (больше 0).";
+                    _status.ForeColor = Theme.Warn;
+                    return;
+                }
+                await Do(() => NareAuth.BanAsync(Token, Pick(_banNick), minutes, _banReason.Text.Trim(), Ct()),
+                    "Забанен " + Pick(_banNick) + (minutes > 0 ? " на " + minutes + " мин" : " навсегда"));
+            };
             _unban.Click += async (s, e) => await Do(() => NareAuth.UnbanAsync(Token, Pick(_banNick), Ct()),
                 "Разбанен " + Pick(_banNick));
 
@@ -316,6 +335,7 @@ namespace NareLauncher.UI.Pages
 
             Row("БАН ИГРОКА", ref y);
             _banNick.SetBounds(pad, y, w, 36); y += 42;
+            _banType.SetBounds(pad, y, w, 36); y += 42;
             _banMinutes.SetBounds(pad, y, w, 36); y += 42;
             _banReason.SetBounds(pad, y, w, 36); y += 42;
             _ban.Location = new Point(pad, y); _unban.Location = new Point(pad + 150, y); y += 54;
