@@ -43,6 +43,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly NareLabel _server = new NareLabel("", 8.6f, FontStyle.Regular, Theme.Dim);
 
+        /// <summary>Кнопки выбора сборного пункта: их столько, сколько адресов в настройках.</summary>
+        private readonly List<NareButton> _hosts = new List<NareButton>();
+
         private readonly System.Windows.Forms.Timer _timer =
             new System.Windows.Forms.Timer { Interval = 10000 };
 
@@ -80,7 +83,47 @@ namespace NareLauncher.UI.Pages
                 if (Visible) _timer.Start(); else _timer.Stop();
             };
 
+            BuildHosts();
             Layout1();
+        }
+
+        /// <summary>Пересобираем кнопки серверов: список мог измениться в настройках.</summary>
+        private void BuildHosts()
+        {
+            foreach (var old in _hosts) { Controls.Remove(old); old.Dispose(); }
+            _hosts.Clear();
+
+            var known = NareNet.Known();
+            if (known.Count < 2) return;            // один адрес — выбирать нечего
+
+            string active = NareNet.Where;
+
+            foreach (var one in known)
+            {
+                string host = one;
+                var button = new NareButton
+                {
+                    Text = one,
+                    Style = one == active ? BtnStyle.Accent : BtnStyle.Ghost,
+                    Size = new Size(Math.Max(150, 20 + one.Length * 8), 28),
+                    Radius = 8,
+                    Font = Theme.F(8.6f, FontStyle.Bold)
+                };
+
+                button.Click += async delegate
+                {
+                    if (NareNet.Where == host) return;
+
+                    NareNet.Use(host);
+                    BuildHosts();
+                    Layout1();
+                    _server.Text = "Сборный пункт: " + NareNet.Where;
+                    await Load(true);
+                };
+
+                _hosts.Add(button);
+                Controls.Add(button);
+            }
         }
 
         protected override void Dispose(bool disposing)
@@ -96,8 +139,9 @@ namespace NareLauncher.UI.Pages
 
         public override async void PageShown()
         {
+            BuildHosts();
             Layout1();
-            _server.Text = "Сборный пункт: " + NareNet.Where;
+            _server.Text = _hosts.Count > 1 ? "Сборные пункты:" : "Сборный пункт: " + NareNet.Where;
             await Load(true);
         }
 
@@ -407,7 +451,19 @@ namespace NareLauncher.UI.Pages
 
             _progress.SetBounds(pad, Height - 20, Math.Max(50, Width - pad * 2), 6);
             _status.SetBounds(pad + 548, by + 10, Math.Max(100, Width - pad * 2 - 548), 22);
-            _server.SetBounds(pad, top - 26, 420, 18);
+
+            if (_hosts.Count > 1)
+            {
+                _server.SetBounds(pad, top - 30, 150, 24);
+
+                int hx = pad + 152;
+                foreach (var button in _hosts)
+                {
+                    button.Location = new Point(hx, top - 32);
+                    hx += button.Width + 8;
+                }
+            }
+            else _server.SetBounds(pad, top - 26, 420, 18);
 
             Invalidate();
         }

@@ -1,8 +1,8 @@
 {
-  "version": "1.13",
+  "version": "1.14",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "6ddae3659924425b62b907c287daa1bda08272c2",
-  "size": 496640,
-  "notes": "вкладка «Вместе»: кто открыл свой мир, доставка его модов и заход одной кнопкой"
+  "sha1": "bb1610bc7148ef8a3f4bb7c111a9e9c9c4f99dbc",
+  "size": 498688,
+  "notes": "два сборных пункта на выбор: кнопки адресов прямо на вкладке «Вместе»"
 }

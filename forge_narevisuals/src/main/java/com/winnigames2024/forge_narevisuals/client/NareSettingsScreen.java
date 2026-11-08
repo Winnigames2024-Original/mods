@@ -568,7 +568,11 @@ public class NareSettingsScreen extends Screen {
                         NareTogether::share));
 
                 list.add(Row.label("Куда объявляемся"));
-                list.add(Row.action("Сборный пункт", cfg.togetherHost, () -> { }));
+                list.add(Row.action("Сборный пункт",
+                        NareTogether.hosts().size() > 1
+                                ? cfg.togetherHost + " · нажмите, чтобы сменить"
+                                : cfg.togetherHost,
+                        NareTogether::nextHost));
                 list.add(Row.slider("Порт мира", 0, 10,
                         () -> cfg.togetherPort == 0 ? 0 : Math.max(1, (cfg.togetherPort - 25560) / 5),
                         v -> { cfg.togetherPort = v == 0 ? 0 : 25560 + v * 5; Config.save(); },

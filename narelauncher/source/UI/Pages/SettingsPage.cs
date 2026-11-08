@@ -50,7 +50,7 @@ namespace NareLauncher.UI.Pages
         { Placeholder = "Команды при входе, через ; — например /login 1234; /spawn" };
 
         private readonly NareTextBox _netHost = new NareTextBox
-        { Placeholder = "Сборный пункт для вкладки «Вместе» — адрес:порт" };
+        { Placeholder = "Сборные пункты «Вместе», через ; — 166.1.161.200:2445;151.245.217.104:2445" };
         private readonly NareButton _browseLocal = new NareButton { Text = "Обзор", Style = BtnStyle.Ghost, Size = new Size(110, 38) };
 
         private readonly NareButton _save = new NareButton { Text = "Сохранить", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(180, 42) };
@@ -225,7 +225,7 @@ namespace NareLauncher.UI.Pages
             _cfKey.Text = s.CurseForgeKey;
             _localFolder.Text = s.LocalModsFolder;
             _onJoin.Text = s.JoinCommands;
-            _netHost.Text = s.NareNetHost;
+            _netHost.Text = s.NareNetHosts;
             ReloadJava();
         }
 
@@ -299,7 +299,12 @@ namespace NareLauncher.UI.Pages
             s.JoinCommands = (_onJoin.Text ?? "").Trim();
 
             string net = (_netHost.Text ?? "").Trim();
-            s.NareNetHost = net.Length == 0 ? "166.1.161.200:2445" : net;
+            s.NareNetHosts = net.Length == 0
+                ? "166.1.161.200:2445;151.245.217.104:2445" : net;
+
+            // выбранный адрес должен остаться в списке, иначе выбираем первый
+            var known = NareNet.Known();
+            if (known.Count > 0 && !known.Contains(s.NareNetHost)) s.NareNetHost = known[0];
 
             int w, h;
             if (int.TryParse((_winW.Text ?? "").Trim(), out w) && w >= 320) s.WindowWidth = w;

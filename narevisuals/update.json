@@ -1,8 +1,8 @@
 {
-  "version": "2.10.0",
-  "file": "forge_narevisuals-2.10.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.10.0.jar",
-  "sha1": "142f2e2ee1eb43f7914d094afc1c98ce97e3d349",
-  "size": 823829,
-  "notes": "«Вместе»: открыть свой мир друзьям, объявить его и поднять туннель, если порт закрыт"
+  "version": "2.11.0",
+  "file": "forge_narevisuals-2.11.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.11.0.jar",
+  "sha1": "cae6f728a2338f0bf25e633ad6ded8e711d55d16",
+  "size": 824509,
+  "notes": "сборный пункт переключается в настройках, адресов может быть несколько"
 }

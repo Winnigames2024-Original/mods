@@ -92,6 +92,47 @@ public final class NareTogether {
         return value == null || value.trim().isEmpty() ? "166.1.161.200:2445" : value.trim();
     }
 
+    /** Все сборные пункты, которые знает мод. */
+    public static List<String> hosts() {
+        var list = new ArrayList<String>();
+
+        String all = Config.get().togetherHosts;
+        if (all != null)
+            for (String part : all.split("[;,]")) {
+                String one = part.trim();
+                if (!one.isEmpty() && !list.contains(one)) list.add(one);
+            }
+
+        String active = where();
+        if (!list.contains(active)) list.add(0, active);
+
+        return list;
+    }
+
+    /**
+     * Переключиться на следующий сборный пункт. Токен привязан к серверу,
+     * поэтому его и туннель сбрасываем — объявимся заново.
+     */
+    public static void nextHost() {
+        var list = hosts();
+        if (list.size() < 2) return;
+
+        int at = list.indexOf(where());
+        String next = list.get((Math.max(at, 0) + 1) % list.size());
+
+        Config.get().togetherHost = next;
+        Config.save();
+
+        token = "";
+        mode = "direct";
+        reachable = null;
+
+        if (tunnel != null) { tunnel.interrupt(); tunnel = null; }
+
+        note = open ? "сборный пункт сменился, объявляюсь заново…" : "мир закрыт";
+        Forge_narevisuals.LOGGER.info("Сборный пункт: {}", next);
+    }
+
     private static String host() {
         String value = where();
         int colon = value.lastIndexOf(':');

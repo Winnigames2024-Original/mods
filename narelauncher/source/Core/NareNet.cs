@@ -112,6 +112,40 @@ namespace NareLauncher.Core
             }
         }
 
+        /// <summary>Все сборные пункты, которые знает лаунчер. Выбранный — первым в списке настроек.</summary>
+        public static List<string> Known()
+        {
+            var list = new List<string>();
+
+            foreach (var part in (Settings.Current.NareNetHosts ?? "").Split(';', ','))
+            {
+                string one = part.Trim();
+                if (one.Length == 0) continue;
+                if (!list.Contains(one)) list.Add(one);
+            }
+
+            string active = Where;
+            if (!list.Contains(active)) list.Insert(0, active);
+
+            return list;
+        }
+
+        /// <summary>Переключиться на другой сборный пункт.</summary>
+        public static void Use(string host)
+        {
+            string one = (host ?? "").Trim();
+            if (one.Length == 0) return;
+
+            Settings.Current.NareNetHost = one;
+
+            var list = Known();
+            if (!list.Contains(one)) list.Insert(0, one);
+            Settings.Current.NareNetHosts = string.Join(";", list.ToArray());
+
+            Settings.Save();
+            Log.Info("Сборный пункт: " + one);
+        }
+
         private static string Url(string route)
         {
             return "http://" + Where + route;
