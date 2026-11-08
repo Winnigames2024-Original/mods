@@ -1,8 +1,8 @@
 {
-  "version": "1.36",
+  "version": "1.37",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "46ee983050f748895a00502b16b904ddb178980a",
+  "sha1": "41324f487f87eba1da2d5e28f648478cd1fbea7b",
   "size": 651776,
-  "notes": "Отчёт о вылете игры случайному админу от бота Bugs | Players; оффлайн-аккаунт просит пароль; кнопка «Выйти из аккаунта»; статус в сети"
+  "notes": "Починка дизайна: нижние кнопки в «Аккаунтах» не обрезаются, левое меню вмещает все вкладки"
 }

@@ -317,7 +317,7 @@ namespace NareLauncher.UI.Pages
         {
             int pad = 28;
             int listY = 76;
-            int bottomH = 150;
+            int bottomH = 188;
 
             _list.SetBounds(pad, listY, Math.Max(100, Width - pad * 2),
                             Math.Max(60, Height - listY - bottomH));

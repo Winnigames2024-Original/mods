@@ -200,7 +200,7 @@ namespace NareLauncher.UI
             string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Публичные", "Чаты", "Админ" };
             Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Arrow, Ico.Account, Ico.Settings };
 
-            int y = 18;
+            int y = 14;
             for (int i = 0; i < titles.Length; i++)
             {
                 int index = i;
@@ -208,12 +208,12 @@ namespace NareLauncher.UI
                 {
                     Text = titles[i],
                     Icon = icons[i],
-                    Bounds = new Rectangle(8, y, SidebarWidth - 16, 44)
+                    Bounds = new Rectangle(8, y, SidebarWidth - 16, 40)
                 };
                 btn.Click += (s, e) => Navigate(index);
                 _sidebar.Controls.Add(btn);
                 _nav.Add(btn);
-                y += 48;
+                y += 41;
             }
 
             _accountChip = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted)
