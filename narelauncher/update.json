@@ -1,8 +1,8 @@
 {
-  "version": "1.22",
+  "version": "1.23",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "ab3019ff0f380ff8ee7241592d219c59667952ec",
+  "sha1": "5432c0daf38bb3b62ae9a0810e94b4311dd6137f",
   "size": 577024,
-  "notes": "список пользователей в админ-панели: выбираешь игрока из списка, ник подставляется сам"
+  "notes": "в админке ник игрока выбирается выпадающим списком, а не вводится руками"
 }

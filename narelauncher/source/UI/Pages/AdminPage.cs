@@ -16,14 +16,14 @@ namespace NareLauncher.UI.Pages
         private readonly Panel _scroll = new Panel { AutoScroll = true, Dock = DockStyle.Fill };
 
         // бан
-        private readonly NareTextBox _banNick = new NareTextBox { Placeholder = "Ник игрока" };
+        private readonly NareDropDown _banNick = new NareDropDown();
         private readonly NareTextBox _banMinutes = new NareTextBox { Placeholder = "Минут (0 или пусто — навсегда)" };
         private readonly NareTextBox _banReason = new NareTextBox { Placeholder = "Причина" };
         private readonly NareButton _ban = new NareButton { Text = "Забанить", Style = BtnStyle.Danger, Size = new Size(140, 38) };
         private readonly NareButton _unban = new NareButton { Text = "Разбанить", Style = BtnStyle.Ghost, Size = new Size(140, 38) };
 
         // предупреждение
-        private readonly NareTextBox _warnNick = new NareTextBox { Placeholder = "Ник" };
+        private readonly NareDropDown _warnNick = new NareDropDown();
         private readonly NareTextBox _warnText = new NareTextBox { Placeholder = "Текст предупреждения" };
         private readonly NareButton _warn = new NareButton { Text = "Предупредить", Style = BtnStyle.Accent, Size = new Size(160, 38) };
 
@@ -34,7 +34,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _commandGo = new NareButton { Text = "Выполнить", Style = BtnStyle.Ghost, Size = new Size(150, 38) };
 
         // запрет «Вместе»
-        private readonly NareTextBox _togNick = new NareTextBox { Placeholder = "Ник" };
+        private readonly NareDropDown _togNick = new NareDropDown();
         private readonly NareButton _togOff = new NareButton { Text = "Запретить «Вместе»", Style = BtnStyle.Danger, Size = new Size(190, 38) };
         private readonly NareButton _togOn = new NareButton { Text = "Разрешить", Style = BtnStyle.Ghost, Size = new Size(140, 38) };
 
@@ -62,7 +62,11 @@ namespace NareLauncher.UI.Pages
         private readonly VirtualList _users = new VirtualList { ItemHeight = 40, EmptyText = "Список придёт с сервера" };
         private readonly VirtualList _info = new VirtualList { ItemHeight = 26, EmptyText = "Пусто" };
 
+        private readonly System.Collections.Generic.List<object> _nicks = new System.Collections.Generic.List<object>();
+
         private string Token { get { var a = AccountStore.Selected; return a == null ? "" : a.Token; } }
+
+        private static string Pick(NareDropDown d) { return d.SelectedItem == null ? "" : d.SelectedItem.ToString(); }
 
         public AdminPage()
         {
@@ -94,17 +98,17 @@ namespace NareLauncher.UI.Pages
             {
                 var u = _users.SelectedItem as UserRow;
                 if (u == null) return;
-                _banNick.Text = u.Nick;
-                _warnNick.Text = u.Nick;
-                _togNick.Text = u.Nick;
+                _banNick.SetItems(_nicks, u.Nick);
+                _warnNick.SetItems(_nicks, u.Nick);
+                _togNick.SetItems(_nicks, u.Nick);
             };
 
-            _ban.Click += async (s, e) => await Do(() => NareAuth.BanAsync(Token, _banNick.Text.Trim(),
-                ParseInt(_banMinutes.Text), _banReason.Text.Trim(), Ct()), "Забанен " + _banNick.Text.Trim());
-            _unban.Click += async (s, e) => await Do(() => NareAuth.UnbanAsync(Token, _banNick.Text.Trim(), Ct()),
-                "Разбанен " + _banNick.Text.Trim());
+            _ban.Click += async (s, e) => await Do(() => NareAuth.BanAsync(Token, Pick(_banNick),
+                ParseInt(_banMinutes.Text), _banReason.Text.Trim(), Ct()), "Забанен " + Pick(_banNick));
+            _unban.Click += async (s, e) => await Do(() => NareAuth.UnbanAsync(Token, Pick(_banNick), Ct()),
+                "Разбанен " + Pick(_banNick));
 
-            _warn.Click += async (s, e) => await Do(() => NareAuth.WarnAsync(Token, _warnNick.Text.Trim(), _warnText.Text.Trim(), Ct()),
+            _warn.Click += async (s, e) => await Do(() => NareAuth.WarnAsync(Token, Pick(_warnNick), _warnText.Text.Trim(), Ct()),
                 "Предупреждение отправлено");
 
             _broadcastGo.Click += async (s, e) => await Do(() => NareAuth.BroadcastAsync(Token, _broadcast.Text.Trim(), Ct()),
@@ -112,9 +116,9 @@ namespace NareLauncher.UI.Pages
             _commandGo.Click += async (s, e) => await Do(() => NareAuth.CommandAsync(Token, _command.Text.Trim(), Ct()),
                 "Команда поставлена в очередь серверу");
 
-            _togOff.Click += async (s, e) => await Do(() => NareAuth.TogetherAsync(Token, _togNick.Text.Trim(), true, Ct()),
-                "«Вместе» запрещено для " + _togNick.Text.Trim());
-            _togOn.Click += async (s, e) => await Do(() => NareAuth.TogetherAsync(Token, _togNick.Text.Trim(), false, Ct()),
+            _togOff.Click += async (s, e) => await Do(() => NareAuth.TogetherAsync(Token, Pick(_togNick), true, Ct()),
+                "«Вместе» запрещено для " + Pick(_togNick));
+            _togOn.Click += async (s, e) => await Do(() => NareAuth.TogetherAsync(Token, Pick(_togNick), false, Ct()),
                 "«Вместе» снова разрешено");
 
             _modBlock.Click += async (s, e) => await Do(() => NareAuth.BlockModAsync(Token, _modId.Text.Trim(), _modVer.Text.Trim(), true, Ct()),
@@ -224,6 +228,14 @@ namespace NareLauncher.UI.Pages
                         Username = a["username"].AsString("")
                     });
                 _users.SetItems(users);
+
+                _nicks.Clear();
+                foreach (var o in users) _nicks.Add(((UserRow)o).Nick);
+
+                string keepBan = Pick(_banNick), keepWarn = Pick(_warnNick), keepTog = Pick(_togNick);
+                _banNick.SetItems(_nicks, keepBan.Length > 0 ? keepBan : null);
+                _warnNick.SetItems(_nicks, keepWarn.Length > 0 ? keepWarn : null);
+                _togNick.SetItems(_nicks, keepTog.Length > 0 ? keepTog : null);
                 var items = new System.Collections.Generic.List<object>();
 
                 foreach (var b in state["bans"].Items)
