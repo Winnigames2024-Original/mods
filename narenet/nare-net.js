@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.10';
+const VERSION = '1.11';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -963,6 +963,29 @@ function accountLogoutOthers(req, res) {
     });
 }
 
+/** Админ сбрасывает вход игрока на ВСЕХ устройствах — лечит залипший вход. */
+function adminLogout(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
+        const a = acc(nick);
+        let kicked = 0;
+        for (const id of Object.keys(a.devices)) {
+            const d = a.devices[id];
+            if (d && d.token) sessions.delete(d.token);
+            kicked++;
+        }
+        a.devices = {};
+        // на всякий случай подчистим и повисшие сессии этого ника
+        for (const [tok, se] of sessions) if (se.nick === nick) sessions.delete(tok);
+        saveAccounts();
+        log('админ сбросил вход у', nick, '— устройств', kicked);
+        send(res, 200, { ok: true, kicked });
+    });
+}
+
 /** Отвязать устройство: его токен перестаёт работать, и на том устройстве
  *  лаунчер при следующей проверке увидит loggedOut и выйдет из аккаунта. */
 function deviceUnlink(req, res) {
@@ -1430,6 +1453,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/revoke' && req.method === 'POST') return adminGrant(req, res, false);
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
+    if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);
 
     // подаккаунты
     if (route === '/subaccount/list' && req.method === 'POST') return subList(req, res);

@@ -75,10 +75,14 @@ namespace NareLauncher.UI.Pages
         private readonly NareTextBox _setNickBox = new NareTextBox { Placeholder = "Новый игровой ник" };
         private readonly NareButton _setNickBtn = new NareButton { Text = "Поставить ник", Style = BtnStyle.Accent, Size = new Size(190, 38) };
 
+        // сброс входа
+        private readonly NareDropDown _logoutNick = new NareDropDown();
+        private readonly NareButton _logoutBtn = new NareButton { Text = "Сбросить вход (выйти со всех устройств)", Style = BtnStyle.Danger, Size = new Size(360, 38) };
+
         private readonly NareLabel _statLine = new NareLabel("", 9.5f, FontStyle.Bold, Theme.Muted);
 
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
-        private readonly NareLabel[] _heads = new NareLabel[11];
+        private readonly NareLabel[] _heads = new NareLabel[12];
         private readonly System.Collections.Generic.List<NareLabel> _caps = new System.Collections.Generic.List<NareLabel>();
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly NareLabel _usersHead = new NareLabel("ПОЛЬЗОВАТЕЛИ — выберите, чтобы подставить ник", 8.5f, FontStyle.Bold, Theme.Accent);
@@ -97,7 +101,7 @@ namespace NareLauncher.UI.Pages
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
                 "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",
-                "МОНЕТЫ", "ПРАВА АДМИНА", "ИГРОВОЙ НИК", "" };
+                "МОНЕТЫ", "ПРАВА АДМИНА", "ИГРОВОЙ НИК", "СБРОС ВХОДА", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -116,7 +120,8 @@ namespace NareLauncher.UI.Pages
                 "Игрок для точечного экстренного обновления",
                 "Игрок (монеты)", "Сколько монет (можно с минусом)",
                 "Игрок (права админа)",
-                "Игрок (сменить ник)", "Новый игровой ник"
+                "Игрок (сменить ник)", "Новый игровой ник",
+                "Игрок (сбросить вход)"
             };
             foreach (var c in caps)
             {
@@ -145,6 +150,7 @@ namespace NareLauncher.UI.Pages
             Add(_coinNick); Add(_coinAmount); Add(_coinGive); Add(_coinTake);
             Add(_rightsNick); Add(_grantBtn); Add(_revokeBtn);
             Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
+            Add(_logoutNick); Add(_logoutBtn);
             _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
             _scroll.Controls.Add(_usersHead);
@@ -163,6 +169,7 @@ namespace NareLauncher.UI.Pages
                 _coinNick.SetItems(_nicks, u.Nick);
                 _rightsNick.SetItems(_nicks, u.Nick);
                 _setNickDrop.SetItems(_nicks, u.Nick);
+                _logoutNick.SetItems(_nicks, u.Nick);
             };
 
             _ban.Click += async (s, e) =>
@@ -237,6 +244,18 @@ namespace NareLauncher.UI.Pages
                 string nick = Pick(_setNickDrop), uname = _setNickBox.Text.Trim();
                 if (nick.Length == 0 || uname.Length == 0) { _status.Text = "Выберите игрока и введите ник."; return; }
                 await Do(() => NareAuth.AdminSetNickAsync(Token, nick, uname, Ct()), "Ник игрока " + nick + " → " + uname);
+            };
+            _logoutBtn.Click += async (s, e) =>
+            {
+                string nick = Pick(_logoutNick);
+                if (nick.Length == 0) { _status.Text = "Выберите игрока."; return; }
+                if (!Host.Confirm("Сбросить вход у " + nick + " на всех устройствах? Игроку нужно будет войти заново. Помогает, если у него завис лаунчер из-за аккаунта."))
+                    return;
+                await Do(async () =>
+                {
+                    int k = await NareAuth.AdminLogoutAsync(Token, nick, Ct());
+                    _status.Text = "Сброшен вход у " + nick + " (устройств: " + k + ")";
+                }, null);
             };
 
             Layout1();
@@ -357,6 +376,8 @@ namespace NareLauncher.UI.Pages
                 _coinNick.SetItems(_nicks, keepCoin.Length > 0 ? keepCoin : null);
                 _rightsNick.SetItems(_nicks, keepRights.Length > 0 ? keepRights : null);
                 _setNickDrop.SetItems(_nicks, keepSet.Length > 0 ? keepSet : null);
+                string keepLogout = Pick(_logoutNick);
+                _logoutNick.SetItems(_nicks, keepLogout.Length > 0 ? keepLogout : null);
 
                 var st = state["stats"];
                 if (st.IsObject)
@@ -506,6 +527,10 @@ namespace NareLauncher.UI.Pages
             Field(_setNickDrop, pad, w, ref y);
             Field(_setNickBox, pad, w, ref y);
             _setNickBtn.Location = new Point(pad, y); y += 54;
+
+            Row("СБРОС ВХОДА", ref y);
+            Field(_logoutNick, pad, w, ref y);
+            _logoutBtn.Location = new Point(pad, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 

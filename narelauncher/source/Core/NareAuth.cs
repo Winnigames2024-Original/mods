@@ -572,6 +572,15 @@ namespace NareLauncher.Core
             await PostAsync("/admin/setnick", body, ct).ConfigureAwait(false);
         }
 
+        /// <summary>Админ сбрасывает вход игрока на всех устройствах.</summary>
+        public static async Task<int> AdminLogoutAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            var j = await PostAsync("/admin/logout", body, ct).ConfigureAwait(false);
+            return (int)j["kicked"].AsLong(0);
+        }
+
         // ---------------------------------------------- подаккаунты (ники)
 
         public class Subs
