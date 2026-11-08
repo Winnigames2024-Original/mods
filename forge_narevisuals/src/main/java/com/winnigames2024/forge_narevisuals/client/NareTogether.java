@@ -67,6 +67,16 @@ public final class NareTogether {
     private static Thread beat;
     private static Thread tunnel;
 
+    /**
+     * Номер поколения туннеля. Поток, у которого номер устарел, сам
+     * выходит: interrupt() не прерывает чтение из сокета, поэтому
+     * старые потоки иначе живут вечно и стучатся с мёртвым токеном.
+     */
+    private static volatile int age;
+
+    /** Управляющий сокет текущего туннеля — закрыть его можно только так. */
+    private static volatile Socket wire;
+
     /** sha1 по пути файла: считать его каждый раз незачем. */
     private static final Map<String, String> hashes = new HashMap<>();
 
@@ -127,6 +137,10 @@ public final class NareTogether {
         mode = "direct";
         reachable = null;
 
+        age++;
+        closeQuietly(wire);
+        wire = null;
+
         if (tunnel != null) { tunnel.interrupt(); tunnel = null; }
 
         note = open ? "сборный пункт сменился, объявляюсь заново…" : "мир закрыт";
@@ -159,11 +173,20 @@ public final class NareTogether {
         int port = want > 0 ? want : freePort();
 
         boolean ok;
-        try {
-            ok = server.publishServer(GameType.SURVIVAL, false, port);
-        } catch (Throwable t) {
-            ok = false;
-            Forge_narevisuals.LOGGER.warn("publishServer не сработал: {}", t.toString());
+
+        // Мир уже открыт в сеть — второй раз открывать нельзя: игра возьмёт
+        // новый порт и выбросит всех, кто успел зайти.
+        if (published(server)) {
+            port = server.getPort();
+            ok = port > 0;
+            Forge_narevisuals.LOGGER.info("Мир уже был открыт на порту {} — оставляю как есть", port);
+        } else {
+            try {
+                ok = server.publishServer(GameType.SURVIVAL, false, port);
+            } catch (Throwable t) {
+                ok = false;
+                Forge_narevisuals.LOGGER.warn("publishServer не сработал: {}", t.toString());
+            }
         }
 
         if (!ok) {
@@ -201,6 +224,11 @@ public final class NareTogether {
         String key = token;
         token = "";
 
+        age++;                                  // всем прежним туннелям — выход
+
+        closeQuietly(wire);
+        wire = null;
+
         if (tunnel != null) { tunnel.interrupt(); tunnel = null; }
         if (beat != null) { beat.interrupt(); beat = null; }
 
@@ -230,6 +258,15 @@ public final class NareTogether {
     }
 
     private static int ticks;
+
+    /** Открыт ли мир в сеть. Игра умеет это сказать, но метод есть не везде. */
+    private static boolean published(MinecraftServer server) {
+        try {
+            return server.isPublished();
+        } catch (Throwable t) {
+            return server.getPort() > 0;
+        }
+    }
 
     private static int freePort() {
         try (java.net.ServerSocket probe = new java.net.ServerSocket(0)) {
@@ -433,18 +470,29 @@ public final class NareTogether {
         if (tunnel != null && tunnel.isAlive()) return;
         if (token.isEmpty()) return;
 
+        age++;                                  // прежние потоки, если есть, выйдут сами
+
         tunnel = new Thread(NareTogether::tunnelLoop, "nare-tunnel");
         tunnel.setDaemon(true);
         tunnel.start();
     }
 
     private static void tunnelLoop() {
-        String key = token;
+        final int mine = age;                   // чьё это поколение
+        int refused = 0;
 
-        while (!stop && open) {
+        while (!stop && open && mine == age) {
+            String key = token;                 // токен берём живой, не снимок
+
+            if (key.isEmpty()) {                // объявления ещё не было
+                sleep(1000);
+                continue;
+            }
+
             Socket control = null;
             try {
                 control = dial();
+                wire = control;
                 control.setKeepAlive(true);
                 control.getOutputStream().write(("NARE1 HOST " + key + "\n").getBytes(StandardCharsets.UTF_8));
                 control.getOutputStream().flush();
@@ -453,7 +501,7 @@ public final class NareTogether {
 
                 final Socket keeper = control;
                 Thread ping = new Thread(() -> {
-                    while (!stop && open && !keeper.isClosed()) {
+                    while (!stop && open && mine == age && !keeper.isClosed()) {
                         try { Thread.sleep(BEAT); } catch (InterruptedException e) { return; }
                         try {
                             keeper.getOutputStream().write("{\"ping\":1}\n".getBytes(StandardCharsets.UTF_8));
@@ -468,7 +516,7 @@ public final class NareTogether {
                         new java.io.InputStreamReader(control.getInputStream(), StandardCharsets.UTF_8));
 
                 String line;
-                while (!stop && open && (line = reader.readLine()) != null) {
+                while (!stop && open && mine == age && (line = reader.readLine()) != null) {
                     if (line.trim().isEmpty()) continue;
 
                     JsonObject json;
@@ -476,7 +524,17 @@ public final class NareTogether {
                     catch (Exception e) { continue; }
 
                     if (json.has("error")) {
-                        Forge_narevisuals.LOGGER.warn("Туннель отказал: {}", json.get("error").getAsString());
+                        String why = json.get("error").getAsString();
+                        Forge_narevisuals.LOGGER.warn("Туннель отказал: {}", why);
+
+                        refused++;
+                        note = "сборный пункт не признал комнату: " + why;
+
+                        // ждём, пока объявление даст свежий токен: со старым
+                        // стучаться бесполезно
+                        for (int i = 0; i < 30 && token.equals(key) && open && mine == age; i++)
+                            sleep(1000);
+
                         break;
                     }
 
@@ -495,12 +553,23 @@ public final class NareTogether {
                 closeQuietly(control);
             }
 
-            if (stop || !open) return;
+            if (stop || !open || mine != age) return;
+
+            if (refused >= 5) {
+                mode = "direct";
+                note = "туннель не принимают — закройте и снова откройте мир";
+                Forge_narevisuals.LOGGER.warn("Туннель сдался после {} отказов", refused);
+                return;
+            }
 
             mode = "direct";
             note = "туннель переподключается…";
-            try { Thread.sleep(5000); } catch (InterruptedException e) { return; }
+            sleep(5000);
         }
+    }
+
+    private static void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
     /** На каждого гостя открываем встречный канал и сводим его с игрой. */

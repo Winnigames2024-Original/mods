@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.0';
+const VERSION = '1.1';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -510,10 +510,16 @@ function tunnelConnection(socket, first) {
 
     if (kind === 'HOST') {
         const room = rooms.get(key);
-        if (!room || room.ip !== plainIp(socket)) {
+        if (!room) {
             socket.write(JSON.stringify({ error: 'комната не найдена — сначала объявитесь' }) + '\n');
             return socket.destroy();
         }
+
+        // Токен — секрет на 128 бит, его и достаточно. Адрес сверяем, но не
+        // отказываем: объявление идёт по HTTP, туннель — отдельным
+        // соединением, и они могут выйти разными путями (IPv4 и IPv6).
+        const from = plainIp(socket);
+        if (room.ip !== from) log('адрес хозяина не совпал:', room.ip, '!=', from, '— пускаю по токену');
 
         if (room.tunnel) room.tunnel.close('хозяин подключился заново');
 
