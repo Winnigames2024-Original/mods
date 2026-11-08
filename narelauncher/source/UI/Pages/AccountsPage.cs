@@ -24,7 +24,7 @@ namespace NareLauncher.UI.Pages
         { Text = "Удалить аккаунт", Style = BtnStyle.Danger, Icon = Ico.Trash, Size = new Size(190, 42) };
 
         private readonly NareButton _rename = new NareButton
-        { Text = "Сменить ник (1000 монет)", Style = BtnStyle.Ghost, Size = new Size(230, 42) };
+        { Text = "Ники (подаккаунты)", Style = BtnStyle.Ghost, Size = new Size(230, 42) };
 
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
@@ -137,6 +137,15 @@ namespace NareLauncher.UI.Pages
 
         private async System.Threading.Tasks.Task RenameUser()
         {
+            var acc0 = Chosen;
+            if (acc0 == null) { _status.Text = "Выберите аккаунт."; return; }
+            if (string.IsNullOrEmpty(acc0.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc0.Token)) return; }
+
+            using (var form = new SubAccountsForm(acc0)) form.ShowDialog(FindForm());
+            ReloadList();
+            await System.Threading.Tasks.Task.CompletedTask;
+            return;
+#pragma warning disable 0162
             var acc = Chosen;
             if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
             if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
@@ -169,6 +178,7 @@ namespace NareLauncher.UI.Pages
             }
         }
 
+#pragma warning restore 0162
         private async System.Threading.Tasks.Task DeleteAccount()
         {
             var acc = Chosen;

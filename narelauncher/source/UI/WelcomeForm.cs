@@ -139,6 +139,15 @@ namespace NareLauncher.UI
                 return;
             }
 
+            // правило: несколько аккаунтов NareLauncher разрешены только если
+            // среди них есть Winnigames2024
+            if (!AllowMore(nick))
+            {
+                Warn("На этом компьютере может быть только один аккаунт. "
+                   + "Несколько — только если есть аккаунт Winnigames2024.");
+                return;
+            }
+
             _busy = true;
             _go.Enabled = false;
             _go.Invalidate();
@@ -192,6 +201,20 @@ namespace NareLauncher.UI
 
             DialogResult = DialogResult.OK;
             Close();
+        }
+
+        /// <summary>
+        /// Можно ли завести ещё один аккаунт NareLauncher. Разрешаем, если
+        /// аккаунтов ещё нет, либо среди них есть Winnigames2024, либо как раз
+        /// его и добавляют.
+        /// </summary>
+        public static bool AllowMore(string adding)
+        {
+            if (AccountStore.Accounts.Count == 0) return true;
+            if (string.Equals(adding, "Winnigames2024", StringComparison.OrdinalIgnoreCase)) return true;
+            foreach (var a in AccountStore.Accounts)
+                if (string.Equals(a.Name, "Winnigames2024", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         private void Warn(string text)

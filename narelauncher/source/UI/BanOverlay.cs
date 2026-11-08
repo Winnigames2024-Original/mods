@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using NareLauncher.Core;
 
@@ -17,8 +18,11 @@ namespace NareLauncher.UI
         private string _left = "";
         private string _nick = "";
 
-        private readonly NareButton _appeal = new NareButton
-        { Text = "Подать апелляцию на разбан", Style = BtnStyle.Accent, Size = new Size(300, 46), Radius = 12 };
+        private readonly VirtualList _chat = new VirtualList { ItemHeight = 46, EmptyText = "Напишите администратору — он ответит здесь" };
+        private readonly NareTextBox _input = new NareTextBox { Placeholder = "Сообщение администратору…" };
+        private readonly NareButton _send = new NareButton { Text = "Отправить", Style = BtnStyle.Accent, Size = new Size(140, 38) };
+
+        private readonly System.Windows.Forms.Timer _poll = new System.Windows.Forms.Timer { Interval = 5000 };
 
         public BanOverlay()
         {
@@ -29,13 +33,20 @@ namespace NareLauncher.UI
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
 
-            _appeal.Click += (s, e) => Appeal();
-            Controls.Add(_appeal);
+            _chat.Renderer = DrawMsg;
+            Controls.Add(_chat);
+            Controls.Add(_input);
+            Controls.Add(_send);
+
+            _send.Click += (s, e) => Send();
+            _input.Inner.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Send(); } };
+
+            _poll.Tick += async delegate { if (Visible) await Refresh(); };
 
             Resize += (s, e) => Place();
         }
 
-        public void Show(string nick, string reason, string left)
+        public async void Show(string nick, string reason, string left)
         {
             _nick = nick ?? "";
             _reason = string.IsNullOrEmpty(reason) ? "Причина не указана." : reason;
@@ -44,43 +55,84 @@ namespace NareLauncher.UI
             BringToFront();
             Place();
             Invalidate();
+            _poll.Start();
+            await Refresh();
         }
 
         public void Hide1()
         {
-            if (Visible) { Visible = false; SendToBack(); }
+            if (Visible) { Visible = false; SendToBack(); _poll.Stop(); }
+        }
+
+        private string Token { get { var a = AccountStore.Selected; return a == null ? "" : a.Token; } }
+
+        private async System.Threading.Tasks.Task Refresh()
+        {
+            if (string.IsNullOrEmpty(Token)) return;
+            try
+            {
+                var msgs = await NareAuth.BanChatAsync(Token, CancellationToken.None);
+                Fill(msgs);
+            }
+            catch { }
+        }
+
+        private void Fill(System.Collections.Generic.List<NareAuth.ChatMessage> msgs)
+        {
+            var items = new System.Collections.Generic.List<object>();
+            foreach (var m in msgs) items.Add(m);
+            _chat.SetItems(items);
+            if (items.Count > 0) _chat.SelectedIndex = items.Count - 1;   // прокрутка вниз
+        }
+
+        private async void Send()
+        {
+            string text = (_input.Text ?? "").Trim();
+            if (text.Length == 0 || string.IsNullOrEmpty(Token)) return;
+
+            _input.Text = "";
+            try
+            {
+                var msgs = await NareAuth.BanSendAsync(Token, text, CancellationToken.None);
+                Fill(msgs);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(FindForm(), "Не отправилось: " + ex.Message, "Чат",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void DrawMsg(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
+        {
+            var m = item as NareAuth.ChatMessage;
+            if (m == null) return;
+
+            bool mine = !m.Admin;
+            int w = Math.Min(r.Width - 80, 420);
+            var bubble = mine
+                ? new Rectangle(r.Right - w - 12, r.Y + 4, w, r.Height - 10)
+                : new Rectangle(r.X + 12, r.Y + 4, w, r.Height - 10);
+
+            Theme.FillRound(g, bubble, 10, mine ? Color.FromArgb(60, Theme.Accent) : Theme.Panel);
+
+            Theme.Text1(g, m.Admin ? "Администратор" : "Вы", Theme.F(7.6f, FontStyle.Bold),
+                m.Admin ? Theme.Warn : Theme.Accent,
+                new Rectangle(bubble.X + 10, bubble.Y + 4, bubble.Width - 20, 12));
+            Theme.Text1(g, m.Text, Theme.F(9f), Theme.Text,
+                new Rectangle(bubble.X + 10, bubble.Y + 18, bubble.Width - 20, bubble.Height - 22));
         }
 
         private void Place()
         {
-            _appeal.Location = new Point((Width - _appeal.Width) / 2, Height / 2 + 40);
-        }
+            int cx = Width / 2;
+            int top = 150;
+            int chatW = Math.Min(620, Width - 80);
+            int chatX = cx - chatW / 2;
 
-        private async void Appeal()
-        {
-            string text = Prompt.Ask(FindForm(),
-                "Апелляция на разбан",
-                "Коротко объясните, почему вас стоит разбанить. Это увидит администратор.");
-
-            if (string.IsNullOrWhiteSpace(text)) return;
-
-            _appeal.Enabled = false;
-            _appeal.Invalidate();
-
-            try
-            {
-                await NareAuth.AppealAsync(_nick, text.Trim(), CancellationToken.None);
-                MessageBox.Show(FindForm(), "Апелляция отправлена. Ждите ответа администратора.",
-                    "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(FindForm(), "Не удалось отправить: " + ex.Message,
-                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-
-            _appeal.Enabled = true;
-            _appeal.Invalidate();
+            _chat.SetBounds(chatX, top, chatW, Math.Max(80, Height - top - 90));
+            _input.SetBounds(chatX, _chat.Bottom + 10, chatW - 152, 38);
+            _send.SetBounds(_input.Right + 12, _chat.Bottom + 10, 140, 38);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -90,26 +142,22 @@ namespace NareLauncher.UI
             Theme.Smooth(g);
 
             int cx = Width / 2;
-            int top = Height / 2 - 150;
 
-            var lockBox = new Rectangle(cx - 34, top, 68, 68);
-            Theme.FillRoundGradient(g, lockBox, 16, Theme.Bad, Theme.Warn, 45f);
-            Theme.Text1(g, "✖", Theme.F(26f, FontStyle.Bold), Color.White, lockBox,
+            var lockBox = new Rectangle(cx - 22, 20, 44, 44);
+            Theme.FillRoundGradient(g, lockBox, 12, Theme.Bad, Theme.Warn, 45f);
+            Theme.Text1(g, "✖", Theme.F(18f, FontStyle.Bold), Color.White, lockBox,
                 StringAlignment.Center, StringAlignment.Center);
 
-            Theme.Text1(g, "Доступ заблокирован", Theme.F(20f, FontStyle.Bold), Theme.Text,
-                new Rectangle(0, top + 84, Width, 32), StringAlignment.Center, StringAlignment.Center);
+            Theme.Text1(g, "Вы забанены", Theme.F(16f, FontStyle.Bold), Theme.Text,
+                new Rectangle(0, 68, Width, 26), StringAlignment.Center, StringAlignment.Center);
 
-            string sub = _nick.Length > 0 ? "Аккаунт " + _nick : "";
+            string sub = _nick.Length > 0 ? _nick : "";
             if (_left.Length > 0) sub += (sub.Length > 0 ? " · " : "") + _left;
-            Theme.Text1(g, sub, Theme.F(10f), Theme.Muted,
-                new Rectangle(0, top + 120, Width, 22), StringAlignment.Center, StringAlignment.Center);
+            Theme.Text1(g, sub, Theme.F(9.5f), Theme.Muted,
+                new Rectangle(0, 96, Width, 18), StringAlignment.Center, StringAlignment.Center);
 
-            var reasonBox = new Rectangle(cx - 220, top + 150, 440, 56);
-            Theme.FillRound(g, reasonBox, 10, Theme.Panel);
-            Theme.DrawRound(g, reasonBox, 10, Theme.Border);
-            Theme.Text1(g, _reason, Theme.F(9.5f), Theme.Text,
-                Rectangle.Inflate(reasonBox, -14, -8), StringAlignment.Center, StringAlignment.Center);
+            Theme.Text1(g, "Причина: " + _reason, Theme.F(9.5f), Theme.Warn,
+                new Rectangle(0, 118, Width, 20), StringAlignment.Center, StringAlignment.Center);
         }
     }
 

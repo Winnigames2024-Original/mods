@@ -383,5 +383,103 @@ namespace NareLauncher.Core
             body.Set("reason", reason ?? "");
             await PostAsync("/admin/server/reject", body, ct).ConfigureAwait(false);
         }
+
+        // ---------------------------------------------- чат по бану
+
+        public class ChatMessage
+        {
+            public string From = "";
+            public bool Admin;
+            public string Text = "";
+            public long At;
+        }
+
+        private static List<ChatMessage> Messages(Json json)
+        {
+            var list = new List<ChatMessage>();
+            foreach (var m in json["messages"].Items)
+                list.Add(new ChatMessage
+                {
+                    From = m["from"].AsString(""),
+                    Admin = m["admin"].AsBool(false),
+                    Text = m["text"].AsString(""),
+                    At = m["at"].AsLong(0)
+                });
+            return list;
+        }
+
+        public static async Task<List<ChatMessage>> BanChatAsync(string token, CancellationToken ct)
+        {
+            return Messages(await PostAsync("/ban/chat", Admin(token), ct).ConfigureAwait(false));
+        }
+
+        public static async Task<List<ChatMessage>> BanSendAsync(string token, string text, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("text", text);
+            return Messages(await PostAsync("/ban/send", body, ct).ConfigureAwait(false));
+        }
+
+        public static async Task<List<ChatMessage>> AdminChatAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            return Messages(await PostAsync("/admin/chat", body, ct).ConfigureAwait(false));
+        }
+
+        public static async Task<List<ChatMessage>> AdminChatSendAsync(string token, string nick, string text, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            body.Set("text", text);
+            return Messages(await PostAsync("/admin/chat/send", body, ct).ConfigureAwait(false));
+        }
+
+        // ---------------------------------------------- подаккаунты (ники)
+
+        public class Subs
+        {
+            public readonly List<string> List = new List<string>();
+            public string Active = "";
+            public long Coins;
+        }
+
+        private static Subs ToSubs(Json json)
+        {
+            var subs = new Subs { Active = json["active"].AsString(""), Coins = json["coins"].AsLong(0) };
+            foreach (var n in json["subs"].Items)
+            {
+                string s = n.AsString("");
+                if (s.Length > 0) subs.List.Add(s);
+            }
+            return subs;
+        }
+
+        public static async Task<Subs> SubListAsync(string token, CancellationToken ct)
+        {
+            return ToSubs(await PostAsync("/subaccount/list", Admin(token), ct).ConfigureAwait(false));
+        }
+
+        public static async Task<Subs> SubAddAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            return ToSubs(await PostAsync("/subaccount/add", body, ct).ConfigureAwait(false));
+        }
+
+        public static async Task<string> SubUseAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            var r = await PostAsync("/subaccount/use", body, ct).ConfigureAwait(false);
+            return r["active"].AsString(nick);
+        }
+
+        public static async Task SubRemoveAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            await PostAsync("/subaccount/remove", body, ct).ConfigureAwait(false);
+        }
     }
 }

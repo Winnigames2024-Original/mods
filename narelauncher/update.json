@@ -1,8 +1,8 @@
 {
-  "version": "1.26",
+  "version": "1.27",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "7a321f167c63b782b6de913a44dee0d9acc09313",
-  "size": 578560,
-  "notes": "подписи над полями в форме добавления сервера"
+  "sha1": "ab630176b746bb7cc2f40e2d3ad4439f176cac09",
+  "size": 597504,
+  "notes": "Чат с тем, кто забанил (вместо апелляции) + подаккаунты (игровые ники) + лимит аккаунтов"
 }

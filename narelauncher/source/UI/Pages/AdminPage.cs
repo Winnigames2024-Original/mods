@@ -22,6 +22,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareTextBox _banReason = new NareTextBox { Placeholder = "Причина" };
         private readonly NareButton _ban = new NareButton { Text = "Забанить", Style = BtnStyle.Danger, Size = new Size(140, 38) };
         private readonly NareButton _unban = new NareButton { Text = "Разбанить", Style = BtnStyle.Ghost, Size = new Size(140, 38) };
+        private readonly NareButton _chat = new NareButton { Text = "Чат с игроком", Style = BtnStyle.Ghost, Size = new Size(160, 38) };
 
         // предупреждение
         private readonly NareDropDown _warnNick = new NareDropDown();
@@ -100,7 +101,7 @@ namespace NareLauncher.UI.Pages
             }
             _scroll.Controls.Add(_title);
 
-            Add(_banNick); Add(_banType); Add(_banMinutes); Add(_banReason); Add(_ban); Add(_unban);
+            Add(_banNick); Add(_banType); Add(_banMinutes); Add(_banReason); Add(_ban); Add(_unban); Add(_chat);
             _banType.SetItems(new object[] { "Временный (указать минуты)", "Навсегда" });
             _banType.SelectedIndex = 0;
             _banType.SelectedIndexChanged += delegate
@@ -144,6 +145,12 @@ namespace NareLauncher.UI.Pages
             };
             _unban.Click += async (s, e) => await Do(() => NareAuth.UnbanAsync(Token, Pick(_banNick), Ct()),
                 "Разбанен " + Pick(_banNick));
+            _chat.Click += delegate
+            {
+                string nick = Pick(_banNick);
+                if (nick.Length == 0) { _status.Text = "Выберите игрока."; return; }
+                using (var form = new ChatForm(Token, nick)) form.ShowDialog(FindForm());
+            };
 
             _warn.Click += async (s, e) => await Do(() => NareAuth.WarnAsync(Token, Pick(_warnNick), _warnText.Text.Trim(), Ct()),
                 "Предупреждение отправлено");
@@ -366,7 +373,8 @@ namespace NareLauncher.UI.Pages
             Field(_banType, pad, w, ref y);
             Field(_banMinutes, pad, w, ref y);
             Field(_banReason, pad, w, ref y);
-            _ban.Location = new Point(pad, y); _unban.Location = new Point(pad + 150, y); y += 54;
+            _ban.Location = new Point(pad, y); _unban.Location = new Point(pad + 150, y);
+            _chat.Location = new Point(pad + 300, y); y += 54;
 
             Row("ПРЕДУПРЕЖДЕНИЕ", ref y);
             Field(_warnNick, pad, w, ref y);
