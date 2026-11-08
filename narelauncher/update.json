@@ -1,8 +1,8 @@
 {
-  "version": "1.29",
+  "version": "1.30",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "350c9780c07139cc57e2b0e8cf2ea2b4d98677a9",
-  "size": 624128,
-  "notes": "Создание ника игры в главном меню + вкладка «Чаты» для всех (с разбаном и передачей чата другому админу)"
+  "sha1": "fd9abf5c99fd45f75b8f4ef9517c908835a84ac1",
+  "size": 627712,
+  "notes": "Уведомления о новых сообщениях в чате, как в Steam (правый нижний угол, клик открывает Чаты)"
 }

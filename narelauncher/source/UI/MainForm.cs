@@ -40,6 +40,9 @@ namespace NareLauncher.UI
         private NareLabel _accountChip;
 
         private BanOverlay _banOverlay;
+        private ToastHost _toasts;
+        private long _chatSeen = -1;       // игрок: время последнего увиденного ответа админа
+        private long _adminChatSeen = -1;  // админ: время последнего увиденного сообщения игрока
         private readonly System.Windows.Forms.Timer _guard = new System.Windows.Forms.Timer { Interval = 15000 };
         private int _warnShown;          // сколько предупреждений уже показали за сессию
         private long _broadcastShown;    // время последнего показанного объявления
@@ -78,6 +81,9 @@ namespace NareLauncher.UI
 
             _banOverlay = new BanOverlay();
             _content.Controls.Add(_banOverlay);
+
+            _toasts = new ToastHost();
+            _content.Controls.Add(_toasts);
 
             // порядок важен: Fill добавляется первым
             Controls.Add(_content);
@@ -418,6 +424,8 @@ namespace NareLauncher.UI
                 _guardNick = nick;
                 _warnShown = 0;
                 _broadcastShown = 0;
+                _chatSeen = -1;
+                _adminChatSeen = -1;
             }
 
             if (string.IsNullOrEmpty(nick)) { _banOverlay.Hide1(); return; }
@@ -505,7 +513,58 @@ namespace NareLauncher.UI
                     form.ShowDialog(this);
                 _updatePrompting = false;
             }
+
+            await CheckChats(acc, policy);
         }
+
+        /// <summary>Уведомления о новых сообщениях в чате — как в Steam.</summary>
+        private async System.Threading.Tasks.Task CheckChats(Account acc, PlayerPolicy policy)
+        {
+            if (acc == null || string.IsNullOrEmpty(acc.Token) || _toasts == null) return;
+            try
+            {
+                if (policy.IsAdmin)
+                {
+                    var chats = await NareAuth.AdminChatsAsync(acc.Token, System.Threading.CancellationToken.None);
+                    long maxAt = 0; NareAuth.ChatSummary newest = null;
+                    foreach (var c in chats)
+                        if (!c.LastAdmin && c.At > maxAt) { maxAt = c.At; newest = c; }
+
+                    if (_adminChatSeen < 0) _adminChatSeen = maxAt;      // базовая отметка — без уведомления
+                    else if (maxAt > _adminChatSeen && newest != null)
+                    {
+                        _adminChatSeen = maxAt;
+                        var who = newest.Nick;
+                        _toasts.Push(who + " написал", newest.Last, () => OpenChats());
+                    }
+                }
+                else
+                {
+                    var msgs = await NareAuth.BanChatAsync(acc.Token, System.Threading.CancellationToken.None);
+                    long maxAt = 0; NareAuth.ChatMessage newest = null;
+                    foreach (var m in msgs)
+                        if (m.Admin && m.At > maxAt) { maxAt = m.At; newest = m; }
+
+                    if (_chatSeen < 0) _chatSeen = maxAt;
+                    else if (maxAt > _chatSeen && newest != null)
+                    {
+                        _chatSeen = maxAt;
+                        _toasts.Push("Ответ администратора", newest.Text, () => OpenChats());
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>Открыть вкладку «Чаты».</summary>
+        public void OpenChats()
+        {
+            int i = _pages.IndexOf(ChatsTab);
+            if (i >= 0) Navigate(i);
+        }
+
+        /// <summary>Пока игрок в «Чатах», новые сообщения не всплывают.</summary>
+        public void MarkChatsSeen() { _chatSeen = -1; _adminChatSeen = -1; }
 
         /// <summary>
         /// Следит, чтобы был активный аккаунт. Когда ни одного нет, спрашивает

@@ -147,6 +147,7 @@
     <Compile Include="UI\EmergencyUpdateForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\Toast.cs" />
     <Compile Include="UI\BanOverlay.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -88,6 +88,7 @@ namespace NareLauncher.UI
         private async Task Refresh()
         {
             if (string.IsNullOrEmpty(Token)) return;
+            if (Host != null) Host.MarkChatsSeen();   // пока открыт чат — без всплывашек
             try
             {
                 if (_admin)
