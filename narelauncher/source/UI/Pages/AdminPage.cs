@@ -59,8 +59,26 @@ namespace NareLauncher.UI.Pages
         private readonly NareDropDown _updNick = new NareDropDown();
         private readonly NareButton _updOne = new NareButton { Text = "Экстренно у выбранного (30с)", Style = BtnStyle.Danger, Size = new Size(300, 38) };
 
+        // монеты
+        private readonly NareDropDown _coinNick = new NareDropDown();
+        private readonly NareTextBox _coinAmount = new NareTextBox { Placeholder = "Сколько (можно с минусом)" };
+        private readonly NareButton _coinGive = new NareButton { Text = "Выдать", Style = BtnStyle.Success, Size = new Size(150, 38) };
+        private readonly NareButton _coinTake = new NareButton { Text = "Забрать", Style = BtnStyle.Danger, Size = new Size(150, 38) };
+
+        // права админа
+        private readonly NareDropDown _rightsNick = new NareDropDown();
+        private readonly NareButton _grantBtn = new NareButton { Text = "Назначить админом", Style = BtnStyle.Accent, Size = new Size(210, 38) };
+        private readonly NareButton _revokeBtn = new NareButton { Text = "Снять админку", Style = BtnStyle.Ghost, Size = new Size(170, 38) };
+
+        // игровой ник
+        private readonly NareDropDown _setNickDrop = new NareDropDown();
+        private readonly NareTextBox _setNickBox = new NareTextBox { Placeholder = "Новый игровой ник" };
+        private readonly NareButton _setNickBtn = new NareButton { Text = "Поставить ник", Style = BtnStyle.Accent, Size = new Size(190, 38) };
+
+        private readonly NareLabel _statLine = new NareLabel("", 9.5f, FontStyle.Bold, Theme.Muted);
+
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
-        private readonly NareLabel[] _heads = new NareLabel[8];
+        private readonly NareLabel[] _heads = new NareLabel[11];
         private readonly System.Collections.Generic.List<NareLabel> _caps = new System.Collections.Generic.List<NareLabel>();
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly NareLabel _usersHead = new NareLabel("ПОЛЬЗОВАТЕЛИ — выберите, чтобы подставить ник", 8.5f, FontStyle.Bold, Theme.Accent);
@@ -78,7 +96,8 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_scroll);
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
-                "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ", "" };
+                "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",
+                "МОНЕТЫ", "ПРАВА АДМИНА", "ИГРОВОЙ НИК", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -94,7 +113,10 @@ namespace NareLauncher.UI.Pages
                 "ID мода (например xray)", "Версия игры или * для всех",
                 "ID заявки сервера (из сводки справа)",
                 "Версия обновления", "Что нового (changelog)",
-                "Игрок для точечного экстренного обновления"
+                "Игрок для точечного экстренного обновления",
+                "Игрок (монеты)", "Сколько монет (можно с минусом)",
+                "Игрок (права админа)",
+                "Игрок (сменить ник)", "Новый игровой ник"
             };
             foreach (var c in caps)
             {
@@ -120,6 +142,10 @@ namespace NareLauncher.UI.Pages
             Add(_srvId); Add(_srvOk); Add(_srvNo);
             Add(_updVer); Add(_updLog); Add(_updGo); Add(_updCrit);
             Add(_updNick); Add(_updOne);
+            Add(_coinNick); Add(_coinAmount); Add(_coinGive); Add(_coinTake);
+            Add(_rightsNick); Add(_grantBtn); Add(_revokeBtn);
+            Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
+            _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
             _scroll.Controls.Add(_usersHead);
             _scroll.Controls.Add(_users);
@@ -134,6 +160,9 @@ namespace NareLauncher.UI.Pages
                 _warnNick.SetItems(_nicks, u.Nick);
                 _togNick.SetItems(_nicks, u.Nick);
                 _updNick.SetItems(_nicks, u.Nick);
+                _coinNick.SetItems(_nicks, u.Nick);
+                _rightsNick.SetItems(_nicks, u.Nick);
+                _setNickDrop.SetItems(_nicks, u.Nick);
             };
 
             _ban.Click += async (s, e) =>
@@ -197,6 +226,19 @@ namespace NareLauncher.UI.Pages
                 await Announce(true, who);
             };
 
+            _coinGive.Click += async (s, e) => await Coins(+1);
+            _coinTake.Click += async (s, e) => await Coins(-1);
+            _grantBtn.Click += async (s, e) => await Do(() => NareAuth.GrantAdminAsync(Token, Pick(_rightsNick), true, Ct()),
+                "Назначен админом: " + Pick(_rightsNick));
+            _revokeBtn.Click += async (s, e) => await Do(() => NareAuth.GrantAdminAsync(Token, Pick(_rightsNick), false, Ct()),
+                "Снята админка: " + Pick(_rightsNick));
+            _setNickBtn.Click += async (s, e) =>
+            {
+                string nick = Pick(_setNickDrop), uname = _setNickBox.Text.Trim();
+                if (nick.Length == 0 || uname.Length == 0) { _status.Text = "Выберите игрока и введите ник."; return; }
+                await Do(() => NareAuth.AdminSetNickAsync(Token, nick, uname, Ct()), "Ник игрока " + nick + " → " + uname);
+            };
+
             Layout1();
         }
 
@@ -231,6 +273,20 @@ namespace NareLauncher.UI.Pages
             await Reload();
         }
 
+        private async System.Threading.Tasks.Task Coins(int sign)
+        {
+            string nick = Pick(_coinNick);
+            if (nick.Length == 0) { _status.Text = "Выберите игрока."; return; }
+            int amt = ParseInt(_coinAmount.Text);
+            if (amt <= 0) { _status.Text = "Сколько монет?"; return; }
+            long give = sign > 0 ? amt : -amt;
+            await Do(async () =>
+            {
+                long bal = await NareAuth.AdminCoinsAsync(Token, nick, give, Ct());
+                _status.Text = nick + ": теперь " + bal + " монет";
+            }, null);
+        }
+
         private async System.Threading.Tasks.Task Announce(bool critical, string nick = null)
         {
             string version = _updVer.Text.Trim();
@@ -249,7 +305,7 @@ namespace NareLauncher.UI.Pages
             try
             {
                 await action();
-                _status.Text = okText;
+                if (!string.IsNullOrEmpty(okText)) _status.Text = okText;
                 _status.ForeColor = Theme.Good;
                 await Reload();
             }
@@ -297,6 +353,19 @@ namespace NareLauncher.UI.Pages
                 _warnNick.SetItems(_nicks, keepWarn.Length > 0 ? keepWarn : null);
                 _togNick.SetItems(_nicks, keepTog.Length > 0 ? keepTog : null);
                 _updNick.SetItems(_nicks, keepUpd.Length > 0 ? keepUpd : null);
+                string keepCoin = Pick(_coinNick), keepRights = Pick(_rightsNick), keepSet = Pick(_setNickDrop);
+                _coinNick.SetItems(_nicks, keepCoin.Length > 0 ? keepCoin : null);
+                _rightsNick.SetItems(_nicks, keepRights.Length > 0 ? keepRights : null);
+                _setNickDrop.SetItems(_nicks, keepSet.Length > 0 ? keepSet : null);
+
+                var st = state["stats"];
+                if (st.IsObject)
+                    _statLine.Text = "Аккаунтов: " + st["accounts"].AsLong(0)
+                        + "   ·   Банов: " + st["bans"].AsLong(0)
+                        + "   ·   Онлайн: " + st["online"].AsLong(0)
+                        + "   ·   Заявок: " + st["pendingServers"].AsLong(0)
+                        + "   ·   Админов: " + st["admins"].AsLong(0)
+                        + "   ·   Чатов: " + st["chats"].AsLong(0);
                 var items = new System.Collections.Generic.List<object>();
 
                 foreach (var b in state["bans"].Items)
@@ -382,8 +451,9 @@ namespace NareLauncher.UI.Pages
             if (_scroll == null) return;
             _head = 0;
             _cap = 0;
-            _title.SetBounds(28, 22, 500, 32);
-            int pad = 28, w = Math.Min(560, Width - pad * 2 - 360), y = 64;
+            _title.SetBounds(28, 18, 500, 30);
+            int pad = 28, w = Math.Min(560, Width - pad * 2 - 360), y = 76;
+            _statLine.SetBounds(28, 50, Math.Max(300, Width - pad - 360), 18);
 
             Row("БАН ИГРОКА", ref y);
             Field(_banNick, pad, w, ref y);
@@ -422,6 +492,20 @@ namespace NareLauncher.UI.Pages
             _updCrit.Location = new Point(pad, y); y += 48;
             Field(_updNick, pad, w, ref y);
             _updOne.Location = new Point(pad, y); y += 54;
+
+            Row("МОНЕТЫ", ref y);
+            Field(_coinNick, pad, w, ref y);
+            Field(_coinAmount, pad, w, ref y);
+            _coinGive.Location = new Point(pad, y); _coinTake.Location = new Point(pad + 160, y); y += 54;
+
+            Row("ПРАВА АДМИНА", ref y);
+            Field(_rightsNick, pad, w, ref y);
+            _grantBtn.Location = new Point(pad, y); _revokeBtn.Location = new Point(pad + 220, y); y += 54;
+
+            Row("ИГРОВОЙ НИК", ref y);
+            Field(_setNickDrop, pad, w, ref y);
+            Field(_setNickBox, pad, w, ref y);
+            _setNickBtn.Location = new Point(pad, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 

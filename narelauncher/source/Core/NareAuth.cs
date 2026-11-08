@@ -536,6 +536,23 @@ namespace NareLauncher.Core
             await PostAsync(grant ? "/admin/grant" : "/admin/revoke", body, ct).ConfigureAwait(false);
         }
 
+        public static async Task<long> AdminCoinsAsync(string token, string nick, long amount, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            body.Set("amount", amount);
+            var j = await PostAsync("/admin/coins", body, ct).ConfigureAwait(false);
+            return j["coins"].AsLong(0);
+        }
+
+        public static async Task AdminSetNickAsync(string token, string nick, string username, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            body.Set("username", username);
+            await PostAsync("/admin/setnick", body, ct).ConfigureAwait(false);
+        }
+
         // ---------------------------------------------- подаккаунты (ники)
 
         public class Subs

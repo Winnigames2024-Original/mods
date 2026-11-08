@@ -1,8 +1,8 @@
 {
-  "version": "1.31",
+  "version": "1.32",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "6edd1b538ffa62265b09d86b2983ef66f5287ec9",
-  "size": 629248,
-  "notes": "Чат показывает сообщения целиком (перенос строк, прокрутка) + кнопка «Разбанить» в чате с игроком"
+  "sha1": "cf1f9acd472278b7fb0b70ab227b565904d3f4ef",
+  "size": 637440,
+  "notes": "Админка: статистика сверху, выдача/снятие монет, назначение админов, смена игрового ника игроку"
 }

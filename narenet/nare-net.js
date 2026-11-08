@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.8';
+const VERSION = '1.9';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1134,6 +1134,45 @@ function adminChatAssign(req, res) {
     });
 }
 
+/** Выдать или забрать монеты игроку. */
+function adminCoins(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        const amount = Math.trunc(Number(body.amount));
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
+        if (!Number.isFinite(amount) || amount === 0) return send(res, 400, { error: 'сколько монет?' });
+
+        const a = acc(nick);
+        a.coins = Math.max(0, (a.coins || 0) + amount);
+        saveAccounts();
+        log('монеты', nick, (amount > 0 ? '+' : '') + amount, '=', a.coins);
+        send(res, 200, { ok: true, coins: a.coins });
+    });
+}
+
+/** Поставить игроку игровой ник (username) — с проверкой занятости. */
+function adminSetNick(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        const username = clean(body.username, 16);
+        if (!nick || !username) return send(res, 400, { error: 'нужен игрок и ник' });
+        if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
+        if (!goodNick(username)) return send(res, 400, { error: 'ник: 3–16 латинских букв, цифр и _' });
+        if (nickOwned(username, nick)) return send(res, 409, { error: 'этот ник занят другим игроком' });
+
+        const a = acc(nick);
+        a.username = username;
+        if (!Array.isArray(a.subs)) a.subs = [];
+        if (a.subs.indexOf(username) < 0) a.subs.push(username);
+        saveAccounts();
+        log('ник игрока', nick, '->', username);
+        send(res, 200, { ok: true, username });
+    });
+}
+
 /** Назначить/снять администратора (только владелец). */
 function adminGrant(req, res, grant) {
     readJsonBody(req, body => {
@@ -1292,7 +1331,7 @@ function adminState(req, res) {
             accounts: Object.keys(accounts).map(n => {
                 const a = acc(n);
                 const ban = banOf(n);
-                return { nick: n, admin: n === ADMIN,
+                return { nick: n, admin: isAdmin(n),
                          coins: a ? a.coins : 0, username: a ? a.username : n,
                          banned: !!ban, blockedTogether: !!policy.together[n] };
             }),
@@ -1304,7 +1343,16 @@ function adminState(req, res) {
             update: policy.update,
             broadcast: policy.broadcast,
             appeals: policy.appeals.slice(-100),
-            commands: policy.commands.slice(-50)
+            commands: policy.commands.slice(-50),
+            stats: {
+                accounts: Object.keys(accounts).length,
+                bans: Object.keys(bans).length,
+                admins: 1 + (policy.admins ? policy.admins.length : 0),
+                online: roomList().length,
+                pendingServers: policy.servers.filter(x => x.status === 'pending').length,
+                approvedServers: policy.servers.filter(x => x.status === 'approved').length,
+                chats: Object.keys(policy.chats).length
+            }
         });
     });
 }
@@ -1337,6 +1385,8 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/chat/assign' && req.method === 'POST') return adminChatAssign(req, res);
     if (route === '/admin/grant' && req.method === 'POST') return adminGrant(req, res, true);
     if (route === '/admin/revoke' && req.method === 'POST') return adminGrant(req, res, false);
+    if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
+    if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
 
     // подаккаунты
     if (route === '/subaccount/list' && req.method === 'POST') return subList(req, res);
