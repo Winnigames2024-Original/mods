@@ -84,6 +84,8 @@ public final class NareServer extends JavaPlugin implements Listener {
     private final Map<UUID, double[]> where = new ConcurrentHashMap<>();
     private final Map<UUID, String> worlds = new ConcurrentHashMap<>();
 
+    private NareCommands commands;
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
@@ -110,6 +112,12 @@ public final class NareServer extends JavaPlugin implements Listener {
         }
 
         Bukkit.getPluginManager().registerEvents(this, this);
+
+        commands = new NareCommands(this,
+                getConfig().getString("narenet.host", ""),
+                getConfig().getString("narenet.key", ""),
+                getConfig().getInt("narenet.seconds", 5));
+        commands.start();
 
         // снимок координат для голоса
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -228,6 +236,7 @@ public final class NareServer extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (commands != null) commands.stop();
         if (voicePipe != null) { voicePipe.close(); voicePipe = null; }
         if (parkour != null) parkour.save();
 

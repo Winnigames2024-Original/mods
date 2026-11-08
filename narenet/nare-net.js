@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -430,6 +430,7 @@ function filePut(req, res, sha1) {
 // =====================================================================
 
 const ADMIN = (process.env.NARENET_ADMIN || 'Winnigames2024');
+const SERVER_KEY = (process.env.NARENET_SERVER_KEY || '');
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const BANS_FILE = path.join(DATA_DIR, 'bans.json');
@@ -802,6 +803,18 @@ function adminUpdate(req, res) {
     });
 }
 
+// Minecraft-сервер (плагин NareServer) забирает очередь команд этим ключом
+function serverCommands(req, res) {
+    const q = query(req);
+    if (!SERVER_KEY || q.key !== SERVER_KEY)
+        return send(res, 403, { error: 'нужен верный ключ сервера' });
+
+    const out = policy.commands.map(c => c.text);
+    if (policy.commands.length > 0) { policy.commands = []; savePolicy(); }
+
+    send(res, 200, { commands: out });
+}
+
 function adminState(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
@@ -843,6 +856,7 @@ const server = http.createServer((req, res) => {
     if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
 
     // --- админ-панель
+    if (route === '/commands') return serverCommands(req, res);
     if (route === '/admin/state' && req.method === 'POST') return adminState(req, res);
     if (route === '/admin/ban' && req.method === 'POST') return adminBan(req, res);
     if (route === '/admin/unban' && req.method === 'POST') return adminUnban(req, res);

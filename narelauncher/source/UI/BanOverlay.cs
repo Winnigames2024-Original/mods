@@ -160,5 +160,88 @@ namespace NareLauncher.UI
                 return form.ShowDialog(owner) == DialogResult.OK ? result : null;
             }
         }
+
+        /// <summary>Один скрытый ввод пароля.</summary>
+        public static string Password(IWin32Window owner, string title, string hint)
+        {
+            return OneField(owner, title, hint, true);
+        }
+
+        /// <summary>Одна строка ввода; mask — скрывать ли символы.</summary>
+        public static string OneField(IWin32Window owner, string title, string hint, bool mask)
+        {
+            using (var form = Shell(title, 180))
+            {
+                var label = new NareLabel(hint, 9.5f, FontStyle.Regular, Theme.Muted)
+                { Bounds = new Rectangle(18, 14, 424, 40) };
+                var box = new NareTextBox { Bounds = new Rectangle(18, 60, 424, 40) };
+                box.Inner.UseSystemPasswordChar = mask;
+
+                var ok = new NareButton { Text = "ОК", Style = BtnStyle.Accent, Size = new Size(150, 38) };
+                var cancel = new NareButton { Text = "Отмена", Style = BtnStyle.Ghost, Size = new Size(120, 38) };
+                ok.Location = new Point(18, 124);
+                cancel.Location = new Point(322, 124);
+
+                string result = null;
+                Action accept = () => { result = box.Text; form.DialogResult = DialogResult.OK; form.Close(); };
+                ok.Click += (s, e) => accept();
+                cancel.Click += (s, e) => { form.DialogResult = DialogResult.Cancel; form.Close(); };
+                box.Inner.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; accept(); } };
+
+                form.Controls.Add(label); form.Controls.Add(box);
+                form.Controls.Add(ok); form.Controls.Add(cancel);
+
+                return form.ShowDialog(owner) == DialogResult.OK ? result : null;
+            }
+        }
+
+        /// <summary>Старый и новый пароль разом.</summary>
+        public static Tuple<string, string> ChangePassword(IWin32Window owner)
+        {
+            using (var form = Shell("Смена пароля", 240))
+            {
+                var l1 = new NareLabel("Текущий пароль", 9.5f, FontStyle.Regular, Theme.Muted)
+                { Bounds = new Rectangle(18, 12, 424, 20) };
+                var old1 = new NareTextBox { Bounds = new Rectangle(18, 36, 424, 38) };
+                old1.Inner.UseSystemPasswordChar = true;
+
+                var l2 = new NareLabel("Новый пароль (от 4 символов)", 9.5f, FontStyle.Regular, Theme.Muted)
+                { Bounds = new Rectangle(18, 84, 424, 20) };
+                var new1 = new NareTextBox { Bounds = new Rectangle(18, 108, 424, 38) };
+                new1.Inner.UseSystemPasswordChar = true;
+
+                var ok = new NareButton { Text = "Сменить", Style = BtnStyle.Accent, Size = new Size(150, 38) };
+                var cancel = new NareButton { Text = "Отмена", Style = BtnStyle.Ghost, Size = new Size(120, 38) };
+                ok.Location = new Point(18, 182);
+                cancel.Location = new Point(322, 182);
+
+                Tuple<string, string> result = null;
+                ok.Click += (s, e) => { result = Tuple.Create(old1.Text, new1.Text); form.DialogResult = DialogResult.OK; form.Close(); };
+                cancel.Click += (s, e) => { form.DialogResult = DialogResult.Cancel; form.Close(); };
+
+                form.Controls.Add(l1); form.Controls.Add(old1);
+                form.Controls.Add(l2); form.Controls.Add(new1);
+                form.Controls.Add(ok); form.Controls.Add(cancel);
+
+                return form.ShowDialog(owner) == DialogResult.OK ? result : null;
+            }
+        }
+
+        private static Form Shell(string title, int height)
+        {
+            return new Form
+            {
+                Text = title,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                ClientSize = new Size(460, height),
+                BackColor = Theme.Bg,
+                ForeColor = Theme.Text,
+                Font = Theme.F(10f)
+            };
+        }
     }
 }

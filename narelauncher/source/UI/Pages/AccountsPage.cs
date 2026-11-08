@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Drawing;
 using System.Windows.Forms;
 using NareLauncher.Core;
@@ -16,6 +17,12 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _manage = new NareButton
         { Text = "Управление аккаунтами", Style = BtnStyle.Accent, Icon = Ico.Account, Size = new Size(230, 42) };
 
+        private readonly NareButton _password = new NareButton
+        { Text = "Сменить пароль", Style = BtnStyle.Ghost, Size = new Size(170, 42) };
+
+        private readonly NareButton _delete = new NareButton
+        { Text = "Удалить аккаунт", Style = BtnStyle.Danger, Icon = Ico.Trash, Size = new Size(190, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -30,8 +37,13 @@ namespace NareLauncher.UI.Pages
             _manage.Click += (s, e) => Host.ManageAccounts();
 
             Controls.Add(_list);
+            _password.Click += async (s, e) => await ChangePassword();
+            _delete.Click += async (s, e) => await DeleteAccount();
+
             Controls.Add(_select);
             Controls.Add(_manage);
+            Controls.Add(_password);
+            Controls.Add(_delete);
             Controls.Add(_status);
         }
 
@@ -74,6 +86,72 @@ namespace NareLauncher.UI.Pages
             AccountStore.Save();
             ReloadList();
             Host.Home.Invalidate();
+        }
+
+        private Account Chosen
+        {
+            get
+            {
+                int i = _list.SelectedIndex;
+                return i >= 0 && i < AccountStore.Accounts.Count ? AccountStore.Accounts[i] : null;
+            }
+        }
+
+        private async System.Threading.Tasks.Task ChangePassword()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+
+            var pair = Prompt.ChangePassword(FindForm());
+            if (pair == null) return;
+
+            if (pair.Item2.Length < 4)
+            {
+                _status.Text = "Новый пароль — от 4 символов.";
+                _status.ForeColor = Theme.Warn;
+                return;
+            }
+
+            try
+            {
+                await NareAuth.ChangePasswordAsync(acc.Name, pair.Item1, pair.Item2, CancellationToken.None);
+                _status.Text = "Пароль для " + acc.Name + " сменён.";
+                _status.ForeColor = Theme.Good;
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "Не вышло: " + ex.Message;
+                _status.ForeColor = Theme.Bad;
+            }
+        }
+
+        private async System.Threading.Tasks.Task DeleteAccount()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+
+            if (!Host.Confirm("Удалить аккаунт " + acc.Name + " и на сервере, и из лаунчера? Это навсегда."))
+                return;
+
+            string password = Prompt.Password(FindForm(), "Удаление аккаунта",
+                "Введите пароль аккаунта " + acc.Name + ", чтобы подтвердить удаление.");
+            if (string.IsNullOrEmpty(password)) return;
+
+            try
+            {
+                await NareAuth.DeleteAsync(acc.Name, password, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "Сервер не дал удалить: " + ex.Message;
+                _status.ForeColor = Theme.Bad;
+                return;
+            }
+
+            AccountStore.Remove(_list.SelectedIndex);
+            ReloadList();
+            _status.Text = "Аккаунт " + acc.Name + " удалён.";
+            _status.ForeColor = Theme.Muted;
         }
 
         private void DrawAccount(Graphics g, Rectangle r, object item, int index, bool hover, bool selected)
@@ -129,6 +207,8 @@ namespace NareLauncher.UI.Pages
             int by = Height - bottomH + 18;
             _select.Location = new Point(pad, by);
             _manage.Location = new Point(pad + 216, by);
+            _password.Location = new Point(pad + 216 + 246, by);
+            _delete.Location = new Point(pad + 216 + 246 + 186, by);
             _status.SetBounds(pad, by + 48, Math.Max(50, Width - pad * 2), 20);
 
             Invalidate();
