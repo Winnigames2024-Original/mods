@@ -40,6 +40,7 @@ namespace NareLauncher.Core
 
         public long Coins;
         public string Username = "";
+        public bool IsAdmin;
 
         public bool ModBlocked(string modId, string gameVersion)
         {
@@ -203,6 +204,7 @@ namespace NareLauncher.Core
 
             policy.Coins = json["coins"].AsLong(0);
             policy.Username = json["username"].AsString("");
+            policy.IsAdmin = json["admin"].AsBool(false);
 
             return policy;
         }
@@ -488,6 +490,50 @@ namespace NareLauncher.Core
             body.Set("nick", nick);
             body.Set("text", text);
             return Messages(await PostAsync("/admin/chat/send", body, ct).ConfigureAwait(false));
+        }
+
+        public class ChatSummary
+        {
+            public string Nick = "";
+            public bool Banned;
+            public int Count;
+            public string Last = "";
+            public bool LastAdmin;
+            public long At;
+            public string Assigned = "";
+        }
+
+        public static async Task<List<ChatSummary>> AdminChatsAsync(string token, CancellationToken ct)
+        {
+            var json = await PostAsync("/admin/chats", Admin(token), ct).ConfigureAwait(false);
+            var list = new List<ChatSummary>();
+            foreach (var c in json["chats"].Items)
+                list.Add(new ChatSummary
+                {
+                    Nick = c["nick"].AsString(""),
+                    Banned = c["banned"].AsBool(false),
+                    Count = (int)c["count"].AsLong(0),
+                    Last = c["last"].AsString(""),
+                    LastAdmin = c["lastAdmin"].AsBool(false),
+                    At = c["at"].AsLong(0),
+                    Assigned = c["assigned"].AsString("")
+                });
+            return list;
+        }
+
+        public static async Task AdminChatAssignAsync(string token, string nick, string to, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            body.Set("to", to);
+            await PostAsync("/admin/chat/assign", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task GrantAdminAsync(string token, string nick, bool grant, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            await PostAsync(grant ? "/admin/grant" : "/admin/revoke", body, ct).ConfigureAwait(false);
         }
 
         // ---------------------------------------------- подаккаунты (ники)

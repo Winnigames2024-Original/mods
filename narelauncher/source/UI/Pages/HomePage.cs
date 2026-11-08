@@ -15,6 +15,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _play = new NareButton();
         private readonly NareButton _folder = new NareButton();
         private readonly NareButton _visuals = new NareButton();
+        private readonly NareButton _nick = new NareButton();
         private readonly NareButton _wmine = new NareButton();
 
         /// <summary>
@@ -63,6 +64,12 @@ namespace NareLauncher.UI.Pages
             _visuals.Size = new Size(190, 40);
             _visuals.Click += (s, e) => RefreshVisuals();
 
+            _nick.Text = "Игровой ник";
+            _nick.Style = BtnStyle.Ghost;
+            _nick.Icon = Ico.Account;
+            _nick.Size = new Size(190, 40);
+            _nick.Click += (s, e) => OpenSubAccounts();
+
             _wmine.Text = "ИГРАТЬ НА WMINE";
             _wmine.Style = BtnStyle.Success;
             _wmine.Icon = Ico.Play;
@@ -84,6 +91,7 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_wmine);
             Controls.Add(_folder);
             Controls.Add(_visuals);
+            Controls.Add(_nick);
             Controls.Add(_progress);
             Controls.Add(_status);
             Controls.Add(_hint);
@@ -142,6 +150,7 @@ namespace NareLauncher.UI.Pages
             ReloadVersions();
             _player.LoadFromAccount();
             Host.RefreshAccountChip();
+            UpdateNickButton();
             Layout1();
             Invalidate();
         }
@@ -693,6 +702,25 @@ namespace NareLauncher.UI.Pages
         /// оказывалась под кнопкой сервера. Теперь правая группа считается
         /// первой, а левая кладётся в то, что от неё осталось.
         /// </summary>
+        private void UpdateNickButton()
+        {
+            var acc = AccountStore.Selected;
+            _nick.Text = acc == null ? "Игровой ник" : "Ник: " + acc.PlayName;
+            _nick.Invalidate();
+        }
+
+        private void OpenSubAccounts()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null) { Host.ManageAccounts(); acc = AccountStore.Selected; if (acc == null) return; }
+            if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
+
+            using (var form = new SubAccountsForm(acc)) form.ShowDialog(FindForm());
+            Host.RefreshAccountChip();
+            UpdateNickButton();
+            Invalidate();
+        }
+
         private void Layout1()
         {
             int top = Height - PanelHeight;
@@ -712,7 +740,7 @@ namespace NareLauncher.UI.Pages
             int row = top + 40;
             int fx = _version.Right + 12;
 
-            if (fx + _folder.Width + 12 + _visuals.Width > free)
+            if (fx + _folder.Width + 12 + _visuals.Width + 12 + _nick.Width > free)
             {
                 fx = pad;
                 row = top + 96;
@@ -720,6 +748,7 @@ namespace NareLauncher.UI.Pages
 
             _folder.SetBounds(fx, row + 2, _folder.Width, _folder.Height);
             _visuals.SetBounds(_folder.Right + 12, row + 2, _visuals.Width, _visuals.Height);
+            _nick.SetBounds(_visuals.Right + 12, row + 2, _nick.Width, _nick.Height);
 
             _hint.SetBounds(pad, top + 144, Math.Max(100, Width - pad * 2), 20);
             _progress.SetBounds(pad, top + 170, Math.Max(50, Width - pad * 2), 8);

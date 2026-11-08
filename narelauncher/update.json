@@ -1,8 +1,8 @@
 {
-  "version": "1.28",
+  "version": "1.29",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "4d3fc4f9de81fc89a5795371891cf6300b1553cf",
-  "size": 609280,
-  "notes": "Экстренное обновление у всех и точечно игроку + вкладка «Устройства» с отвязкой, как в Telegram"
+  "sha1": "350c9780c07139cc57e2b0e8cf2ea2b4d98677a9",
+  "size": 624128,
+  "notes": "Создание ника игры в главном меню + вкладка «Чаты» для всех (с разбаном и передачей чата другому админу)"
 }

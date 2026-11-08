@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.7';
+const VERSION = '1.8';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -463,10 +463,14 @@ const policy = loadJson(POLICY_FILE, {
     commands: [],                               // очередь команд серверу
     appeals: [],                                // [ { nick, text, at } ]
     servers: [],                                // рекламные серверы на модерации/одобренные
-    chats: {}                                   // nick -> [ { from, text, at } ]: переписка по бану
+    chats: {},                                  // nick -> [ { from, text, at } ]: переписка
+    chatAssign: {},                             // nick -> админ, которому передали чат
+    admins: []                                  // доп. администраторы (кроме главного ADMIN)
 });
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
+if (!policy.chatAssign) policy.chatAssign = {};
+if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
@@ -592,10 +596,24 @@ function readJsonBody(req, done) {
     });
 }
 
+function isAdmin(nick) {
+    return nick === ADMIN || (policy.admins && policy.admins.indexOf(nick) >= 0);
+}
+
 function needAdmin(body, res) {
     const nick = sessionNick(body && body.token);
-    if (nick !== ADMIN) {
+    if (!isAdmin(nick)) {
         send(res, 403, { error: 'нужен вход администратором' });
+        return false;
+    }
+    return true;
+}
+
+/** Только главный администратор (владелец) — для назначения других админов. */
+function needOwner(body, res) {
+    const nick = sessionNick(body && body.token);
+    if (nick !== ADMIN) {
+        send(res, 403, { error: 'только главный администратор' });
         return false;
     }
     return true;
@@ -720,7 +738,8 @@ function statusFor(nick, tok) {
         update: updateFor(nick),
         blockedMods: policy.mods,
         coins: a ? a.coins : 0,
-        username: a ? a.username : nick
+        username: a ? a.username : nick,
+        admin: isAdmin(nick)
     };
 }
 
@@ -1058,16 +1077,78 @@ function adminChatGet(req, res) {
 function adminChatSend(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
+        const me = sessionNick(body.token);
         const nick = clean(body.nick, 16);
         const text = clean(body.text, 500);
         if (!nick || !text) return send(res, 400, { error: 'нужен игрок и текст' });
 
         const list = chatList(nick);
-        list.push({ from: ADMIN, admin: true, text, at: now() });
+        list.push({ from: me, admin: true, text, at: now() });
         if (list.length > 200) list.shift();
         savePolicy();
 
         send(res, 200, { ok: true, messages: list });
+    });
+}
+
+/** Список всех переписок — для вкладки «Чаты» у администратора. */
+function adminChatsList(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const out = [];
+        for (const nick of Object.keys(policy.chats)) {
+            const list = policy.chats[nick] || [];
+            const last = list.length ? list[list.length - 1] : null;
+            out.push({
+                nick,
+                banned: !!banOf(nick),
+                count: list.length,
+                last: last ? last.text : '',
+                lastFrom: last ? last.from : '',
+                lastAdmin: last ? !!last.admin : false,
+                at: last ? last.at : 0,
+                assigned: policy.chatAssign[nick] || ''
+            });
+        }
+        out.sort((a, b) => b.at - a.at);
+        send(res, 200, { ok: true, chats: out });
+    });
+}
+
+/** Передать чат другому администратору. */
+function adminChatAssign(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        const to = clean(body.to, 16);
+        if (!nick || !to) return send(res, 400, { error: 'нужен игрок и кому передать' });
+        if (!isAdmin(to)) return send(res, 400, { error: 'этот пользователь не администратор' });
+
+        policy.chatAssign[nick] = to;
+        const list = chatList(nick);
+        list.push({ from: sessionNick(body.token), admin: true,
+                    text: 'Чат передан администратору ' + to, at: now() });
+        if (list.length > 200) list.shift();
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Назначить/снять администратора (только владелец). */
+function adminGrant(req, res, grant) {
+    readJsonBody(req, body => {
+        if (!needOwner(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        if (nick === ADMIN) return send(res, 400, { error: 'это и так главный администратор' });
+        if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
+
+        const i = policy.admins.indexOf(nick);
+        if (grant && i < 0) policy.admins.push(nick);
+        if (!grant && i >= 0) policy.admins.splice(i, 1);
+        savePolicy();
+        log(grant ? 'назначен админ:' : 'снят админ:', nick);
+        send(res, 200, { ok: true, admins: policy.admins });
     });
 }
 
@@ -1252,6 +1333,10 @@ const server = http.createServer((req, res) => {
     if (route === '/ban/send' && req.method === 'POST') return banChatSend(req, res);
     if (route === '/admin/chat' && req.method === 'POST') return adminChatGet(req, res);
     if (route === '/admin/chat/send' && req.method === 'POST') return adminChatSend(req, res);
+    if (route === '/admin/chats' && req.method === 'POST') return adminChatsList(req, res);
+    if (route === '/admin/chat/assign' && req.method === 'POST') return adminChatAssign(req, res);
+    if (route === '/admin/grant' && req.method === 'POST') return adminGrant(req, res, true);
+    if (route === '/admin/revoke' && req.method === 'POST') return adminGrant(req, res, false);
 
     // подаккаунты
     if (route === '/subaccount/list' && req.method === 'POST') return subList(req, res);
