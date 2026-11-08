@@ -36,6 +36,26 @@ namespace NareLauncher.Core
 
         public static Process Current;
 
+        // последние строки игрового лога — для отчёта о вылете
+        private static readonly System.Collections.Generic.Queue<string> _recent = new System.Collections.Generic.Queue<string>();
+        private static readonly object _recentLock = new object();
+        private static System.DateTime _startedAt;
+
+        private static void Remember(string line)
+        {
+            if (line == null) return;
+            lock (_recentLock)
+            {
+                _recent.Enqueue(line);
+                while (_recent.Count > 120) _recent.Dequeue();
+            }
+        }
+
+        private static string RecentTail()
+        {
+            lock (_recentLock) return string.Join("\n", _recent.ToArray());
+        }
+
         /// <summary>Если задано, игра сразу зайдёт на этот сервер (адрес или адрес:порт).</summary>
         public static string QuickServer;
 
@@ -113,18 +133,35 @@ namespace NareLauncher.Core
             Log.Info("Команда запуска: \"" + psi.FileName + "\" " + psi.Arguments);
 
             var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
-            proc.OutputDataReceived += (s, e) => { if (e.Data != null) Log.Game(e.Data); };
-            proc.ErrorDataReceived += (s, e) => { if (e.Data != null) Log.Game(e.Data); };
+            proc.OutputDataReceived += (s, e) => { if (e.Data != null) { Log.Game(e.Data); Remember(e.Data); } };
+            proc.ErrorDataReceived += (s, e) => { if (e.Data != null) { Log.Game(e.Data); Remember(e.Data); } };
+            string crashToken = account == null ? null : account.Token;
             proc.Exited += (s, e) =>
             {
                 int code = 0;
                 try { code = proc.ExitCode; } catch { }
                 Log.Info("Minecraft завершился с кодом " + code);
+
+                // ненулевой код = вылет: шлём лог админу через бота Bugs | Players
+                if (code != 0 && !string.IsNullOrEmpty(crashToken))
+                {
+                    double sec = (System.DateTime.UtcNow - _startedAt).TotalSeconds;
+                    string tail = "Код выхода: " + code + " (через " + (int)sec + " c)\n\n" + RecentTail();
+                    var tok = crashToken;
+                    System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        try { await NareAuth.CrashReportAsync(tok, tail, System.Threading.CancellationToken.None); }
+                        catch { }
+                    });
+                }
+
                 Current = null;
                 var h = Exited;
                 if (h != null) h(code);
             };
 
+            lock (_recentLock) _recent.Clear();
+            _startedAt = System.DateTime.UtcNow;
             proc.Start();
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();

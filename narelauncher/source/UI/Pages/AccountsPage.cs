@@ -32,6 +32,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _logoutAll = new NareButton
         { Text = "Выйти со всех аккаунтов", Style = BtnStyle.Danger, Size = new Size(260, 42) };
 
+        private readonly NareButton _logout = new NareButton
+        { Text = "Выйти из аккаунта", Style = BtnStyle.Ghost, Size = new Size(190, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -51,6 +54,7 @@ namespace NareLauncher.UI.Pages
             _rename.Click += async (s, e) => await RenameUser();
             _devices.Click += (s, e) => OpenDevices();
             _logoutAll.Click += async (s, e) => await LogoutAll();
+            _logout.Click += async (s, e) => await LogoutOne();
 
             Controls.Add(_select);
             Controls.Add(_manage);
@@ -59,6 +63,7 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_rename);
             Controls.Add(_devices);
             Controls.Add(_logoutAll);
+            Controls.Add(_logout);
             Controls.Add(_status);
         }
 
@@ -239,8 +244,9 @@ namespace NareLauncher.UI.Pages
 
             Theme.Text1(g, acc.Name, Theme.F(11f, FontStyle.Bold), Theme.Text,
                 new Rectangle(av.Right + 14, box.Y + 10, box.Width - 220, 22));
-            string sub = "NareLauncher онлайн";
-            if (!string.Equals(acc.PlayName, acc.Name, StringComparison.Ordinal))
+            bool online = !string.IsNullOrEmpty(acc.Token);
+            string sub = online ? "в сети" : "не в сети — выберите, чтобы войти";
+            if (online && !string.Equals(acc.PlayName, acc.Name, StringComparison.Ordinal))
                 sub += " · в игре: " + acc.PlayName;
             Theme.Text1(g, sub, Theme.F(8.8f), Theme.Muted,
                 new Rectangle(av.Right + 14, box.Y + 32, box.Width - 220, 18));
@@ -267,6 +273,20 @@ namespace NareLauncher.UI.Pages
             if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
 
             using (var form = new DevicesForm(acc)) form.ShowDialog(FindForm());
+        }
+
+        private async System.Threading.Tasks.Task LogoutOne()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+            if (string.IsNullOrEmpty(acc.Token)) { _status.Text = "Этот аккаунт и так не в сети."; return; }
+
+            await NareAuth.LogoutAsync(acc.Token, System.Threading.CancellationToken.None);
+            acc.Token = "";
+            AccountStore.Save();
+            ReloadList();
+            _status.Text = "Вы вышли из аккаунта «" + acc.Name + "». Чтобы войти — выберите его и введите пароль.";
+            _status.ForeColor = Theme.Good;
         }
 
         private async System.Threading.Tasks.Task LogoutAll()
@@ -309,6 +329,7 @@ namespace NareLauncher.UI.Pages
             _delete.Location = new Point(pad + 216 + 246 + 186, by);
             _rename.Location = new Point(pad, by + 50);
             _devices.Location = new Point(pad + 246, by + 50);
+            _logout.Location = new Point(pad + 452, by + 50);
             _logoutAll.Location = new Point(pad, by + 100);
             _status.SetBounds(pad + 276, by + 108, Math.Max(50, Width - pad * 2 - 276), 20);
 

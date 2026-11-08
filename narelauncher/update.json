@@ -1,8 +1,8 @@
 {
-  "version": "1.35",
+  "version": "1.36",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "5f8c66d4c2dcd1ad372a3137afbe5f464216bbe5",
-  "size": 647680,
-  "notes": "Объявление и предупреждения показываются один раз на игрока (запоминаются на диск, не всплывают при каждом запуске)"
+  "sha1": "46ee983050f748895a00502b16b904ddb178980a",
+  "size": 651776,
+  "notes": "Отчёт о вылете игры случайному админу от бота Bugs | Players; оффлайн-аккаунт просит пароль; кнопка «Выйти из аккаунта»; статус в сети"
 }

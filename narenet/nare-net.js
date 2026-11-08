@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.11';
+const VERSION = '1.12';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -986,6 +986,37 @@ function adminLogout(req, res) {
     });
 }
 
+/** Список всех администраторов (главный + назначенные). */
+function adminNicks() {
+    const list = [ADMIN];
+    if (policy.admins) for (const n of policy.admins) if (list.indexOf(n) < 0) list.push(n);
+    return list;
+}
+
+/** Игра вылетела — лог уходит случайному админу как сообщение от бота
+ *  «Bugs | Players» в чат игрока; чат закрепляется за этим админом. */
+function crashReport(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 200, { ok: true });   // не залогинен — молча пропускаем
+
+        let text = String(body.log || '').slice(-1800);     // хвост лога — там обычно ошибка
+        if (!text.trim()) text = 'Игра закрылась с ошибкой, лог пустой.';
+
+        const admins = adminNicks();
+        const pick = admins[Math.floor(Math.random() * admins.length)];
+
+        const list = chatList(nick);
+        list.push({ from: 'Bugs | Players', admin: false, bot: true,
+                    text: '⚠ Ошибка старта игры у ' + nick + ':\n' + text, at: now() });
+        if (list.length > 200) list.shift();
+        policy.chatAssign[nick] = pick;
+        savePolicy();
+        log('краш-репорт от', nick, '-> админу', pick);
+        send(res, 200, { ok: true, to: pick });
+    });
+}
+
 /** Отвязать устройство: его токен перестаёт работать, и на том устройстве
  *  лаунчер при следующей проверке увидит loggedOut и выйдет из аккаунта. */
 function deviceUnlink(req, res) {
@@ -1454,6 +1485,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
     if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);
+    if (route === '/crash' && req.method === 'POST') return crashReport(req, res);
 
     // подаккаунты
     if (route === '/subaccount/list' && req.method === 'POST') return subList(req, res);

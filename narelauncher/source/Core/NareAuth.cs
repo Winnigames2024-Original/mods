@@ -572,6 +572,17 @@ namespace NareLauncher.Core
             await PostAsync("/admin/setnick", body, ct).ConfigureAwait(false);
         }
 
+        /// <summary>Игра вылетела — отправляем лог случайному админу через бота.</summary>
+        public static async Task CrashReportAsync(string token, string log, CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(token)) return;
+            var body = Json.NewObject();
+            body.Set("token", token);
+            body.Set("log", log ?? "");
+            try { await PostAsync("/crash", body, ct).ConfigureAwait(false); }
+            catch { }
+        }
+
         /// <summary>Админ сбрасывает вход игрока на всех устройствах.</summary>
         public static async Task<int> AdminLogoutAsync(string token, string nick, CancellationToken ct)
         {

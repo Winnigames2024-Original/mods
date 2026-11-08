@@ -536,10 +536,15 @@ namespace NareLauncher.UI
             {
                 if (policy.IsAdmin)
                 {
+                    string me = acc.Name;
                     var chats = await NareAuth.AdminChatsAsync(acc.Token, System.Threading.CancellationToken.None);
                     long maxAt = 0; NareAuth.ChatSummary newest = null;
                     foreach (var c in chats)
-                        if (!c.LastAdmin && c.At > maxAt) { maxAt = c.At; newest = c; }
+                    {
+                        // чужие закреплённые чаты не дёргают — только нераспределённые и свои
+                        bool mine = string.IsNullOrEmpty(c.Assigned) || string.Equals(c.Assigned, me, StringComparison.Ordinal);
+                        if (!c.LastAdmin && mine && c.At > maxAt) { maxAt = c.At; newest = c; }
+                    }
 
                     if (_adminChatSeen < 0) _adminChatSeen = maxAt;      // базовая отметка — без уведомления
                     else if (maxAt > _adminChatSeen && newest != null)
