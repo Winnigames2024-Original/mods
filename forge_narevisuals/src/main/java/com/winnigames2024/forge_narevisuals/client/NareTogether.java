@@ -89,7 +89,7 @@ public final class NareTogether {
 
     private static String where() {
         String value = Config.get().togetherHost;
-        return value == null || value.trim().isEmpty() ? "166.1.161.200:2445" : value.trim();
+        return value == null || value.trim().isEmpty() ? "151.245.217.104:2445" : value.trim();
     }
 
     /** Все сборные пункты, которые знает мод. */

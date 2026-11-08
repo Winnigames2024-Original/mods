@@ -61,10 +61,10 @@ namespace NareLauncher.Core
         public string JoinCommands = "";
 
         /// <summary>Какой сборный пункт NareNet сейчас выбран.</summary>
-        public string NareNetHost = "166.1.161.200:2445";
+        public string NareNetHost = "151.245.217.104:2445";
 
         /// <summary>Все известные сборные пункты, через точку с запятой.</summary>
-        public string NareNetHosts = "166.1.161.200:2445;151.245.217.104:2445";
+        public string NareNetHosts = "151.245.217.104:2445";
 
         public static Settings Current = new Settings();
 

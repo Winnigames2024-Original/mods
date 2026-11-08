@@ -1,6 +1,14 @@
 {
-  "latest": "2.11.0",
+  "latest": "2.12.0",
   "releases": [
+    {
+      "version": "2.12.0",
+      "file": "forge_narevisuals-2.12.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.12.0.jar",
+      "sha1": "cc31dd22bdd5c7523094511ce59f16bd2764056a",
+      "size": 824487,
+      "notes": "сборный пункт переехал на 151.245.217.104:2445"
+    },
     {
       "version": "2.11.0",
       "file": "forge_narevisuals-2.11.0.jar",

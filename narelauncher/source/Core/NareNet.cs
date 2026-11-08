@@ -98,7 +98,7 @@ namespace NareLauncher.Core
             get
             {
                 string value = (Settings.Current.NareNetHost ?? "").Trim();
-                return value.Length == 0 ? "166.1.161.200:2445" : value;
+                return value.Length == 0 ? "151.245.217.104:2445" : value;
             }
         }
 

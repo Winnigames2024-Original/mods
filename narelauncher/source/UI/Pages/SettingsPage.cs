@@ -50,7 +50,7 @@ namespace NareLauncher.UI.Pages
         { Placeholder = "Команды при входе, через ; — например /login 1234; /spawn" };
 
         private readonly NareTextBox _netHost = new NareTextBox
-        { Placeholder = "Сборные пункты «Вместе», через ; — 166.1.161.200:2445;151.245.217.104:2445" };
+        { Placeholder = "Сборные пункты «Вместе», через ; — 151.245.217.104:2445" };
         private readonly NareButton _browseLocal = new NareButton { Text = "Обзор", Style = BtnStyle.Ghost, Size = new Size(110, 38) };
 
         private readonly NareButton _save = new NareButton { Text = "Сохранить", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(180, 42) };
@@ -300,7 +300,7 @@ namespace NareLauncher.UI.Pages
 
             string net = (_netHost.Text ?? "").Trim();
             s.NareNetHosts = net.Length == 0
-                ? "166.1.161.200:2445;151.245.217.104:2445" : net;
+                ? "151.245.217.104:2445" : net;
 
             // выбранный адрес должен остаться в списке, иначе выбираем первый
             var known = NareNet.Known();

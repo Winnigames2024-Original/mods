@@ -1,8 +1,8 @@
 {
-  "version": "1.14",
+  "version": "1.15",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "bb1610bc7148ef8a3f4bb7c111a9e9c9c4f99dbc",
+  "sha1": "9886450b51be0ccab99c26e5ec4b5f586c6a91d8",
   "size": 498688,
-  "notes": "два сборных пункта на выбор: кнопки адресов прямо на вкладке «Вместе»"
+  "notes": "сборный пункт «Вместе» переехал на 151.245.217.104:2445"
 }

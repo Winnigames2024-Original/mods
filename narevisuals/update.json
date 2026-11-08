@@ -1,8 +1,8 @@
 {
-  "version": "2.11.0",
-  "file": "forge_narevisuals-2.11.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.11.0.jar",
-  "sha1": "cae6f728a2338f0bf25e633ad6ded8e711d55d16",
-  "size": 824509,
-  "notes": "сборный пункт переключается в настройках, адресов может быть несколько"
+  "version": "2.12.0",
+  "file": "forge_narevisuals-2.12.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.12.0.jar",
+  "sha1": "cc31dd22bdd5c7523094511ce59f16bd2764056a",
+  "size": 824487,
+  "notes": "сборный пункт переехал на 151.245.217.104:2445"
 }
