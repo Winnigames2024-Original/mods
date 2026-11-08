@@ -7,9 +7,11 @@ namespace NareLauncher.Core
 {
     public class Account
     {
-        public string Name = "Player";
+        public string Name = "Player";        // логин в NareLauncher (не меняется)
         public string Uuid = "";
-        public string Type = "offline";      // offline / microsoft
+        public string Type = "online";        // в NareLauncher аккаунты только онлайн
+        /// <summary>Игровой ник. Меняется за монеты; пусто — играем под Name.</summary>
+        public string Username = "";
         public string AccessToken = "0";
         public string RefreshToken = "";
         public DateTime ExpiresAt = DateTime.MinValue;
@@ -22,13 +24,19 @@ namespace NareLauncher.Core
         /// <summary>Этот аккаунт — администратор.</summary>
         public bool Admin;
 
-        public bool IsOffline { get { return Type != "microsoft"; } }
+        /// <summary>Под каким ником заходить в игру.</summary>
+        public string PlayName
+        {
+            get { return string.IsNullOrWhiteSpace(Username) ? Name : Username.Trim(); }
+        }
 
-        public string UserType { get { return IsOffline ? "legacy" : "msa"; } }
+        public bool IsOffline { get { return true; } }
+
+        public string UserType { get { return "legacy"; } }
 
         public override string ToString()
         {
-            return Name + (IsOffline ? "  ·  оффлайн" : "  ·  Microsoft");
+            return Name + "  ·  NareLauncher";
         }
     }
 
@@ -58,12 +66,13 @@ namespace NareLauncher.Core
                 {
                     Name = a["name"].AsString("Player"),
                     Uuid = a["uuid"].AsString(""),
-                    Type = a["type"].AsString("offline"),
+                    Type = a["type"].AsString("online"),
                     AccessToken = a["accessToken"].AsString("0"),
                     RefreshToken = a["refreshToken"].AsString(""),
                     SkinPath = a["skinPath"].AsString(""),
                     Token = a["token"].AsString(""),
-                    Admin = a["admin"].AsBool(false)
+                    Admin = a["admin"].AsBool(false),
+                    Username = a["username"].AsString("")
                 };
                 DateTime exp;
                 if (DateTime.TryParse(a["expiresAt"].AsString(""), out exp)) acc.ExpiresAt = exp;
@@ -93,6 +102,7 @@ namespace NareLauncher.Core
                     o.Set("skinPath", a.SkinPath);
                     o.Set("token", a.Token);
                     o.Set("admin", a.Admin);
+                    o.Set("username", a.Username);
                     arr.Add(o);
                 }
                 root["accounts"] = arr;
@@ -110,7 +120,7 @@ namespace NareLauncher.Core
             var acc = new Account
             {
                 Name = nick,
-                Type = "offline",
+                Type = "online",
                 Uuid = OfflineUuid(nick),
                 AccessToken = "0"
             };

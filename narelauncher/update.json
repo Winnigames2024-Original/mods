@@ -1,8 +1,8 @@
 {
-  "version": "1.19",
+  "version": "1.20",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "8e7e7060f4986b127f929e63936297d573116ac7",
-  "size": 550400,
-  "notes": "смена пароля и удаление аккаунта во вкладке «Аккаунты»"
+  "sha1": "c8ec29cdcd62cf46763d6da21fbe97c4047aa17a",
+  "size": 563200,
+  "notes": "аккаунты только онлайн с паролем, авто-вход для старых аккаунтов, монеты и смена игрового ника"
 }

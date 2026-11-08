@@ -23,6 +23,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _delete = new NareButton
         { Text = "Удалить аккаунт", Style = BtnStyle.Danger, Icon = Ico.Trash, Size = new Size(190, 42) };
 
+        private readonly NareButton _rename = new NareButton
+        { Text = "Сменить ник (1000 монет)", Style = BtnStyle.Ghost, Size = new Size(230, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -39,11 +42,13 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_list);
             _password.Click += async (s, e) => await ChangePassword();
             _delete.Click += async (s, e) => await DeleteAccount();
+            _rename.Click += async (s, e) => await RenameUser();
 
             Controls.Add(_select);
             Controls.Add(_manage);
             Controls.Add(_password);
             Controls.Add(_delete);
+            Controls.Add(_rename);
             Controls.Add(_status);
         }
 
@@ -85,6 +90,11 @@ namespace NareLauncher.UI.Pages
             AccountStore.SelectedIndex = _list.SelectedIndex;
             AccountStore.Save();
             ReloadList();
+
+            // нет пароля на сервере — сразу попросим войти
+            var acc = AccountStore.Selected;
+            if (acc != null && string.IsNullOrEmpty(acc.Token)) Host.EnsureAuth();
+
             Host.Home.Invalidate();
         }
 
@@ -116,6 +126,40 @@ namespace NareLauncher.UI.Pages
             {
                 await NareAuth.ChangePasswordAsync(acc.Name, pair.Item1, pair.Item2, CancellationToken.None);
                 _status.Text = "Пароль для " + acc.Name + " сменён.";
+                _status.ForeColor = Theme.Good;
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "Не вышло: " + ex.Message;
+                _status.ForeColor = Theme.Bad;
+            }
+        }
+
+        private async System.Threading.Tasks.Task RenameUser()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+            if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
+
+            string name = Prompt.OneField(FindForm(), "Смена игрового ника",
+                "Новый игровой ник (3–16, латиница). Логин аккаунта " + acc.Name +
+                " не меняется. Стоит 1000 монет.", false);
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            if (!AccountStore.IsValidNick(name))
+            {
+                _status.Text = "Ник: 3–16 символов, латиница, цифры и _";
+                _status.ForeColor = Theme.Warn;
+                return;
+            }
+
+            try
+            {
+                long coins = await NareAuth.ChangeUsernameAsync(acc.Token, name.Trim(), CancellationToken.None);
+                acc.Username = name.Trim();
+                AccountStore.Save();
+                ReloadList();
+                _status.Text = "Теперь вы играете как " + name.Trim() + ". Осталось монет: " + coins + ".";
                 _status.ForeColor = Theme.Good;
             }
             catch (Exception ex)
@@ -175,9 +219,10 @@ namespace NareLauncher.UI.Pages
 
             Theme.Text1(g, acc.Name, Theme.F(11f, FontStyle.Bold), Theme.Text,
                 new Rectangle(av.Right + 14, box.Y + 10, box.Width - 220, 22));
-            Theme.Text1(g, (acc.IsOffline ? "Оффлайн-аккаунт" : "Microsoft") + " · UUID " +
-                           (acc.Uuid.Length > 8 ? acc.Uuid.Substring(0, 8) : acc.Uuid),
-                Theme.F(8.8f), Theme.Muted,
+            string sub = "NareLauncher онлайн";
+            if (!string.Equals(acc.PlayName, acc.Name, StringComparison.Ordinal))
+                sub += " · в игре: " + acc.PlayName;
+            Theme.Text1(g, sub, Theme.F(8.8f), Theme.Muted,
                 new Rectangle(av.Right + 14, box.Y + 32, box.Width - 220, 18));
 
             if (active)
@@ -209,7 +254,8 @@ namespace NareLauncher.UI.Pages
             _manage.Location = new Point(pad + 216, by);
             _password.Location = new Point(pad + 216 + 246, by);
             _delete.Location = new Point(pad + 216 + 246 + 186, by);
-            _status.SetBounds(pad, by + 48, Math.Max(50, Width - pad * 2), 20);
+            _rename.Location = new Point(pad, by + 50);
+            _status.SetBounds(pad + 246, by + 58, Math.Max(50, Width - pad * 2 - 246), 20);
 
             Invalidate();
         }

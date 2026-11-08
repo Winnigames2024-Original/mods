@@ -178,15 +178,15 @@ namespace NareLauncher.Core
             // ---- подстановки ----
             var vars = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                { "auth_player_name", account.Name },
+                { "auth_player_name", account.PlayName },
                 { "version_name", versionId },
                 { "game_directory", gameDir },
                 { "assets_root", assetsRoot },
                 { "game_assets", gameAssets },
                 { "assets_index_name", assetsIndexName },
-                { "auth_uuid", account.Uuid },
+                { "auth_uuid", AccountStore.OfflineUuid(account.PlayName) },
                 { "auth_access_token", account.AccessToken },
-                { "auth_session", "token:" + account.AccessToken + ":" + account.Uuid },
+                { "auth_session", "token:" + account.AccessToken + ":" + AccountStore.OfflineUuid(account.PlayName) },
                 { "user_type", account.UserType },
                 { "version_type", resolved["type"].AsString("release") },
                 { "user_properties", "{}" },

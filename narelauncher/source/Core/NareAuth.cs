@@ -34,6 +34,9 @@ namespace NareLauncher.Core
         /// <summary>Заблокированные моды: пары id|version, version "*" — все.</summary>
         public readonly List<string> BlockedMods = new List<string>();
 
+        public long Coins;
+        public string Username = "";
+
         public bool ModBlocked(string modId, string gameVersion)
         {
             if (string.IsNullOrEmpty(modId)) return false;
@@ -179,6 +182,9 @@ namespace NareLauncher.Core
                 if (id.Length > 0) policy.BlockedMods.Add(id + "|" + version);
             }
 
+            policy.Coins = json["coins"].AsLong(0);
+            policy.Username = json["username"].AsString("");
+
             return policy;
         }
 
@@ -266,6 +272,116 @@ namespace NareLauncher.Core
         public static Task<Json> StateAsync(string token, CancellationToken ct)
         {
             return PostAsync("/admin/state", Admin(token), ct);
+        }
+
+        // ------------------------------------------------ реклама и монеты
+
+        public class AdServer
+        {
+            public string Id = "";
+            public string Owner = "";
+            public string Name = "";
+            public string Ip = "";
+            public string Version = "";
+            public string Loader = "";
+            public string Desc = "";
+            public long Reward = 100;
+            public string Status = "";
+            public string Reason = "";
+        }
+
+        private static AdServer ToServer(Json s)
+        {
+            return new AdServer
+            {
+                Id = s["id"].AsString(""),
+                Owner = s["owner"].AsString(""),
+                Name = s["name"].AsString(""),
+                Ip = s["ip"].AsString(""),
+                Version = s["version"].AsString(""),
+                Loader = s["loader"].AsString(""),
+                Desc = s["desc"].AsString(""),
+                Reward = s["reward"].AsLong(100),
+                Status = s["status"].AsString(""),
+                Reason = s["reason"].AsString("")
+            };
+        }
+
+        public static async Task<List<AdServer>> AdServersAsync(CancellationToken ct)
+        {
+            var json = await Net.GetJsonAsync(Url("/servers"), ct).ConfigureAwait(false);
+            var list = new List<AdServer>();
+            foreach (var s in json["servers"].Items) list.Add(ToServer(s));
+            return list;
+        }
+
+        public static async Task<string> SubmitServerAsync(string token, AdServer server, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("name", server.Name);
+            body.Set("ip", server.Ip);
+            body.Set("version", server.Version ?? "");
+            body.Set("loader", server.Loader ?? "");
+            body.Set("desc", server.Desc ?? "");
+            var r = await PostAsync("/servers/submit", body, ct).ConfigureAwait(false);
+            return r["id"].AsString("");
+        }
+
+        public static async Task<List<AdServer>> MyServersAsync(string token, CancellationToken ct)
+        {
+            var json = await PostAsync("/servers/mine", Admin(token), ct).ConfigureAwait(false);
+            var list = new List<AdServer>();
+            foreach (var s in json["servers"].Items) list.Add(ToServer(s));
+            return list;
+        }
+
+        public class EarnResult { public long Awarded; public long Coins; public int CooldownLeft; }
+
+        public static async Task<EarnResult> EarnCoinsAsync(string token, string serverId, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("serverId", serverId);
+            var r = await PostAsync("/coins/earn", body, ct).ConfigureAwait(false);
+            return new EarnResult
+            {
+                Awarded = r["awarded"].AsLong(0),
+                Coins = r["coins"].AsLong(0),
+                CooldownLeft = r["cooldownLeft"].AsInt(0)
+            };
+        }
+
+        public static async Task<long> ChangeUsernameAsync(string token, string username, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("username", username);
+            var r = await PostAsync("/username/change", body, ct).ConfigureAwait(false);
+            return r["coins"].AsLong(0);
+        }
+
+        // ---- модерация серверов (админ)
+
+        public static async Task<List<AdServer>> AdminServersAsync(string token, CancellationToken ct)
+        {
+            var json = await PostAsync("/admin/servers", Admin(token), ct).ConfigureAwait(false);
+            var list = new List<AdServer>();
+            foreach (var s in json["servers"].Items) list.Add(ToServer(s));
+            return list;
+        }
+
+        public static async Task ApproveServerAsync(string token, string id, long reward, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("id", id);
+            if (reward > 0) body.Set("reward", reward);
+            await PostAsync("/admin/server/approve", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task RejectServerAsync(string token, string id, string reason, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("id", id);
+            body.Set("reason", reason ?? "");
+            await PostAsync("/admin/server/reject", body, ct).ConfigureAwait(false);
         }
     }
 }

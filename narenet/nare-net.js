@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.3';
+const VERSION = '1.4';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -431,6 +431,9 @@ function filePut(req, res, sha1) {
 
 const ADMIN = (process.env.NARENET_ADMIN || 'Winnigames2024');
 const SERVER_KEY = (process.env.NARENET_SERVER_KEY || '');
+const COIN_REWARD = Number(process.env.NARENET_COIN_REWARD || 100);
+const COIN_COOLDOWN = Number(process.env.NARENET_COIN_COOLDOWN_MIN || 60) * 60000;
+const NAME_PRICE = Number(process.env.NARENET_NAME_PRICE || 1000);
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const BANS_FILE = path.join(DATA_DIR, 'bans.json');
@@ -457,8 +460,10 @@ const policy = loadJson(POLICY_FILE, {
     update: null,                               // { version, changelog, critical, at }
     broadcast: null,                            // { text, at }
     commands: [],                               // очередь команд серверу
-    appeals: []                                 // [ { nick, text, at } ]
+    appeals: [],                                // [ { nick, text, at } ]
+    servers: []                                 // рекламные серверы на модерации/одобренные
 });
+if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
 function saveBans() { saveJson(BANS_FILE, bans); }
@@ -577,7 +582,8 @@ function accountRegister(req, res) {
         if (accounts[nick]) return send(res, 409, { error: 'такой ник уже занят' });
 
         const made = makeHash(body.password);
-        accounts[nick] = { salt: made.salt, hash: made.hash, created: now() };
+        accounts[nick] = { salt: made.salt, hash: made.hash, created: now(),
+                           coins: 0, username: nick, earned: {} };
         saveAccounts();
         log('аккаунт заведён:', nick);
 
@@ -638,9 +644,20 @@ function accountDelete(req, res) {
 
 // --------------------------------------------------------- статус (лаунчер)
 
+/** Аккаунт с заполненными по умолчанию новыми полями. */
+function acc(nick) {
+    const a = accounts[nick];
+    if (!a) return null;
+    if (typeof a.coins !== 'number') a.coins = 0;
+    if (!a.username) a.username = nick;
+    if (!a.earned) a.earned = {};
+    return a;
+}
+
 function statusFor(nick) {
     const ban = banOf(nick);
     const list = warns[nick] || [];
+    const a = acc(nick);
 
     return {
         nick,
@@ -653,7 +670,9 @@ function statusFor(nick) {
         warnings: list,
         broadcast: policy.broadcast,
         update: policy.update,
-        blockedMods: policy.mods
+        blockedMods: policy.mods,
+        coins: a ? a.coins : 0,
+        username: a ? a.username : nick
     };
 }
 
@@ -815,6 +834,134 @@ function serverCommands(req, res) {
     send(res, 200, { commands: out });
 }
 
+// ------------------------------------------------- рекламные серверы и монеты
+
+function serversPublic(req, res) {
+    const out = policy.servers
+        .filter(x => x.status === 'approved')
+        .map(x => ({ id: x.id, owner: x.owner, name: x.name, ip: x.ip,
+                     version: x.version, loader: x.loader, desc: x.desc, reward: x.reward || COIN_REWARD }));
+    send(res, 200, { servers: out });
+}
+
+function serverSubmit(req, res) {
+    readJsonBody(req, body => {
+        if (!body) return send(res, 400, { error: 'это не JSON' });
+        const nick = sessionNick(body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const name = clean(body.name, 60);
+        const ip = clean(body.ip, 80);
+        if (!name || !ip) return send(res, 400, { error: 'нужно название и адрес сервера' });
+
+        // один человек не заваливает очередь десятками заявок
+        const mine = policy.servers.filter(x => x.owner === nick && x.status === 'pending').length;
+        if (mine >= 5) return send(res, 429, { error: 'у вас уже 5 заявок на модерации' });
+
+        const entry = {
+            id: crypto.randomBytes(5).toString('hex'),
+            owner: nick,
+            name, ip,
+            version: clean(body.version, 32),
+            loader: clean(body.loader, 16),
+            desc: clean(body.desc, 300),
+            reward: COIN_REWARD,
+            status: 'pending',
+            at: now()
+        };
+        policy.servers.push(entry);
+        if (policy.servers.length > 500) policy.servers.shift();
+        savePolicy();
+        log('заявка на сервер-рекламу от', nick, ':', name);
+
+        send(res, 200, { ok: true, id: entry.id, status: 'pending' });
+    });
+}
+
+function serversMine(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const out = policy.servers.filter(x => x.owner === nick)
+            .map(x => ({ id: x.id, name: x.name, ip: x.ip, status: x.status, reason: x.reason || '' }));
+        send(res, 200, { servers: out });
+    });
+}
+
+function coinsEarn(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const server = policy.servers.find(x => x.id === body.serverId && x.status === 'approved');
+        if (!server) return send(res, 404, { error: 'это не одобренный рекламный сервер' });
+
+        const a = acc(nick);
+        const last = a.earned[server.id] || 0;
+        const left = COIN_COOLDOWN - (now() - last);
+
+        if (left > 0)
+            return send(res, 200, { ok: true, awarded: 0, coins: a.coins,
+                                    cooldownLeft: Math.ceil(left / 60000) });
+
+        const reward = server.reward || COIN_REWARD;
+        a.coins += reward;
+        a.earned[server.id] = now();
+        saveAccounts();
+        log('монеты:', nick, '+' + reward, 'за', server.name);
+
+        send(res, 200, { ok: true, awarded: reward, coins: a.coins });
+    });
+}
+
+function usernameChange(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+
+        const username = clean(body.username, 16);
+        if (!goodNick(username)) return send(res, 400, { error: 'ник: 3–16 латинских букв, цифр и _' });
+
+        const a = acc(nick);
+        if (a.username === username) return send(res, 400, { error: 'это и так ваш ник' });
+        if (a.coins < NAME_PRICE)
+            return send(res, 402, { error: 'нужно ' + NAME_PRICE + ' монет, у вас ' + a.coins });
+
+        a.coins -= NAME_PRICE;
+        a.username = username;
+        saveAccounts();
+        log('смена ника:', nick, '-> показывается как', username, '(-' + NAME_PRICE + ')');
+
+        send(res, 200, { ok: true, username, coins: a.coins });
+    });
+}
+
+// --- модерация серверов (админ)
+
+function adminServers(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        send(res, 200, { ok: true, servers: policy.servers.slice(-200) });
+    });
+}
+
+function adminServerDecide(req, res, approve) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const server = policy.servers.find(x => x.id === body.id);
+        if (!server) return send(res, 404, { error: 'нет такой заявки' });
+
+        server.status = approve ? 'approved' : 'rejected';
+        if (!approve) server.reason = clean(body.reason, 200);
+        if (approve && Number(body.reward) > 0) server.reward = Number(body.reward);
+        savePolicy();
+        log('сервер', server.name, approve ? 'одобрен' : 'отклонён');
+
+        send(res, 200, { ok: true });
+    });
+}
+
 function adminState(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
@@ -857,6 +1004,16 @@ const server = http.createServer((req, res) => {
 
     // --- админ-панель
     if (route === '/commands') return serverCommands(req, res);
+
+    // реклама серверов и монеты
+    if (route === '/servers') return serversPublic(req, res);
+    if (route === '/servers/submit' && req.method === 'POST') return serverSubmit(req, res);
+    if (route === '/servers/mine' && req.method === 'POST') return serversMine(req, res);
+    if (route === '/coins/earn' && req.method === 'POST') return coinsEarn(req, res);
+    if (route === '/username/change' && req.method === 'POST') return usernameChange(req, res);
+    if (route === '/admin/servers' && req.method === 'POST') return adminServers(req, res);
+    if (route === '/admin/server/approve' && req.method === 'POST') return adminServerDecide(req, res, true);
+    if (route === '/admin/server/reject' && req.method === 'POST') return adminServerDecide(req, res, false);
     if (route === '/admin/state' && req.method === 'POST') return adminState(req, res);
     if (route === '/admin/ban' && req.method === 'POST') return adminBan(req, res);
     if (route === '/admin/unban' && req.method === 'POST') return adminUnban(req, res);

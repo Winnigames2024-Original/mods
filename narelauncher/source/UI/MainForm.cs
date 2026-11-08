@@ -265,6 +265,29 @@ namespace NareLauncher.UI
             RefreshAdminNav();
         }
 
+        /// <summary>
+        /// Следит, чтобы у активного аккаунта была сессия на сервере. Нет
+        /// пароля — открывает окно ввода. Возвращает false, если так и не вошли.
+        /// </summary>
+        public bool EnsureAuth()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null) return false;
+            if (!string.IsNullOrEmpty(acc.Token)) return true;
+
+            using (var form = new AuthForm(acc))
+            {
+                form.ShowDialog(this);
+                if (form.Done)
+                {
+                    RefreshAccountChip();
+                    CheckPolicy();
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>Кнопка «Админ» видна только администратору.</summary>
         public void RefreshAdminNav()
         {
@@ -363,6 +386,10 @@ namespace NareLauncher.UI
             if (AccountStore.Accounts.Count == 0)
                 ManageAccounts();
 
+            // у активного аккаунта нет пароля на сервере — попросим сразу
+            var active = AccountStore.Selected;
+            if (active != null && string.IsNullOrEmpty(active.Token)) EnsureAuth();
+
             _guard.Tick += delegate { CheckPolicy(); };
             _guard.Start();
             CheckPolicy();
@@ -394,6 +421,16 @@ namespace NareLauncher.UI
             if (!policy.Known) return;
 
             NareAuth.Last = policy;
+
+            // сервер — хозяин игрового ника: подхватываем его на аккаунт
+            if (!string.IsNullOrEmpty(policy.Username) && acc != null
+                && !string.Equals(acc.Username, policy.Username, StringComparison.Ordinal)
+                && !string.Equals(policy.Username, acc.Name, StringComparison.Ordinal))
+            {
+                acc.Username = policy.Username;
+                AccountStore.Save();
+            }
+
             RefreshAdminNav();
 
             // бан

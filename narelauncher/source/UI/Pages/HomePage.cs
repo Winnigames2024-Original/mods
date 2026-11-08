@@ -456,6 +456,9 @@ namespace NareLauncher.UI.Pages
                 Invalidate();
             }
 
+            // у аккаунта должен быть пароль на сервере — иначе просим войти
+            if (string.IsNullOrEmpty(account.Token) && !Host.EnsureAuth()) return;
+
             if (GameLauncher.IsRunning)
             {
                 if (!Host.Confirm("Игра уже запущена. Запустить ещё одну копию?")) return;
