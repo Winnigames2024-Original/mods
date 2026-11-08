@@ -44,8 +44,8 @@ namespace NareLauncher.UI
         private long _chatSeen = -1;       // игрок: время последнего увиденного ответа админа
         private long _adminChatSeen = -1;  // админ: время последнего увиденного сообщения игрока
         private readonly System.Windows.Forms.Timer _guard = new System.Windows.Forms.Timer { Interval = 15000 };
-        private int _warnShown;          // сколько предупреждений уже показали за сессию
-        private long _broadcastShown;    // время последнего показанного объявления
+        private int _warnShown = -1;     // сколько предупреждений уже показали (с диска, на игрока)
+        private long _broadcastShown = -1; // время последнего показанного объявления (с диска)
         private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
         private long _updateHandledAt = -1; // время последнего отработанного экстренного обновления
         private bool _loggingOut;        // идёт выход после отвязки устройства
@@ -422,8 +422,8 @@ namespace NareLauncher.UI
             if (nick != _guardNick)      // сменили аккаунт — показываем всё заново
             {
                 _guardNick = nick;
-                _warnShown = 0;
-                _broadcastShown = 0;
+                _warnShown = -1;
+                _broadcastShown = -1;
                 _chatSeen = -1;
                 _adminChatSeen = -1;
             }
@@ -484,19 +484,30 @@ namespace NareLauncher.UI
             }
 
             // предупреждения — показываем новые
+            if (_warnShown < 0) _warnShown = (int)EmergencyMark.LoadKey("warns_" + nick);
+            if (_warnShown > policy.Warnings.Count) _warnShown = policy.Warnings.Count;
             for (int i = _warnShown; i < policy.Warnings.Count; i++)
             {
                 MessageBox.Show(this, policy.Warnings[i],
                     "Предупреждение от администратора", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-            _warnShown = policy.Warnings.Count;
-
-            // объявление для всех
-            if (policy.HasBroadcast && policy.BroadcastAt > _broadcastShown)
+            if (policy.Warnings.Count != _warnShown)
             {
-                _broadcastShown = policy.BroadcastAt;
-                MessageBox.Show(this, policy.Broadcast,
-                    "Объявление", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _warnShown = policy.Warnings.Count;
+                EmergencyMark.SaveKey("warns_" + nick, _warnShown);
+            }
+
+            // объявление для всех — один раз на каждого, даже после перезапуска
+            if (policy.HasBroadcast)
+            {
+                if (_broadcastShown < 0) _broadcastShown = EmergencyMark.LoadKey("broadcast");
+                if (policy.BroadcastAt > _broadcastShown)
+                {
+                    _broadcastShown = policy.BroadcastAt;
+                    EmergencyMark.SaveKey("broadcast", policy.BroadcastAt);
+                    MessageBox.Show(this, policy.Broadcast,
+                        "Объявление", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
 
             // экстренное обновление — срабатывает по времени объявления, а не по

@@ -37,5 +37,36 @@ namespace NareLauncher.Core
             }
             catch { }
         }
+
+        private static string FileFor(string key)
+        {
+            return Path.Combine(Paths.DataDir, key + ".at");
+        }
+
+        /// <summary>Отметка «последнее увиденное» по ключу (например «broadcast»).</summary>
+        public static long LoadKey(string key)
+        {
+            try
+            {
+                string f = FileFor(key);
+                if (File.Exists(f))
+                {
+                    long v;
+                    if (long.TryParse(File.ReadAllText(f).Trim(), out v)) return v;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
+        public static void SaveKey(string key, long at)
+        {
+            try
+            {
+                Directory.CreateDirectory(Paths.DataDir);
+                File.WriteAllText(FileFor(key), at.ToString());
+            }
+            catch { }
+        }
     }
 }
