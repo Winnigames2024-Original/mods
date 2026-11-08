@@ -44,6 +44,11 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _modBlock = new NareButton { Text = "Заблокировать мод", Style = BtnStyle.Danger, Size = new Size(190, 38) };
         private readonly NareButton _modUnblock = new NareButton { Text = "Разблокировать", Style = BtnStyle.Ghost, Size = new Size(160, 38) };
 
+        // модерация серверов
+        private readonly NareTextBox _srvId = new NareTextBox { Placeholder = "ID заявки сервера" };
+        private readonly NareButton _srvOk = new NareButton { Text = "Одобрить сервер", Style = BtnStyle.Success, Size = new Size(180, 38) };
+        private readonly NareButton _srvNo = new NareButton { Text = "Отклонить", Style = BtnStyle.Danger, Size = new Size(140, 38) };
+
         // экстренное обновление
         private readonly NareTextBox _updVer = new NareTextBox { Placeholder = "Версия (подтянется сама)" };
         private readonly NareTextBox _updLog = new NareTextBox { Placeholder = "Что нового (changelog)" };
@@ -51,7 +56,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _updCrit = new NareButton { Text = "Экстренное: закрыть всем через 30с", Style = BtnStyle.Danger, Size = new Size(300, 38) };
 
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
-        private readonly NareLabel[] _heads = new NareLabel[7];
+        private readonly NareLabel[] _heads = new NareLabel[8];
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly VirtualList _info = new VirtualList { ItemHeight = 26, EmptyText = "Пусто" };
 
@@ -62,7 +67,7 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_scroll);
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
-                "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "ОБНОВЛЕНИЕ", "" };
+                "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -75,6 +80,7 @@ namespace NareLauncher.UI.Pages
             Add(_broadcast); Add(_broadcastGo); Add(_command); Add(_commandGo);
             Add(_togNick); Add(_togOff); Add(_togOn);
             Add(_modId); Add(_modVer); Add(_modBlock); Add(_modUnblock);
+            Add(_srvId); Add(_srvOk); Add(_srvNo);
             Add(_updVer); Add(_updLog); Add(_updGo); Add(_updCrit);
             _scroll.Controls.Add(_status);
             _scroll.Controls.Add(_info);
@@ -102,6 +108,11 @@ namespace NareLauncher.UI.Pages
                 "Мод заблокирован");
             _modUnblock.Click += async (s, e) => await Do(() => NareAuth.BlockModAsync(Token, _modId.Text.Trim(), _modVer.Text.Trim(), false, Ct()),
                 "Мод разблокирован");
+
+            _srvOk.Click += async (s, e) => await Do(() => NareAuth.ApproveServerAsync(Token, _srvId.Text.Trim(), 0, Ct()),
+                "Сервер одобрен");
+            _srvNo.Click += async (s, e) => await Do(() => NareAuth.RejectServerAsync(Token, _srvId.Text.Trim(), "", Ct()),
+                "Сервер отклонён");
 
             _updGo.Click += async (s, e) => await Announce(false);
             _updCrit.Click += async (s, e) =>
@@ -192,6 +203,15 @@ namespace NareLauncher.UI.Pages
                 foreach (var m in state["mods"].Items)
                     items.Add("МОД БЛОК  " + m["id"].AsString("") + "  для  " + m["version"].AsString("*"));
 
+                try
+                {
+                    var servers = await NareAuth.AdminServersAsync(Token, Ct());
+                    foreach (var sv in servers)
+                        if (sv.Status == "pending")
+                            items.Add("ЗАЯВКА  " + sv.Id + "  " + sv.Name + "  (" + sv.Ip + ")");
+                }
+                catch { }
+
                 _info.SetItems(items);
             }
             catch (Exception ex) { _status.Text = "Сводка не пришла: " + ex.Message; }
@@ -203,6 +223,7 @@ namespace NareLauncher.UI.Pages
             if (line == null) return;
             Color c = line.StartsWith("БАН") ? Theme.Bad
                     : line.StartsWith("АПЕЛЛЯЦИЯ") ? Theme.Warn
+                    : line.StartsWith("ЗАЯВКА") ? Theme.Accent
                     : Theme.Muted;
             Theme.Text1(g, line, Theme.F(9f), c,
                 new Rectangle(r.X + 8, r.Y, r.Width - 16, r.Height));
@@ -240,6 +261,10 @@ namespace NareLauncher.UI.Pages
             _modId.SetBounds(pad, y, w, 36); y += 42;
             _modVer.SetBounds(pad, y, w, 36); y += 42;
             _modBlock.Location = new Point(pad, y); _modUnblock.Location = new Point(pad + 200, y); y += 54;
+
+            Row("МОДЕРАЦИЯ СЕРВЕРОВ", ref y);
+            _srvId.SetBounds(pad, y, w, 36); y += 42;
+            _srvOk.Location = new Point(pad, y); _srvNo.Location = new Point(pad + 196, y); y += 54;
 
             Row("ОБНОВЛЕНИЕ", ref y);
             _updVer.SetBounds(pad, y, w, 36); y += 42;

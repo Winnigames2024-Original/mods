@@ -34,6 +34,7 @@ namespace NareLauncher.UI
         public ConsolePage ConsoleTab;
         public TogetherPage TogetherTab;
         public AdminPage AdminTab;
+        public AdServersPage AdTab;
 
         private NareLabel _accountChip;
 
@@ -89,6 +90,7 @@ namespace NareLauncher.UI
             InstanceTab = new InstancePage { Host = this };
             ServersTab = new ServersPage { Host = this };
             TogetherTab = new TogetherPage { Host = this };
+            AdTab = new AdServersPage { Host = this };
             AdminTab = new AdminPage { Host = this };
             SkinTab = new SkinPage { Host = this };
             CosmeticsTab = new CosmeticsPage { Host = this };
@@ -107,6 +109,7 @@ namespace NareLauncher.UI
             _pages.Add(AccountsTab);
             _pages.Add(SettingsTab);
             _pages.Add(ConsoleTab);
+            _pages.Add(AdTab);
             _pages.Add(AdminTab);
 
             foreach (var p in _pages)
@@ -183,8 +186,8 @@ namespace NareLauncher.UI
 
         private void BuildSidebar()
         {
-            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Админ" };
-            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Settings };
+            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Публичные", "Админ" };
+            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Arrow, Ico.Settings };
 
             int y = 18;
             for (int i = 0; i < titles.Length; i++)

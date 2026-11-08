@@ -191,6 +191,9 @@
     <Compile Include="UI\Pages\InstancePage.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="UI\Pages\AdServersPage.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="UI\Pages\AdminPage.cs">
       <SubType>UserControl</SubType>
     </Compile>
