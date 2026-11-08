@@ -1,6 +1,14 @@
 {
-  "latest": "2.12.0",
+  "latest": "2.13.0",
   "releases": [
+    {
+      "version": "2.13.0",
+      "file": "forge_narevisuals-2.13.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.13.0.jar",
+      "sha1": "c1619644f287c395cbcc12efa7ac37b69e719c10",
+      "size": 824537,
+      "notes": "туннель поднимается сразу, а не после проверки порта — комната доступна через секунду"
+    },
     {
       "version": "2.12.0",
       "file": "forge_narevisuals-2.12.0.jar",

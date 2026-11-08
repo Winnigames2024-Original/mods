@@ -283,7 +283,18 @@ public final class NareTogether {
         reachable = json.has("reachable") && !json.get("reachable").isJsonNull()
                 ? json.get("reachable").getAsBoolean() : null;
 
-        if (Boolean.FALSE.equals(reachable) && !"tunnel".equals(mode)) startTunnel();
+        // Туннель поднимаем сразу, не дожидаясь проверки порта: иначе комната
+        // первые секунды висит «порт закрыт» и зайти в неё нельзя. Если потом
+        // окажется, что снаружи и так достаёт, туннель закроем.
+        if (!Boolean.TRUE.equals(reachable) && !"tunnel".equals(mode)) startTunnel();
+
+        if (Boolean.TRUE.equals(reachable) && tunnel != null) {
+            tunnel.interrupt();
+            tunnel = null;
+            mode = "direct";
+            shownPort = gamePort;
+            Forge_narevisuals.LOGGER.info("Порт открыт снаружи — туннель больше не нужен");
+        }
 
         note = "tunnel".equals(mode)
                 ? "гости идут через наш сервер: " + host() + ":" + shownPort

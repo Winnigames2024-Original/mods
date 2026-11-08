@@ -71,9 +71,9 @@ namespace NareLauncher.Core
             get
             {
                 if (Tunnel) return "через наш сервер";
-                if (Reachable == false) return "порт закрыт";
                 if (Reachable == true) return "напрямую";
-                return "проверяется";
+                if (Reachable == false) return "порт закрыт, туннель поднимается…";
+                return "проверяется, пара секунд";
             }
         }
 

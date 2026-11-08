@@ -1,8 +1,8 @@
 {
-  "version": "1.15",
+  "version": "1.16",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "9886450b51be0ccab99c26e5ec4b5f586c6a91d8",
+  "sha1": "1816acb3eec2b8619f05ac316a7b96c0c8ef3094",
   "size": 498688,
-  "notes": "сборный пункт «Вместе» переехал на 151.245.217.104:2445"
+  "notes": "«Играть» больше не гаснет молча, а говорит, почему пока нельзя; список обновляется чаще"
 }

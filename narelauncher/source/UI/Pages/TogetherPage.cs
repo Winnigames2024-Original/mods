@@ -47,7 +47,7 @@ namespace NareLauncher.UI.Pages
         private readonly List<NareButton> _hosts = new List<NareButton>();
 
         private readonly System.Windows.Forms.Timer _timer =
-            new System.Windows.Forms.Timer { Interval = 10000 };
+            new System.Windows.Forms.Timer { Interval = 5000 };
 
         private readonly List<Room> _list = new List<Room>();
         private CancellationTokenSource _cts;
@@ -213,7 +213,10 @@ namespace NareLauncher.UI.Pages
         private void Buttons()
         {
             var room = Current;
-            _play.Enabled = !_busy && room != null && room.Joinable;
+
+            // кнопку не гасим: пусть нажмётся и скажет, почему пока нельзя —
+            // потухшая кнопка без объяснений хуже отказа словами
+            _play.Enabled = !_busy && room != null;
             _refresh.Enabled = !_busy;
             _play.Invalidate();
             _refresh.Invalidate();
@@ -234,7 +237,11 @@ namespace NareLauncher.UI.Pages
 
             if (!room.Joinable)
             {
-                Say("У хозяина закрыт порт и туннель не поднят — зайти некуда.", Theme.Warn);
+                Say(room.Reachable == null
+                    ? "Хозяин только что открыл мир — сервер ещё проверяет порт. Пара секунд, и кнопка заработает."
+                    : "У хозяина закрыт порт, а туннель не поднялся. Пусть он в игре закроет и снова откроет мир.",
+                    Theme.Warn);
+
                 return;
             }
 
