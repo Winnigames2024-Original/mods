@@ -24,6 +24,8 @@ namespace NareLauncher.UI.Pages
         private readonly NareLabel _ramLabel = new NareLabel("", 10f, FontStyle.Bold);
 
         private readonly NareTextBox _jvmArgs = new NareTextBox { Placeholder = "Дополнительные аргументы JVM" };
+        private readonly NareTextBox _gameArgs = new NareTextBox
+        { Placeholder = "Аргументы игры — например --funtrolls2026" };
 
         private readonly NareTextBox _winW = new NareTextBox();
         private readonly NareTextBox _winH = new NareTextBox();
@@ -81,6 +83,7 @@ namespace NareLauncher.UI.Pages
 
             AddCaption("Аргументы JVM", "Для опытных пользователей");
             _scroll.Controls.Add(_jvmArgs);
+            _scroll.Controls.Add(_gameArgs);
 
             AddCaption("Окно игры", "Разрешение при запуске");
             _scroll.Controls.Add(_winW);
@@ -211,6 +214,7 @@ namespace NareLauncher.UI.Pages
             _ram.Value = s.RamMb;
             _ramLabel.Text = s.RamMb + " МБ";
             _jvmArgs.Text = s.JvmArgs;
+            _gameArgs.Text = s.GameArgs;
             _winW.Text = s.WindowWidth.ToString();
             _winH.Text = s.WindowHeight.ToString();
             _fullscreen.Checked = s.Fullscreen;
@@ -286,6 +290,7 @@ namespace NareLauncher.UI.Pages
 
             s.RamMb = _ram.Value;
             s.JvmArgs = _jvmArgs.Text ?? "";
+            s.GameArgs = (_gameArgs.Text ?? "").Trim();
             s.Fullscreen = _fullscreen.Checked;
             s.IsolateVersions = _isolate.Checked;
             s.CloseOnLaunch = _closeOnLaunch.Checked;
@@ -398,6 +403,9 @@ namespace NareLauncher.UI.Pages
             // JVM
             caption(0);
             _jvmArgs.SetBounds(pad, y, w, 38);
+            y += 48;
+
+            _gameArgs.SetBounds(pad, y, w, 38);
             y += 60;
 
             // Окно

@@ -269,6 +269,14 @@ namespace NareLauncher.Core
                 Log.Info("При входе мод выполнит: " + onJoin);
             }
 
+            // свои аргументы игры — как игрок их написал
+            foreach (var extra in SplitArgs(Settings.Current.GameArgs))
+            {
+                if (game.Contains(extra)) continue;
+                game.Add(Substitute(extra, vars));
+                Log.Info("Свой аргумент игре: " + extra);
+            }
+
             if (LockToServer && Settings.Current.Visuals)
             {
                 game.Add("--lockserver");

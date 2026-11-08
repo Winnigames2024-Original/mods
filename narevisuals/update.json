@@ -1,8 +1,8 @@
 {
-  "version": "2.14.0",
-  "file": "forge_narevisuals-2.14.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.14.0.jar",
-  "sha1": "2ab0b94c9a95acca313affc8b1f9973d3561a7ec",
-  "size": 825205,
-  "notes": "мир не переоткрывается на новом порту, старые туннели больше не живут вечно"
+  "version": "2.15.0",
+  "file": "forge_narevisuals-2.15.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.15.0.jar",
+  "sha1": "34ad9c6ad26e20a2fe807a4eb06c5a27258e2c9a",
+  "size": 825209,
+  "notes": "шутки включаются и аргументом игры, и свойством -Dnarevisuals.funtrolls2026"
 }

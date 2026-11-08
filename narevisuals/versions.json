@@ -1,6 +1,14 @@
 {
-  "latest": "2.14.0",
+  "latest": "2.15.0",
   "releases": [
+    {
+      "version": "2.15.0",
+      "file": "forge_narevisuals-2.15.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.15.0.jar",
+      "sha1": "34ad9c6ad26e20a2fe807a4eb06c5a27258e2c9a",
+      "size": 825209,
+      "notes": "шутки включаются и аргументом игры, и свойством -Dnarevisuals.funtrolls2026"
+    },
     {
       "version": "2.14.0",
       "file": "forge_narevisuals-2.14.0.jar",

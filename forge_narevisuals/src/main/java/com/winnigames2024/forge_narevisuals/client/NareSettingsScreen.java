@@ -230,7 +230,7 @@ public class NareSettingsScreen extends Screen {
                         () -> minecraft.setScreen(new NarePanelScreen(this))));
                 list.add(Row.label(NareNet.weAllowFun()
                         ? "Шутки разрешены аргументом запуска"
-                        : "Шутки выключены: нет аргумента --funtrolls2026"));
+                        : "Шутки выключены: нужен аргумент игры --funtrolls2026"));
 
                 list.add(Row.label("Подробности — в соседних разделах"));
             }

@@ -1,8 +1,8 @@
 {
-  "version": "1.16",
+  "version": "1.17",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "1816acb3eec2b8619f05ac316a7b96c0c8ef3094",
-  "size": 498688,
-  "notes": "«Играть» больше не гаснет молча, а говорит, почему пока нельзя; список обновляется чаще"
+  "sha1": "2dfa00cc44b0efb4d73ab599741a576644623f9e",
+  "size": 499200,
+  "notes": "своё поле для аргументов игры — для --funtrolls2026 и подобных"
 }

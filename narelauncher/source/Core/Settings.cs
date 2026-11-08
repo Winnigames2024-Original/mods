@@ -9,6 +9,13 @@ namespace NareLauncher.Core
         public string JavaPath = "";              // пусто = автопоиск
         public int RamMb = 4096;
         public string JvmArgs = "-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=20 -XX:MaxGCPauseMillis=50 -Dfile.encoding=UTF-8";
+
+        /// <summary>
+        /// Аргументы самой игры, а не JVM: например --funtrolls2026. Их место
+        /// после главного класса, поэтому в строку JVM их писать нельзя —
+        /// Java откажется запускаться с незнакомым ключом.
+        /// </summary>
+        public string GameArgs = "";
         public bool IsolateVersions = true;       // своя папка (и свои моды) для каждой версии
         public bool CloseOnLaunch = false;
         public bool ShowConsole = true;
@@ -78,6 +85,7 @@ namespace NareLauncher.Core
                 s.JavaPath = j["javaPath"].AsString(s.JavaPath);
                 s.RamMb = j["ramMb"].AsInt(s.RamMb);
                 s.JvmArgs = j["jvmArgs"].AsString(s.JvmArgs);
+                s.GameArgs = j["gameArgs"].AsString(s.GameArgs);
                 s.IsolateVersions = j["isolateVersions"].AsBool(s.IsolateVersions);
                 s.CloseOnLaunch = j["closeOnLaunch"].AsBool(s.CloseOnLaunch);
                 s.ShowConsole = j["showConsole"].AsBool(s.ShowConsole);
@@ -128,6 +136,7 @@ namespace NareLauncher.Core
                 j.Set("javaPath", s.JavaPath);
                 j.Set("ramMb", s.RamMb);
                 j.Set("jvmArgs", s.JvmArgs);
+                j.Set("gameArgs", s.GameArgs);
                 j.Set("isolateVersions", s.IsolateVersions);
                 j.Set("closeOnLaunch", s.CloseOnLaunch);
                 j.Set("showConsole", s.ShowConsole);

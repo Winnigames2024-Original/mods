@@ -105,7 +105,10 @@ public final class NareNet {
     }
 
     public static boolean weAllowFun() {
-        return has(FUN_ARG);
+        // Launch.flag смотрит и в аргументы игры, и в свойство
+        // -Dnarevisuals.funtrolls2026: аргументы игры в лаунчере отдельным
+        // полем, но кто-то вписывает флаг в строку JVM, и так тоже сработает.
+        return Launch.flag(FUN_ARG);
     }
 
     private static boolean has(String arg) {
