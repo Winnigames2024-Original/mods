@@ -22,8 +22,10 @@ namespace NareLauncher.UI
         private readonly Account _account;
 
         private readonly NareTextBox _password = new NareTextBox { Placeholder = "Пароль аккаунта (от 4 символов)" };
-        private readonly NareButton _save = new NareButton
-        { Text = "СОХРАНИТЬ", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(220, 46), Radius = 12 };
+        private readonly NareButton _login = new NareButton
+        { Text = "ВОЙТИ", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(200, 46), Radius = 12 };
+        private readonly NareButton _register = new NareButton
+        { Text = "РЕГИСТРАЦИЯ", Style = BtnStyle.Ghost, Size = new Size(200, 46), Radius = 12 };
         private readonly NareButton _closeX = new NareButton
         { Text = "", Style = BtnStyle.Ghost, Icon = Ico.Close, Size = new Size(40, 28), Radius = 8 };
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Warn);
@@ -55,24 +57,27 @@ namespace NareLauncher.UI
             {
                 if (e.KeyCode != Keys.Enter) return;
                 e.SuppressKeyPress = true;
-                Accept();
+                Go(false);
             };
             _password.Inner.TextChanged += (s, e) =>
             {
                 _status.Text = "";
-                _save.Enabled = _password.Text.Length > 0 && !_busy;
-                _save.Invalidate();
+                bool on = _password.Text.Length > 0 && !_busy;
+                _login.Enabled = on; _register.Enabled = on;
+                _login.Invalidate(); _register.Invalidate();
             };
 
-            _save.Click += (s, e) => Accept();
+            _login.Click += (s, e) => Go(false);
+            _register.Click += (s, e) => Go(true);
             _closeX.Click += (s, e) => Close();
 
             Controls.Add(_password);
-            Controls.Add(_save);
+            Controls.Add(_login);
+            Controls.Add(_register);
             Controls.Add(_closeX);
             Controls.Add(_status);
 
-            _save.Enabled = false;
+            _login.Enabled = false; _register.Enabled = false;
             Layout1();
         }
 
@@ -82,28 +87,24 @@ namespace NareLauncher.UI
             try { _password.Inner.Focus(); } catch { }
         }
 
-        private async void Accept()
+        private async void Go(bool register)
         {
             string password = _password.Text;
-            if (password.Length < 4)
-            {
-                Warn("Пароль — от 4 символов.");
-                return;
-            }
+            if (password.Length < 4) { Warn("Пароль — от 4 символов."); return; }
 
             _busy = true;
-            _save.Enabled = false;
-            _save.Invalidate();
+            _login.Enabled = false; _register.Enabled = false;
+            _login.Invalidate(); _register.Invalidate();
             _status.ForeColor = Theme.Muted;
-            _status.Text = "Проверяю на сервере…";
+            _status.Text = register ? "Регистрирую…" : "Вхожу…";
 
             NareAuth.LoginResult result = null;
             string problem = null;
-
             try
             {
-                try { result = await NareAuth.RegisterAsync(_account.Name, password, CancellationToken.None); }
-                catch { result = await NareAuth.LoginAsync(_account.Name, password, CancellationToken.None); }
+                result = register
+                    ? await NareAuth.RegisterAsync(_account.Name, password, CancellationToken.None)
+                    : await NareAuth.LoginAsync(_account.Name, password, CancellationToken.None);
             }
             catch (Exception ex) { problem = ex.Message; }
 
@@ -111,11 +112,16 @@ namespace NareLauncher.UI
 
             if (result == null)
             {
-                Warn(problem != null && problem.Contains("не подходят")
-                    ? "Пароль не подходит к этому аккаунту."
-                    : "Сервер недоступен: " + (problem ?? "нет связи"));
-                _save.Enabled = _password.Text.Length > 0;
-                _save.Invalidate();
+                string msg = problem ?? "нет связи";
+                if (register && msg.Contains("занят"))
+                    Warn("Ник уже зарегистрирован — нажмите «Войти».");
+                else if (!register && msg.Contains("не подходят"))
+                    Warn("Ник или пароль не подходят. Новый аккаунт — «Регистрация».");
+                else
+                    Warn(msg);
+                bool on = _password.Text.Length > 0;
+                _login.Enabled = on; _register.Enabled = on;
+                _login.Invalidate(); _register.Invalidate();
                 return;
             }
 
@@ -154,8 +160,8 @@ namespace NareLauncher.UI
 
             Theme.Text1(g, "Аккаунт " + _account.Name, Theme.F(15f, FontStyle.Bold), Theme.Text,
                 new Rectangle(24, TitleHeight + 18, Width - 48, 26));
-            Theme.Text1(g, "У этого аккаунта ещё нет пароля на сервере. Задайте его — "
-                + "он защитит аккаунт и откроет функции «Вместе», монеты и баны.",
+            Theme.Text1(g, "Войдите, если аккаунт уже есть, или зарегистрируйте его. "
+                + "Пароль защитит аккаунт и откроет «Вместе», монеты и чаты.",
                 Theme.F(9f), Theme.Muted, new Rectangle(24, TitleHeight + 46, Width - 48, 40));
 
             using (var pen = new Pen(Theme.Border))
@@ -188,7 +194,9 @@ namespace NareLauncher.UI
             int y = TitleHeight + 100;
             _password.SetBounds(pad, y, w, 40);
             _status.SetBounds(pad, y + 46, w, 20);
-            _save.Location = new Point(pad + (w - _save.Width) / 2, ClientSize.Height - _save.Height - 22);
+            int by = ClientSize.Height - _login.Height - 22;
+            _register.Location = new Point(pad, by);
+            _login.Location = new Point(ClientSize.Width - pad - _login.Width, by);
         }
     }
 }

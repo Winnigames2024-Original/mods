@@ -158,13 +158,16 @@ namespace NareLauncher.UI
             if (_admin)
             {
                 bool pub = string.Equals(_openNick, "Publish", StringComparison.Ordinal);
+                bool bugs = string.Equals(_openNick, "Bugs", StringComparison.Ordinal);
                 _who.Text = _openNick.Length == 0 ? "Выберите чат слева"
-                    : pub ? "📢 Publish — заявки на публикацию серверов"
+                    : pub ? "🤖 Publish — заявки на публикацию (кликните по тексту, чтобы скопировать)"
+                    : bugs ? "🤖 Bugs | Players — отчёты о вылетах (кликните по тексту, чтобы скопировать)"
                     : "Чат с " + _openNick + (_openBanned ? "  (в бане)" : "");
 
-                // обычные элементы прячем на Publish, и наоборот
-                _input.Visible = !pub; _send.Visible = !pub;
-                _unban.Visible = !pub; _staffPick.Visible = !pub; _assign.Visible = !pub;
+                // обычные элементы прячем на ботах; на Publish — кнопки заявок
+                bool chat = !pub && !bugs;
+                _input.Visible = chat; _send.Visible = chat;
+                _unban.Visible = chat; _staffPick.Visible = chat; _assign.Visible = chat;
                 _pubPick.Visible = pub; _pubOk.Visible = pub; _pubNo.Visible = pub;
 
                 _unban.Enabled = _openNick.Length > 0 && _openBanned;
@@ -267,10 +270,12 @@ namespace NareLauncher.UI
             if (selected) Theme.FillRound(g, box, 9, Color.FromArgb(46, Theme.Accent));
             else if (hover) Theme.FillRound(g, box, 9, Color.FromArgb(16, 255, 255, 255));
 
-            Theme.Text1(g, c.Nick, Theme.F(10.5f, FontStyle.Bold), Theme.Text,
+            bool bot = c.Nick == "Publish" || c.Nick == "Bugs";
+            string title = bot ? ("🤖 " + (c.Nick == "Bugs" ? "Bugs | Players" : "Publish")) : c.Nick;
+            Theme.Text1(g, title, Theme.F(10.5f, FontStyle.Bold), bot ? Theme.Accent : Theme.Text,
                 new Rectangle(box.X + 12, box.Y + 7, box.Width - 90, 20));
 
-            string prev = (c.LastAdmin ? "вы: " : "") + c.Last;
+            string prev = (c.LastAdmin && !bot ? "вы: " : "") + c.Last;
             Theme.Text1(g, prev, Theme.F(8.5f), Theme.Dim,
                 new Rectangle(box.X + 12, box.Y + 28, box.Width - 24, 18));
 

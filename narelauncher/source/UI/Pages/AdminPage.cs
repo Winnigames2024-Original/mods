@@ -79,6 +79,8 @@ namespace NareLauncher.UI.Pages
         // сброс входа
         private readonly NareDropDown _logoutNick = new NareDropDown();
         private readonly NareButton _logoutBtn = new NareButton { Text = "Сбросить вход (выйти со всех устройств)", Style = BtnStyle.Danger, Size = new Size(360, 38) };
+        private readonly NareTextBox _passBox = new NareTextBox { Placeholder = "Новый пароль (от 4 знаков)" };
+        private readonly NareButton _passBtn = new NareButton { Text = "Поставить новый пароль", Style = BtnStyle.Accent, Size = new Size(240, 38) };
 
         private readonly NareLabel _statLine = new NareLabel("", 9.5f, FontStyle.Bold, Theme.Muted);
 
@@ -102,7 +104,7 @@ namespace NareLauncher.UI.Pages
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
                 "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",
-                "МОНЕТЫ", "ПРАВА: АДМИН / МОДЕРАТОР", "ИГРОВОЙ НИК", "СБРОС ВХОДА", "" };
+                "МОНЕТЫ", "ПРАВА: АДМИН / МОДЕРАТОР", "ИГРОВОЙ НИК", "СБРОС ВХОДА И ПАРОЛЬ", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -122,7 +124,7 @@ namespace NareLauncher.UI.Pages
                 "Игрок (монеты)", "Сколько монет (можно с минусом)",
                 "Игрок (права админа)", "Роль",
                 "Игрок (сменить ник)", "Новый игровой ник",
-                "Игрок (сбросить вход)"
+                "Игрок (сбросить вход)", "Новый пароль игроку"
             };
             foreach (var c in caps)
             {
@@ -152,6 +154,7 @@ namespace NareLauncher.UI.Pages
             Add(_rightsNick); Add(_rolePick); Add(_grantBtn); Add(_revokeBtn);
             Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
             Add(_logoutNick); Add(_logoutBtn);
+            Add(_passBox); Add(_passBtn);
             _rolePick.SetItems(new System.Collections.Generic.List<string> { "Админ", "Модератор" }, "Админ");
             _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
@@ -263,6 +266,16 @@ namespace NareLauncher.UI.Pages
                     int k = await NareAuth.AdminLogoutAsync(Token, nick, Ct());
                     _status.Text = "Сброшен вход у " + nick + " (устройств: " + k + ")";
                 }, null);
+            };
+            _passBtn.Click += async (s, e) =>
+            {
+                string nick = Pick(_logoutNick);
+                string pw = _passBox.Text;
+                if (nick.Length == 0) { _status.Text = "Выберите игрока."; return; }
+                if (pw.Length < 4) { _status.Text = "Пароль — от 4 знаков."; return; }
+                await Do(() => NareAuth.AdminSetPassAsync(Token, nick, pw, Ct()),
+                    "Новый пароль поставлен игроку " + nick + ". Старый больше не действует.");
+                _passBox.Text = "";
             };
 
             Layout1();
@@ -536,9 +549,11 @@ namespace NareLauncher.UI.Pages
             Field(_setNickBox, pad, w, ref y);
             _setNickBtn.Location = new Point(pad, y); y += 54;
 
-            Row("СБРОС ВХОДА", ref y);
+            Row("СБРОС ВХОДА И ПАРОЛЬ", ref y);
             Field(_logoutNick, pad, w, ref y);
-            _logoutBtn.Location = new Point(pad, y); y += 54;
+            _logoutBtn.Location = new Point(pad, y); y += 48;
+            Field(_passBox, pad, w, ref y);
+            _passBtn.Location = new Point(pad, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 

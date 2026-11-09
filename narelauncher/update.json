@@ -1,8 +1,8 @@
 {
-  "version": "1.39",
+  "version": "1.40",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "1df51f6daac053c27609c14a4f37589684e7bec2",
-  "size": 660480,
-  "notes": "Копирование сообщений в чатах (клик), бот Publish с приёмом/отклонением заявок, роль модератора и выдача ролей, список админов/модеров в «Передать»"
+  "sha1": "62353e264b254e812dc86f1cd68741afe1b27231",
+  "size": 663552,
+  "notes": "Кнопки Регистрация и Вход, боты Bugs и Publish отдельными каналами, админ может сбросить пароль игроку; фикс: смена пароля больше не сбрасывает монеты/устройства"
 }

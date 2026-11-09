@@ -472,6 +472,8 @@ namespace NareLauncher.Core
         {
             public string From = "";
             public bool Admin;
+            public bool Bot;
+            public string ServerId = "";   // для заявок бота Publish — id сервера
             public string Text = "";
             public long At;
         }
@@ -484,6 +486,8 @@ namespace NareLauncher.Core
                 {
                     From = m["from"].AsString(""),
                     Admin = m["admin"].AsBool(false),
+                    Bot = m["bot"].AsBool(false),
+                    ServerId = m["serverId"].AsString(""),
                     Text = m["text"].AsString(""),
                     At = m["at"].AsLong(0)
                 });
@@ -609,6 +613,15 @@ namespace NareLauncher.Core
             body.Set("nick", nick);
             body.Set("username", username);
             await PostAsync("/admin/setnick", body, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>Админ ставит игроку новый пароль (старый не показывается — он хранится хэшем).</summary>
+        public static async Task AdminSetPassAsync(string token, string nick, string password, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            body.Set("password", password);
+            await PostAsync("/admin/setpass", body, ct).ConfigureAwait(false);
         }
 
         /// <summary>Игра вылетела — отправляем лог случайному админу через бота.</summary>

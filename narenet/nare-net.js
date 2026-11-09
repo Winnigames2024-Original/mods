@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.14';
+const VERSION = '1.15';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -685,7 +685,7 @@ function accountPassword(req, res) {
             return send(res, 400, { error: 'новый пароль: от 4 до 100 знаков' });
 
         const made = makeHash(body.newPassword);
-        accounts[nick] = { salt: made.salt, hash: made.hash, created: record.created };
+        record.salt = made.salt; record.hash = made.hash;   // остальное (монеты, устройства, ники) сохраняем
         saveAccounts();
         log('пароль сменён:', nick);
 
@@ -1024,17 +1024,13 @@ function crashReport(req, res) {
         let text = String(body.log || '').slice(-1800);     // хвост лога — там обычно ошибка
         if (!text.trim()) text = 'Игра закрылась с ошибкой, лог пустой.';
 
-        const admins = adminNicks();
-        const pick = admins[Math.floor(Math.random() * admins.length)];
-
-        const list = chatList(nick);
+        const list = chatList('Bugs');
         list.push({ from: 'Bugs | Players', admin: false, bot: true,
                     text: '⚠ Ошибка старта игры у ' + nick + ':\n' + text, at: now() });
         if (list.length > 200) list.shift();
-        policy.chatAssign[nick] = pick;
         savePolicy();
-        log('краш-репорт от', nick, '-> админу', pick);
-        send(res, 200, { ok: true, to: pick });
+        log('краш-репорт от', nick, '-> в канал Bugs');
+        send(res, 200, { ok: true });
     });
 }
 
@@ -1269,6 +1265,30 @@ function adminCoins(req, res) {
 }
 
 /** Поставить игроку игровой ник (username) — с проверкой занятости. */
+function adminSetPass(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        const record = accounts[nick];
+        if (!record) return send(res, 404, { error: 'нет такого аккаунта' });
+        if (!goodPassword(body.password)) return send(res, 400, { error: 'пароль: от 4 до 100 знаков' });
+
+        const made = makeHash(body.password);
+        record.salt = made.salt; record.hash = made.hash;
+        const a = acc(nick);
+        for (const id of Object.keys(a.devices)) {
+            const d = a.devices[id];
+            if (d && d.token) sessions.delete(d.token);
+        }
+        a.devices = {};
+        for (const [tok, se] of sessions) if (se.nick === nick) sessions.delete(tok);
+        saveAccounts();
+        log('админ сменил пароль у', nick);
+        send(res, 200, { ok: true });
+    });
+}
+
 function adminSetNick(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
@@ -1377,11 +1397,11 @@ function serverSubmit(req, res) {
 
         // бот Publish: кладём запрос в общий чат модерации
         const pub = chatList('Publish');
-        pub.push({ from: 'Publish', admin: false, bot: true,
+        pub.push({ from: 'Publish', admin: false, bot: true, serverId: entry.id,
                    text: '📢 Запрос на публикацию сервера\n' + name + '  (' + (entry.hideIp ? 'IP скрыт' : ip) + ')\n'
                          + (entry.version ? ('версия ' + entry.version + '\n') : '')
                          + (entry.desc ? (entry.desc + '\n') : '')
-                         + 'от ' + nick + '  ·  id: ' + entry.id, at: now() });
+                         + 'от ' + nick, at: now() });
         if (pub.length > 200) pub.shift();
 
         savePolicy();
@@ -1555,6 +1575,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/pending' && req.method === 'POST') return adminPending(req, res);
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
+    if (route === '/admin/setpass' && req.method === 'POST') return adminSetPass(req, res);
     if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);
     if (route === '/crash' && req.method === 'POST') return crashReport(req, res);
 
