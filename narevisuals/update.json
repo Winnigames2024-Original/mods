@@ -1,8 +1,8 @@
 {
-  "version": "2.22.0",
-  "file": "forge_narevisuals-2.22.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.22.0.jar",
-  "sha1": "f22b72e79a9097e2f80769930de9532a4bc63618",
-  "size": 848176,
-  "notes": "Команды (/ntp, /rtp, дома, /vc) теперь гарантированно работают на локальном сервере «Вместе»: регистрация и при старте сервера, а не только через RegisterCommandsEvent (мод клиентский)"
+  "version": "2.23.0",
+  "file": "forge_narevisuals-2.23.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.23.0.jar",
+  "sha1": "2bfd20ae8aa4651529f164012d68c983681afa81",
+  "size": 852933,
+  "notes": "Команды из веб-панели теперь выполняются и в мирах «Вместе» без плагина (мод-хост забирает их по токену комнаты). Добавлены /invsee (чужой инвентарь) и авто-еда при голоде"
 }

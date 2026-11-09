@@ -303,8 +303,46 @@ public final class NareTogether {
                 if (s != null) applyViewDistance(s);
             } catch (Throwable ignore) {}
 
+            // команды из веб-панели для этого мира «Вместе» (без плагина)
+            try { pullWorldCommands(); } catch (Throwable ignore) {}
+
             try { Thread.sleep(BEAT); } catch (InterruptedException e) { return; }
         }
+    }
+
+    /** Забрать команды, поставленные админом для этого мира в панели, и выполнить их. */
+    private static void pullWorldCommands() {
+        if (token.isEmpty()) return;
+        MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
+        if (server == null) return;
+
+        String answer;
+        try {
+            JsonObject body = new JsonObject();
+            body.addProperty("token", token);
+            answer = post("/world/commands", body.toString());
+        } catch (Exception e) {
+            return; // сервер недоступен — тихо
+        }
+
+        try {
+            JsonObject json = JsonParser.parseString(answer).getAsJsonObject();
+            if (!json.has("commands")) return;
+            com.google.gson.JsonArray arr = json.getAsJsonArray("commands");
+            if (arr.size() == 0) return;
+            java.util.List<String> cmds = new java.util.ArrayList<>();
+            for (int i = 0; i < arr.size(); i++) cmds.add(arr.get(i).getAsString());
+            server.execute(() -> {
+                for (String c : cmds) {
+                    try {
+                        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), c);
+                        Forge_narevisuals.LOGGER.info("Вместе: выполнил команду из панели: {}", c);
+                    } catch (Throwable t) {
+                        Forge_narevisuals.LOGGER.warn("команда из панели не выполнилась: {}", t.toString());
+                    }
+                }
+            });
+        } catch (Exception ignore) { }
     }
 
     private static int lastVd = -1;

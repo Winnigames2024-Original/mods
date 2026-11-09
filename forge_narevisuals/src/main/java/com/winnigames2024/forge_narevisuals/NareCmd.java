@@ -13,6 +13,11 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -40,6 +45,11 @@ public final class NareCmd {
             return builder.buildFuture();
         }
     };
+
+    private static final SuggestionProvider<CommandSourceStack> ONLINE = (ctx, builder) ->
+            SharedSuggestionProvider.suggest(
+                    ctx.getSource().getServer().getPlayerList().getPlayers().stream()
+                            .map(pl -> pl.getGameProfile().getName()), builder);
 
     // Обычный путь — для серверов, где мод полноценный.
     @SubscribeEvent
@@ -79,6 +89,30 @@ public final class NareCmd {
                 .executes(ctx -> vchest(ctx.getSource())));
         d.register(Commands.literal("vc").requires(s -> true)
                 .executes(ctx -> vchest(ctx.getSource())));
+
+        d.register(Commands.literal("invsee").requires(s -> true)
+                .then(Commands.argument("игрок", StringArgumentType.word()).suggests(ONLINE)
+                        .executes(ctx -> invsee(ctx.getSource(), StringArgumentType.getString(ctx, "игрок")))));
+    }
+
+    private static int invsee(CommandSourceStack src, String name) {
+        ServerPlayer me;
+        try { me = src.getPlayerOrException(); } catch (Exception ex) { return 0; }
+        ServerPlayer target = me.server.getPlayerList().getPlayerByName(name);
+        if (target == null) { src.sendFailure(Component.literal("Игрок «" + name + "» не в сети")); return 0; }
+
+        final Inventory inv = target.getInventory();
+        final SimpleContainer view = new SimpleContainer(36);
+        for (int i = 0; i < 36; i++) view.setItem(i, inv.getItem(i));
+        // правки возвращаем в настоящий инвентарь игрока
+        view.addListener(cont -> {
+            for (int i = 0; i < 36; i++) inv.setItem(i, cont.getItem(i));
+            inv.setChanged();
+        });
+        me.openMenu(new SimpleMenuProvider(
+                (id, pinv, pl) -> new ChestMenu(MenuType.GENERIC_9x4, id, pinv, view, 4),
+                Component.literal("Инвентарь: " + name)));
+        return 1;
     }
 
     private static int vchest(CommandSourceStack src) {

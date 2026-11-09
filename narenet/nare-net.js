@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.26';
+const VERSION = '1.27';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -482,7 +482,8 @@ const policy = loadJson(POLICY_FILE, {
     update: null,                               // { version, changelog, critical, at } — всем
     updateTargets: {},                          // nick -> { version, changelog, critical, at } — точечно
     broadcast: null,                            // { text, at }
-    commands: [],                               // очередь команд серверу
+    commands: [],                               // очередь команд серверу (плагин WMine)
+    worldCommands: {},                          // nick хоста -> [команды] для его мира «Вместе» (без плагина)
     appeals: [],                                // [ { nick, text, at } ]
     servers: [],                                // рекламные серверы на модерации/одобренные
     chats: {},                                  // nick -> [ { from, text, at } ]: переписка
@@ -494,6 +495,7 @@ const policy = loadJson(POLICY_FILE, {
 });
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
+if (!policy.worldCommands) policy.worldCommands = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -1019,8 +1021,14 @@ function startLogs(){ if(logTimer)clearInterval(logTimer); pollLogs(); loadWorld
 function stopLogs(){ if(logTimer){clearInterval(logTimer);logTimer=null;} }
 function clearView(){ var c=document.getElementById("console"); if(c)c.innerHTML=""; }
 function cmsg(t,ok){var m=document.getElementById("cmsg");m.textContent=t||"";m.className=ok?"ok":"err";}
-function queue(text){return api("/admin/command",{text:text}).then(function(d){
-  if(d.ok)cmsg("отправлено: /"+text,true);else cmsg(d.error||"ошибка (нужны права админа)",false);});}
+function queue(text){
+  var sel=document.getElementById("worldsel");
+  var host=sel?sel.value:"";
+  var path=host?"/admin/worldcommand":"/admin/command";
+  var body=host?{host:host,text:text}:{text:text};
+  return api(path,body).then(function(d){
+    if(d.ok)cmsg("отправлено"+(host?(" в мир «"+host+"» (Вместе)"):" на WMine")+": /"+text,true);
+    else cmsg(d.error||"ошибка (нужны права админа)",false);});}
 function runCmd(){var t=document.getElementById("ct").value.trim();var c=document.getElementById("cc").value.trim();
   if(!c){cmsg("введите команду",false);return;}
   var full=t?("execute as "+t+" at "+t+" run "+c):c; queue(full); document.getElementById("cc").value="";}
@@ -1346,6 +1354,37 @@ function serverCommands(req, res) {
     if (policy.commands.length > 0) { policy.commands = []; savePolicy(); }
 
     send(res, 200, { commands: out });
+}
+
+/** Админ ставит команду в очередь конкретного мира «Вместе» (хоста) — без плагина. */
+function adminWorldCommand(req, res) {
+    readJsonBody(req, body => {
+        if (!needStaff(body, res)) return;
+        const host = clean(body.host, 32);
+        const text = clean(body.text, 300);
+        if (!host) return send(res, 400, { error: 'не указан игрок/мир' });
+        if (!text) return send(res, 400, { error: 'пустая команда' });
+        if (!policy.worldCommands) policy.worldCommands = {};
+        if (!policy.worldCommands[host]) policy.worldCommands[host] = [];
+        policy.worldCommands[host].push(text);
+        if (policy.worldCommands[host].length > 100) policy.worldCommands[host].shift();
+        savePolicy();
+        log('команда для мира', host, 'поставлена в очередь:', text);
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Мод-хост забирает команды для своего мира «Вместе». Авторизация — токеном комнаты. */
+function worldCommandsPull(req, res) {
+    readJsonBody(req, body => {
+        const tok = body && body.token;
+        const room = tok ? rooms.get(tok) : null;
+        if (!room) return send(res, 403, { error: 'нет такой комнаты' });
+        const nick = room.nick;
+        const list = (policy.worldCommands && policy.worldCommands[nick]) || [];
+        if (list.length > 0) { policy.worldCommands[nick] = []; savePolicy(); }
+        send(res, 200, { commands: list });
+    });
 }
 
 // ------------------------------------------------- подаккаунты (игровые ники)
@@ -2245,6 +2284,8 @@ const server = http.createServer((req, res) => {
 
     // --- админ-панель
     if (route === '/commands') return serverCommands(req, res);
+    if (route === '/admin/worldcommand' && req.method === 'POST') return adminWorldCommand(req, res);
+    if (route === '/world/commands' && req.method === 'POST') return worldCommandsPull(req, res);
 
     // реклама серверов и монеты
     if (route === '/servers') return serversPublic(req, res);
