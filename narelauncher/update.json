@@ -1,8 +1,8 @@
 {
-  "version": "1.41",
+  "version": "1.42",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "4c743b8b238120f94a2c409cc34bfda1ea837210",
-  "size": 665088,
-  "notes": "Админка: удаление аккаунта игрока"
+  "sha1": "84348bad39998fcd3fb28bde26c2fb4a3964897b",
+  "size": 668160,
+  "notes": "Админка: выдача временного пароля игроку (оригинальный тоже работает) — для забытых паролей"
 }

@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.16';
+const VERSION = '1.17';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -497,6 +497,21 @@ function checkPassword(password, record) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/** Подходит ли пароль как основной ИЛИ как временный (выданный админом). */
+function checkAnyPassword(password, record) {
+    if (checkPassword(password, record)) return true;
+    if (record && record.temp && checkPassword(password, record.temp)) return true;
+    return false;
+}
+
+/** Короткий человекочитаемый временный пароль. */
+function makeTempPass() {
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let s = '';
+    for (let i = 0; i < 8; i++) s += abc[crypto.randomBytes(1)[0] % abc.length];
+    return s;
+}
+
 function goodNick(nick) {
     return typeof nick === 'string' && /^[A-Za-z0-9_]{3,16}$/.test(nick);
 }
@@ -666,7 +681,7 @@ function accountLogin(req, res) {
 
         const nick = clean(body.nick, 16);
         const record = accounts[nick];
-        if (!record || !checkPassword(body.password, record))
+        if (!record || !checkAnyPassword(body.password, record))
             return send(res, 403, { error: 'ник или пароль не подходят' });
 
         send(res, 200, { ok: true, nick, token: openSession(nick, body.device), admin: nick === ADMIN });
@@ -679,13 +694,14 @@ function accountPassword(req, res) {
 
         const nick = clean(body.nick, 16);
         const record = accounts[nick];
-        if (!record || !checkPassword(body.password, record))
+        if (!record || !checkAnyPassword(body.password, record))
             return send(res, 403, { error: 'старый пароль не подходит' });
         if (!goodPassword(body.newPassword))
             return send(res, 400, { error: 'новый пароль: от 4 до 100 знаков' });
 
         const made = makeHash(body.newPassword);
         record.salt = made.salt; record.hash = made.hash;   // остальное (монеты, устройства, ники) сохраняем
+        delete record.temp;   // сменил пароль — временный больше не нужен
         saveAccounts();
         log('пароль сменён:', nick);
 
@@ -1298,6 +1314,33 @@ function adminDelete(req, res) {
     });
 }
 
+function adminTempPass(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        const record = accounts[nick];
+        if (!record) return send(res, 404, { error: 'нет такого аккаунта' });
+
+        // убрать временный пароль
+        if (body.clear === true) {
+            delete record.temp;
+            saveAccounts();
+            log('временный пароль убран у', nick);
+            return send(res, 200, { ok: true, cleared: true });
+        }
+
+        // задать: свой или сгенерировать
+        let pass = typeof body.password === 'string' && body.password.length >= 4 ? body.password : makeTempPass();
+        const made = makeHash(pass);
+        record.temp = { salt: made.salt, hash: made.hash };
+        saveAccounts();
+        log('выдан временный пароль игроку', nick);
+        // отдаём админу открытый временный пароль, чтобы передать игроку (оригинал при этом не раскрывается)
+        send(res, 200, { ok: true, password: pass });
+    });
+}
+
 function adminSetPass(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
@@ -1309,6 +1352,7 @@ function adminSetPass(req, res) {
 
         const made = makeHash(body.password);
         record.salt = made.salt; record.hash = made.hash;
+        delete record.temp;
         const a = acc(nick);
         for (const id of Object.keys(a.devices)) {
             const d = a.devices[id];
@@ -1609,6 +1653,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
     if (route === '/admin/setpass' && req.method === 'POST') return adminSetPass(req, res);
+    if (route === '/admin/temppass' && req.method === 'POST') return adminTempPass(req, res);
     if (route === '/admin/delete' && req.method === 'POST') return adminDelete(req, res);
     if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);
     if (route === '/crash' && req.method === 'POST') return crashReport(req, res);

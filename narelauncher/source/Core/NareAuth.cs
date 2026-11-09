@@ -624,6 +624,16 @@ namespace NareLauncher.Core
             await PostAsync("/admin/setpass", body, ct).ConfigureAwait(false);
         }
 
+        /// <summary>Админ выдаёт игроку временный пароль (оригинальный тоже продолжит работать). Возвращает выданный пароль.</summary>
+        public static async Task<string> AdminTempPassAsync(string token, string nick, string password, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            if (!string.IsNullOrEmpty(password)) body.Set("password", password);
+            var j = await PostAsync("/admin/temppass", body, ct).ConfigureAwait(false);
+            return j["password"].AsString("");
+        }
+
         /// <summary>Админ удаляет аккаунт игрока.</summary>
         public static async Task AdminDeleteAsync(string token, string nick, CancellationToken ct)
         {
