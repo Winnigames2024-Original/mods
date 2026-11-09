@@ -100,6 +100,7 @@
     <Compile Include="Core\BlockModel.cs" />
     <Compile Include="Core\ModSourcesExtra.cs" />
     <Compile Include="Core\Net.cs" />
+    <Compile Include="Core\Translate.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\SkinDocument.cs" />
@@ -148,6 +149,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="UI\ChatView.cs" />
+    <Compile Include="UI\InputPrompt.cs" />
     <Compile Include="UI\Toast.cs" />
     <Compile Include="UI\BanOverlay.cs">
       <SubType>Form</SubType>

@@ -40,6 +40,25 @@ namespace NareLauncher.UI
             _send.Click += (s, e) => Send();
             _input.Inner.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Send(); } };
 
+            _chat.EditRequested += async (m, nt) =>
+            {
+                if (string.IsNullOrEmpty(Token) || string.IsNullOrEmpty(m.Id)) return;
+                await NareAuth.ChatEditAsync(Token, _nick, m.Id, nt, CancellationToken.None);
+                await Refresh();
+            };
+            _chat.DeleteRequested += async (m) =>
+            {
+                if (string.IsNullOrEmpty(Token) || string.IsNullOrEmpty(m.Id)) return;
+                await NareAuth.ChatDeleteAsync(Token, _nick, m.Id, CancellationToken.None);
+                await Refresh();
+            };
+            _chat.TranslateRequested += async (m) =>
+            {
+                if (string.IsNullOrEmpty(m.Text)) return;
+                try { var tr = await Translate.TextAsync(m.Text, CancellationToken.None); InputPrompt.Info(FindForm(), "Перевод", tr); }
+                catch { }
+            };
+
             _poll.Tick += async delegate { if (Visible) await Refresh(); };
 
             Resize += (s, e) => Place();
@@ -78,6 +97,8 @@ namespace NareLauncher.UI
 
         private void Fill(System.Collections.Generic.List<NareAuth.ChatMessage> msgs)
         {
+            _chat.MeNick = _nick;
+            _chat.IsStaff = false;
             _chat.SetMessages(msgs, false, _nick);
         }
 

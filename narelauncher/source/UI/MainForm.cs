@@ -42,6 +42,7 @@ namespace NareLauncher.UI
 
         private BanOverlay _banOverlay;
         private ToastHost _toasts;
+        private NotifyIcon _tray;
         private long _chatSeen = -1;       // игрок: время последнего увиденного ответа админа
         private long _adminChatSeen = -1;  // админ: время последнего увиденного сообщения игрока
         private readonly System.Windows.Forms.Timer _guard = new System.Windows.Forms.Timer { Interval = 15000 };
@@ -85,6 +86,20 @@ namespace NareLauncher.UI
 
             _toasts = new ToastHost();
             _content.Controls.Add(_toasts);
+
+            // системный значок в трее — для уведомлений Windows (как у Telegram)
+            try
+            {
+                _tray = new NotifyIcon
+                {
+                    Icon = this.Icon ?? System.Drawing.SystemIcons.Application,
+                    Text = "Nare Launcher",
+                    Visible = true
+                };
+                _tray.BalloonTipClicked += (s, e) => { ShowFromTray(); OpenChats(); };
+                _tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowFromTray(); };
+            }
+            catch { _tray = null; }
 
             // порядок важен: Fill добавляется первым
             Controls.Add(_content);
@@ -554,7 +569,7 @@ namespace NareLauncher.UI
                     {
                         _adminChatSeen = maxAt;
                         var who = newest.Nick;
-                        _toasts.Push(who + " написал", newest.Last, () => OpenChats());
+                        Notify(who + " написал", newest.Last);
                     }
                 }
                 else
@@ -568,7 +583,7 @@ namespace NareLauncher.UI
                     else if (maxAt > _chatSeen && newest != null)
                     {
                         _chatSeen = maxAt;
-                        _toasts.Push("Ответ администратора", newest.Text, () => OpenChats());
+                        Notify("Ответ администратора", newest.Text);
                     }
                 }
             }
@@ -580,6 +595,35 @@ namespace NareLauncher.UI
         {
             int i = _pages.IndexOf(ChatsTab);
             if (i >= 0) Navigate(i);
+        }
+
+        private void ShowFromTray()
+        {
+            try
+            {
+                if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+                Show();
+                Activate();
+                BringToFront();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Уведомление о новом сообщении: всплывашка в окне + системное уведомление
+        /// Windows в трее (как у Telegram) + звук.
+        /// </summary>
+        public void Notify(string title, string body)
+        {
+            if (_toasts != null) _toasts.Push(title, body, () => OpenChats());
+
+            // системное уведомление Windows — показываем, когда окно не в фокусе
+            bool focused = (ActiveForm == this) && WindowState != FormWindowState.Minimized;
+            if (_tray != null && !focused)
+            {
+                try { _tray.ShowBalloonTip(5000, title, body ?? "", ToolTipIcon.Info); } catch { }
+            }
+            try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
         }
 
         /// <summary>Пока игрок в «Чатах», новые сообщения не всплывают.</summary>
@@ -615,6 +659,7 @@ namespace NareLauncher.UI
         {
             Settings.Save();
             AccountStore.Save();
+            try { if (_tray != null) { _tray.Visible = false; _tray.Dispose(); _tray = null; } } catch { }
             base.OnFormClosing(e);
         }
 

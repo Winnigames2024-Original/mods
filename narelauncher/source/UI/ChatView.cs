@@ -35,6 +35,94 @@ namespace NareLauncher.UI
         /// <summary>Нажата inline-кнопка: (serverId, approve).</summary>
         public event Action<string, bool> Action;
 
+        /// <summary>Ник текущего пользователя — чтобы решать, что можно со своим сообщением.</summary>
+        public string MeNick = "";
+        /// <summary>Текущий пользователь — админ/модератор (может править/удалять чужое).</summary>
+        public bool IsStaff;
+
+        /// <summary>Правка сообщения: (сообщение, новый текст).</summary>
+        public event Action<NareAuth.ChatMessage, string> EditRequested;
+        /// <summary>Удаление сообщения.</summary>
+        public event Action<NareAuth.ChatMessage> DeleteRequested;
+        /// <summary>Перевод сообщения (обрабатывает хост — показывает результат).</summary>
+        public event Action<NareAuth.ChatMessage> TranslateRequested;
+
+        private Row RowAt(Point p)
+        {
+            foreach (var r in _rows)
+            {
+                var b = new Rectangle(r.Bubble.X, r.Bubble.Y - _scroll, r.Bubble.Width, r.Bubble.Height);
+                if (b.Contains(p)) return r;
+            }
+            return null;
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (e.Button != MouseButtons.Right) return;
+            var r = RowAt(e.Location);
+            if (r == null) return;
+            var m = r.Msg;
+
+            var menu = new ContextMenuStrip();
+            menu.Renderer = new ToolStripProfessionalRenderer(new DarkMenuColors());
+            menu.BackColor = Color.FromArgb(28, 32, 42);
+            menu.ForeColor = Theme.Text;
+            menu.Font = Theme.F(9.5f);
+
+            bool deleted = m.Deleted;
+            bool bot = m.Bot;
+            bool mine = !string.IsNullOrEmpty(MeNick) && string.Equals(m.From, MeNick, StringComparison.OrdinalIgnoreCase);
+            bool canEdit = !deleted && !bot && (mine || IsStaff);
+            bool canDelete = !deleted && !bot && (mine || IsStaff);
+
+            if (!deleted)
+            {
+                var copy = menu.Items.Add("Копировать");
+                copy.Click += (s, ev) => { try { if (!string.IsNullOrEmpty(m.Text)) Clipboard.SetText(m.Text); } catch { } };
+
+                var tr = menu.Items.Add("Перевести");
+                tr.Click += (s, ev) => { var h = TranslateRequested; if (h != null) h(m); };
+            }
+
+            if (canEdit)
+            {
+                var ed = menu.Items.Add("Изменить" + (IsStaff && !mine ? " (как админ)" : ""));
+                ed.Click += (s, ev) =>
+                {
+                    string nt = InputPrompt.Ask(FindForm(), "Изменить сообщение", m.Text);
+                    if (!string.IsNullOrEmpty(nt)) { var h = EditRequested; if (h != null) h(m, nt); }
+                };
+            }
+
+            if (canDelete)
+            {
+                var del = menu.Items.Add("Удалить" + (IsStaff && !mine ? " (как админ)" : ""));
+                del.Click += (s, ev) =>
+                {
+                    var h = DeleteRequested; if (h != null) h(m);
+                };
+            }
+
+            if (menu.Items.Count == 0) { menu.Dispose(); return; }
+            menu.Closed += (s, ev) => { try { menu.Dispose(); } catch { } };
+            menu.Show(this, e.Location);
+        }
+
+        private class DarkMenuColors : ProfessionalColorTable
+        {
+            public override Color MenuItemSelected { get { return Color.FromArgb(60, Theme.Accent); } }
+            public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(60, Theme.Accent); } }
+            public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(60, Theme.Accent); } }
+            public override Color MenuItemBorder { get { return Theme.Accent; } }
+            public override Color MenuBorder { get { return Theme.Border; } }
+            public override Color ToolStripDropDownBackground { get { return Color.FromArgb(28, 32, 42); } }
+            public override Color ImageMarginGradientBegin { get { return Color.FromArgb(28, 32, 42); } }
+            public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(28, 32, 42); } }
+            public override Color ImageMarginGradientEnd { get { return Color.FromArgb(28, 32, 42); } }
+        }
+
         public ChatView()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
@@ -58,6 +146,11 @@ namespace NareLauncher.UI
 
         private int MaxBubble { get { return Math.Max(140, Math.Min(400, Width - 90)); } }
 
+        private static string BodyText(NareAuth.ChatMessage m)
+        {
+            return m.Deleted ? "сообщение удалено" : (m.Text ?? "");
+        }
+
         private void Measure()
         {
             _total = 8;
@@ -66,7 +159,7 @@ namespace NareLauncher.UI
                 foreach (var r in _rows)
                 {
                     int inner = MaxBubble - 24;
-                    var sz = TextRenderer.MeasureText(g, r.Msg.Text ?? "", Body,
+                    var sz = TextRenderer.MeasureText(g, BodyText(r.Msg), Body,
                         new Size(inner, 0), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
                     r.Actions = !string.IsNullOrEmpty(r.Msg.ServerId) && PendingIds.Contains(r.Msg.ServerId);
                     int bw = Math.Min(MaxBubble, Math.Max(200, sz.Width + 24));
@@ -106,6 +199,7 @@ namespace NareLauncher.UI
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
+            if (e.Button != MouseButtons.Left) return;   // правой кнопкой — контекстное меню, не копирование
             for (int i = 0; i < _rows.Count; i++)
             {
                 var r = _rows[i];
@@ -173,11 +267,13 @@ namespace NareLauncher.UI
                 string who = string.IsNullOrEmpty(r.Msg.FromName) ? r.Msg.From : r.Msg.FromName;
                 if (!string.IsNullOrEmpty(r.Msg.Tag)) who = r.Msg.Tag + " " + who;
                 string name = r.Msg.Admin ? (who + " · админ") : who;
+                if (r.Msg.Edited && !r.Msg.Deleted) name += "  (изм.)";
                 Theme.Text1(g, name, Head, r.Mine ? Theme.Accent2 : Theme.Warn,
                     new Rectangle(bubble.X + 12, bubble.Y + 6, bubble.Width - 20, 13));
 
                 var textR = new Rectangle(bubble.X + 12, bubble.Y + 20, bubble.Width - 24, bubble.Height - 26);
-                TextRenderer.DrawText(g, r.Msg.Text ?? "", Body, textR, Theme.Text,
+                TextRenderer.DrawText(g, BodyText(r.Msg), Body, textR,
+                    r.Msg.Deleted ? Theme.Dim : Theme.Text,
                     TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
 
                 if (r.Actions)

@@ -70,6 +70,41 @@ namespace NareLauncher.UI
             _pubNo.Click += async (s, e) => await Decide(false);
 
             _poll.Tick += async (s, e) => await Refresh();
+
+            _msgs.EditRequested += async (m, nt) => await EditMsg(m, nt);
+            _msgs.DeleteRequested += async (m) => await DeleteMsg(m);
+            _msgs.TranslateRequested += async (m) => await TranslateMsg(m);
+        }
+
+        private string OwnerNick { get { return _admin ? _openNick : MyNick; } }
+
+        private async System.Threading.Tasks.Task EditMsg(NareAuth.ChatMessage m, string nt)
+        {
+            if (string.IsNullOrEmpty(Token) || string.IsNullOrEmpty(m.Id)) return;
+            var err = await NareAuth.ChatEditAsync(Token, OwnerNick, m.Id, nt, CancellationToken.None);
+            if (!string.IsNullOrEmpty(err)) { _status.Text = err; return; }
+            await Refresh();
+        }
+
+        private async System.Threading.Tasks.Task DeleteMsg(NareAuth.ChatMessage m)
+        {
+            if (string.IsNullOrEmpty(Token) || string.IsNullOrEmpty(m.Id)) return;
+            var err = await NareAuth.ChatDeleteAsync(Token, OwnerNick, m.Id, CancellationToken.None);
+            if (!string.IsNullOrEmpty(err)) { _status.Text = err; return; }
+            await Refresh();
+        }
+
+        private async System.Threading.Tasks.Task TranslateMsg(NareAuth.ChatMessage m)
+        {
+            if (string.IsNullOrEmpty(m.Text)) return;
+            _status.Text = "перевожу…";
+            try
+            {
+                var tr = await Translate.TextAsync(m.Text, CancellationToken.None);
+                _status.Text = "";
+                InputPrompt.Info(FindForm(), "Перевод", tr);
+            }
+            catch { _status.Text = "перевод недоступен"; }
         }
 
         private string Token { get { var a = AccountStore.Selected; return a == null ? "" : a.Token; } }
@@ -154,6 +189,8 @@ namespace NareLauncher.UI
 
         private void ShowChat()
         {
+            _msgs.MeNick = MyNick;
+            _msgs.IsStaff = _admin;
             _msgs.SetMessages(_chat, _admin, MyNick);
             if (_admin)
             {

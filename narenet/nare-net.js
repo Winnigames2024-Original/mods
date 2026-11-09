@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.20';
+const VERSION = '1.21';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1234,7 +1234,7 @@ function banChatSend(req, res) {
 
         const a = acc(nick);
         const list = chatList(nick);
-        list.push({ from: nick, fromName: displayName(nick), tag: tagLabel(a.tag), admin: false, text, at: now() });
+        list.push({ id: crypto.randomBytes(6).toString('hex'), from: nick, fromName: displayName(nick), tag: tagLabel(a.tag), admin: false, text, at: now() });
         if (list.length > 200) list.shift();
         savePolicy();
 
@@ -1260,11 +1260,51 @@ function adminChatSend(req, res) {
 
         const ame = acc(me);
         const list = chatList(nick);
-        list.push({ from: me, fromName: displayName(me), tag: ame ? tagLabel(ame.tag) : '', admin: true, text, at: now() });
+        list.push({ id: crypto.randomBytes(6).toString('hex'), from: me, fromName: displayName(me), tag: ame ? tagLabel(ame.tag) : '', admin: true, text, at: now() });
         if (list.length > 200) list.shift();
         savePolicy();
 
         send(res, 200, { ok: true, messages: list });
+    });
+}
+
+/** Редактировать сообщение: своё — любой, чужое — только персонал. */
+function chatEdit(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const owner = clean(body.owner, 16);
+        const id = clean(body.id, 32);
+        const text = clean(body.text, 500);
+        if (!text) return send(res, 400, { error: 'пустое сообщение' });
+        const list = policy.chats[owner];
+        if (!list) return send(res, 404, { error: 'нет чата' });
+        const m = list.find(x => x.id === id);
+        if (!m) return send(res, 404, { error: 'нет сообщения' });
+        if (!(isStaff(me) || m.from === me)) return send(res, 403, { error: 'можно менять только своё' });
+        m.text = text;
+        m.edited = true;
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Удалить сообщение: своё — любой, чужое — только персонал. */
+function chatDelete(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const owner = clean(body.owner, 16);
+        const id = clean(body.id, 32);
+        const list = policy.chats[owner];
+        if (!list) return send(res, 404, { error: 'нет чата' });
+        const m = list.find(x => x.id === id);
+        if (!m) return send(res, 404, { error: 'нет сообщения' });
+        if (!(isStaff(me) || m.from === me)) return send(res, 403, { error: 'можно удалять только своё' });
+        m.deleted = true;
+        m.text = '';
+        savePolicy();
+        send(res, 200, { ok: true });
     });
 }
 
@@ -1950,6 +1990,8 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/chat' && req.method === 'POST') return adminChatGet(req, res);
     if (route === '/admin/chat/send' && req.method === 'POST') return adminChatSend(req, res);
     if (route === '/admin/chats' && req.method === 'POST') return adminChatsList(req, res);
+    if (route === '/chat/edit' && req.method === 'POST') return chatEdit(req, res);
+    if (route === '/chat/delete' && req.method === 'POST') return chatDelete(req, res);
     if (route === '/admin/chat/assign' && req.method === 'POST') return adminChatAssign(req, res);
     if (route === '/admin/grant' && req.method === 'POST') return adminGrant(req, res, true);
     if (route === '/admin/revoke' && req.method === 'POST') return adminGrant(req, res, false);

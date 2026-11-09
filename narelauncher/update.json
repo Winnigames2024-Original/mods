@@ -1,8 +1,8 @@
 {
-  "version": "1.45",
+  "version": "1.46",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "3e99731b376235087b71f5c342f95119fe10d867",
-  "size": 715776,
-  "notes": "Онлайн-статус, теги за монеты и отображаемое имя в чатах за монеты — показываются в профиле и чатах"
+  "sha1": "e942394e44f424400b87e75e0158692d709744a4",
+  "size": 733184,
+  "notes": "Уведомления Windows со звуком о новых сообщениях (как в Telegram) и меню по правой кнопке в чате: копировать, перевести, изменить и удалить сообщение (у админа — любое, у игрока — своё)"
 }

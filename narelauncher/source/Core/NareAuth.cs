@@ -643,6 +643,9 @@ namespace NareLauncher.Core
             public string ServerId = "";   // для заявок бота Publish — id сервера
             public string Text = "";
             public long At;
+            public string Id = "";
+            public bool Edited;
+            public bool Deleted;
         }
 
         private static List<ChatMessage> Messages(Json json)
@@ -658,9 +661,33 @@ namespace NareLauncher.Core
                     Bot = m["bot"].AsBool(false),
                     ServerId = m["serverId"].AsString(""),
                     Text = m["text"].AsString(""),
-                    At = m["at"].AsLong(0)
+                    At = m["at"].AsLong(0),
+                    Id = m["id"].AsString(""),
+                    Edited = m["edited"].AsBool(false),
+                    Deleted = m["deleted"].AsBool(false)
                 });
             return list;
+        }
+
+        /// <summary>Редактировать сообщение в чате. owner — чей это чат (ник игрока).</summary>
+        public static async Task<string> ChatEditAsync(string token, string owner, string id, string text, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("owner", owner);
+            body.Set("id", id);
+            body.Set("text", text);
+            var r = await PostAsync("/chat/edit", body, ct).ConfigureAwait(false);
+            return r["ok"].AsBool(false) ? "" : r["error"].AsString("ошибка");
+        }
+
+        /// <summary>Удалить сообщение в чате. owner — чей это чат (ник игрока).</summary>
+        public static async Task<string> ChatDeleteAsync(string token, string owner, string id, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("owner", owner);
+            body.Set("id", id);
+            var r = await PostAsync("/chat/delete", body, ct).ConfigureAwait(false);
+            return r["ok"].AsBool(false) ? "" : r["error"].AsString("ошибка");
         }
 
         public static async Task<List<ChatMessage>> BanChatAsync(string token, CancellationToken ct)

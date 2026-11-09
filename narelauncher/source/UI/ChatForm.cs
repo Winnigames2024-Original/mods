@@ -48,6 +48,28 @@ namespace NareLauncher.UI
             _unban.Click += async (s, e) => await Unban();
             _input.Inner.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Send(); } };
 
+            _chat.IsStaff = true;
+            var me = AccountStore.Selected;
+            _chat.MeNick = me == null ? "" : me.Name;
+            _chat.EditRequested += async (m, nt) =>
+            {
+                if (string.IsNullOrEmpty(m.Id)) return;
+                await NareAuth.ChatEditAsync(_token, _nick, m.Id, nt, CancellationToken.None);
+                await Refresh();
+            };
+            _chat.DeleteRequested += async (m) =>
+            {
+                if (string.IsNullOrEmpty(m.Id)) return;
+                await NareAuth.ChatDeleteAsync(_token, _nick, m.Id, CancellationToken.None);
+                await Refresh();
+            };
+            _chat.TranslateRequested += async (m) =>
+            {
+                if (string.IsNullOrEmpty(m.Text)) return;
+                try { var tr = await Translate.TextAsync(m.Text, CancellationToken.None); InputPrompt.Info(this, "Перевод", tr); }
+                catch { }
+            };
+
             _poll.Tick += async delegate { await Refresh(); };
             Load += async delegate { await Refresh(); _poll.Start(); };
             FormClosed += delegate { _poll.Stop(); };
