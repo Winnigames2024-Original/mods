@@ -1,8 +1,8 @@
 {
-  "version": "2.17.0",
-  "file": "forge_narevisuals-2.17.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.17.0.jar",
-  "sha1": "8d8493d498259616782e6aa2f0193dbd80025efb",
-  "size": 825712,
-  "notes": "Мир «Вместе» открывается в offline-режиме — оффлайн-аккаунты NareLauncher больше не получают Invalid session"
+  "version": "2.18.0",
+  "file": "forge_narevisuals-2.18.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.18.0.jar",
+  "sha1": "5a0a32b5e2fcb85d89999035d590d4bb02412bff",
+  "size": 826529,
+  "notes": "Дальность прорисовки в мире «Вместе» теперь берётся от хоста и меняется вживую — друзья видят так же далеко, ползунок дальности работает"
 }

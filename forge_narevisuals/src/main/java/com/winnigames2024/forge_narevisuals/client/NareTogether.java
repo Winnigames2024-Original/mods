@@ -176,6 +176,11 @@ public final class NareTogether {
 
         // Мир уже открыт в сеть — второй раз открывать нельзя: игра возьмёт
         // новый порт и выбросит всех, кто успел зайти.
+        // Открытый мир должен пускать оффлайн-аккаунты NareLauncher: иначе игра
+        // проверяет сессию входящих у Mojang и выдаёт "Invalid session".
+        try { server.setUsesAuthentication(false); } catch (Throwable ignore) {}
+        try { server.setEnforceWhitelist(false); } catch (Throwable ignore) {}
+
         if (published(server)) {
             port = server.getPort();
             ok = port > 0;
@@ -188,6 +193,8 @@ public final class NareTogether {
                 Forge_narevisuals.LOGGER.warn("publishServer не сработал: {}", t.toString());
             }
         }
+        // ещё раз после публикации — на случай, если игра включила проверку сессий
+        try { server.setUsesAuthentication(false); } catch (Throwable ignore) {}
 
         if (!ok) {
             note = "игра не смогла открыть порт " + port;
@@ -208,6 +215,9 @@ public final class NareTogether {
         note = "мир открыт на порту " + gamePort + ", объявляю…";
 
         Forge_narevisuals.LOGGER.info("Мир открыт для друзей на порту {}", gamePort);
+
+        lastVd = -1;
+        applyViewDistance(server);
 
         beat = new Thread(NareTogether::beatLoop, "nare-together");
         beat.setDaemon(true);
@@ -287,7 +297,44 @@ public final class NareTogether {
                 Forge_narevisuals.LOGGER.warn("NareNet не ответил: {}", e.toString());
             }
 
+            // живое изменение дальности: если хост двигает ползунок — переносим на сервер
+            try {
+                MinecraftServer s = Minecraft.getInstance().getSingleplayerServer();
+                if (s != null) applyViewDistance(s);
+            } catch (Throwable ignore) {}
+
             try { Thread.sleep(BEAT); } catch (InterruptedException e) { return; }
+        }
+    }
+
+    private static int lastVd = -1;
+
+    /// Дальность прорисовки «Вместе»-мира = дальности хоста. На сервере view-distance
+    /// режет, сколько чанков уходит игрокам, поэтому без этого друзья видели мало и
+    /// ползунок дальности у них «не работал».
+    static void applyViewDistance(MinecraftServer server) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            int rd = mc.options.renderDistance().get();
+            if (rd < 3) rd = 3;
+            if (rd > 32) rd = 32;
+            if (rd == lastVd) return;
+            lastVd = rd;
+            final int vd = rd;
+            int simOpt;
+            try { simOpt = mc.options.simulationDistance().get(); } catch (Throwable t) { simOpt = rd; }
+            final int sim = Math.max(3, Math.min(rd, simOpt));
+            server.execute(() -> {
+                try {
+                    server.getPlayerList().setViewDistance(vd);
+                    server.getPlayerList().setSimulationDistance(sim);
+                    Forge_narevisuals.LOGGER.info("Вместе: дальность прорисовки = {}, симуляции = {}", vd, sim);
+                } catch (Throwable t) {
+                    Forge_narevisuals.LOGGER.warn("не смог выставить дальность: {}", t.toString());
+                }
+            });
+        } catch (Throwable t) {
+            Forge_narevisuals.LOGGER.warn("дальность: {}", t.toString());
         }
     }
 
