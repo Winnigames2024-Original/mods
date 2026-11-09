@@ -61,15 +61,14 @@ namespace NareLauncher.UI
         {
             base.OnMouseDown(e);
             if (e.Button != MouseButtons.Right) return;
-            var r = RowAt(e.Location);
-            if (r == null) return;
-            var m = r.Msg;
+            try { ShowContextMenu(e.Location); } catch { }
+        }
 
-            var menu = new ContextMenuStrip();
-            menu.Renderer = new ToolStripProfessionalRenderer(new DarkMenuColors());
-            menu.BackColor = Color.FromArgb(28, 32, 42);
-            menu.ForeColor = Theme.Text;
-            menu.Font = Theme.F(9.5f);
+        private void ShowContextMenu(Point loc)
+        {
+            var r = RowAt(loc);
+            if (r == null || r.Msg == null) return;
+            var m = r.Msg;
 
             bool deleted = m.Deleted;
             bool bot = m.Bot;
@@ -77,51 +76,43 @@ namespace NareLauncher.UI
             bool canEdit = !deleted && !bot && (mine || IsStaff);
             bool canDelete = !deleted && !bot && (mine || IsStaff);
 
+            var menu = new ContextMenuStrip();
+            menu.ShowImageMargin = false;
+            menu.BackColor = Color.FromArgb(32, 36, 46);
+            menu.ForeColor = Theme.Text;
+
             if (!deleted)
             {
-                var copy = menu.Items.Add("Копировать");
-                copy.Click += (s, ev) => { try { if (!string.IsNullOrEmpty(m.Text)) Clipboard.SetText(m.Text); } catch { } };
-
-                var tr = menu.Items.Add("Перевести");
-                tr.Click += (s, ev) => { var h = TranslateRequested; if (h != null) h(m); };
+                AddItem(menu, "Копировать", () => { try { if (!string.IsNullOrEmpty(m.Text)) Clipboard.SetText(m.Text); } catch { } });
+                AddItem(menu, "Перевести", () => { var h = TranslateRequested; if (h != null) h(m); });
             }
-
             if (canEdit)
-            {
-                var ed = menu.Items.Add("Изменить" + (IsStaff && !mine ? " (как админ)" : ""));
-                ed.Click += (s, ev) =>
+                AddItem(menu, "Изменить" + (IsStaff && !mine ? " (как админ)" : ""), () =>
                 {
                     string nt = InputPrompt.Ask(FindForm(), "Изменить сообщение", m.Text);
                     if (!string.IsNullOrEmpty(nt)) { var h = EditRequested; if (h != null) h(m, nt); }
-                };
-            }
-
+                });
             if (canDelete)
-            {
-                var del = menu.Items.Add("Удалить" + (IsStaff && !mine ? " (как админ)" : ""));
-                del.Click += (s, ev) =>
-                {
-                    var h = DeleteRequested; if (h != null) h(m);
-                };
-            }
+                AddItem(menu, "Удалить" + (IsStaff && !mine ? " (как админ)" : ""), () => { var h = DeleteRequested; if (h != null) h(m); });
 
             if (menu.Items.Count == 0) { menu.Dispose(); return; }
-            menu.Closed += (s, ev) => { try { menu.Dispose(); } catch { } };
-            menu.Show(this, e.Location);
+            menu.Show(this, loc);
         }
 
-        private class DarkMenuColors : ProfessionalColorTable
+        // Действие выполняем ПОСЛЕ закрытия меню (BeginInvoke) — иначе модальное окно
+        // «Изменить», открытое прямо из клика по пункту, вешает UI-поток.
+        private void AddItem(ContextMenuStrip menu, string text, Action act)
         {
-            public override Color MenuItemSelected { get { return Color.FromArgb(60, Theme.Accent); } }
-            public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(60, Theme.Accent); } }
-            public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(60, Theme.Accent); } }
-            public override Color MenuItemBorder { get { return Theme.Accent; } }
-            public override Color MenuBorder { get { return Theme.Border; } }
-            public override Color ToolStripDropDownBackground { get { return Color.FromArgb(28, 32, 42); } }
-            public override Color ImageMarginGradientBegin { get { return Color.FromArgb(28, 32, 42); } }
-            public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(28, 32, 42); } }
-            public override Color ImageMarginGradientEnd { get { return Color.FromArgb(28, 32, 42); } }
+            var it = menu.Items.Add(text);
+            it.Click += (s, ev) =>
+            {
+                try { BeginInvoke((Action)(() => { try { act(); } catch { } })); }
+                catch { try { act(); } catch { } }
+            };
         }
+
+        private readonly System.Windows.Forms.Timer _anim = new System.Windows.Forms.Timer { Interval = 80 };
+        private int _phase;
 
         public ChatView()
         {
@@ -129,6 +120,12 @@ namespace NareLauncher.UI
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             BackColor = Theme.Panel;
             Cursor = Cursors.Hand;
+            _anim.Tick += (s, e) => { _phase += 80; if (!IsDisposed) Invalidate(); };
+        }
+
+        private static string DisplayName(NareAuth.ChatMessage m)
+        {
+            return string.IsNullOrEmpty(m.FromName) ? m.From : m.FromName;
         }
 
         private static readonly Font Body = Theme.F(9.5f);
@@ -137,8 +134,14 @@ namespace NareLauncher.UI
         public void SetMessages(IEnumerable<NareAuth.ChatMessage> msgs, bool adminView, string youName)
         {
             _rows.Clear();
+            bool rainbow = false;
             foreach (var m in msgs)
+            {
                 _rows.Add(new Row { Msg = m, Mine = adminView ? m.Admin : !m.Admin });
+                if (!rainbow && NareColors.HasRainbow(DisplayName(m))) rainbow = true;
+            }
+            if (rainbow) { if (!_anim.Enabled) _anim.Start(); }
+            else { if (_anim.Enabled) _anim.Stop(); }
             Measure();
             if (_stick) ScrollBottom();
             Invalidate();
@@ -268,8 +271,13 @@ namespace NareLauncher.UI
                 if (!string.IsNullOrEmpty(r.Msg.Tag)) who = r.Msg.Tag + " " + who;
                 string name = r.Msg.Admin ? (who + " · админ") : who;
                 if (r.Msg.Edited && !r.Msg.Deleted) name += "  (изм.)";
-                Theme.Text1(g, name, Head, r.Mine ? Theme.Accent2 : Theme.Warn,
-                    new Rectangle(bubble.X + 12, bubble.Y + 6, bubble.Width - 20, 13));
+                Color nameCol = r.Mine ? Theme.Accent2 : Theme.Warn;
+                if (NareColors.HasCodes(name))
+                    NareColors.Draw(g, name, Head, nameCol,
+                        new Rectangle(bubble.X + 12, bubble.Y + 5, bubble.Width - 20, 14), _phase);
+                else
+                    Theme.Text1(g, name, Head, nameCol,
+                        new Rectangle(bubble.X + 12, bubble.Y + 6, bubble.Width - 20, 13));
 
                 var textR = new Rectangle(bubble.X + 12, bubble.Y + 20, bubble.Width - 24, bubble.Height - 26);
                 TextRenderer.DrawText(g, BodyText(r.Msg), Body, textR,

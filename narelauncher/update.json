@@ -1,8 +1,8 @@
 {
-  "version": "1.46",
+  "version": "1.47",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "e942394e44f424400b87e75e0158692d709744a4",
-  "size": 733184,
-  "notes": "Уведомления Windows со звуком о новых сообщениях (как в Telegram) и меню по правой кнопке в чате: копировать, перевести, изменить и удалить сообщение (у админа — любое, у игрока — своё)"
+  "sha1": "3a28fbcb6fc1c523c2cfda4921a038da98488437",
+  "size": 735744,
+  "notes": "Исправлено зависание и вылет чата при правой кнопке на сообщении. Цветные коды в именах: &red:ВЛАДЕЛЕЦ, &blue:текст, &random:текст (переливается радугой)"
 }

@@ -101,6 +101,7 @@
     <Compile Include="Core\ModSourcesExtra.cs" />
     <Compile Include="Core\Net.cs" />
     <Compile Include="Core\Translate.cs" />
+    <Compile Include="Core\NareColors.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\SkinDocument.cs" />
