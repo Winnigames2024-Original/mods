@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.22';
+const VERSION = '1.23';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -868,6 +868,27 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
       <th>Ник</th><th>Имя</th><th>Монеты</th><th>Статус</th><th>Действия</th>
     </tr></thead><tbody id="tb"></tbody></table></div>
   </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><b>Команды и троллинг</b><span class="muted">выполняется на сервере WMine</span></div>
+    <div class="row" style="margin-top:8px">
+      <input id="ct" placeholder="ник игрока (для «от его имени»)" style="flex:1;min-width:160px">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="cc" placeholder="команда без / (напр. tp PRINKE_52 0 100 0)" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')runCmd()">
+      <button class="pri" onclick="runCmd()">Выполнить</button>
+    </div>
+    <div class="muted" style="margin-top:6px">Указан ник — команда выполнится «от его имени» (execute as). Пусто — как консоль сервера.</div>
+    <div class="row" style="margin-top:10px">
+      <button class="sm" onclick="troll('up')">Подкинуть</button>
+      <button class="sm" onclick="troll('blind')">Ослепить</button>
+      <button class="sm" onclick="troll('slow')">Замедлить</button>
+      <button class="sm" onclick="troll('levit')">Левитация</button>
+      <button class="sm" onclick="troll('spec')">Наблюдатель</button>
+      <button class="sm" onclick="troll('surv')">Выживание</button>
+      <button class="sm red" onclick="troll('kill')">Убить</button>
+    </div>
+    <div id="cmsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
 </div>
 
 <script>
@@ -948,6 +969,20 @@ function toggleMnt(){var on=!(state.maintenance&&state.maintenance.on);
   var m=on?(prompt("Сообщение о техработах:","Идут технические работы")||"Идут технические работы"):"";
   api("/admin/maintenance",{on:on,message:m}).then(function(d){done(d,on?"техработы включены":"техработы выключены");});}
 function done(d,okText,raw){raw=raw||d;if(d&&d.ok){if(okText)msg(okText,true);load();}else{msg((d&&d.error)||"ошибка (нужны права админа?)",false);}}
+function cmsg(t,ok){var m=document.getElementById("cmsg");m.textContent=t||"";m.className=ok?"ok":"err";}
+function queue(text){return api("/admin/command",{text:text}).then(function(d){
+  if(d.ok)cmsg("отправлено: /"+text,true);else cmsg(d.error||"ошибка (нужны права админа)",false);});}
+function runCmd(){var t=document.getElementById("ct").value.trim();var c=document.getElementById("cc").value.trim();
+  if(!c){cmsg("введите команду",false);return;}
+  var full=t?("execute as "+t+" at "+t+" run "+c):c; queue(full); document.getElementById("cc").value="";}
+function troll(kind){var t=document.getElementById("ct").value.trim();
+  if(!t){cmsg("укажите ник игрока в поле сверху",false);return;}
+  var map={up:"execute as "+t+" at "+t+" run tp ~ ~40 ~",
+    blind:"effect give "+t+" minecraft:blindness 30 1",
+    slow:"effect give "+t+" minecraft:slowness 30 4",
+    levit:"effect give "+t+" minecraft:levitation 10 1",
+    spec:"gamemode spectator "+t, surv:"gamemode survival "+t, kill:"kill "+t};
+  if(map[kind])queue(map[kind]);}
 if(token)load();
 </script>
 </div></body></html>`;
