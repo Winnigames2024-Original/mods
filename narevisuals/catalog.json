@@ -15,9 +15,9 @@
       "icon": "",
       "releases": [
         {
-          "version": "2.16.0",
-          "file": "forge_narevisuals-2.16.0.jar",
-          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.16.0.jar",
+          "version": "2.17.0",
+          "file": "forge_narevisuals-2.17.0.jar",
+          "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.17.0.jar",
           "sha1": "c33197272c9e521490ba000f094b89491af916c3",
           "size": 825610,
           "notes": "бан и запрет «Вместе» от админа учитываются при открытии мира"

@@ -2,6 +2,14 @@
   "latest": "2.16.0",
   "releases": [
     {
+      "version": "2.17.0",
+      "file": "forge_narevisuals-2.17.0.jar",
+      "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.17.0.jar",
+      "sha1": "8d8493d498259616782e6aa2f0193dbd80025efb",
+      "size": 825712,
+      "notes": "Мир «Вместе» в offline-режиме — фикс Invalid session"
+    },
+    {
       "version": "2.16.0",
       "file": "forge_narevisuals-2.16.0.jar",
       "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.16.0.jar",
