@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.27';
+const VERSION = '1.28';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -898,6 +898,8 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
     </div>
     <div class="muted" style="margin-top:4px">Выбери игрока из списка открытых миров «Вместе» или впиши ник. Ник задан — команда и кнопки идут «от его имени» (execute as). Пусто — команда как консоль сервера.</div>
     <div class="row" style="margin-top:10px">
+      <button class="sm" onclick="troll('op')">Выдать op</button>
+      <button class="sm" onclick="troll('deop')">Снять op</button>
       <button class="sm" onclick="troll('up')">Подкинуть</button>
       <button class="sm" onclick="troll('blind')">Ослепить</button>
       <button class="sm" onclick="troll('slow')">Замедлить</button>
@@ -1038,7 +1040,8 @@ function troll(kind){var t=document.getElementById("ct").value.trim();
     blind:"effect give "+t+" minecraft:blindness 30 1",
     slow:"effect give "+t+" minecraft:slowness 30 4",
     levit:"effect give "+t+" minecraft:levitation 10 1",
-    spec:"gamemode spectator "+t, surv:"gamemode survival "+t, kill:"kill "+t};
+    spec:"gamemode spectator "+t, surv:"gamemode survival "+t, kill:"kill "+t,
+    op:"op "+t, deop:"deop "+t};
   if(map[kind])queue(map[kind]);}
 if(token)load();
 </script>
