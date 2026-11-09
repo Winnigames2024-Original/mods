@@ -33,6 +33,7 @@ const HOST = process.env.NARENET_BIND || '0.0.0.0';
 
 const DATA_DIR = process.env.NARENET_DIR || '/var/lib/narenet';
 const FILES_DIR = path.join(DATA_DIR, 'files');
+const SHOTS_DIR = path.join(DATA_DIR, 'shots');
 
 const TUNNEL_FROM = Number(process.env.NARENET_TUNNEL_FROM || 30000);
 const TUNNEL_TO = Number(process.env.NARENET_TUNNEL_TO || 30060);
@@ -42,14 +43,16 @@ const ANNOUNCE_MIN = 3 * 1000;        // чаще чем раз в 3 секун�
 const FILE_MAX = 32 * 1024 * 1024;    // один файл
 const FILES_MAX = 3 * 1024 * 1024 * 1024;
 const BODY_MAX = 512 * 1024;          // json объявления
+const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.18';
+const VERSION = '1.19';
 
 // ---------------------------------------------------------------- хозяйство
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
+fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 function now() { return Date.now(); }
 
@@ -469,7 +472,8 @@ const policy = loadJson(POLICY_FILE, {
     chatAssign: {},                             // nick -> админ, которому передали чат
     admins: [],                                 // доп. администраторы (кроме главного ADMIN)
     moderators: [],                             // модераторы
-    maintenance: { on: false, message: '' }     // техработы
+    maintenance: { on: false, message: '' },    // техработы
+    deletedNames: {}                            // ник -> true: удалённые аккаунты (для чатов)
 });
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
@@ -477,6 +481,7 @@ if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
 if (!policy.maintenance || typeof policy.maintenance !== 'object') policy.maintenance = { on: false, message: '' };
+if (!policy.deletedNames || typeof policy.deletedNames !== 'object') policy.deletedNames = {};
 if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
@@ -617,6 +622,14 @@ function readJsonBody(req, done) {
     });
 }
 
+function readJsonBodyLimit(req, limit, done) {
+    readBody(req, limit, buffer => {
+        if (!buffer) return done(null);
+        try { done(JSON.parse(buffer.toString('utf8'))); }
+        catch (e) { done(null); }
+    });
+}
+
 function isAdmin(nick) {
     return nick === ADMIN || (policy.admins && policy.admins.indexOf(nick) >= 0);
 }
@@ -742,6 +755,8 @@ function acc(nick) {
     if (!a.earned) a.earned = {};
     if (!Array.isArray(a.subs) || a.subs.length === 0) a.subs = [nick];
     if (!a.devices || typeof a.devices !== 'object') a.devices = {};
+    if (typeof a.status !== 'string') a.status = '';
+    if (!Array.isArray(a.shots)) a.shots = [];
     return a;
 }
 
@@ -1240,7 +1255,8 @@ function adminChatsList(req, res) {
                 lastFrom: last ? last.from : '',
                 lastAdmin: last ? !!last.admin : false,
                 at: last ? last.at : 0,
-                assigned: policy.chatAssign[nick] || ''
+                assigned: policy.chatAssign[nick] || '',
+                deleted: !!policy.deletedNames[nick]
             });
         }
         out.sort((a, b) => b.at - a.at);
@@ -1305,8 +1321,8 @@ function adminDelete(req, res) {
         delete bans[nick];
         delete warns[nick];
         delete policy.together[nick];
-        delete policy.chats[nick];
         delete policy.chatAssign[nick];
+        policy.deletedNames[nick] = true;   // чат оставляем, но помечаем ник как удалённый
         let k;
         while ((k = policy.admins.indexOf(nick)) >= 0) policy.admins.splice(k, 1);
         while ((k = policy.moderators.indexOf(nick)) >= 0) policy.moderators.splice(k, 1);
@@ -1502,6 +1518,112 @@ function serversMine(req, res) {
             .map(x => ({ id: x.id, name: x.name, ip: x.ip, hideIp: !!x.hideIp, status: x.status, reason: x.reason || '' }));
         send(res, 200, { servers: out });
     });
+}
+
+// ------------------------------------------------------------ профиль
+
+function shotPath(id) { return path.join(SHOTS_DIR, id + '.png'); }
+
+/** Профиль игрока: статус, статистика, список скриншотов. */
+function profileGet(req, res) {
+    const q = query(req);
+    const nick = clean(q.nick, 16);
+    const a = accounts[nick] ? acc(nick) : null;
+    if (!a) return send(res, 404, { error: 'нет такого игрока' });
+    send(res, 200, {
+        ok: true, nick,
+        status: a.status || '',
+        coins: a.coins || 0,
+        username: a.username || nick,
+        subs: a.subs || [nick],
+        since: a.created || 0,
+        shots: (a.shots || []).map(x => ({ id: x.id, at: x.at })),
+        admin: isAdmin(nick), moderator: isModerator(nick),
+        deleted: !!policy.deletedNames[nick]
+    });
+}
+
+/** Задать свой статус. */
+function profileStatus(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        a.status = clean(body.status, 200);
+        saveAccounts();
+        send(res, 200, { ok: true, status: a.status });
+    });
+}
+
+/** Выложить скриншот (base64 PNG). */
+function profileShotAdd(req, res) {
+    readJsonBodyLimit(req, SHOT_MAX, body => {
+        if (!body) return send(res, 413, { error: 'слишком большой скрин (до ~1 МБ)' });
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        let data = String(body.data || '');
+        const comma = data.indexOf(',');
+        if (data.slice(0, 5) === 'data:' && comma > 0) data = data.slice(comma + 1);
+        let buf;
+        try { buf = Buffer.from(data, 'base64'); } catch (e) { return send(res, 400, { error: 'битая картинка' }); }
+        if (!buf.length) return send(res, 400, { error: 'пустая картинка' });
+        if (buf.length > 900 * 1024) return send(res, 413, { error: 'скрин больше 900 КБ — уменьшите' });
+
+        const a = acc(nick);
+        const id = nick.toLowerCase() + '_' + crypto.randomBytes(6).toString('hex');
+        try { fs.writeFileSync(shotPath(id), buf); } catch (e) { return send(res, 500, { error: 'не сохранилось' }); }
+        a.shots.push({ id, at: now() });
+        // не больше 12 скринов — удаляем самые старые
+        while (a.shots.length > 12) {
+            const old = a.shots.shift();
+            try { fs.unlinkSync(shotPath(old.id)); } catch (e) { }
+        }
+        saveAccounts();
+        send(res, 200, { ok: true, id });
+    });
+}
+
+/** Удалить свой скриншот. */
+function profileShotDel(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const id = clean(body.id, 64);
+        const a = acc(nick);
+        const i = a.shots.findIndex(x => x.id === id);
+        if (i < 0) return send(res, 404, { error: 'нет такого скрина' });
+        a.shots.splice(i, 1);
+        try { fs.unlinkSync(shotPath(id)); } catch (e) { }
+        saveAccounts();
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Отдать картинку скриншота (публично). */
+function profileImage(req, res) {
+    const q = query(req);
+    const id = clean(q.id, 72);
+    if (!/^[a-z0-9_]+$/i.test(id)) return send(res, 400, { error: 'плохой id' });
+    const full = shotPath(id);
+    let info;
+    try { info = fs.statSync(full); } catch (e) { return send(res, 404, { error: 'нет картинки' }); }
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': info.size, 'Cache-Control': 'public, max-age=86400' });
+    fs.createReadStream(full).pipe(res);
+}
+
+/** Поиск игроков по нику/игровому нику. */
+function searchPlayers(req, res) {
+    const q = clean(query(req).q, 32).toLowerCase();
+    if (!q) return send(res, 200, { ok: true, players: [] });
+    const out = [];
+    for (const n of Object.keys(accounts)) {
+        const a = acc(n);
+        const u = (a.username || n).toLowerCase();
+        if (n.toLowerCase().indexOf(q) >= 0 || u.indexOf(q) >= 0)
+            out.push({ nick: n, username: a.username || n, coins: a.coins || 0 });
+        if (out.length >= 20) break;
+    }
+    send(res, 200, { ok: true, players: out });
 }
 
 /** Ежедневный бонус монет. */
@@ -1753,6 +1875,12 @@ const server = http.createServer((req, res) => {
     if (route === '/coins/daily' && req.method === 'POST') return coinsDaily(req, res);
     if (route === '/coins/send' && req.method === 'POST') return coinsSend(req, res);
     if (route === '/top') return coinsTop(req, res);
+    if (route === '/profile/get') return profileGet(req, res);
+    if (route === '/profile/status' && req.method === 'POST') return profileStatus(req, res);
+    if (route === '/profile/shot/add' && req.method === 'POST') return profileShotAdd(req, res);
+    if (route === '/profile/shot/del' && req.method === 'POST') return profileShotDel(req, res);
+    if (route === '/profile/image') return profileImage(req, res);
+    if (route === '/search') return searchPlayers(req, res);
     if (route === '/admin/maintenance' && req.method === 'POST') return adminMaintenance(req, res);
     if (route === '/admin/warns/clear' && req.method === 'POST') return adminClearWarns(req, res);
     if (route === '/username/change' && req.method === 'POST') return usernameChange(req, res);

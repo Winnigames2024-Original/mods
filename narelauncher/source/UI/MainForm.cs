@@ -36,6 +36,7 @@ namespace NareLauncher.UI
         public AdminPage AdminTab;
         public AdServersPage AdTab;
         public ChatsPage ChatsTab;
+        public ProfilePage ProfileTab;
 
         private NareLabel _accountChip;
 
@@ -102,6 +103,7 @@ namespace NareLauncher.UI
             AdTab = new AdServersPage { Host = this };
             AdminTab = new AdminPage { Host = this };
             ChatsTab = new ChatsPage { Host = this };
+            ProfileTab = new ProfilePage { Host = this };
             SkinTab = new SkinPage { Host = this };
             CosmeticsTab = new CosmeticsPage { Host = this };
             AccountsTab = new AccountsPage { Host = this };
@@ -119,6 +121,7 @@ namespace NareLauncher.UI
             _pages.Add(AccountsTab);
             _pages.Add(SettingsTab);
             _pages.Add(ConsoleTab);
+            _pages.Add(ProfileTab);
             _pages.Add(AdTab);
             _pages.Add(ChatsTab);
             _pages.Add(AdminTab);
@@ -197,10 +200,10 @@ namespace NareLauncher.UI
 
         private void BuildSidebar()
         {
-            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Публичные", "Чаты", "Админ" };
-            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Arrow, Ico.Account, Ico.Settings };
+            string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Профиль", "Публичные", "Чаты", "Админ" };
+            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Account, Ico.Arrow, Ico.Account, Ico.Settings };
 
-            int y = 14;
+            int y = 12;
             for (int i = 0; i < titles.Length; i++)
             {
                 int index = i;
@@ -208,12 +211,12 @@ namespace NareLauncher.UI
                 {
                     Text = titles[i],
                     Icon = icons[i],
-                    Bounds = new Rectangle(8, y, SidebarWidth - 16, 40)
+                    Bounds = new Rectangle(8, y, SidebarWidth - 16, 36)
                 };
                 btn.Click += (s, e) => Navigate(index);
                 _sidebar.Controls.Add(btn);
                 _nav.Add(btn);
-                y += 41;
+                y += 39;
             }
 
             _accountChip = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted)

@@ -459,6 +459,68 @@ namespace NareLauncher.Core
             await PostAsync("/admin/warns/clear", body, ct).ConfigureAwait(false);
         }
 
+        // ------------------------------------------------------------ профиль
+
+        public class Profile
+        {
+            public string Nick = "", Status = "", Username = "";
+            public long Coins, Since;
+            public bool Admin, Moderator, Deleted;
+            public readonly List<string> Shots = new List<string>();
+            public readonly List<string> Subs = new List<string>();
+        }
+
+        public static string ShotImageUrl(string id) { return Url("/profile/image?id=" + Net.UrlEncode(id)); }
+
+        public static async Task<Profile> ProfileGetAsync(string nick, CancellationToken ct)
+        {
+            var j = await Net.GetJsonAsync(Url("/profile/get?nick=" + Net.UrlEncode(nick)), ct).ConfigureAwait(false);
+            var p = new Profile
+            {
+                Nick = j["nick"].AsString(nick),
+                Status = j["status"].AsString(""),
+                Username = j["username"].AsString(nick),
+                Coins = j["coins"].AsLong(0),
+                Since = j["since"].AsLong(0),
+                Admin = j["admin"].AsBool(false),
+                Moderator = j["moderator"].AsBool(false),
+                Deleted = j["deleted"].AsBool(false)
+            };
+            foreach (var x in j["shots"].Items) p.Shots.Add(x["id"].AsString(""));
+            foreach (var x in j["subs"].Items) p.Subs.Add(x.AsString(""));
+            return p;
+        }
+
+        public static async Task ProfileStatusAsync(string token, string status, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("status", status ?? "");
+            await PostAsync("/profile/status", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task<string> ProfileShotAddAsync(string token, string base64Png, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("data", base64Png);
+            var j = await PostAsync("/profile/shot/add", body, ct).ConfigureAwait(false);
+            return j["id"].AsString("");
+        }
+
+        public static async Task ProfileShotDelAsync(string token, string id, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("id", id);
+            await PostAsync("/profile/shot/del", body, ct).ConfigureAwait(false);
+        }
+
+        public class SearchHit { public string Nick = "", Username = ""; public long Coins; }
+
+        public static async Task<List<SearchHit>> SearchAsync(string q, CancellationToken ct)
+        {
+            var j = await Net.GetJsonAsync(Url("/search?q=" + Net.UrlEncode(q)), ct).ConfigureAwait(false);
+            var list = new List<SearchHit>();
+            foreach (var x in j["players"].Items)
+                list.Add(new SearchHit { Nick = x["nick"].AsString(""), Username = x["username"].AsString(""), Coins = x["coins"].AsLong(0) });
+            return list;
+        }
+
         public static async Task<EarnResult> EarnCoinsAsync(string token, string serverId, CancellationToken ct)
         {
             var body = Admin(token);
@@ -571,6 +633,7 @@ namespace NareLauncher.Core
             public bool LastAdmin;
             public long At;
             public string Assigned = "";
+            public bool Deleted;
         }
 
         public static async Task<List<ChatSummary>> AdminChatsAsync(string token, CancellationToken ct)
@@ -586,7 +649,8 @@ namespace NareLauncher.Core
                     Last = c["last"].AsString(""),
                     LastAdmin = c["lastAdmin"].AsBool(false),
                     At = c["at"].AsLong(0),
-                    Assigned = c["assigned"].AsString("")
+                    Assigned = c["assigned"].AsString(""),
+                    Deleted = c["deleted"].AsBool(false)
                 });
             return list;
         }

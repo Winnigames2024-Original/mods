@@ -162,7 +162,7 @@ namespace NareLauncher.UI
                 _who.Text = _openNick.Length == 0 ? "Выберите чат слева"
                     : pub ? "🤖 Publish — заявки на публикацию (кликните по тексту, чтобы скопировать)"
                     : bugs ? "🤖 Bugs | Players — отчёты о вылетах (кликните по тексту, чтобы скопировать)"
-                    : "Чат с " + _openNick + (_openBanned ? "  (в бане)" : "");
+                    : "Чат с " + _openNick + (IsDeletedOpen() ? " | Аккаунт Удалён" : (_openBanned ? "  (в бане)" : ""));
 
                 // обычные элементы прячем на ботах; на Publish — кнопки заявок
                 bool chat = !pub && !bugs;
@@ -176,6 +176,16 @@ namespace NareLauncher.UI
                 _pubOk.Enabled = pub && hasPending;
                 _pubNo.Enabled = pub && hasPending;
             }
+        }
+
+        private bool IsDeletedOpen()
+        {
+            foreach (var it in _list.Items)
+            {
+                var c = it as NareAuth.ChatSummary;
+                if (c != null && string.Equals(c.Nick, _openNick, StringComparison.Ordinal)) return c.Deleted;
+            }
+            return false;
         }
 
         private async Task OpenSelected()
@@ -271,8 +281,10 @@ namespace NareLauncher.UI
             else if (hover) Theme.FillRound(g, box, 9, Color.FromArgb(16, 255, 255, 255));
 
             bool bot = c.Nick == "Publish" || c.Nick == "Bugs";
-            string title = bot ? ("🤖 " + (c.Nick == "Bugs" ? "Bugs | Players" : "Publish")) : c.Nick;
-            Theme.Text1(g, title, Theme.F(10.5f, FontStyle.Bold), bot ? Theme.Accent : Theme.Text,
+            string title = bot ? ("🤖 " + (c.Nick == "Bugs" ? "Bugs | Players" : "Publish"))
+                : c.Deleted ? (c.Nick + " | Аккаунт Удалён") : c.Nick;
+            var titleColor = bot ? Theme.Accent : c.Deleted ? Theme.Dim : Theme.Text;
+            Theme.Text1(g, title, Theme.F(10.5f, FontStyle.Bold), titleColor,
                 new Rectangle(box.X + 12, box.Y + 7, box.Width - 90, 20));
 
             string prev = (c.LastAdmin && !bot ? "вы: " : "") + c.Last;

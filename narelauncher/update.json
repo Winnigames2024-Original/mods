@@ -1,8 +1,8 @@
 {
-  "version": "1.43",
+  "version": "1.44",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "ec71b0fc0b6c5bd2031f71d2f879f5275f55cde8",
-  "size": 681984,
-  "notes": "Игрокам: ежедневный бонус, перевод монет, топ игроков. Админу: режим техработ (блок входа) и снятие предупреждений"
+  "sha1": "bf65cfc8b80e8a4324f0024809e8385a72507a92",
+  "size": 699904,
+  "notes": "Профиль игрока со скриншотами и статусом, поиск игроков, удалённые аккаунты в чатах помечаются «Аккаунт Удалён»"
 }
