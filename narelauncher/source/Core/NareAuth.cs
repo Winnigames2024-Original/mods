@@ -624,6 +624,14 @@ namespace NareLauncher.Core
             await PostAsync("/admin/setpass", body, ct).ConfigureAwait(false);
         }
 
+        /// <summary>Админ удаляет аккаунт игрока.</summary>
+        public static async Task AdminDeleteAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("nick", nick);
+            await PostAsync("/admin/delete", body, ct).ConfigureAwait(false);
+        }
+
         /// <summary>Игра вылетела — отправляем лог случайному админу через бота.</summary>
         public static async Task CrashReportAsync(string token, string log, CancellationToken ct)
         {

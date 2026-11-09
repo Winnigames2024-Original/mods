@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.15';
+const VERSION = '1.16';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1265,6 +1265,39 @@ function adminCoins(req, res) {
 }
 
 /** Поставить игроку игровой ник (username) — с проверкой занятости. */
+function adminDelete(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        if (nick === ADMIN) return send(res, 403, { error: 'главного администратора удалять нельзя' });
+        if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
+
+        const a = accounts[nick];
+        if (a.devices) for (const id of Object.keys(a.devices)) {
+            const d = a.devices[id];
+            if (d && d.token) sessions.delete(d.token);
+        }
+        for (const [tok, se] of sessions) if (se.nick === nick) sessions.delete(tok);
+
+        delete accounts[nick];
+        delete bans[nick];
+        delete warns[nick];
+        delete policy.together[nick];
+        delete policy.chats[nick];
+        delete policy.chatAssign[nick];
+        let k;
+        while ((k = policy.admins.indexOf(nick)) >= 0) policy.admins.splice(k, 1);
+        while ((k = policy.moderators.indexOf(nick)) >= 0) policy.moderators.splice(k, 1);
+        policy.servers = policy.servers.filter(x => x.owner !== nick);
+
+        saveAccounts();
+        savePolicy();
+        log('аккаунт удалён админом:', nick);
+        send(res, 200, { ok: true });
+    });
+}
+
 function adminSetPass(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
@@ -1576,6 +1609,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
     if (route === '/admin/setpass' && req.method === 'POST') return adminSetPass(req, res);
+    if (route === '/admin/delete' && req.method === 'POST') return adminDelete(req, res);
     if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);
     if (route === '/crash' && req.method === 'POST') return crashReport(req, res);
 

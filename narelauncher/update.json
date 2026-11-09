@@ -1,8 +1,8 @@
 {
-  "version": "1.40",
+  "version": "1.41",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "62353e264b254e812dc86f1cd68741afe1b27231",
-  "size": 663552,
-  "notes": "Кнопки Регистрация и Вход, боты Bugs и Publish отдельными каналами, админ может сбросить пароль игроку; фикс: смена пароля больше не сбрасывает монеты/устройства"
+  "sha1": "4c743b8b238120f94a2c409cc34bfda1ea837210",
+  "size": 665088,
+  "notes": "Админка: удаление аккаунта игрока"
 }

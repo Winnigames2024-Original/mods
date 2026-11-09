@@ -81,6 +81,7 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _logoutBtn = new NareButton { Text = "Сбросить вход (выйти со всех устройств)", Style = BtnStyle.Danger, Size = new Size(360, 38) };
         private readonly NareTextBox _passBox = new NareTextBox { Placeholder = "Новый пароль (от 4 знаков)" };
         private readonly NareButton _passBtn = new NareButton { Text = "Поставить новый пароль", Style = BtnStyle.Accent, Size = new Size(240, 38) };
+        private readonly NareButton _delBtn = new NareButton { Text = "Удалить аккаунт игрока", Style = BtnStyle.Danger, Size = new Size(240, 38) };
 
         private readonly NareLabel _statLine = new NareLabel("", 9.5f, FontStyle.Bold, Theme.Muted);
 
@@ -154,7 +155,7 @@ namespace NareLauncher.UI.Pages
             Add(_rightsNick); Add(_rolePick); Add(_grantBtn); Add(_revokeBtn);
             Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
             Add(_logoutNick); Add(_logoutBtn);
-            Add(_passBox); Add(_passBtn);
+            Add(_passBox); Add(_passBtn); Add(_delBtn);
             _rolePick.SetItems(new System.Collections.Generic.List<string> { "Админ", "Модератор" }, "Админ");
             _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
@@ -276,6 +277,14 @@ namespace NareLauncher.UI.Pages
                 await Do(() => NareAuth.AdminSetPassAsync(Token, nick, pw, Ct()),
                     "Новый пароль поставлен игроку " + nick + ". Старый больше не действует.");
                 _passBox.Text = "";
+            };
+            _delBtn.Click += async (s, e) =>
+            {
+                string nick = Pick(_logoutNick);
+                if (nick.Length == 0) { _status.Text = "Выберите игрока."; return; }
+                if (!Host.Confirm("Удалить аккаунт игрока " + nick + "? Это навсегда — пропадут монеты, ники, баны и устройства. Ник освободится."))
+                    return;
+                await Do(() => NareAuth.AdminDeleteAsync(Token, nick, Ct()), "Аккаунт " + nick + " удалён.");
             };
 
             Layout1();
@@ -553,7 +562,7 @@ namespace NareLauncher.UI.Pages
             Field(_logoutNick, pad, w, ref y);
             _logoutBtn.Location = new Point(pad, y); y += 48;
             Field(_passBox, pad, w, ref y);
-            _passBtn.Location = new Point(pad, y); y += 54;
+            _passBtn.Location = new Point(pad, y); _delBtn.Location = new Point(pad + 252, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 
