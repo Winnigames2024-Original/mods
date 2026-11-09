@@ -1,8 +1,8 @@
 {
-  "version": "1.37",
+  "version": "1.38",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "41324f487f87eba1da2d5e28f648478cd1fbea7b",
-  "size": 651776,
-  "notes": "Починка дизайна: нижние кнопки в «Аккаунтах» не обрезаются, левое меню вмещает все вкладки"
+  "sha1": "687beb1fe91eaf5296357abba2218c5ac93d85e7",
+  "size": 652288,
+  "notes": "Публичные серверы: опция «Скрыть IP» при добавлении — адрес не виден в списке, заход через кнопку «Играть»"
 }

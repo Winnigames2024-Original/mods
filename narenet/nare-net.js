@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.12';
+const VERSION = '1.13';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1291,7 +1291,8 @@ function adminGrant(req, res, grant) {
 function serversPublic(req, res) {
     const out = policy.servers
         .filter(x => x.status === 'approved')
-        .map(x => ({ id: x.id, owner: x.owner, name: x.name, ip: x.ip,
+        .map(x => ({ id: x.id, owner: x.owner, name: x.name,
+                     ip: x.hideIp ? '' : x.ip, hideIp: !!x.hideIp,
                      version: x.version, loader: x.loader, desc: x.desc, reward: x.reward || COIN_REWARD }));
     send(res, 200, { servers: out });
 }
@@ -1317,6 +1318,7 @@ function serverSubmit(req, res) {
             version: clean(body.version, 32),
             loader: clean(body.loader, 16),
             desc: clean(body.desc, 300),
+            hideIp: body.hideIp === true,
             reward: COIN_REWARD,
             status: 'pending',
             at: now()
@@ -1336,7 +1338,7 @@ function serversMine(req, res) {
         if (!nick) return send(res, 403, { error: 'нужен вход' });
 
         const out = policy.servers.filter(x => x.owner === nick)
-            .map(x => ({ id: x.id, name: x.name, ip: x.ip, status: x.status, reason: x.reason || '' }));
+            .map(x => ({ id: x.id, name: x.name, ip: x.ip, hideIp: !!x.hideIp, status: x.status, reason: x.reason || '' }));
         send(res, 200, { servers: out });
     });
 }
@@ -1355,7 +1357,7 @@ function coinsEarn(req, res) {
 
         if (left > 0)
             return send(res, 200, { ok: true, awarded: 0, coins: a.coins,
-                                    cooldownLeft: Math.ceil(left / 60000) });
+                                    cooldownLeft: Math.ceil(left / 60000), ip: server.ip });
 
         const reward = server.reward || COIN_REWARD;
         a.coins += reward;
@@ -1363,7 +1365,7 @@ function coinsEarn(req, res) {
         saveAccounts();
         log('монеты:', nick, '+' + reward, 'за', server.name);
 
-        send(res, 200, { ok: true, awarded: reward, coins: a.coins });
+        send(res, 200, { ok: true, awarded: reward, coins: a.coins, ip: server.ip });
     });
 }
 

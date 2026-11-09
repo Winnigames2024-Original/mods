@@ -85,34 +85,37 @@ namespace NareLauncher.UI.Pages
 
             if (string.IsNullOrEmpty(Token) && !Host.EnsureAuth()) return;
 
-            // запускаем игру с заходом на сервер
-            var request = new PlayLink.Request
-            {
-                Version = string.IsNullOrEmpty(server.Version) ? "" : server.Version,
-                Loader = string.IsNullOrEmpty(server.Loader) ? "vanilla" : server.Loader,
-                Server = server.Ip
-            };
-
-            if (request.HasVersion)
-            {
-                Host.Home.PlayFromLink(request);
-            }
-            else
-            {
-                Host.Home.LaunchOn(server.Ip);
-            }
-            Host.Navigate(0);
-
-            // монеты за заход — сервер сам следит за кулдауном
+            // сначала заход на сервере: начисляет монеты и отдаёт реальный адрес
+            // (для серверов со скрытым IP адреса нет в списке — только отсюда)
+            string ip = server.Ip;
             try
             {
                 var earn = await NareAuth.EarnCoinsAsync(Token, server.Id, CancellationToken.None);
+                if (!string.IsNullOrEmpty(earn.Ip)) ip = earn.Ip;
                 _coins.Text = "Монеты: " + earn.Coins;
                 _status.Text = earn.Awarded > 0
                     ? "Начислено " + earn.Awarded + " монет за заход!"
                     : "Монеты за этот сервер снова через " + earn.CooldownLeft + " мин.";
             }
             catch (Exception ex) { Log.Warn("Монеты не начислились: " + ex.Message); }
+
+            if (string.IsNullOrEmpty(ip))
+            {
+                _status.Text = "Не удалось получить адрес сервера. Попробуйте ещё раз.";
+                _status.ForeColor = Theme.Bad;
+                return;
+            }
+
+            var request = new PlayLink.Request
+            {
+                Version = string.IsNullOrEmpty(server.Version) ? "" : server.Version,
+                Loader = string.IsNullOrEmpty(server.Loader) ? "vanilla" : server.Loader,
+                Server = ip
+            };
+
+            if (request.HasVersion) Host.Home.PlayFromLink(request);
+            else Host.Home.LaunchOn(ip);
+            Host.Navigate(0);
         }
 
         private async void Submit()
@@ -174,7 +177,7 @@ namespace NareLauncher.UI.Pages
             Theme.Text1(g, s.Name, Theme.F(12f, FontStyle.Bold), Theme.Text,
                 new Rectangle(box.X + 14, box.Y + 8, box.Width - 160, 22));
 
-            string sub = s.Ip;
+            string sub = s.HideIp ? "🔒 IP скрыт" : s.Ip;
             if (!string.IsNullOrEmpty(s.Version)) sub += "  ·  " + s.Version;
             if (!string.IsNullOrEmpty(s.Loader)) sub += " " + s.Loader;
             Theme.Text1(g, sub, Theme.F(9f), Theme.Muted,
@@ -230,6 +233,8 @@ namespace NareLauncher.UI.Pages
         private readonly NareTextBox _desc = new NareTextBox { Placeholder = "Короткое описание" };
         private readonly NareButton _ok = new NareButton { Text = "Отправить на модерацию", Style = BtnStyle.Accent, Size = new Size(240, 40) };
         private readonly NareButton _cancel = new NareButton { Text = "Отмена", Style = BtnStyle.Ghost, Size = new Size(120, 40) };
+        private readonly NareButton _hideIp = new NareButton { Text = "☐  Скрыть IP (адрес не виден в списке)", Style = BtnStyle.Ghost, Size = new Size(440, 38) };
+        private bool _hide;
 
         public NareAuth.AdServer Result = new NareAuth.AdServer();
 
@@ -240,7 +245,7 @@ namespace NareLauncher.UI.Pages
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(480, 344);
+            ClientSize = new Size(480, 404);
             BackColor = Theme.Bg; ForeColor = Theme.Text; Font = Theme.F(10f);
 
             void Cap(string text, int y)
@@ -258,8 +263,18 @@ namespace NareLauncher.UI.Pages
             _version.SetBounds(20, 156, 440, 38);
             Cap("Короткое описание", 202);
             _desc.SetBounds(20, 218, 440, 38);
-            _ok.Location = new Point(20, 280);
-            _cancel.Location = new Point(340, 280);
+            Cap("Приватность", 264);
+            _hideIp.Location = new Point(20, 280);
+            _ok.Location = new Point(20, 340);
+            _cancel.Location = new Point(340, 340);
+
+            _hideIp.Click += (s, e) =>
+            {
+                _hide = !_hide;
+                _hideIp.Text = (_hide ? "☑" : "☐") + "  Скрыть IP (адрес не виден в списке)";
+                _hideIp.Style = _hide ? BtnStyle.Accent : BtnStyle.Ghost;
+                _hideIp.Invalidate();
+            };
 
             _ok.Click += (s, e) =>
             {
@@ -269,14 +284,15 @@ namespace NareLauncher.UI.Pages
                 {
                     Name = name, Ip = ip,
                     Version = _version.Text.Trim(),
-                    Desc = _desc.Text.Trim()
+                    Desc = _desc.Text.Trim(),
+                    HideIp = _hide
                 };
                 DialogResult = DialogResult.OK; Close();
             };
             _cancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
 
             Controls.Add(_name); Controls.Add(_ip); Controls.Add(_version); Controls.Add(_desc);
-            Controls.Add(_ok); Controls.Add(_cancel);
+            Controls.Add(_hideIp); Controls.Add(_ok); Controls.Add(_cancel);
         }
     }
 }

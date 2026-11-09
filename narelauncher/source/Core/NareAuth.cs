@@ -362,6 +362,7 @@ namespace NareLauncher.Core
             public string Loader = "";
             public string Desc = "";
             public long Reward = 100;
+            public bool HideIp;
             public string Status = "";
             public string Reason = "";
         }
@@ -378,6 +379,7 @@ namespace NareLauncher.Core
                 Loader = s["loader"].AsString(""),
                 Desc = s["desc"].AsString(""),
                 Reward = s["reward"].AsLong(100),
+                HideIp = s["hideIp"].AsBool(false),
                 Status = s["status"].AsString(""),
                 Reason = s["reason"].AsString("")
             };
@@ -399,6 +401,7 @@ namespace NareLauncher.Core
             body.Set("version", server.Version ?? "");
             body.Set("loader", server.Loader ?? "");
             body.Set("desc", server.Desc ?? "");
+            body.Set("hideIp", server.HideIp);
             var r = await PostAsync("/servers/submit", body, ct).ConfigureAwait(false);
             return r["id"].AsString("");
         }
@@ -411,7 +414,7 @@ namespace NareLauncher.Core
             return list;
         }
 
-        public class EarnResult { public long Awarded; public long Coins; public int CooldownLeft; }
+        public class EarnResult { public long Awarded; public long Coins; public int CooldownLeft; public string Ip = ""; }
 
         public static async Task<EarnResult> EarnCoinsAsync(string token, string serverId, CancellationToken ct)
         {
@@ -422,7 +425,8 @@ namespace NareLauncher.Core
             {
                 Awarded = r["awarded"].AsLong(0),
                 Coins = r["coins"].AsLong(0),
-                CooldownLeft = r["cooldownLeft"].AsInt(0)
+                CooldownLeft = r["cooldownLeft"].AsInt(0),
+                Ip = r["ip"].AsString("")
             };
         }
 
