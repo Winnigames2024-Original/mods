@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.23';
+const VERSION = '1.24';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -857,6 +857,7 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
     <div id="stats"></div>
     <div class="row" style="margin-top:10px">
       <button id="mnt" onclick="toggleMnt()">Техработы</button>
+      <button class="red" onclick="modUpdate()">⚠ Обновить мод у всех</button>
       <button onclick="load()">Обновить</button>
       <button onclick="logout()">Выйти</button>
     </div>
@@ -969,6 +970,10 @@ function toggleMnt(){var on=!(state.maintenance&&state.maintenance.on);
   var m=on?(prompt("Сообщение о техработах:","Идут технические работы")||"Идут технические работы"):"";
   api("/admin/maintenance",{on:on,message:m}).then(function(d){done(d,on?"техработы включены":"техработы выключены");});}
 function done(d,okText,raw){raw=raw||d;if(d&&d.ok){if(okText)msg(okText,true);load();}else{msg((d&&d.error)||"ошибка (нужны права админа?)",false);}}
+function modUpdate(){
+  if(!confirm("Разослать всем онлайн-игрокам срочное оповещение: вышло обновление мода, перезапустите лаунчер?"))return;
+  api("/admin/broadcast",{text:"⚠ Вышло обновление мода. Перезапустите лаунчер, чтобы получить новую версию."}).then(function(d){
+    if(d.ok)msg("оповещение об обновлении мода разослано всем онлайн",true);else msg(d.error||"ошибка (нужны права админа)",false);});}
 function cmsg(t,ok){var m=document.getElementById("cmsg");m.textContent=t||"";m.className=ok?"ok":"err";}
 function queue(text){return api("/admin/command",{text:text}).then(function(d){
   if(d.ok)cmsg("отправлено: /"+text,true);else cmsg(d.error||"ошибка (нужны права админа)",false);});}
