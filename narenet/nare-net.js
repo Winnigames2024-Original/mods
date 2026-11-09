@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.19';
+const VERSION = '1.20';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -439,6 +439,19 @@ const COIN_COOLDOWN = Number(process.env.NARENET_COIN_COOLDOWN_MIN || 60) * 6000
 const NAME_PRICE = Number(process.env.NARENET_NAME_PRICE || 1000);
 const DAILY_BONUS = Number(process.env.NARENET_DAILY_BONUS || 50);
 const DAILY_COOLDOWN = 20 * 60 * 60 * 1000;   // 20 часов
+const CHATNAME_PRICE = Number(process.env.NARENET_CHATNAME_PRICE || 1500);
+const ONLINE_WINDOW = 70 * 1000;              // считаем онлайном, если был в сети < 70 c назад
+const TAGS = [
+    { id: 'star',  label: '⭐',  price: 500 },
+    { id: 'fire',  label: '🔥',  price: 500 },
+    { id: 'heart', label: '❤',  price: 800 },
+    { id: 'skull', label: '☠',  price: 1000 },
+    { id: 'pro',   label: 'PRO', price: 1500 },
+    { id: 'gem',   label: '💎',  price: 2000 },
+    { id: 'crown', label: '👑',  price: 2500 },
+    { id: 'vip',   label: 'VIP', price: 3000 }
+];
+function tagLabel(id) { const t = TAGS.find(x => x.id === id); return t ? t.label : ''; }
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const BANS_FILE = path.join(DATA_DIR, 'bans.json');
@@ -757,6 +770,10 @@ function acc(nick) {
     if (!a.devices || typeof a.devices !== 'object') a.devices = {};
     if (typeof a.status !== 'string') a.status = '';
     if (!Array.isArray(a.shots)) a.shots = [];
+    if (!Array.isArray(a.tags)) a.tags = [];
+    if (typeof a.tag !== 'string') a.tag = '';
+    if (typeof a.chatName !== 'string') a.chatName = '';
+    if (typeof a.lastSeen !== 'number') a.lastSeen = 0;
     return a;
 }
 
@@ -777,6 +794,7 @@ function statusFor(nick, tok) {
     if (tok) {
         const who = sessionNick(tok);
         if (who !== nick) loggedOut = true;
+        else if (a) a.lastSeen = now();   // отметка присутствия (в памяти, без записи на диск)
     }
 
     return {
@@ -1184,6 +1202,15 @@ function subRemove(req, res) {
 
 // --------------------------------------------------- чат по бану
 
+function displayName(nick) {
+    const a = accounts[nick] ? acc(nick) : null;
+    return a && a.chatName ? a.chatName : nick;
+}
+function isOnline(nick) {
+    const a = accounts[nick] ? acc(nick) : null;
+    return !!(a && a.lastSeen && (now() - a.lastSeen) < ONLINE_WINDOW);
+}
+
 function chatList(nick) {
     if (!policy.chats[nick]) policy.chats[nick] = [];
     return policy.chats[nick];
@@ -1205,8 +1232,9 @@ function banChatSend(req, res) {
         const text = clean(body.text, 500);
         if (!text) return send(res, 400, { error: 'пустое сообщение' });
 
+        const a = acc(nick);
         const list = chatList(nick);
-        list.push({ from: nick, admin: false, text, at: now() });
+        list.push({ from: nick, fromName: displayName(nick), tag: tagLabel(a.tag), admin: false, text, at: now() });
         if (list.length > 200) list.shift();
         savePolicy();
 
@@ -1230,8 +1258,9 @@ function adminChatSend(req, res) {
         const text = clean(body.text, 500);
         if (!nick || !text) return send(res, 400, { error: 'нужен игрок и текст' });
 
+        const ame = acc(me);
         const list = chatList(nick);
-        list.push({ from: me, admin: true, text, at: now() });
+        list.push({ from: me, fromName: displayName(me), tag: ame ? tagLabel(ame.tag) : '', admin: true, text, at: now() });
         if (list.length > 200) list.shift();
         savePolicy();
 
@@ -1256,7 +1285,8 @@ function adminChatsList(req, res) {
                 lastAdmin: last ? !!last.admin : false,
                 at: last ? last.at : 0,
                 assigned: policy.chatAssign[nick] || '',
-                deleted: !!policy.deletedNames[nick]
+                deleted: !!policy.deletedNames[nick],
+                online: isOnline(nick), display: displayName(nick), tag: tagLabel((accounts[nick] ? acc(nick).tag : ''))
             });
         }
         out.sort((a, b) => b.at - a.at);
@@ -1520,6 +1550,79 @@ function serversMine(req, res) {
     });
 }
 
+// ------------------------------------------------------------ теги и имя
+
+function tagsList(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        send(res, 200, { ok: true, catalog: TAGS, owned: a.tags, equipped: a.tag,
+                         coins: a.coins, chatName: a.chatName, chatNamePrice: CHATNAME_PRICE });
+    });
+}
+
+function tagsBuy(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const id = clean(body.id, 16);
+        const tag = TAGS.find(x => x.id === id);
+        if (!tag) return send(res, 404, { error: 'нет такого тега' });
+        const a = acc(nick);
+        if (a.tags.indexOf(id) >= 0) return send(res, 400, { error: 'этот тег уже у вас есть' });
+        if (a.coins < tag.price) return send(res, 402, { error: 'нужно ' + tag.price + ' монет, у вас ' + a.coins });
+        a.coins -= tag.price;
+        a.tags.push(id);
+        a.tag = id;   // сразу надеваем
+        saveAccounts();
+        send(res, 200, { ok: true, coins: a.coins, owned: a.tags, equipped: a.tag });
+    });
+}
+
+function tagsEquip(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const id = clean(body.id, 16);
+        const a = acc(nick);
+        if (id && a.tags.indexOf(id) < 0) return send(res, 400, { error: 'этого тега у вас нет' });
+        a.tag = id;   // '' = снять
+        saveAccounts();
+        send(res, 200, { ok: true, equipped: a.tag });
+    });
+}
+
+function chatNameSet(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const name = clean(body.name, 20);
+        if (!name) return send(res, 400, { error: 'введите имя' });
+        if (name.length < 2) return send(res, 400, { error: 'имя слишком короткое' });
+        // нельзя выдавать себя за чужой аккаунт
+        if (accounts[name] && name !== nick) return send(res, 409, { error: 'это ник другого аккаунта' });
+        const a = acc(nick);
+        if (a.chatName === name) return send(res, 400, { error: 'это имя уже стоит' });
+        if (a.coins < CHATNAME_PRICE) return send(res, 402, { error: 'нужно ' + CHATNAME_PRICE + ' монет, у вас ' + a.coins });
+        a.coins -= CHATNAME_PRICE;
+        a.chatName = name;
+        saveAccounts();
+        send(res, 200, { ok: true, coins: a.coins, chatName: a.chatName });
+    });
+}
+
+function chatNameClear(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        a.chatName = '';
+        saveAccounts();
+        send(res, 200, { ok: true });
+    });
+}
+
 // ------------------------------------------------------------ профиль
 
 function shotPath(id) { return path.join(SHOTS_DIR, id + '.png'); }
@@ -1539,7 +1642,9 @@ function profileGet(req, res) {
         since: a.created || 0,
         shots: (a.shots || []).map(x => ({ id: x.id, at: x.at })),
         admin: isAdmin(nick), moderator: isModerator(nick),
-        deleted: !!policy.deletedNames[nick]
+        deleted: !!policy.deletedNames[nick],
+        online: isOnline(nick), lastSeen: a.lastSeen || 0,
+        tag: tagLabel(a.tag), chatName: a.chatName || ''
     });
 }
 
@@ -1620,7 +1725,7 @@ function searchPlayers(req, res) {
         const a = acc(n);
         const u = (a.username || n).toLowerCase();
         if (n.toLowerCase().indexOf(q) >= 0 || u.indexOf(q) >= 0)
-            out.push({ nick: n, username: a.username || n, coins: a.coins || 0 });
+            out.push({ nick: n, username: a.username || n, coins: a.coins || 0, online: isOnline(n), tag: tagLabel(a.tag) });
         if (out.length >= 20) break;
     }
     send(res, 200, { ok: true, players: out });
@@ -1881,6 +1986,11 @@ const server = http.createServer((req, res) => {
     if (route === '/profile/shot/del' && req.method === 'POST') return profileShotDel(req, res);
     if (route === '/profile/image') return profileImage(req, res);
     if (route === '/search') return searchPlayers(req, res);
+    if (route === '/tags/list' && req.method === 'POST') return tagsList(req, res);
+    if (route === '/tags/buy' && req.method === 'POST') return tagsBuy(req, res);
+    if (route === '/tags/equip' && req.method === 'POST') return tagsEquip(req, res);
+    if (route === '/chatname/set' && req.method === 'POST') return chatNameSet(req, res);
+    if (route === '/chatname/clear' && req.method === 'POST') return chatNameClear(req, res);
     if (route === '/admin/maintenance' && req.method === 'POST') return adminMaintenance(req, res);
     if (route === '/admin/warns/clear' && req.method === 'POST') return adminClearWarns(req, res);
     if (route === '/username/change' && req.method === 'POST') return usernameChange(req, res);

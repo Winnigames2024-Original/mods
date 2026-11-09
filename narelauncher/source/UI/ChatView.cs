@@ -19,12 +19,21 @@ namespace NareLauncher.UI
             public int Y;
             public int H;
             public Rectangle Bubble;
+            public bool Actions;             // есть ли inline-кнопки (заявка Publish)
+            public Rectangle OkBtn;          // координаты в ленте (без прокрутки)
+            public Rectangle NoBtn;
         }
 
         private readonly List<Row> _rows = new List<Row>();
         private int _scroll;
         private int _total;
         private bool _stick = true;         // держаться низа, пока не прокрутили вверх вручную
+
+        /// <summary>id серверов, по которым ещё можно принять/отклонить.</summary>
+        public readonly System.Collections.Generic.HashSet<string> PendingIds = new System.Collections.Generic.HashSet<string>();
+
+        /// <summary>Нажата inline-кнопка: (serverId, approve).</summary>
+        public event Action<string, bool> Action;
 
         public ChatView()
         {
@@ -59,12 +68,21 @@ namespace NareLauncher.UI
                     int inner = MaxBubble - 24;
                     var sz = TextRenderer.MeasureText(g, r.Msg.Text ?? "", Body,
                         new Size(inner, 0), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
-                    int bw = Math.Min(MaxBubble, Math.Max(90, sz.Width + 24));
+                    r.Actions = !string.IsNullOrEmpty(r.Msg.ServerId) && PendingIds.Contains(r.Msg.ServerId);
+                    int bw = Math.Min(MaxBubble, Math.Max(200, sz.Width + 24));
                     int bh = sz.Height + 28;        // шапка (имя) + отступы
+                    if (r.Actions) bh += 34;        // ряд кнопок
                     int x = r.Mine ? Width - bw - 12 : 12;
                     r.H = bh + 8;
                     r.Y = _total;
                     r.Bubble = new Rectangle(x, _total + 4, bw, bh);
+                    if (r.Actions)
+                    {
+                        int by = r.Bubble.Bottom - 32;
+                        int half = (r.Bubble.Width - 24 - 8) / 2;
+                        r.OkBtn = new Rectangle(r.Bubble.X + 12, by, half, 26);
+                        r.NoBtn = new Rectangle(r.OkBtn.Right + 8, by, half, 26);
+                    }
                     _total += r.H;
                 }
             }
@@ -91,10 +109,19 @@ namespace NareLauncher.UI
             for (int i = 0; i < _rows.Count; i++)
             {
                 var r = _rows[i];
+
+                if (r.Actions)
+                {
+                    var ok = new Rectangle(r.OkBtn.X, r.OkBtn.Y - _scroll, r.OkBtn.Width, r.OkBtn.Height);
+                    var no = new Rectangle(r.NoBtn.X, r.NoBtn.Y - _scroll, r.NoBtn.Width, r.NoBtn.Height);
+                    if (ok.Contains(e.Location)) { var h = Action; if (h != null) h(r.Msg.ServerId, true); return; }
+                    if (no.Contains(e.Location)) { var h = Action; if (h != null) h(r.Msg.ServerId, false); return; }
+                }
+
                 var b = new Rectangle(r.Bubble.X, r.Bubble.Y - _scroll, r.Bubble.Width, r.Bubble.Height);
                 if (b.Contains(e.Location))
                 {
-                    try { Clipboard.SetText(r.Msg.Text ?? ""); } catch { }
+                    try { if (!string.IsNullOrEmpty(r.Msg.Text)) Clipboard.SetText(r.Msg.Text); } catch { }
                     _copied = i;
                     Invalidate();
                     var t = new System.Windows.Forms.Timer { Interval = 900 };
@@ -143,13 +170,25 @@ namespace NareLauncher.UI
                 var bubble = new Rectangle(r.Bubble.X, y, r.Bubble.Width, r.Bubble.Height);
                 Theme.FillRound(g, bubble, 12, r.Mine ? Color.FromArgb(70, Theme.Accent) : Color.FromArgb(255, 30, 36, 48));
 
-                string name = r.Msg.Admin ? (r.Msg.From + " · админ") : r.Msg.From;
+                string who = string.IsNullOrEmpty(r.Msg.FromName) ? r.Msg.From : r.Msg.FromName;
+                if (!string.IsNullOrEmpty(r.Msg.Tag)) who = r.Msg.Tag + " " + who;
+                string name = r.Msg.Admin ? (who + " · админ") : who;
                 Theme.Text1(g, name, Head, r.Mine ? Theme.Accent2 : Theme.Warn,
                     new Rectangle(bubble.X + 12, bubble.Y + 6, bubble.Width - 20, 13));
 
                 var textR = new Rectangle(bubble.X + 12, bubble.Y + 20, bubble.Width - 24, bubble.Height - 26);
                 TextRenderer.DrawText(g, r.Msg.Text ?? "", Body, textR, Theme.Text,
                     TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+                if (r.Actions)
+                {
+                    var ok = new Rectangle(r.OkBtn.X, r.OkBtn.Y - _scroll, r.OkBtn.Width, r.OkBtn.Height);
+                    var no = new Rectangle(r.NoBtn.X, r.NoBtn.Y - _scroll, r.NoBtn.Width, r.NoBtn.Height);
+                    Theme.FillRound(g, ok, 8, Color.FromArgb(70, Theme.Good));
+                    Theme.FillRound(g, no, 8, Color.FromArgb(70, Theme.Bad));
+                    Theme.Text1(g, "✓ Принять", Theme.F(8.5f, FontStyle.Bold), Theme.Good, ok, StringAlignment.Center, StringAlignment.Center);
+                    Theme.Text1(g, "✕ Отклонить", Theme.F(8.5f, FontStyle.Bold), Theme.Bad, no, StringAlignment.Center, StringAlignment.Center);
+                }
 
                 if (_rows.IndexOf(r) == _copied)
                 {

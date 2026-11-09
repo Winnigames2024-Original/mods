@@ -22,6 +22,7 @@ namespace NareLauncher.UI
         private readonly NareTextBox _status = new NareTextBox { Placeholder = "Ваш статус — что вы строите, зовёте играть…" };
         private readonly NareButton _saveStatus = new NareButton { Text = "Сохранить статус", Style = BtnStyle.Accent, Size = new Size(190, 36) };
         private readonly NareButton _addShot = new NareButton { Text = "Выложить скрин", Style = BtnStyle.Success, Size = new Size(180, 36) };
+        private readonly NareButton _tagsBtn = new NareButton { Text = "Теги и имя", Style = BtnStyle.Ghost, Size = new Size(150, 36) };
         private readonly NareLabel _info = new NareLabel("", 9.5f, FontStyle.Regular, Theme.Muted);
 
         private readonly System.Windows.Forms.Timer _searchTimer = new System.Windows.Forms.Timer { Interval = 350 };
@@ -35,7 +36,7 @@ namespace NareLauncher.UI
         {
             Controls.Add(_search); Controls.Add(_results); Controls.Add(_mine);
             Controls.Add(_status); Controls.Add(_saveStatus); Controls.Add(_addShot);
-            Controls.Add(_info);
+            Controls.Add(_tagsBtn); Controls.Add(_info);
 
             _results.Renderer = DrawResult;
             _results.Visible = false;
@@ -48,6 +49,7 @@ namespace NareLauncher.UI
             _mine.Click += async (s, e) => { _search.Text = ""; _results.Visible = false; await Open(MyNick); };
             _saveStatus.Click += async (s, e) => await SaveStatus();
             _addShot.Click += async (s, e) => await AddShot();
+            _tagsBtn.Click += (s, e) => { using (var f = new TagsForm(AccountStore.Selected)) f.ShowDialog(FindForm()); _ = Open(MyNick); };
             MouseClick += OnShotClick;
         }
 
@@ -100,6 +102,7 @@ namespace NareLauncher.UI
                 _status.Enabled = IsMine;
                 _saveStatus.Visible = IsMine;
                 _addShot.Visible = IsMine;
+                _tagsBtn.Visible = IsMine;
                 _info.Text = "";
                 LoadImages();
                 Layout1();
@@ -233,7 +236,8 @@ namespace NareLauncher.UI
             _status.SetBounds(pad, top, Math.Min(520, Width - pad * 2 - 210), 38);
             _saveStatus.Location = new Point(_status.Right + 12, top + 1);
             _addShot.Location = new Point(pad, top + 52);
-            _info.SetBounds(pad + 200, top + 58, Width - pad * 2 - 200, 20);
+            _tagsBtn.Location = new Point(pad + 192, top + 52);
+            _info.SetBounds(pad + 356, top + 60, Width - pad * 2 - 356, 20);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -243,9 +247,21 @@ namespace NareLauncher.UI
 
             if (_profile == null) return;
 
-            string name = _profile.Deleted ? (_profile.Nick + " | Аккаунт Удалён") : _profile.Nick;
+            string disp = !string.IsNullOrEmpty(_profile.ChatName) ? _profile.ChatName : _profile.Nick;
+            string name = _profile.Deleted ? (_profile.Nick + " | Аккаунт Удалён") : disp;
+            if (!string.IsNullOrEmpty(_profile.Tag) && !_profile.Deleted) name = _profile.Tag + " " + name;
             string role = _profile.Admin ? "  · админ" : _profile.Moderator ? "  · модератор" : "";
             Theme.Text1(g, name + role, Theme.F(16f, FontStyle.Bold), Theme.Text, new Rectangle(28, 74, Width - 56, 26));
+            if (!_profile.Deleted)
+            {
+                if (_profile.Online)
+                {
+                    using (var br = new SolidBrush(Theme.Good)) g.FillEllipse(br, Width - 110, 82, 9, 9);
+                    Theme.Text1(g, "в сети", Theme.F(9.5f, FontStyle.Bold), Theme.Good, new Rectangle(Width - 96, 76, 70, 20));
+                }
+                else if (_profile.LastSeen > 0)
+                    Theme.Text1(g, "был(а) " + Ago(_profile.LastSeen), Theme.F(9f), Theme.Dim, new Rectangle(Width - 180, 76, 154, 20), StringAlignment.Far, StringAlignment.Center);
+            }
 
             string sub = _profile.Coins + " монет";
             if (!string.Equals(_profile.Username, _profile.Nick, StringComparison.Ordinal)) sub += "   ·   в игре: " + _profile.Username;
@@ -287,6 +303,20 @@ namespace NareLauncher.UI
                 else
                     Theme.Text1(g, "загрузка…", Theme.F(8.5f), Theme.Dim, cell, StringAlignment.Center, StringAlignment.Center);
             }
+        }
+
+        private static string Ago(long atMs)
+        {
+            try
+            {
+                var span = DateTime.Now - DateTimeOffset.FromUnixTimeMilliseconds(atMs).LocalDateTime;
+                if (span.TotalMinutes < 2) return "только что";
+                if (span.TotalHours < 1) return (int)span.TotalMinutes + " мин назад";
+                if (span.TotalDays < 1) return (int)span.TotalHours + " ч назад";
+                if (span.TotalDays < 30) return (int)span.TotalDays + " дн назад";
+                return DateTimeOffset.FromUnixTimeMilliseconds(atMs).LocalDateTime.ToString("dd.MM.yyyy");
+            }
+            catch { return "давно"; }
         }
 
         private static Rectangle FitRect(Size img, Rectangle box)

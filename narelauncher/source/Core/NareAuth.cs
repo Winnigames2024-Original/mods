@@ -465,7 +465,9 @@ namespace NareLauncher.Core
         {
             public string Nick = "", Status = "", Username = "";
             public long Coins, Since;
-            public bool Admin, Moderator, Deleted;
+            public bool Admin, Moderator, Deleted, Online;
+            public long LastSeen;
+            public string Tag = "", ChatName = "";
             public readonly List<string> Shots = new List<string>();
             public readonly List<string> Subs = new List<string>();
         }
@@ -484,7 +486,11 @@ namespace NareLauncher.Core
                 Since = j["since"].AsLong(0),
                 Admin = j["admin"].AsBool(false),
                 Moderator = j["moderator"].AsBool(false),
-                Deleted = j["deleted"].AsBool(false)
+                Deleted = j["deleted"].AsBool(false),
+                Online = j["online"].AsBool(false),
+                LastSeen = j["lastSeen"].AsLong(0),
+                Tag = j["tag"].AsString(""),
+                ChatName = j["chatName"].AsString("")
             };
             foreach (var x in j["shots"].Items) p.Shots.Add(x["id"].AsString(""));
             foreach (var x in j["subs"].Items) p.Subs.Add(x.AsString(""));
@@ -510,15 +516,71 @@ namespace NareLauncher.Core
             await PostAsync("/profile/shot/del", body, ct).ConfigureAwait(false);
         }
 
-        public class SearchHit { public string Nick = "", Username = ""; public long Coins; }
+        public class SearchHit { public string Nick = "", Username = "", Tag = ""; public long Coins; public bool Online; }
 
         public static async Task<List<SearchHit>> SearchAsync(string q, CancellationToken ct)
         {
             var j = await Net.GetJsonAsync(Url("/search?q=" + Net.UrlEncode(q)), ct).ConfigureAwait(false);
             var list = new List<SearchHit>();
             foreach (var x in j["players"].Items)
-                list.Add(new SearchHit { Nick = x["nick"].AsString(""), Username = x["username"].AsString(""), Coins = x["coins"].AsLong(0) });
+                list.Add(new SearchHit { Nick = x["nick"].AsString(""), Username = x["username"].AsString(""), Coins = x["coins"].AsLong(0), Online = x["online"].AsBool(false), Tag = x["tag"].AsString("") });
             return list;
+        }
+
+        // ------------------------------------------------------------ теги и имя
+
+        public class TagInfo { public string Id = "", Label = ""; public long Price; }
+        public class TagsState
+        {
+            public readonly List<TagInfo> Catalog = new List<TagInfo>();
+            public readonly List<string> Owned = new List<string>();
+            public string Equipped = "", ChatName = "";
+            public long Coins, ChatNamePrice;
+        }
+
+        private static TagsState ParseTags(Json j)
+        {
+            var st = new TagsState
+            {
+                Equipped = j["equipped"].AsString(""),
+                ChatName = j["chatName"].AsString(""),
+                Coins = j["coins"].AsLong(0),
+                ChatNamePrice = j["chatNamePrice"].AsLong(0)
+            };
+            foreach (var x in j["catalog"].Items)
+                st.Catalog.Add(new TagInfo { Id = x["id"].AsString(""), Label = x["label"].AsString(""), Price = x["price"].AsLong(0) });
+            foreach (var x in j["owned"].Items) st.Owned.Add(x.AsString(""));
+            return st;
+        }
+
+        public static async Task<TagsState> TagsListAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token);
+            return ParseTags(await PostAsync("/tags/list", body, ct).ConfigureAwait(false));
+        }
+
+        public static async Task TagsBuyAsync(string token, string id, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("id", id);
+            await PostAsync("/tags/buy", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task TagsEquipAsync(string token, string id, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("id", id ?? "");
+            await PostAsync("/tags/equip", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task ChatNameSetAsync(string token, string name, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("name", name);
+            await PostAsync("/chatname/set", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task ChatNameClearAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token);
+            await PostAsync("/chatname/clear", body, ct).ConfigureAwait(false);
         }
 
         public static async Task<EarnResult> EarnCoinsAsync(string token, string serverId, CancellationToken ct)
@@ -574,6 +636,8 @@ namespace NareLauncher.Core
         public class ChatMessage
         {
             public string From = "";
+            public string FromName = "";
+            public string Tag = "";
             public bool Admin;
             public bool Bot;
             public string ServerId = "";   // для заявок бота Publish — id сервера
@@ -588,6 +652,8 @@ namespace NareLauncher.Core
                 list.Add(new ChatMessage
                 {
                     From = m["from"].AsString(""),
+                    FromName = m["fromName"].AsString(""),
+                    Tag = m["tag"].AsString(""),
                     Admin = m["admin"].AsBool(false),
                     Bot = m["bot"].AsBool(false),
                     ServerId = m["serverId"].AsString(""),
@@ -634,6 +700,9 @@ namespace NareLauncher.Core
             public long At;
             public string Assigned = "";
             public bool Deleted;
+            public bool Online;
+            public string Display = "";
+            public string Tag = "";
         }
 
         public static async Task<List<ChatSummary>> AdminChatsAsync(string token, CancellationToken ct)
@@ -650,7 +719,10 @@ namespace NareLauncher.Core
                     LastAdmin = c["lastAdmin"].AsBool(false),
                     At = c["at"].AsLong(0),
                     Assigned = c["assigned"].AsString(""),
-                    Deleted = c["deleted"].AsBool(false)
+                    Deleted = c["deleted"].AsBool(false),
+                    Online = c["online"].AsBool(false),
+                    Display = c["display"].AsString(""),
+                    Tag = c["tag"].AsString("")
                 });
             return list;
         }

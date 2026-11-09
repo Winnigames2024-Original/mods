@@ -1,8 +1,8 @@
 {
-  "version": "1.44",
+  "version": "1.45",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "bf65cfc8b80e8a4324f0024809e8385a72507a92",
-  "size": 699904,
-  "notes": "Профиль игрока со скриншотами и статусом, поиск игроков, удалённые аккаунты в чатах помечаются «Аккаунт Удалён»"
+  "sha1": "3e99731b376235087b71f5c342f95119fe10d867",
+  "size": 715776,
+  "notes": "Онлайн-статус, теги за монеты и отображаемое имя в чатах за монеты — показываются в профиле и чатах"
 }

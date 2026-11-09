@@ -281,11 +281,20 @@ namespace NareLauncher.UI
             else if (hover) Theme.FillRound(g, box, 9, Color.FromArgb(16, 255, 255, 255));
 
             bool bot = c.Nick == "Publish" || c.Nick == "Bugs";
+            string shown = !string.IsNullOrEmpty(c.Display) ? c.Display : c.Nick;
+            if (!string.IsNullOrEmpty(c.Tag)) shown = c.Tag + " " + shown;
             string title = bot ? ("🤖 " + (c.Nick == "Bugs" ? "Bugs | Players" : "Publish"))
-                : c.Deleted ? (c.Nick + " | Аккаунт Удалён") : c.Nick;
+                : c.Deleted ? (c.Nick + " | Аккаунт Удалён") : shown;
             var titleColor = bot ? Theme.Accent : c.Deleted ? Theme.Dim : Theme.Text;
+            // точка онлайна
+            if (!bot && !c.Deleted && c.Online)
+            {
+                using (var br = new SolidBrush(Theme.Good))
+                    g.FillEllipse(br, box.X + 12, box.Y + 13, 8, 8);
+            }
+            int tx = (!bot && !c.Deleted && c.Online) ? box.X + 26 : box.X + 12;
             Theme.Text1(g, title, Theme.F(10.5f, FontStyle.Bold), titleColor,
-                new Rectangle(box.X + 12, box.Y + 7, box.Width - 90, 20));
+                new Rectangle(tx, box.Y + 7, box.Right - tx - 76, 20));
 
             string prev = (c.LastAdmin && !bot ? "вы: " : "") + c.Last;
             Theme.Text1(g, prev, Theme.F(8.5f), Theme.Dim,
