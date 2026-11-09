@@ -41,6 +41,7 @@ namespace NareLauncher.Core
         public long Coins;
         public string Username = "";
         public bool IsAdmin;
+        public bool IsModerator;
 
         public bool ModBlocked(string modId, string gameVersion)
         {
@@ -205,6 +206,7 @@ namespace NareLauncher.Core
             policy.Coins = json["coins"].AsLong(0);
             policy.Username = json["username"].AsString("");
             policy.IsAdmin = json["admin"].AsBool(false);
+            policy.IsModerator = json["moderator"].AsBool(false);
 
             return policy;
         }
@@ -552,11 +554,44 @@ namespace NareLauncher.Core
             await PostAsync("/admin/chat/assign", body, ct).ConfigureAwait(false);
         }
 
-        public static async Task GrantAdminAsync(string token, string nick, bool grant, CancellationToken ct)
+        public static async Task GrantAdminAsync(string token, string nick, bool grant, CancellationToken ct, string role = "admin")
         {
             var body = Admin(token);
             body.Set("nick", nick);
+            body.Set("role", role);
             await PostAsync(grant ? "/admin/grant" : "/admin/revoke", body, ct).ConfigureAwait(false);
+        }
+
+        public class StaffMember { public string Nick = ""; public string Role = ""; }
+
+        public static async Task<List<StaffMember>> AdminStaffAsync(string token, CancellationToken ct)
+        {
+            var j = await PostAsync("/admin/staff", Admin(token), ct).ConfigureAwait(false);
+            var list = new List<StaffMember>();
+            foreach (var x in j["staff"].Items)
+                list.Add(new StaffMember { Nick = x["nick"].AsString(""), Role = x["role"].AsString("") });
+            return list;
+        }
+
+        public class PendingServer
+        {
+            public string Id = "", Owner = "", Name = "", Ip = "", Version = "", Desc = "";
+            public bool HideIp;
+        }
+
+        public static async Task<List<PendingServer>> AdminPendingAsync(string token, CancellationToken ct)
+        {
+            var j = await PostAsync("/admin/pending", Admin(token), ct).ConfigureAwait(false);
+            var list = new List<PendingServer>();
+            foreach (var x in j["pending"].Items)
+                list.Add(new PendingServer
+                {
+                    Id = x["id"].AsString(""), Owner = x["owner"].AsString(""),
+                    Name = x["name"].AsString(""), Ip = x["ip"].AsString(""),
+                    HideIp = x["hideIp"].AsBool(false),
+                    Version = x["version"].AsString(""), Desc = x["desc"].AsString("")
+                });
+            return list;
         }
 
         public static async Task<long> AdminCoinsAsync(string token, string nick, long amount, CancellationToken ct)

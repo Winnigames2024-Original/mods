@@ -24,8 +24,17 @@ namespace NareLauncher.UI
         // --- админский список чатов + кнопки
         private readonly VirtualList _list = new VirtualList { ItemHeight = 56, EmptyText = "Никто ещё не писал." };
         private readonly NareButton _unban = new NareButton { Text = "Разбанить", Style = BtnStyle.Success, Size = new Size(150, 38) };
-        private readonly NareButton _assign = new NareButton { Text = "Передать админу", Style = BtnStyle.Ghost, Size = new Size(190, 38) };
+        private readonly NareDropDown _staffPick = new NareDropDown();
+        private readonly NareButton _assign = new NareButton { Text = "Передать", Style = BtnStyle.Ghost, Size = new Size(130, 38) };
         private readonly NareLabel _who = new NareLabel("", 11f, FontStyle.Bold, Theme.Text);
+
+        // --- бот Publish: приём/отклонение заявок
+        private readonly NareDropDown _pubPick = new NareDropDown();
+        private readonly NareButton _pubOk = new NareButton { Text = "Одобрить", Style = BtnStyle.Success, Size = new Size(150, 40) };
+        private readonly NareButton _pubNo = new NareButton { Text = "Отклонить", Style = BtnStyle.Danger, Size = new Size(150, 40) };
+        private List<NareAuth.PendingServer> _pending = new List<NareAuth.PendingServer>();
+        private List<string> _staff = new List<string>();
+        private List<string> _staffNicks = new List<string>();
 
         private readonly System.Windows.Forms.Timer _poll = new System.Windows.Forms.Timer { Interval = 5000 };
 
@@ -41,8 +50,12 @@ namespace NareLauncher.UI
             Controls.Add(_input);
             Controls.Add(_send);
             Controls.Add(_unban);
+            Controls.Add(_staffPick);
             Controls.Add(_assign);
             Controls.Add(_who);
+            Controls.Add(_pubPick);
+            Controls.Add(_pubOk);
+            Controls.Add(_pubNo);
             Controls.Add(_status);
 
             _list.Renderer = DrawSummary;
@@ -53,6 +66,8 @@ namespace NareLauncher.UI
             _input.Inner.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; _ = Send(); } };
             _unban.Click += async (s, e) => await Unban();
             _assign.Click += async (s, e) => await Assign();
+            _pubOk.Click += async (s, e) => await Decide(true);
+            _pubNo.Click += async (s, e) => await Decide(false);
 
             _poll.Tick += async (s, e) => await Refresh();
         }
@@ -65,12 +80,16 @@ namespace NareLauncher.UI
             var acc = AccountStore.Selected;
             if (acc != null && string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); }
 
-            _admin = acc != null && (acc.Admin || NareAuth.Last.IsAdmin);
+            _admin = acc != null && (acc.Admin || NareAuth.Last.IsAdmin || NareAuth.Last.IsModerator);
             Layout1();
             _list.Visible = _admin;
             _unban.Visible = _admin;
+            _staffPick.Visible = _admin;
             _assign.Visible = _admin;
             _who.Visible = _admin;
+            _pubPick.Visible = false;
+            _pubOk.Visible = false;
+            _pubNo.Visible = false;
 
             if (!_admin) { _openNick = MyNick; _openBanned = false; }
 
@@ -99,6 +118,28 @@ namespace NareLauncher.UI
                     _list.SetItems(items);
                     if (keep >= 0 && keep < items.Count) _list.SelectedIndex = keep;
 
+                    if (_staff.Count == 0)
+                    {
+                        try
+                        {
+                            var st = await NareAuth.AdminStaffAsync(Token, CancellationToken.None);
+                            _staff = new List<string>();
+                            foreach (var m in st) _staff.Add(m.Nick + "  (" + m.Role + ")");
+                            _staffNicks = new List<string>();
+                            foreach (var m in st) _staffNicks.Add(m.Nick);
+                            _staffPick.SetItems(_staff, null);
+                        }
+                        catch { }
+                    }
+
+                    if (string.Equals(_openNick, "Publish", StringComparison.Ordinal))
+                    {
+                        _pending = await NareAuth.AdminPendingAsync(Token, CancellationToken.None);
+                        var pl = new List<string>();
+                        foreach (var ps in _pending) pl.Add(ps.Name + " — " + (ps.HideIp ? "IP скрыт" : ps.Ip) + "  [" + ps.Owner + "]");
+                        _pubPick.SetItems(pl, null);
+                    }
+
                     if (_openNick.Length > 0)
                         _chat = await NareAuth.AdminChatAsync(Token, _openNick, CancellationToken.None);
                 }
@@ -116,11 +157,21 @@ namespace NareLauncher.UI
             _msgs.SetMessages(_chat, _admin, MyNick);
             if (_admin)
             {
-                _who.Text = _openNick.Length > 0
-                    ? "Чат с " + _openNick + (_openBanned ? "  (в бане)" : "")
-                    : "Выберите чат слева";
+                bool pub = string.Equals(_openNick, "Publish", StringComparison.Ordinal);
+                _who.Text = _openNick.Length == 0 ? "Выберите чат слева"
+                    : pub ? "📢 Publish — заявки на публикацию серверов"
+                    : "Чат с " + _openNick + (_openBanned ? "  (в бане)" : "");
+
+                // обычные элементы прячем на Publish, и наоборот
+                _input.Visible = !pub; _send.Visible = !pub;
+                _unban.Visible = !pub; _staffPick.Visible = !pub; _assign.Visible = !pub;
+                _pubPick.Visible = pub; _pubOk.Visible = pub; _pubNo.Visible = pub;
+
                 _unban.Enabled = _openNick.Length > 0 && _openBanned;
                 _assign.Enabled = _openNick.Length > 0;
+                bool hasPending = _pending != null && _pending.Count > 0;
+                _pubOk.Enabled = pub && hasPending;
+                _pubNo.Enabled = pub && hasPending;
             }
         }
 
@@ -172,16 +223,38 @@ namespace NareLauncher.UI
         private async Task Assign()
         {
             if (_openNick.Length == 0) return;
-            string to = Prompt.OneField(FindForm(), "Передать чат",
-                "Ник администратора, которому передать чат с " + _openNick + ":", false);
-            if (string.IsNullOrWhiteSpace(to)) return;
+            int i = _staffPick.SelectedIndex;
+            if (i < 0 || i >= _staffNicks.Count) { _status.Text = "Выберите, кому передать (список справа)."; return; }
+            string to = _staffNicks[i];
             try
             {
-                await NareAuth.AdminChatAssignAsync(Token, _openNick, to.Trim(), CancellationToken.None);
-                _status.Text = "Чат передан администратору " + to.Trim() + ".";
+                await NareAuth.AdminChatAssignAsync(Token, _openNick, to, CancellationToken.None);
+                _status.Text = "Чат передан: " + to;
+                _status.ForeColor = Theme.Good;
                 await Refresh();
             }
-            catch (Exception ex) { _status.Text = "Не вышло: " + ex.Message; }
+            catch (Exception ex) { _status.Text = "Не вышло: " + ex.Message; _status.ForeColor = Theme.Bad; }
+        }
+
+        private async Task Decide(bool approve)
+        {
+            int i = _pubPick.SelectedIndex;
+            if (i < 0 || i >= _pending.Count) { _status.Text = "Выберите заявку."; return; }
+            var ps = _pending[i];
+            try
+            {
+                if (approve) await NareAuth.ApproveServerAsync(Token, ps.Id, 0, CancellationToken.None);
+                else
+                {
+                    string reason = Prompt.OneField(FindForm(), "Отклонить заявку",
+                        "Причина отклонения «" + ps.Name + "» (можно пусто):", false);
+                    await NareAuth.RejectServerAsync(Token, ps.Id, reason ?? "", CancellationToken.None);
+                }
+                _status.Text = (approve ? "Одобрено: " : "Отклонено: ") + ps.Name;
+                _status.ForeColor = Theme.Good;
+                await Refresh();
+            }
+            catch (Exception ex) { _status.Text = "Не вышло: " + ex.Message; _status.ForeColor = Theme.Bad; }
         }
 
         // --------------------------------------------------------- отрисовка
@@ -226,12 +299,26 @@ namespace NareLauncher.UI
                 _list.SetBounds(pad, top, listW, h - top - 20);
                 int cx = pad + listW + 20;
                 int cw = w - cx - pad;
-                _who.SetBounds(cx, top - 2, cw, 22);
-                _unban.Location = new Point(w - pad - _assign.Width - _unban.Width - 12, top - 6);
-                _assign.Location = new Point(w - pad - _assign.Width, top - 6);
+
+                int ubX = w - pad - _unban.Width;
+                int asX = ubX - 8 - _assign.Width;
+                int spX = asX - 8 - 170;
+                _unban.Location = new Point(ubX, top - 6);
+                _assign.Location = new Point(asX, top - 6);
+                _staffPick.SetBounds(spX, top - 4, 170, 34);
+                _who.SetBounds(cx, top - 2, Math.Max(80, spX - cx - 10), 22);
+
                 _msgs.SetBounds(cx, top + 30, cw, h - top - 30 - bottom);
+
+                // обычный ввод
                 _input.SetBounds(cx, h - bottom + 6, cw - 162, 40);
                 _send.Location = new Point(cx + cw - 150, h - bottom + 6);
+
+                // панель Publish (накладывается на ввод, видна только в чате Publish)
+                _pubOk.Location = new Point(cx + cw - 150, h - bottom + 6);
+                _pubNo.Location = new Point(cx + cw - 150 - 158, h - bottom + 6);
+                _pubPick.SetBounds(cx, h - bottom + 9, cw - 320, 34);
+
                 _status.SetBounds(cx, h - 24, cw, 18);
             }
             else

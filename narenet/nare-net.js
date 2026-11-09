@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.13';
+const VERSION = '1.14';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -465,12 +465,14 @@ const policy = loadJson(POLICY_FILE, {
     servers: [],                                // рекламные серверы на модерации/одобренные
     chats: {},                                  // nick -> [ { from, text, at } ]: переписка
     chatAssign: {},                             // nick -> админ, которому передали чат
-    admins: []                                  // доп. администраторы (кроме главного ADMIN)
+    admins: [],                                 // доп. администраторы (кроме главного ADMIN)
+    moderators: []                              // модераторы
 });
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
+if (!Array.isArray(policy.moderators)) policy.moderators = [];
 if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
@@ -598,6 +600,24 @@ function readJsonBody(req, done) {
 
 function isAdmin(nick) {
     return nick === ADMIN || (policy.admins && policy.admins.indexOf(nick) >= 0);
+}
+
+function isModerator(nick) {
+    return policy.moderators && policy.moderators.indexOf(nick) >= 0;
+}
+
+function isStaff(nick) {
+    return isAdmin(nick) || isModerator(nick);
+}
+
+/** Доступ для персонала (админ или модератор) — модерация чатов/серверов/игроков. */
+function needStaff(body, res) {
+    const nick = sessionNick(body && body.token);
+    if (!isStaff(nick)) {
+        send(res, 403, { error: 'нужен вход администратором или модератором' });
+        return false;
+    }
+    return true;
 }
 
 function needAdmin(body, res) {
@@ -739,7 +759,8 @@ function statusFor(nick, tok) {
         blockedMods: policy.mods,
         coins: a ? a.coins : 0,
         username: a ? a.username : nick,
-        admin: isAdmin(nick)
+        admin: isAdmin(nick),
+        moderator: isModerator(nick)
     };
 }
 
@@ -772,7 +793,7 @@ function appeal(req, res) {
 
 function adminBan(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
 
         const nick = clean(body.nick, 16);
         if (!nick) return send(res, 400, { error: 'не указан ник' });
@@ -791,7 +812,7 @@ function adminBan(req, res) {
 
 function adminUnban(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const nick = clean(body.nick, 16);
         if (bans[nick]) { delete bans[nick]; saveBans(); log('разбан:', nick); }
         send(res, 200, { ok: true });
@@ -800,7 +821,7 @@ function adminUnban(req, res) {
 
 function adminWarn(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const nick = clean(body.nick, 16);
         const text = clean(body.text, 300);
         if (!nick || !text) return send(res, 400, { error: 'нужен ник и текст' });
@@ -842,7 +863,7 @@ function adminCommand(req, res) {
 
 function adminTogether(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const nick = clean(body.nick, 16);
         if (!nick) return send(res, 400, { error: 'не указан ник' });
 
@@ -1163,7 +1184,7 @@ function banChatSend(req, res) {
 
 function adminChatGet(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const nick = clean(body.nick, 16);
         send(res, 200, { ok: true, messages: chatList(nick) });
     });
@@ -1171,7 +1192,7 @@ function adminChatGet(req, res) {
 
 function adminChatSend(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const me = sessionNick(body.token);
         const nick = clean(body.nick, 16);
         const text = clean(body.text, 500);
@@ -1189,7 +1210,7 @@ function adminChatSend(req, res) {
 /** Список всех переписок — для вкладки «Чаты» у администратора. */
 function adminChatsList(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const out = [];
         for (const nick of Object.keys(policy.chats)) {
             const list = policy.chats[nick] || [];
@@ -1213,11 +1234,11 @@ function adminChatsList(req, res) {
 /** Передать чат другому администратору. */
 function adminChatAssign(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const nick = clean(body.nick, 16);
         const to = clean(body.to, 16);
         if (!nick || !to) return send(res, 400, { error: 'нужен игрок и кому передать' });
-        if (!isAdmin(to)) return send(res, 400, { error: 'этот пользователь не администратор' });
+        if (!isStaff(to)) return send(res, 400, { error: 'это не администратор и не модератор' });
 
         policy.chatAssign[nick] = to;
         const list = chatList(nick);
@@ -1277,12 +1298,40 @@ function adminGrant(req, res, grant) {
         if (nick === ADMIN) return send(res, 400, { error: 'это и так главный администратор' });
         if (!accounts[nick]) return send(res, 404, { error: 'нет такого аккаунта' });
 
-        const i = policy.admins.indexOf(nick);
-        if (grant && i < 0) policy.admins.push(nick);
-        if (!grant && i >= 0) policy.admins.splice(i, 1);
+        const role = clean(body.role, 16) || 'admin';   // admin | moderator
+        const drop = n => { let k; while ((k = policy.admins.indexOf(n)) >= 0) policy.admins.splice(k, 1);
+                            while ((k = policy.moderators.indexOf(n)) >= 0) policy.moderators.splice(k, 1); };
+
+        drop(nick);   // роль всегда одна — сначала снимаем все
+        if (grant) {
+            if (role === 'moderator') policy.moderators.push(nick);
+            else policy.admins.push(nick);
+        }
         savePolicy();
-        log(grant ? 'назначен админ:' : 'снят админ:', nick);
-        send(res, 200, { ok: true, admins: policy.admins });
+        log(grant ? ('назначен ' + role + ':') : 'сняты права:', nick);
+        send(res, 200, { ok: true, admins: policy.admins, moderators: policy.moderators });
+    });
+}
+
+/** Список персонала — для выпадашки «передать админу». */
+function adminStaff(req, res) {
+    readJsonBody(req, body => {
+        if (!needStaff(body, res)) return;
+        const out = [{ nick: ADMIN, role: 'главный админ' }];
+        for (const n of policy.admins) out.push({ nick: n, role: 'админ' });
+        for (const n of policy.moderators) out.push({ nick: n, role: 'модератор' });
+        send(res, 200, { ok: true, staff: out });
+    });
+}
+
+/** Заявки на публикацию серверов — для бота Publish. */
+function adminPending(req, res) {
+    readJsonBody(req, body => {
+        if (!needStaff(body, res)) return;
+        const out = policy.servers.filter(x => x.status === 'pending')
+            .map(x => ({ id: x.id, owner: x.owner, name: x.name, ip: x.ip,
+                         hideIp: !!x.hideIp, version: x.version, desc: x.desc, at: x.at }));
+        send(res, 200, { ok: true, pending: out });
     });
 }
 
@@ -1325,6 +1374,16 @@ function serverSubmit(req, res) {
         };
         policy.servers.push(entry);
         if (policy.servers.length > 500) policy.servers.shift();
+
+        // бот Publish: кладём запрос в общий чат модерации
+        const pub = chatList('Publish');
+        pub.push({ from: 'Publish', admin: false, bot: true,
+                   text: '📢 Запрос на публикацию сервера\n' + name + '  (' + (entry.hideIp ? 'IP скрыт' : ip) + ')\n'
+                         + (entry.version ? ('версия ' + entry.version + '\n') : '')
+                         + (entry.desc ? (entry.desc + '\n') : '')
+                         + 'от ' + nick + '  ·  id: ' + entry.id, at: now() });
+        if (pub.length > 200) pub.shift();
+
         savePolicy();
         log('заявка на сервер-рекламу от', nick, ':', name);
 
@@ -1395,20 +1454,28 @@ function usernameChange(req, res) {
 
 function adminServers(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         send(res, 200, { ok: true, servers: policy.servers.slice(-200) });
     });
 }
 
 function adminServerDecide(req, res, approve) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
         const server = policy.servers.find(x => x.id === body.id);
         if (!server) return send(res, 404, { error: 'нет такой заявки' });
 
         server.status = approve ? 'approved' : 'rejected';
         if (!approve) server.reason = clean(body.reason, 200);
         if (approve && Number(body.reward) > 0) server.reward = Number(body.reward);
+
+        const who = sessionNick(body.token);
+        const pub = chatList('Publish');
+        pub.push({ from: 'Publish', admin: true, bot: true,
+                   text: (approve ? '✅ Одобрено: ' : '❌ Отклонено: ') + server.name
+                         + (approve ? '' : (server.reason ? (' — ' + server.reason) : '')) + '  (' + who + ')', at: now() });
+        if (pub.length > 200) pub.shift();
+
         savePolicy();
         log('сервер', server.name, approve ? 'одобрен' : 'отклонён');
 
@@ -1418,7 +1485,7 @@ function adminServerDecide(req, res, approve) {
 
 function adminState(req, res) {
     readJsonBody(req, body => {
-        if (!needAdmin(body, res)) return;
+        if (!needStaff(body, res)) return;
 
         // просроченные баны заодно подчистим
         for (const nick of Object.keys(bans)) banOf(nick);
@@ -1484,6 +1551,8 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/chat/assign' && req.method === 'POST') return adminChatAssign(req, res);
     if (route === '/admin/grant' && req.method === 'POST') return adminGrant(req, res, true);
     if (route === '/admin/revoke' && req.method === 'POST') return adminGrant(req, res, false);
+    if (route === '/admin/staff' && req.method === 'POST') return adminStaff(req, res);
+    if (route === '/admin/pending' && req.method === 'POST') return adminPending(req, res);
     if (route === '/admin/coins' && req.method === 'POST') return adminCoins(req, res);
     if (route === '/admin/setnick' && req.method === 'POST') return adminSetNick(req, res);
     if (route === '/admin/logout' && req.method === 'POST') return adminLogout(req, res);

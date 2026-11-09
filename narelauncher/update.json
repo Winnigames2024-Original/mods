@@ -1,8 +1,8 @@
 {
-  "version": "1.38",
+  "version": "1.39",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "687beb1fe91eaf5296357abba2218c5ac93d85e7",
-  "size": 652288,
-  "notes": "Публичные серверы: опция «Скрыть IP» при добавлении — адрес не виден в списке, заход через кнопку «Играть»"
+  "sha1": "1df51f6daac053c27609c14a4f37589684e7bec2",
+  "size": 660480,
+  "notes": "Копирование сообщений в чатах (клик), бот Publish с приёмом/отклонением заявок, роль модератора и выдача ролей, список админов/модеров в «Передать»"
 }

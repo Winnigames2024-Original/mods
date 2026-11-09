@@ -306,7 +306,7 @@ namespace NareLauncher.UI
         public void RefreshAdminNav()
         {
             var acc = AccountStore.Selected;
-            bool admin = acc != null && acc.Admin;
+            bool admin = (acc != null && acc.Admin) || NareAuth.Last.IsAdmin || NareAuth.Last.IsModerator;
 
             int adminIndex = _pages.IndexOf(AdminTab);
             if (adminIndex >= 0 && adminIndex < _nav.Count)
@@ -454,13 +454,13 @@ namespace NareLauncher.UI
 
             NareAuth.Last = policy;
 
-            // сервер может назначить игрока админом — подхватываем
+            // сервер может назначить игрока админом/модератором — подхватываем
             if (acc != null && acc.Admin != policy.IsAdmin)
             {
                 acc.Admin = policy.IsAdmin;
                 AccountStore.Save();
-                RefreshAdminNav();
             }
+            RefreshAdminNav();
 
             // сервер — хозяин игрового ника: подхватываем его на аккаунт
             if (!string.IsNullOrEmpty(policy.Username) && acc != null

@@ -67,8 +67,9 @@ namespace NareLauncher.UI.Pages
 
         // права админа
         private readonly NareDropDown _rightsNick = new NareDropDown();
-        private readonly NareButton _grantBtn = new NareButton { Text = "Назначить админом", Style = BtnStyle.Accent, Size = new Size(210, 38) };
-        private readonly NareButton _revokeBtn = new NareButton { Text = "Снять админку", Style = BtnStyle.Ghost, Size = new Size(170, 38) };
+        private readonly NareDropDown _rolePick = new NareDropDown();
+        private readonly NareButton _grantBtn = new NareButton { Text = "Назначить", Style = BtnStyle.Accent, Size = new Size(150, 38) };
+        private readonly NareButton _revokeBtn = new NareButton { Text = "Снять права", Style = BtnStyle.Ghost, Size = new Size(160, 38) };
 
         // игровой ник
         private readonly NareDropDown _setNickDrop = new NareDropDown();
@@ -101,7 +102,7 @@ namespace NareLauncher.UI.Pages
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
                 "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",
-                "МОНЕТЫ", "ПРАВА АДМИНА", "ИГРОВОЙ НИК", "СБРОС ВХОДА", "" };
+                "МОНЕТЫ", "ПРАВА: АДМИН / МОДЕРАТОР", "ИГРОВОЙ НИК", "СБРОС ВХОДА", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -119,7 +120,7 @@ namespace NareLauncher.UI.Pages
                 "Версия обновления", "Что нового (changelog)",
                 "Игрок для точечного экстренного обновления",
                 "Игрок (монеты)", "Сколько монет (можно с минусом)",
-                "Игрок (права админа)",
+                "Игрок (права админа)", "Роль",
                 "Игрок (сменить ник)", "Новый игровой ник",
                 "Игрок (сбросить вход)"
             };
@@ -148,9 +149,10 @@ namespace NareLauncher.UI.Pages
             Add(_updVer); Add(_updLog); Add(_updGo); Add(_updCrit);
             Add(_updNick); Add(_updOne);
             Add(_coinNick); Add(_coinAmount); Add(_coinGive); Add(_coinTake);
-            Add(_rightsNick); Add(_grantBtn); Add(_revokeBtn);
+            Add(_rightsNick); Add(_rolePick); Add(_grantBtn); Add(_revokeBtn);
             Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
             Add(_logoutNick); Add(_logoutBtn);
+            _rolePick.SetItems(new System.Collections.Generic.List<string> { "Админ", "Модератор" }, "Админ");
             _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
             _scroll.Controls.Add(_usersHead);
@@ -235,10 +237,15 @@ namespace NareLauncher.UI.Pages
 
             _coinGive.Click += async (s, e) => await Coins(+1);
             _coinTake.Click += async (s, e) => await Coins(-1);
-            _grantBtn.Click += async (s, e) => await Do(() => NareAuth.GrantAdminAsync(Token, Pick(_rightsNick), true, Ct()),
-                "Назначен админом: " + Pick(_rightsNick));
+            _grantBtn.Click += async (s, e) =>
+            {
+                string role = Pick(_rolePick) == "Модератор" ? "moderator" : "admin";
+                string nick = Pick(_rightsNick);
+                await Do(() => NareAuth.GrantAdminAsync(Token, nick, true, Ct(), role),
+                    "Назначен (" + (role == "moderator" ? "модератор" : "админ") + "): " + nick);
+            };
             _revokeBtn.Click += async (s, e) => await Do(() => NareAuth.GrantAdminAsync(Token, Pick(_rightsNick), false, Ct()),
-                "Снята админка: " + Pick(_rightsNick));
+                "Сняты права: " + Pick(_rightsNick));
             _setNickBtn.Click += async (s, e) =>
             {
                 string nick = Pick(_setNickDrop), uname = _setNickBox.Text.Trim();
@@ -519,9 +526,10 @@ namespace NareLauncher.UI.Pages
             Field(_coinAmount, pad, w, ref y);
             _coinGive.Location = new Point(pad, y); _coinTake.Location = new Point(pad + 160, y); y += 54;
 
-            Row("ПРАВА АДМИНА", ref y);
+            Row("ПРАВА: АДМИН / МОДЕРАТОР", ref y);
             Field(_rightsNick, pad, w, ref y);
-            _grantBtn.Location = new Point(pad, y); _revokeBtn.Location = new Point(pad + 220, y); y += 54;
+            Field(_rolePick, pad, w, ref y);
+            _grantBtn.Location = new Point(pad, y); _revokeBtn.Location = new Point(pad + 162, y); y += 54;
 
             Row("ИГРОВОЙ НИК", ref y);
             Field(_setNickDrop, pad, w, ref y);

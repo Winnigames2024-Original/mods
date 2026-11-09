@@ -31,6 +31,7 @@ namespace NareLauncher.UI
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             BackColor = Theme.Panel;
+            Cursor = Cursors.Hand;
         }
 
         private static readonly Font Body = Theme.F(9.5f);
@@ -81,6 +82,29 @@ namespace NareLauncher.UI
 
         public void ScrollBottom() { _scroll = MaxScroll; _stick = true; ClampScroll(); }
 
+        private int _copied = -1;   // индекс скопированного пузыря (для короткой подсветки)
+
+        /// <summary>Клик по сообщению копирует его текст.</summary>
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            base.OnMouseClick(e);
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                var r = _rows[i];
+                var b = new Rectangle(r.Bubble.X, r.Bubble.Y - _scroll, r.Bubble.Width, r.Bubble.Height);
+                if (b.Contains(e.Location))
+                {
+                    try { Clipboard.SetText(r.Msg.Text ?? ""); } catch { }
+                    _copied = i;
+                    Invalidate();
+                    var t = new System.Windows.Forms.Timer { Interval = 900 };
+                    t.Tick += (s, ev) => { _copied = -1; t.Stop(); t.Dispose(); if (!IsDisposed) Invalidate(); };
+                    t.Start();
+                    return;
+                }
+            }
+        }
+
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e);
@@ -126,6 +150,12 @@ namespace NareLauncher.UI
                 var textR = new Rectangle(bubble.X + 12, bubble.Y + 20, bubble.Width - 24, bubble.Height - 26);
                 TextRenderer.DrawText(g, r.Msg.Text ?? "", Body, textR, Theme.Text,
                     TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+                if (_rows.IndexOf(r) == _copied)
+                {
+                    var tag = new Rectangle(bubble.X, bubble.Y - 2, 96, 16);
+                    Theme.Text1(g, "✓ скопировано", Theme.F(7.5f, FontStyle.Bold), Theme.Good, tag);
+                }
             }
 
             // тонкий скроллбар
