@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.24';
+const VERSION = '1.26';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -56,9 +56,13 @@ fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 function now() { return Date.now(); }
 
+const LOG_BUF = [];
 function log() {
     const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    console.log('[' + stamp + ']', Array.from(arguments).join(' '));
+    const line = '[' + stamp + '] ' + Array.from(arguments).join(' ');
+    console.log(line);
+    LOG_BUF.push(line);
+    if (LOG_BUF.length > 400) LOG_BUF.shift();
 }
 
 function token() { return crypto.randomBytes(16).toString('hex'); }
@@ -841,6 +845,12 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
 .stat b{color:#9db6ff;font-size:15px}
 #msg{min-height:18px;font-size:13px;margin-top:8px} .ok{color:#6fe39a} .err{color:#ff8a98}
 .actions{display:flex;gap:5px;flex-wrap:wrap}
+.console{background:#06080d;border:1px solid #1c2230;border-radius:8px;padding:10px 12px;height:260px;overflow:auto;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.55;color:#aeb9cc;white-space:pre-wrap;word-break:break-word}
+.console .l{padding:0} .console .l:hover{background:#0d1118}
+.prompt{display:flex;align-items:center;gap:8px;background:#06080d;border:1px solid #1c2230;border-radius:8px;padding:4px 10px}
+.prompt .caret{color:#6fe39a;font-family:monospace;font-weight:700}
+.prompt input{flex:1;background:transparent;border:none;color:#e6e9f0;font-family:Consolas,Menlo,monospace;font-size:13px;padding:7px 0}
+.prompt input:focus{outline:none}
 </style></head><body><div class="wrap">
 <h1>NareNet — админ-панель</h1>
 <div class="muted">Бан, разбан, пароли, монеты, техработы — прямо из браузера.</div>
@@ -870,15 +880,21 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
     </tr></thead><tbody id="tb"></tbody></table></div>
   </div>
   <div class="card">
-    <div class="row" style="justify-content:space-between"><b>Команды и троллинг</b><span class="muted">выполняется на сервере WMine</span></div>
-    <div class="row" style="margin-top:8px">
-      <input id="ct" placeholder="ник игрока (для «от его имени»)" style="flex:1;min-width:160px">
+    <div class="row" style="justify-content:space-between">
+      <b>Консоль сервера</b>
+      <span><button class="sm" onclick="pollLogs()">Обновить</button> <button class="sm" onclick="clearView()">Очистить</button></span>
     </div>
-    <div class="row" style="margin-top:8px">
-      <input id="cc" placeholder="команда без / (напр. tp PRINKE_52 0 100 0)" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')runCmd()">
+    <div id="console" class="console" style="margin-top:8px"></div>
+    <div class="prompt" style="margin-top:8px">
+      <span class="caret">&gt;</span>
+      <input id="cc" placeholder="команда без / (напр. tp PRINKE_52 0 100 0)" onkeydown="if(event.key==='Enter')runCmd()">
       <button class="pri" onclick="runCmd()">Выполнить</button>
     </div>
-    <div class="muted" style="margin-top:6px">Указан ник — команда выполнится «от его имени» (execute as). Пусто — как консоль сервера.</div>
+    <div class="row" style="margin-top:8px">
+      <select id="worldsel" onchange="pickWorld()" style="flex:1;min-width:220px"><option value="">— выберите игрока и его мир —</option></select>
+      <input id="ct" placeholder="или впишите ник" style="width:160px">
+    </div>
+    <div class="muted" style="margin-top:4px">Выбери игрока из списка открытых миров «Вместе» или впиши ник. Ник задан — команда и кнопки идут «от его имени» (execute as). Пусто — команда как консоль сервера.</div>
     <div class="row" style="margin-top:10px">
       <button class="sm" onclick="troll('up')">Подкинуть</button>
       <button class="sm" onclick="troll('blind')">Ослепить</button>
@@ -907,7 +923,7 @@ function login(){
      token=d.token;sessionStorage.setItem("nn_token",token);load();
    }).catch(function(){document.getElementById("lmsg").textContent="сервер недоступен";});
 }
-function logout(){token="";sessionStorage.removeItem("nn_token");show(false);}
+function logout(){stopLogs();token="";sessionStorage.removeItem("nn_token");show(false);}
 function show(app){document.getElementById("app").style.display=app?"block":"none";
   document.getElementById("login").style.display=app?"none":"block";}
 function load(){
@@ -923,7 +939,7 @@ function load(){
     var mnt=d.maintenance&&d.maintenance.on;
     document.getElementById("mnt").textContent=mnt?"Выключить техработы":"Включить техработы";
     document.getElementById("mnt").className=mnt?"red":"";
-    show(true);draw();
+    show(true);draw();startLogs();
   }).catch(function(){document.getElementById("lmsg").textContent="сервер недоступен";show(false);});
 }
 function stat(n,v){return '<span class="stat"><b>'+(v==null?0:v)+'</b> '+n+'</span>';}
@@ -974,6 +990,34 @@ function modUpdate(){
   if(!confirm("Разослать всем онлайн-игрокам срочное оповещение: вышло обновление мода, перезапустите лаунчер?"))return;
   api("/admin/broadcast",{text:"⚠ Вышло обновление мода. Перезапустите лаунчер, чтобы получить новую версию."}).then(function(d){
     if(d.ok)msg("оповещение об обновлении мода разослано всем онлайн",true);else msg(d.error||"ошибка (нужны права админа)",false);});}
+var logTimer=null;
+function pollLogs(){
+  api("/admin/logs",{}).then(function(d){
+    if(!d.ok)return;
+    var c=document.getElementById("console");if(!c)return;
+    var atBottom=c.scrollHeight-c.scrollTop-c.clientHeight<40;
+    c.innerHTML=(d.lines||[]).map(function(l){return '<div class="l">'+esc(l)+'</div>';}).join("");
+    if(atBottom)c.scrollTop=c.scrollHeight;
+  }).catch(function(){});
+}
+function loadWorlds(){
+  fetch("/rooms").then(function(r){return r.json()}).then(function(d){
+    var sel=document.getElementById("worldsel");if(!sel)return;
+    var cur=sel.value;
+    var rooms=(d.rooms||[]);
+    var html='<option value="">— выберите игрока и его мир ('+rooms.length+') —</option>';
+    rooms.forEach(function(rm){
+      var w=rm.world||"мир"; var pl=(rm.players!=null?rm.players:"?")+(rm.max?("/"+rm.max):"");
+      html+='<option value="'+esc(rm.nick)+'">'+esc(rm.nick)+' — '+esc(w)+' ('+pl+')</option>';
+    });
+    sel.innerHTML=html; sel.value=cur;
+  }).catch(function(){});
+}
+function pickWorld(){var sel=document.getElementById("worldsel");var ct=document.getElementById("ct");
+  if(sel&&ct&&sel.value){ct.value=sel.value;cmsg("выбран игрок "+sel.value,true);}}
+function startLogs(){ if(logTimer)clearInterval(logTimer); pollLogs(); loadWorlds(); logTimer=setInterval(function(){pollLogs();loadWorlds();},2000); }
+function stopLogs(){ if(logTimer){clearInterval(logTimer);logTimer=null;} }
+function clearView(){ var c=document.getElementById("console"); if(c)c.innerHTML=""; }
 function cmsg(t,ok){var m=document.getElementById("cmsg");m.textContent=t||"";m.className=ok?"ok":"err";}
 function queue(text){return api("/admin/command",{text:text}).then(function(d){
   if(d.ok)cmsg("отправлено: /"+text,true);else cmsg(d.error||"ошибка (нужны права админа)",false);});}
@@ -991,6 +1035,13 @@ function troll(kind){var t=document.getElementById("ct").value.trim();
 if(token)load();
 </script>
 </div></body></html>`;
+
+function adminLogs(req, res) {
+    readJsonBody(req, body => {
+        if (!needStaff(body, res)) return;
+        send(res, 200, { ok: true, lines: LOG_BUF });
+    });
+}
 
 function panelPage(req, res) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -2161,6 +2212,7 @@ const server = http.createServer((req, res) => {
 
     // --- лаунчер спрашивает про себя
     if (route === '/panel' || route === '/panel/') return panelPage(req, res);
+    if (route === '/admin/logs' && req.method === 'POST') return adminLogs(req, res);
     if (route === '/status') return status(req, res);
     if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
 
