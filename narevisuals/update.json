@@ -1,8 +1,8 @@
 {
-  "version": "2.21.0",
-  "file": "forge_narevisuals-2.21.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.21.0.jar",
-  "sha1": "eea8bc461237f3f22438ab6024dc4999c260c16a",
-  "size": 847650,
-  "notes": "Команды: /rtp, /sethome /home /delhome (с автоподсказками), /virtualchest и /vc (личный сундук с сохранением). Телепорт и rtp без урона от падения и без кика (прогрузка чанка + сброс счётчика полёта)"
+  "version": "2.22.0",
+  "file": "forge_narevisuals-2.22.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.22.0.jar",
+  "sha1": "f22b72e79a9097e2f80769930de9532a4bc63618",
+  "size": 848176,
+  "notes": "Команды (/ntp, /rtp, дома, /vc) теперь гарантированно работают на локальном сервере «Вместе»: регистрация и при старте сервера, а не только через RegisterCommandsEvent (мод клиентский)"
 }

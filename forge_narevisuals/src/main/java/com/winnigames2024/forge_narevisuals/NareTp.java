@@ -26,7 +26,19 @@ public final class NareTp {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent e) {
-        e.getDispatcher().register(
+        register(e.getDispatcher());
+    }
+
+    // Гарантия для локального сервера «Вместе» (мод clientSideOnly): регистрируем
+    // команду и при старте сервера, если её ещё нет.
+    @SubscribeEvent
+    public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent e) {
+        register(e.getServer().getCommands().getDispatcher());
+    }
+
+    private static void register(com.mojang.brigadier.CommandDispatcher<CommandSourceStack> d) {
+        if (d.getRoot().getChild("ntp") != null) return;
+        d.register(
                 Commands.literal("ntp")
                         .requires(src -> true)
                         .then(Commands.argument("игрок", StringArgumentType.word())

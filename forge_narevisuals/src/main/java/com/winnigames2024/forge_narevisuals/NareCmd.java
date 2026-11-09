@@ -41,28 +41,43 @@ public final class NareCmd {
         }
     };
 
+    // Обычный путь — для серверов, где мод полноценный.
     @SubscribeEvent
     public static void onRegister(RegisterCommandsEvent e) {
-        e.getDispatcher().register(Commands.literal("rtp").requires(s -> true)
+        register(e.getDispatcher());
+    }
+
+    // Гарантия для локального сервера «Вместе»: мод клиентский (clientSideOnly),
+    // поэтому RegisterCommandsEvent для интегрированного сервера может не прийти —
+    // регистрируем команды при старте сервера напрямую в его диспетчере.
+    @SubscribeEvent
+    public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent e) {
+        register(e.getServer().getCommands().getDispatcher());
+    }
+
+    private static void register(com.mojang.brigadier.CommandDispatcher<CommandSourceStack> d) {
+        if (d.getRoot().getChild("rtp") != null) return;   // уже зарегистрированы
+
+        d.register(Commands.literal("rtp").requires(s -> true)
                 .executes(ctx -> rtp(ctx.getSource(), 5000))
                 .then(Commands.argument("радиус", IntegerArgumentType.integer(100, 100000))
                         .executes(ctx -> rtp(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "радиус")))));
 
-        e.getDispatcher().register(Commands.literal("sethome").requires(s -> true)
+        d.register(Commands.literal("sethome").requires(s -> true)
                 .then(Commands.argument("имя", StringArgumentType.word())
                         .executes(ctx -> setHome(ctx.getSource(), StringArgumentType.getString(ctx, "имя")))));
 
-        e.getDispatcher().register(Commands.literal("home").requires(s -> true)
+        d.register(Commands.literal("home").requires(s -> true)
                 .then(Commands.argument("имя", StringArgumentType.word()).suggests(HOME_NAMES)
                         .executes(ctx -> goHome(ctx.getSource(), StringArgumentType.getString(ctx, "имя")))));
 
-        e.getDispatcher().register(Commands.literal("delhome").requires(s -> true)
+        d.register(Commands.literal("delhome").requires(s -> true)
                 .then(Commands.argument("имя", StringArgumentType.word()).suggests(HOME_NAMES)
                         .executes(ctx -> delHome(ctx.getSource(), StringArgumentType.getString(ctx, "имя")))));
 
-        e.getDispatcher().register(Commands.literal("virtualchest").requires(s -> true)
+        d.register(Commands.literal("virtualchest").requires(s -> true)
                 .executes(ctx -> vchest(ctx.getSource())));
-        e.getDispatcher().register(Commands.literal("vc").requires(s -> true)
+        d.register(Commands.literal("vc").requires(s -> true)
                 .executes(ctx -> vchest(ctx.getSource())));
     }
 
