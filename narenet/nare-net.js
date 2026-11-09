@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.21';
+const VERSION = '1.22';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -816,6 +816,145 @@ function statusFor(nick, tok) {
         moderator: isModerator(nick),
         maintenance: (policy.maintenance.on && !isStaff(nick)) ? (policy.maintenance.message || 'Идут технические работы. Зайдите позже.') : ''
     };
+}
+
+const PANEL_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NareNet — админ-панель</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0e1118;color:#e6e9f0}
+.wrap{max-width:1000px;margin:0 auto;padding:18px}
+h1{font-size:20px;margin:0 0 4px} .muted{color:#8b93a7;font-size:13px}
+.card{background:#161b26;border:1px solid #232a3a;border-radius:12px;padding:16px;margin:12px 0}
+input,select{background:#0e1118;border:1px solid #2a3144;color:#e6e9f0;border-radius:8px;padding:9px 11px;font-size:14px;outline:none}
+input:focus{border-color:#4f7cff}
+button{background:#1d2535;border:1px solid #2a3144;color:#e6e9f0;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
+button:hover{border-color:#4f7cff} button.pri{background:#2f52d8;border-color:#2f52d8} button.red{background:#5a1d26;border-color:#7a2633}
+button.red:hover{border-color:#ff5a6a} button.sm{padding:5px 9px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px 8px;border-bottom:1px solid #202636}
+th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
+.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;margin-left:5px}
+.b-admin{background:#243a6b;color:#9db6ff} .b-ban{background:#5a1d26;color:#ff9aa6} .b-tg{background:#3a2a5a;color:#c7a6ff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stat{display:inline-block;background:#0e1118;border:1px solid #232a3a;border-radius:8px;padding:6px 10px;margin:3px;font-size:12px}
+.stat b{color:#9db6ff;font-size:15px}
+#msg{min-height:18px;font-size:13px;margin-top:8px} .ok{color:#6fe39a} .err{color:#ff8a98}
+.actions{display:flex;gap:5px;flex-wrap:wrap}
+</style></head><body><div class="wrap">
+<h1>NareNet — админ-панель</h1>
+<div class="muted">Бан, разбан, пароли, монеты, техработы — прямо из браузера.</div>
+
+<div id="login" class="card" style="max-width:360px">
+  <div class="row"><input id="u" placeholder="ник админа" autocomplete="username"></div>
+  <div class="row" style="margin-top:8px"><input id="p" type="password" placeholder="пароль" autocomplete="current-password"></div>
+  <div class="row" style="margin-top:10px"><button class="pri" onclick="login()">Войти</button></div>
+  <div id="lmsg" class="err" style="font-size:13px;margin-top:8px"></div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="card">
+    <div id="stats"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="mnt" onclick="toggleMnt()">Техработы</button>
+      <button onclick="load()">Обновить</button>
+      <button onclick="logout()">Выйти</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row"><input id="q" placeholder="поиск по нику…" oninput="draw()" style="flex:1;min-width:200px"></div>
+    <div id="msg"></div>
+    <div style="overflow:auto;margin-top:10px"><table id="tbl"><thead><tr>
+      <th>Ник</th><th>Имя</th><th>Монеты</th><th>Статус</th><th>Действия</th>
+    </tr></thead><tbody id="tb"></tbody></table></div>
+  </div>
+</div>
+
+<script>
+var token=sessionStorage.getItem("nn_token")||"";
+var state=null, isAdmin=false;
+function api(path,body){body=body||{};body.token=token;
+  return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
+function msg(t,ok){var m=document.getElementById("msg");m.textContent=t||"";m.className=ok?"ok":"err";}
+function login(){
+  var u=document.getElementById("u").value.trim(), p=document.getElementById("p").value;
+  document.getElementById("lmsg").textContent="";
+  fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
+   .then(function(r){return r.json()}).then(function(d){
+     if(!d.ok){document.getElementById("lmsg").textContent=d.error||"не вышло";return;}
+     token=d.token;sessionStorage.setItem("nn_token",token);load();
+   }).catch(function(){document.getElementById("lmsg").textContent="сервер недоступен";});
+}
+function logout(){token="";sessionStorage.removeItem("nn_token");show(false);}
+function show(app){document.getElementById("app").style.display=app?"block":"none";
+  document.getElementById("login").style.display=app?"none":"block";}
+function load(){
+  api("/admin/state",{}).then(function(d){
+    if(!d.ok){document.getElementById("lmsg").textContent=d.error||"нужен вход админом";show(false);return;}
+    state=d;isAdmin=false;
+    (d.accounts||[]).forEach(function(a){/*admin flag per row*/});
+    // определить, админ ли мы: пробуем админ-действие недоступно — покажем все кнопки, сервер сам проверит
+    var st=d.stats||{};
+    document.getElementById("stats").innerHTML=
+      stat("аккаунтов",st.accounts)+stat("онлайн",st.online)+stat("банов",st.bans)+
+      stat("админов",st.admins)+stat("чатов",st.chats)+stat("серверов",st.approvedServers);
+    var mnt=d.maintenance&&d.maintenance.on;
+    document.getElementById("mnt").textContent=mnt?"Выключить техработы":"Включить техработы";
+    document.getElementById("mnt").className=mnt?"red":"";
+    show(true);draw();
+  }).catch(function(){document.getElementById("lmsg").textContent="сервер недоступен";show(false);});
+}
+function stat(n,v){return '<span class="stat"><b>'+(v==null?0:v)+'</b> '+n+'</span>';}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}
+function banInfo(nick){var b=(state.bans||[]).filter(function(x){return x.nick===nick})[0];return b||null;}
+function draw(){
+  if(!state)return;
+  var q=(document.getElementById("q").value||"").toLowerCase();
+  var rows=(state.accounts||[]).filter(function(a){return a.nick.toLowerCase().indexOf(q)>=0||(a.username||"").toLowerCase().indexOf(q)>=0;});
+  rows.sort(function(a,b){return a.nick.localeCompare(b.nick);});
+  var h="";
+  rows.forEach(function(a){
+    var badges=(a.admin?'<span class="badge b-admin">админ</span>':'')+
+               (a.banned?'<span class="badge b-ban">бан</span>':'')+
+               (a.blockedTogether?'<span class="badge b-tg">без Вместе</span>':'');
+    var acts='<div class="actions">'+
+      (a.banned?btn("разбан","unban(\\''+a.nick+'\\')",""):btn("бан","ban(\\''+a.nick+'\\')","red"))+
+      btn("монеты","coins(\\''+a.nick+'\\')","")+
+      btn("врем. пароль","temp(\\''+a.nick+'\\')","")+
+      btn("сброс пароля","setpass(\\''+a.nick+'\\')","")+
+      btn("удалить","del(\\''+a.nick+'\\')","red")+'</div>';
+    h+="<tr><td>"+esc(a.nick)+badges+"</td><td>"+esc(a.username||"")+"</td><td>"+(a.coins||0)+"</td><td>"+
+       (a.banned?banLeft(a.nick):"—")+"</td><td>"+acts+"</td></tr>";
+  });
+  document.getElementById("tb").innerHTML=h||'<tr><td colspan="5" class="muted">никого не найдено</td></tr>';
+}
+function banLeft(nick){var b=banInfo(nick);if(!b)return"бан";return esc(b.left||"бан")+(b.reason?' · '+esc(b.reason):"");}
+function btn(t,fn,cls){return '<button class="sm '+cls+'" onclick="'+fn+'">'+t+'</button>';}
+function ban(nick){
+  var mins=prompt("Бан "+nick+": на сколько минут? (0 = навсегда)","0");if(mins===null)return;
+  var reason=prompt("Причина бана:","нарушение правил");if(reason===null)return;
+  api("/admin/ban",{nick:nick,minutes:Number(mins)||0,reason:reason}).then(function(d){done(d,"забанен "+nick);});
+}
+function unban(nick){api("/admin/unban",{nick:nick}).then(function(d){done(d,"разбанен "+nick);});}
+function coins(nick){var a=prompt("Монеты "+nick+": сколько добавить? (минус — отнять)","100");if(a===null)return;
+  api("/admin/coins",{nick:nick,amount:Number(a)}).then(function(d){done(d,d.ok?("монет у "+nick+": "+d.coins):null,d);});}
+function temp(nick){api("/admin/temppass",{nick:nick}).then(function(d){
+  if(d.ok&&d.password){msg("временный пароль для "+nick+": "+d.password+"  (оригинальный тоже работает)",true);}else done(d);});}
+function setpass(nick){var p=prompt("Новый пароль для "+nick+" (от 4 знаков):","");if(!p)return;
+  api("/admin/setpass",{nick:nick,password:p}).then(function(d){done(d,"пароль "+nick+" заменён");});}
+function del(nick){if(!confirm("Удалить аккаунт "+nick+"? Это необратимо."))return;
+  api("/admin/delete",{nick:nick}).then(function(d){done(d,"удалён "+nick);});}
+function toggleMnt(){var on=!(state.maintenance&&state.maintenance.on);
+  var m=on?(prompt("Сообщение о техработах:","Идут технические работы")||"Идут технические работы"):"";
+  api("/admin/maintenance",{on:on,message:m}).then(function(d){done(d,on?"техработы включены":"техработы выключены");});}
+function done(d,okText,raw){raw=raw||d;if(d&&d.ok){if(okText)msg(okText,true);load();}else{msg((d&&d.error)||"ошибка (нужны права админа?)",false);}}
+if(token)load();
+</script>
+</div></body></html>`;
+
+function panelPage(req, res) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(PANEL_HTML);
 }
 
 function status(req, res) {
@@ -1981,6 +2120,7 @@ const server = http.createServer((req, res) => {
     if (route === '/account/logout/others' && req.method === 'POST') return accountLogoutOthers(req, res);
 
     // --- лаунчер спрашивает про себя
+    if (route === '/panel' || route === '/panel/') return panelPage(req, res);
     if (route === '/status') return status(req, res);
     if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
 
