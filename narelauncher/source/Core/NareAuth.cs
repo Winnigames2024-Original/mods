@@ -42,6 +42,7 @@ namespace NareLauncher.Core
         public string Username = "";
         public bool IsAdmin;
         public bool IsModerator;
+        public string Maintenance = "";   // непусто = идут техработы, вход закрыт
 
         public bool ModBlocked(string modId, string gameVersion)
         {
@@ -207,6 +208,7 @@ namespace NareLauncher.Core
             policy.Username = json["username"].AsString("");
             policy.IsAdmin = json["admin"].AsBool(false);
             policy.IsModerator = json["moderator"].AsBool(false);
+            policy.Maintenance = json["maintenance"].AsString("");
 
             return policy;
         }
@@ -417,6 +419,45 @@ namespace NareLauncher.Core
         }
 
         public class EarnResult { public long Awarded; public long Coins; public int CooldownLeft; public string Ip = ""; }
+
+        public class DailyResult { public long Awarded; public long Coins; public int NextIn; }
+
+        public static async Task<DailyResult> CoinsDailyAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token);
+            var r = await PostAsync("/coins/daily", body, ct).ConfigureAwait(false);
+            return new DailyResult { Awarded = r["awarded"].AsLong(0), Coins = r["coins"].AsLong(0), NextIn = r["nextIn"].AsInt(0) };
+        }
+
+        public static async Task<long> CoinsSendAsync(string token, string to, long amount, CancellationToken ct)
+        {
+            var body = Json.NewObject(); body.Set("token", token); body.Set("to", to); body.Set("amount", amount);
+            var r = await PostAsync("/coins/send", body, ct).ConfigureAwait(false);
+            return r["coins"].AsLong(0);
+        }
+
+        public class TopPlayer { public string Nick = ""; public long Coins; public string Username = ""; }
+
+        public static async Task<List<TopPlayer>> TopAsync(CancellationToken ct)
+        {
+            var r = await Net.GetJsonAsync(Url("/top"), ct).ConfigureAwait(false);
+            var list = new List<TopPlayer>();
+            foreach (var x in r["top"].Items)
+                list.Add(new TopPlayer { Nick = x["nick"].AsString(""), Coins = x["coins"].AsLong(0), Username = x["username"].AsString("") });
+            return list;
+        }
+
+        public static async Task AdminMaintenanceAsync(string token, bool on, string message, CancellationToken ct)
+        {
+            var body = Admin(token); body.Set("on", on); body.Set("message", message ?? "");
+            await PostAsync("/admin/maintenance", body, ct).ConfigureAwait(false);
+        }
+
+        public static async Task AdminClearWarnsAsync(string token, string nick, CancellationToken ct)
+        {
+            var body = Admin(token); body.Set("nick", nick);
+            await PostAsync("/admin/warns/clear", body, ct).ConfigureAwait(false);
+        }
 
         public static async Task<EarnResult> EarnCoinsAsync(string token, string serverId, CancellationToken ct)
         {

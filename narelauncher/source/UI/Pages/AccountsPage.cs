@@ -35,6 +35,9 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _logout = new NareButton
         { Text = "Выйти из аккаунта", Style = BtnStyle.Ghost, Size = new Size(190, 42) };
 
+        private readonly NareButton _coins = new NareButton
+        { Text = "Монеты и топ", Style = BtnStyle.Ghost, Size = new Size(190, 42) };
+
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
 
         public AccountsPage()
@@ -55,6 +58,7 @@ namespace NareLauncher.UI.Pages
             _devices.Click += (s, e) => OpenDevices();
             _logoutAll.Click += async (s, e) => await LogoutAll();
             _logout.Click += async (s, e) => await LogoutOne();
+            _coins.Click += (s, e) => OpenCoins();
 
             Controls.Add(_select);
             Controls.Add(_manage);
@@ -64,6 +68,7 @@ namespace NareLauncher.UI.Pages
             Controls.Add(_devices);
             Controls.Add(_logoutAll);
             Controls.Add(_logout);
+            Controls.Add(_coins);
             Controls.Add(_status);
         }
 
@@ -275,6 +280,15 @@ namespace NareLauncher.UI.Pages
             using (var form = new DevicesForm(acc)) form.ShowDialog(FindForm());
         }
 
+        private void OpenCoins()
+        {
+            var acc = Chosen;
+            if (acc == null) { _status.Text = "Выберите аккаунт."; return; }
+            if (string.IsNullOrEmpty(acc.Token)) { Host.EnsureAuth(); if (string.IsNullOrEmpty(acc.Token)) return; }
+            using (var form = new CoinsForm(acc)) form.ShowDialog(FindForm());
+            ReloadList();
+        }
+
         private async System.Threading.Tasks.Task LogoutOne()
         {
             var acc = Chosen;
@@ -331,7 +345,8 @@ namespace NareLauncher.UI.Pages
             _devices.Location = new Point(pad + 246, by + 50);
             _logout.Location = new Point(pad + 452, by + 50);
             _logoutAll.Location = new Point(pad, by + 100);
-            _status.SetBounds(pad + 276, by + 108, Math.Max(50, Width - pad * 2 - 276), 20);
+            _coins.Location = new Point(pad + 272, by + 100);
+            _status.SetBounds(pad + 472, by + 108, Math.Max(50, Width - pad * 2 - 472), 20);
 
             Invalidate();
         }

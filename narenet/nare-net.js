@@ -45,7 +45,7 @@ const BODY_MAX = 512 * 1024;          // json объявления
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.17';
+const VERSION = '1.18';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -434,6 +434,8 @@ const SERVER_KEY = (process.env.NARENET_SERVER_KEY || '');
 const COIN_REWARD = Number(process.env.NARENET_COIN_REWARD || 100);
 const COIN_COOLDOWN = Number(process.env.NARENET_COIN_COOLDOWN_MIN || 60) * 60000;
 const NAME_PRICE = Number(process.env.NARENET_NAME_PRICE || 1000);
+const DAILY_BONUS = Number(process.env.NARENET_DAILY_BONUS || 50);
+const DAILY_COOLDOWN = 20 * 60 * 60 * 1000;   // 20 часов
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const BANS_FILE = path.join(DATA_DIR, 'bans.json');
@@ -466,13 +468,15 @@ const policy = loadJson(POLICY_FILE, {
     chats: {},                                  // nick -> [ { from, text, at } ]: переписка
     chatAssign: {},                             // nick -> админ, которому передали чат
     admins: [],                                 // доп. администраторы (кроме главного ADMIN)
-    moderators: []                              // модераторы
+    moderators: [],                             // модераторы
+    maintenance: { on: false, message: '' }     // техработы
 });
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
+if (!policy.maintenance || typeof policy.maintenance !== 'object') policy.maintenance = { on: false, message: '' };
 if (!policy.servers) policy.servers = [];
 
 function saveAccounts() { saveJson(ACCOUNTS_FILE, accounts); }
@@ -776,7 +780,8 @@ function statusFor(nick, tok) {
         coins: a ? a.coins : 0,
         username: a ? a.username : nick,
         admin: isAdmin(nick),
-        moderator: isModerator(nick)
+        moderator: isModerator(nick),
+        maintenance: (policy.maintenance.on && !isStaff(nick)) ? (policy.maintenance.message || 'Идут технические работы. Зайдите позже.') : ''
     };
 }
 
@@ -1499,6 +1504,78 @@ function serversMine(req, res) {
     });
 }
 
+/** Ежедневный бонус монет. */
+function coinsDaily(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const last = a.lastDaily || 0;
+        const left = DAILY_COOLDOWN - (now() - last);
+        if (left > 0)
+            return send(res, 200, { ok: true, awarded: 0, coins: a.coins, nextIn: Math.ceil(left / 3600000) });
+        a.coins += DAILY_BONUS;
+        a.lastDaily = now();
+        saveAccounts();
+        log('ежедневный бонус', nick, '+' + DAILY_BONUS);
+        send(res, 200, { ok: true, awarded: DAILY_BONUS, coins: a.coins, nextIn: 20 });
+    });
+}
+
+/** Перевод монет другому игроку. */
+function coinsSend(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const to = clean(body.to, 16);
+        const amount = Math.trunc(Number(body.amount));
+        if (!to) return send(res, 400, { error: 'кому перевести?' });
+        if (to === nick) return send(res, 400, { error: 'себе переводить незачем' });
+        if (!accounts[to]) return send(res, 404, { error: 'нет такого игрока' });
+        if (!Number.isFinite(amount) || amount <= 0) return send(res, 400, { error: 'сколько монет?' });
+        const a = acc(nick);
+        if (a.coins < amount) return send(res, 402, { error: 'не хватает монет (у вас ' + a.coins + ')' });
+        a.coins -= amount;
+        acc(to).coins += amount;
+        saveAccounts();
+        log('перевод', nick, '->', to, amount);
+        send(res, 200, { ok: true, coins: a.coins });
+    });
+}
+
+/** Топ игроков по монетам. */
+function coinsTop(req, res) {
+    const out = Object.keys(accounts)
+        .map(n => ({ nick: n, coins: acc(n).coins || 0, username: acc(n).username || n }))
+        .sort((x, y) => y.coins - x.coins)
+        .slice(0, 10);
+    send(res, 200, { ok: true, top: out });
+}
+
+/** Режим технических работ (вход закрыт всем, кроме персонала). */
+function adminMaintenance(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        policy.maintenance = { on: body.on === true, message: clean(body.message, 300) };
+        savePolicy();
+        log('техработы:', policy.maintenance.on ? 'ВКЛ' : 'выкл');
+        send(res, 200, { ok: true, maintenance: policy.maintenance });
+    });
+}
+
+/** Снять все предупреждения игрока. */
+function adminClearWarns(req, res) {
+    readJsonBody(req, body => {
+        if (!needStaff(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (!nick) return send(res, 400, { error: 'не указан игрок' });
+        delete warns[nick];
+        saveWarns();
+        log('сняты предупреждения у', nick);
+        send(res, 200, { ok: true });
+    });
+}
+
 function coinsEarn(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token);
@@ -1603,6 +1680,7 @@ function adminState(req, res) {
             mods: policy.mods,
             update: policy.update,
             broadcast: policy.broadcast,
+            maintenance: policy.maintenance,
             appeals: policy.appeals.slice(-100),
             commands: policy.commands.slice(-50),
             stats: {
@@ -1672,6 +1750,11 @@ const server = http.createServer((req, res) => {
     if (route === '/servers/submit' && req.method === 'POST') return serverSubmit(req, res);
     if (route === '/servers/mine' && req.method === 'POST') return serversMine(req, res);
     if (route === '/coins/earn' && req.method === 'POST') return coinsEarn(req, res);
+    if (route === '/coins/daily' && req.method === 'POST') return coinsDaily(req, res);
+    if (route === '/coins/send' && req.method === 'POST') return coinsSend(req, res);
+    if (route === '/top') return coinsTop(req, res);
+    if (route === '/admin/maintenance' && req.method === 'POST') return adminMaintenance(req, res);
+    if (route === '/admin/warns/clear' && req.method === 'POST') return adminClearWarns(req, res);
     if (route === '/username/change' && req.method === 'POST') return usernameChange(req, res);
     if (route === '/admin/servers' && req.method === 'POST') return adminServers(req, res);
     if (route === '/admin/server/approve' && req.method === 'POST') return adminServerDecide(req, res, true);

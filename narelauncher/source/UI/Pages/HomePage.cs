@@ -448,6 +448,14 @@ namespace NareLauncher.UI.Pages
                 return;
             }
 
+            // режим техработ — вход закрыт (для персонала сервер его не ставит)
+            if (!string.IsNullOrEmpty(NareAuth.Last.Maintenance))
+            {
+                GameLauncher.QuickServer = null;
+                Host.ShowInfo("Технические работы\n\n" + NareAuth.Last.Maintenance);
+                return;
+            }
+
             var version = _version.SelectedItem as InstalledVersion;
             if (version == null)
             {

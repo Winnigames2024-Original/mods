@@ -84,10 +84,16 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _delBtn = new NareButton { Text = "Удалить аккаунт игрока", Style = BtnStyle.Danger, Size = new Size(240, 38) };
         private readonly NareButton _tempBtn = new NareButton { Text = "Выдать временный пароль", Style = BtnStyle.Ghost, Size = new Size(240, 38) };
 
+        // техработы + очистка предупреждений
+        private readonly NareTextBox _maintMsg = new NareTextBox { Placeholder = "Сообщение игрокам (почему закрыт вход)" };
+        private readonly NareButton _maintBtn = new NareButton { Text = "Включить техработы", Style = BtnStyle.Danger, Size = new Size(260, 38) };
+        private readonly NareButton _clrWarnBtn = new NareButton { Text = "Снять все предупреждения", Style = BtnStyle.Ghost, Size = new Size(260, 38) };
+        private bool _maintOn;
+
         private readonly NareLabel _statLine = new NareLabel("", 9.5f, FontStyle.Bold, Theme.Muted);
 
         private readonly NareLabel _title = new NareLabel("АДМИН-ПАНЕЛЬ", 19f, FontStyle.Bold, Theme.Text);
-        private readonly NareLabel[] _heads = new NareLabel[12];
+        private readonly NareLabel[] _heads = new NareLabel[13];
         private readonly System.Collections.Generic.List<NareLabel> _caps = new System.Collections.Generic.List<NareLabel>();
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
         private readonly NareLabel _usersHead = new NareLabel("ПОЛЬЗОВАТЕЛИ — выберите, чтобы подставить ник", 8.5f, FontStyle.Bold, Theme.Accent);
@@ -106,7 +112,7 @@ namespace NareLauncher.UI.Pages
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
                 "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",
-                "МОНЕТЫ", "ПРАВА: АДМИН / МОДЕРАТОР", "ИГРОВОЙ НИК", "СБРОС ВХОДА И ПАРОЛЬ", "" };
+                "МОНЕТЫ", "ПРАВА: АДМИН / МОДЕРАТОР", "ИГРОВОЙ НИК", "СБРОС ВХОДА И ПАРОЛЬ", "ТЕХРАБОТЫ И ПРЕДУПРЕЖДЕНИЯ", "" };
             for (int i = 0; i < _heads.Length; i++)
             {
                 _heads[i] = new NareLabel(titles[i], 9f, FontStyle.Bold, Theme.Accent);
@@ -126,7 +132,8 @@ namespace NareLauncher.UI.Pages
                 "Игрок (монеты)", "Сколько монет (можно с минусом)",
                 "Игрок (права админа)", "Роль",
                 "Игрок (сменить ник)", "Новый игровой ник",
-                "Игрок (сбросить вход)", "Новый пароль игроку"
+                "Игрок (сбросить вход)", "Новый пароль игроку",
+                "Сообщение для техработ"
             };
             foreach (var c in caps)
             {
@@ -157,6 +164,7 @@ namespace NareLauncher.UI.Pages
             Add(_setNickDrop); Add(_setNickBox); Add(_setNickBtn);
             Add(_logoutNick); Add(_logoutBtn);
             Add(_passBox); Add(_passBtn); Add(_delBtn); Add(_tempBtn);
+            Add(_maintMsg); Add(_maintBtn); Add(_clrWarnBtn);
             _rolePick.SetItems(new System.Collections.Generic.List<string> { "Админ", "Модератор" }, "Админ");
             _scroll.Controls.Add(_statLine);
             _scroll.Controls.Add(_status);
@@ -304,6 +312,18 @@ namespace NareLauncher.UI.Pages
                         "Временный пароль", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }, null);
             };
+            _maintBtn.Click += async (s, e) =>
+            {
+                bool turnOn = !_maintOn;
+                await Do(() => NareAuth.AdminMaintenanceAsync(Token, turnOn, _maintMsg.Text.Trim(), Ct()),
+                    turnOn ? "Техработы включены — вход для игроков закрыт." : "Техработы выключены.");
+            };
+            _clrWarnBtn.Click += async (s, e) =>
+            {
+                string nick = Pick(_warnNick);
+                if (nick.Length == 0) { _status.Text = "Выберите игрока (в разделе «Предупреждение»)."; return; }
+                await Do(() => NareAuth.AdminClearWarnsAsync(Token, nick, Ct()), "Предупреждения сняты у " + nick);
+            };
 
             Layout1();
         }
@@ -425,6 +445,12 @@ namespace NareLauncher.UI.Pages
                 _setNickDrop.SetItems(_nicks, keepSet.Length > 0 ? keepSet : null);
                 string keepLogout = Pick(_logoutNick);
                 _logoutNick.SetItems(_nicks, keepLogout.Length > 0 ? keepLogout : null);
+
+                var mt = state["maintenance"];
+                _maintOn = mt.IsObject && mt["on"].AsBool(false);
+                _maintBtn.Text = _maintOn ? "Выключить техработы" : "Включить техработы";
+                _maintBtn.Style = _maintOn ? BtnStyle.Success : BtnStyle.Danger;
+                if (_maintMsg.Text.Length == 0 && mt.IsObject) _maintMsg.Text = mt["message"].AsString("");
 
                 var st = state["stats"];
                 if (st.IsObject)
@@ -582,6 +608,11 @@ namespace NareLauncher.UI.Pages
             Field(_passBox, pad, w, ref y);
             _passBtn.Location = new Point(pad, y); _delBtn.Location = new Point(pad + 252, y); y += 46;
             _tempBtn.Location = new Point(pad, y); y += 54;
+
+            Row("ТЕХРАБОТЫ И ПРЕДУПРЕЖДЕНИЯ", ref y);
+            Field(_maintMsg, pad, w, ref y);
+            _maintBtn.Location = new Point(pad, y); y += 48;
+            _clrWarnBtn.Location = new Point(pad, y); y += 54;
 
             _status.SetBounds(pad, y, w + 200, 20); y += 28;
 
