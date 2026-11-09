@@ -28,7 +28,11 @@ public final class NareKeys {
             "key.narevisuals.esp", InputConstants.KEY_J, CATEGORY);
 
     public static final KeyMapping TOGGLE_BRIGHT = new KeyMapping(
-            "key.narevisuals.bright", InputConstants.KEY_G, CATEGORY);
+            "key.narevisuals.bright", InputConstants.KEY_K, CATEGORY);
+
+    /** Телепорт к игроку: открыть список и перенестись. По умолчанию G. */
+    public static final KeyMapping TELEPORT = new KeyMapping(
+            "key.narevisuals.teleport", InputConstants.KEY_G, CATEGORY);
 
     public static final KeyMapping TOGGLE_FREECAM = new KeyMapping(
             "key.narevisuals.freecam", InputConstants.KEY_F, CATEGORY);
@@ -59,13 +63,13 @@ public final class NareKeys {
 
     /** Для экрана назначения клавиш: сами привязки и их подписи. */
     public static final KeyMapping[] ALL = {
-            OPEN_SETTINGS, TOGGLE_HUD, TOGGLE_ESP, TOGGLE_BRIGHT,
+            OPEN_SETTINGS, TOGGLE_HUD, TOGGLE_ESP, TOGGLE_BRIGHT, TELEPORT,
             TOGGLE_FREECAM, TOGGLE_SKY, ZOOM, TOGGLE_NEAR, MOVE_HUD, VOICE, TALK
     };
 
     public static final String[] TITLES = {
             "Открыть настройки", "Спрятать HUD", "Подсветка игроков",
-            "Яркость", "Свободная камера", "Своё небо",
+            "Яркость", "Телепорт к игроку", "Свободная камера", "Своё небо",
             "Приближение (держать)", "Игроки рядом", "Передвинуть элементы",
             "Меню голоса", "Говорить (держать)"
     };
@@ -83,20 +87,37 @@ public final class NareKeys {
         migrated = true;
 
         Config cfg = Config.get();
-        if (cfg.freecamKeyMoved) return;
+        boolean changed = false;
 
-        cfg.freecamKeyMoved = true;
+        // свободная камера раньше была на N — один раз переносим на F
+        if (!cfg.freecamKeyMoved) {
+            cfg.freecamKeyMoved = true;
+            if (TOGGLE_FREECAM.getKey().getValue() == InputConstants.KEY_N) {
+                TOGGLE_FREECAM.setKeyModifierAndCode(KeyModifier.NONE,
+                        InputConstants.getKey(InputConstants.KEY_F, 0));
+                changed = true;
+            }
+        }
+
+        // яркость переезжает с G на K, потому что G теперь занят телепортом —
+        // но только если игрок сам не менял её с дефолтной G
+        if (!cfg.brightKeyMoved) {
+            cfg.brightKeyMoved = true;
+            if (TOGGLE_BRIGHT.getKey().getValue() == InputConstants.KEY_G) {
+                TOGGLE_BRIGHT.setKeyModifierAndCode(KeyModifier.NONE,
+                        InputConstants.getKey(InputConstants.KEY_K, 0));
+                changed = true;
+            }
+        }
+
         Config.save();
 
-        if (TOGGLE_FREECAM.getKey().getValue() != InputConstants.KEY_N) return;
-
-        TOGGLE_FREECAM.setKeyModifierAndCode(KeyModifier.NONE,
-                InputConstants.getKey(InputConstants.KEY_F, 0));
-
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            mc.options.save();
-            KeyMapping.resetMapping();
+        if (changed) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.options.save();
+                KeyMapping.resetMapping();
+            }
         }
     }
 

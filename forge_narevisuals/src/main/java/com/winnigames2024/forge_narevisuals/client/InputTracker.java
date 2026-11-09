@@ -100,6 +100,9 @@ public final class InputTracker {
             cfg.nightVision = on;
             Config.save();
             note(mc, "Яркость: " + onOff(on));
+        } else if (NareKeys.TELEPORT.isDown()) {
+            if (mc.player != null && mc.getConnection() != null)
+                mc.setScreen(new NareTpScreen());
         } else if (NareKeys.TOGGLE_FREECAM.isDown()) {
             Freecam.toggle();
         } else if (NareKeys.TOGGLE_SKY.isDown()) {

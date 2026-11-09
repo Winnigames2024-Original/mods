@@ -160,6 +160,7 @@ public class Config {
 
     /** Свободную камеру один раз перенесли со старой N на F. */
     public boolean freecamKeyMoved = false;
+    public boolean brightKeyMoved = false;   // яркость переехала с G на K (G занял телепорт)
     public boolean freecamHint = true;
 
     // ------------------------------------------------------------ зум

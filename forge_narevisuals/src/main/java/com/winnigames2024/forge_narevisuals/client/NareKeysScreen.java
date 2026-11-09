@@ -83,7 +83,8 @@ public class NareKeysScreen extends Screen {
         bind(NareKeys.OPEN_SETTINGS, InputConstants.getKey(InputConstants.KEY_RSHIFT, 0));
         bind(NareKeys.TOGGLE_HUD, InputConstants.getKey(InputConstants.KEY_H, 0));
         bind(NareKeys.TOGGLE_ESP, InputConstants.getKey(InputConstants.KEY_J, 0));
-        bind(NareKeys.TOGGLE_BRIGHT, InputConstants.getKey(InputConstants.KEY_G, 0));
+        bind(NareKeys.TOGGLE_BRIGHT, InputConstants.getKey(InputConstants.KEY_K, 0));
+        bind(NareKeys.TELEPORT, InputConstants.getKey(InputConstants.KEY_G, 0));
         bind(NareKeys.TOGGLE_FREECAM, InputConstants.getKey(InputConstants.KEY_F, 0));
         bind(NareKeys.TOGGLE_SKY, InputConstants.UNKNOWN);
         bind(NareKeys.ZOOM, InputConstants.getKey(InputConstants.KEY_C, 0));

@@ -1,8 +1,8 @@
 {
-  "version": "2.18.0",
-  "file": "forge_narevisuals-2.18.0.jar",
-  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.18.0.jar",
-  "sha1": "5a0a32b5e2fcb85d89999035d590d4bb02412bff",
-  "size": 826529,
-  "notes": "Дальность прорисовки в мире «Вместе» теперь берётся от хоста и меняется вживую — друзья видят так же далеко, ползунок дальности работает"
+  "version": "2.19.0",
+  "file": "forge_narevisuals-2.19.0.jar",
+  "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narevisuals/forge_narevisuals-2.19.0.jar",
+  "sha1": "13a0c60e5e0cb51d4c9ec2c5033f1e2efde71b0f",
+  "size": 833227,
+  "notes": "Телепорт к игроку по кнопке G: список игроков в сети, клик — перенос. На мире «Вместе» переносит сам сервер (права владельца). Яркость переехала с G на K"
 }
