@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.28';
+const VERSION = '1.29';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1377,6 +1377,20 @@ function adminWorldCommand(req, res) {
     });
 }
 
+/** Роутер спрашивает: на каком порту тоннель мира игрока <name> (ник хоста). */
+function resolveName(req, res) {
+    const q = query(req);
+    const name = (typeof q.name === 'string' ? q.name : '').toLowerCase();
+    if (!name) return send(res, 400, { error: 'нет имени' });
+    for (const room of rooms.values()) {
+        if (now() - room.seen > ROOM_LIFE) continue;
+        if ((room.nick || '').toLowerCase() === name && room.mode === 'tunnel' && room.publicPort) {
+            return send(res, 200, { ok: true, port: room.publicPort, nick: room.nick });
+        }
+    }
+    send(res, 404, { error: 'мир не найден или закрыт' });
+}
+
 /** Мод-хост забирает команды для своего мира «Вместе». Авторизация — токеном комнаты. */
 function worldCommandsPull(req, res) {
     readJsonBody(req, body => {
@@ -2289,6 +2303,7 @@ const server = http.createServer((req, res) => {
     if (route === '/commands') return serverCommands(req, res);
     if (route === '/admin/worldcommand' && req.method === 'POST') return adminWorldCommand(req, res);
     if (route === '/world/commands' && req.method === 'POST') return worldCommandsPull(req, res);
+    if (route === '/resolve') return resolveName(req, res);
 
     // реклама серверов и монеты
     if (route === '/servers') return serversPublic(req, res);
