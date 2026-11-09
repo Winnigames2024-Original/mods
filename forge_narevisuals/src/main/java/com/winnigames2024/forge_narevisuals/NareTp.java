@@ -50,8 +50,8 @@ public final class NareTp {
             src.sendFailure(Component.literal("Это вы и есть"));
             return 0;
         }
-        me.teleportTo(target.serverLevel(), target.getX(), target.getY(), target.getZ(),
-                java.util.Set.of(), target.getYRot(), target.getXRot(), false);
+        NareCmd.place(me, target.serverLevel(), target.getX(), target.getY(), target.getZ(),
+                target.getYRot(), target.getXRot());
         final String who = targetName;
         src.sendSuccess(() -> Component.literal("Телепорт к " + who), false);
         return 1;
