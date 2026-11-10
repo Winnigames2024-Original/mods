@@ -23,6 +23,18 @@ namespace NareLauncher.Core
         public string Folder { get; private set; }
         public int Port { get; private set; }
         public bool Running { get { return _proc != null && !_proc.HasExited; } }
+        public int Players { get { return _players; } }
+        public double CpuPct { get { return Running ? _cpuPct : 0; } }
+        public int RamMb
+        {
+            get { try { if (!Running) return 0; _proc.Refresh(); return (int)(_proc.WorkingSet64 / (1024 * 1024)); } catch { return 0; } }
+        }
+        public int UptimeSec
+        {
+            get { try { return Running ? (int)(DateTime.UtcNow - _startedAt).TotalSeconds : 0; } catch { return 0; } }
+        }
+        /// <summary>Пересчитать CPU% (вызывать периодически, иначе доля не обновляется).</summary>
+        public void SampleCpu() { try { var _ = StatsJson(); } catch { } }
         public Action<string> OnLine;
         public Action OnExit;
 

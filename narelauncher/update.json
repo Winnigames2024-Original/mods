@@ -1,8 +1,8 @@
 {
-  "version": "1.51",
+  "version": "1.52",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "ad26cbddd4b8ea4de9b9a02f0cb350725fbf4173",
-  "size": 765440,
-  "notes": "Веб-панель серверов в стиле хостинга (как panel.minecraft-hosting.net): карточки CPU/память/аптайм/игроки, кнопки питания Старт/Рестарт/Стоп прямо из браузера, графики. Кнопки работают, пока лаунчер открыт."
+  "sha1": "4b9f0860906669a921b983ecfe9cf96fdc53f148",
+  "size": 771072,
+  "notes": "Вкладка «Мои серверы» в стиле хостинг-панели: карточка сервера со статусом Онлайн/Оффлайн, карточки CPU/Память/Аптайм/Игроки, цветные кнопки питания, тёмная консоль-терминал."
 }
