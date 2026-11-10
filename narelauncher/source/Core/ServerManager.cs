@@ -48,6 +48,7 @@ namespace NareLauncher.Core
         {
             if (Running) return;
             Directory.CreateDirectory(Folder);
+            KillStalePid();   // убить зависший сервер прошлого запуска (держит мир/лог)
             File.WriteAllText(Path.Combine(Folder, "eula.txt"), "eula=true\n");
             WriteProps();
 
@@ -91,6 +92,7 @@ namespace NareLauncher.Core
             _startedAt = DateTime.UtcNow;
             _players = 0;
             _proc.Start();
+            try { File.WriteAllText(Path.Combine(Folder, "nare_pid.txt"), _proc.Id.ToString()); } catch { }
             _proc.BeginOutputReadLine();
             _proc.BeginErrorReadLine();
         }
@@ -104,6 +106,7 @@ namespace NareLauncher.Core
 
         public void Stop()
         {
+            try { File.Delete(Path.Combine(Folder, "nare_pid.txt")); } catch { }
             if (!Running) return;
             try
             {
@@ -111,6 +114,30 @@ namespace NareLauncher.Core
                 if (_proc != null && !_proc.WaitForExit(10000)) _proc.Kill();
             }
             catch { try { if (_proc != null) _proc.Kill(); } catch { } }
+        }
+
+        /// <summary>Убивает процесс сервера, оставшийся от прошлого запуска (по PID-файлу),
+        /// иначе он держит session.lock мира и новый сервер не стартует.</summary>
+        private void KillStalePid()
+        {
+            try
+            {
+                string f = Path.Combine(Folder, "nare_pid.txt");
+                if (!File.Exists(f)) return;
+                int pid;
+                if (int.TryParse((File.ReadAllText(f) ?? "").Trim(), out pid) && pid > 0)
+                {
+                    try
+                    {
+                        var pr = Process.GetProcessById(pid);
+                        string n = (pr.ProcessName ?? "").ToLowerInvariant();
+                        if (n == "java" || n == "javaw") { pr.Kill(); pr.WaitForExit(6000); }
+                    }
+                    catch { }
+                }
+                try { File.Delete(f); } catch { }
+            }
+            catch { }
         }
 
         private void Line(string s)

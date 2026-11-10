@@ -1,8 +1,8 @@
 {
-  "version": "1.62",
+  "version": "1.63",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "116557241b56d64c26d28a74e0d13c500b70c51c",
-  "size": 807936,
-  "notes": "Разные иконки в меню: Видео, Чаты, Серверы, Вместе, Публичные больше не дублируются (новые иконки видео/чат/сервер/люди/поиск)."
+  "sha1": "a1c4aeb0625813448495d5dd4ef27b567598d30c",
+  "size": 808448,
+  "notes": "Фикс «мир занят другим процессом» (DirectoryLock): перед запуском убивается зависший сервер прошлого запуска по PID-файлу. Сервер снова стартует."
 }
