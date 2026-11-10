@@ -14,6 +14,11 @@ namespace NareLauncher.Core
     public class ServerManager
     {
         private Process _proc;
+        private DateTime _startedAt;
+        private int _players;
+        private TimeSpan _lastCpu;
+        private DateTime _lastCpuAt;
+        private double _cpuPct;
 
         public string Folder { get; private set; }
         public int Port { get; private set; }
@@ -59,6 +64,8 @@ namespace NareLauncher.Core
             _proc.OutputDataReceived += (s, e) => { if (e.Data != null) Line(e.Data); };
             _proc.ErrorDataReceived += (s, e) => { if (e.Data != null) Line(e.Data); };
             _proc.Exited += (s, e) => { var h = OnExit; if (h != null) h(); };
+            _startedAt = DateTime.UtcNow;
+            _players = 0;
             _proc.Start();
             _proc.BeginOutputReadLine();
             _proc.BeginErrorReadLine();
@@ -82,7 +89,45 @@ namespace NareLauncher.Core
             catch { try { if (_proc != null) _proc.Kill(); } catch { } }
         }
 
-        private void Line(string s) { var h = OnLine; if (h != null) h(s); }
+        private void Line(string s)
+        {
+            try
+            {
+                if (s.IndexOf(" joined the game", StringComparison.Ordinal) >= 0) _players++;
+                else if (s.IndexOf(" left the game", StringComparison.Ordinal) >= 0 && _players > 0) _players--;
+            }
+            catch { }
+            var h = OnLine; if (h != null) h(s);
+        }
+
+        /// <summary>Внутренний JSON статистики для веб-панели: ram, up, players.</summary>
+        public string StatsJson()
+        {
+            if (!Running) return null;
+            int ram = 0, up = 0;
+            try { _proc.Refresh(); ram = (int)(_proc.WorkingSet64 / (1024 * 1024)); } catch { }
+            try { up = (int)(DateTime.UtcNow - _startedAt).TotalSeconds; } catch { }
+            try
+            {
+                var cpu = _proc.TotalProcessorTime;
+                var now = DateTime.UtcNow;
+                if (_lastCpuAt != default(DateTime))
+                {
+                    double wall = (now - _lastCpuAt).TotalMilliseconds;
+                    if (wall > 0)
+                    {
+                        double used = (cpu - _lastCpu).TotalMilliseconds;
+                        double pct = used / wall / Environment.ProcessorCount * 100.0;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+                        _cpuPct = pct;
+                    }
+                }
+                _lastCpu = cpu; _lastCpuAt = now;
+            }
+            catch { }
+            int cpuI = (int)Math.Round(_cpuPct * 10);   // десятые доли %, делим на 10 на клиенте
+            return "\"ram\":" + ram + ",\"up\":" + up + ",\"players\":" + _players + ",\"cpu\":" + cpuI;
+        }
 
         private void WriteProps()
         {

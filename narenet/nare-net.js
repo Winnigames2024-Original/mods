@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.31';
+const VERSION = '1.32';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -486,6 +486,8 @@ const policy = loadJson(POLICY_FILE, {
     worldCommands: {},                          // nick хоста -> [команды] для его мира «Вместе» (без плагина)
     srvLog: {},                                 // имя сервера -> [строки лога] (кольцо)
     srvCmd: {},                                 // имя сервера -> [команды в stdin от веб-консоли]
+    srvCtl: {},                                 // ник владельца -> [{name,action}] кнопки питания
+    srvStat: {},                                // имя сервера -> {ram,up,players,at}
     appeals: [],                                // [ { nick, text, at } ]
     servers: [],                                // рекламные серверы на модерации/одобренные
     chats: {},                                  // nick -> [ { from, text, at } ]: переписка
@@ -500,6 +502,8 @@ if (!policy.updateTargets) policy.updateTargets = {};
 if (!policy.worldCommands) policy.worldCommands = {};
 if (!policy.srvLog) policy.srvLog = {};
 if (!policy.srvCmd) policy.srvCmd = {};
+if (!policy.srvCtl) policy.srvCtl = {};
+if (!policy.srvStat) policy.srvStat = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -1234,80 +1238,219 @@ show();
 
 const SERVER_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Консоль сервера — NareLauncher</title>
+<title>Панель сервера — NareLauncher</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0b0e14;color:#e7eaf2}
-.wrap{max-width:900px;margin:0 auto;padding:16px}
-.brand{font-size:20px;font-weight:800}.brand span{color:#5b8cff}.muted{color:#8b93a7;font-size:13px}
-.card{background:#141926;border:1px solid #232a3a;border-radius:14px;padding:16px;margin:12px 0}
-input{background:#0b0e14;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:10px 12px;font-size:14px;width:100%}
-button{background:#1d2535;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:9px 14px;cursor:pointer}
-button.pri{background:#2f52d8;border-color:#2f52d8}button:hover{border-color:#5b8cff}
-.row{display:flex;gap:10px;align-items:center}
-.console{background:#06080d;border:1px solid #1c2230;border-radius:10px;padding:12px;height:420px;overflow:auto;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.5;color:#aeb9cc;white-space:pre-wrap;word-break:break-word}
-.prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
-.prompt .c{color:#6fe39a;font-family:monospace;font-weight:700}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#56d364;margin-right:6px}.dot.off{background:#596173}
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0a0d14;color:#e7eaf2}
+.layout{display:flex;min-height:100vh}
+.side{width:234px;flex-shrink:0;background:#0c0f18;border-right:1px solid #171d2b;padding:18px 14px}
+.logo{font-size:19px;font-weight:800;padding:6px 10px 18px}.logo span{color:#5b8cff}
+.seclbl{color:#525a70;font-size:11px;font-weight:700;letter-spacing:.09em;padding:0 10px 8px}
+.nav a{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:#aeb6c8;font-size:14px;cursor:pointer;margin-bottom:3px}
+.nav a .i{width:18px;text-align:center;opacity:.85}
+.nav a:hover{background:#111726;color:#e7eaf2}
+.nav a.on{background:#16233f;color:#fff}
+.nav .badge{margin-left:auto;background:#1c7d4d;color:#d8ffe8;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
+.content{flex:1;padding:22px 26px;max-width:1500px}
+.panel{background:#10141f;border:1px solid #1b2232;border-radius:16px;padding:20px 22px;margin-bottom:16px}
+.srvtitle{font-size:26px;font-weight:800;word-break:break-all}
+.statusline{display:flex;align-items:center;gap:20px;flex-wrap:wrap;color:#9aa4ba;font-size:13.5px;margin-top:9px}
+.statusline .it{display:flex;align-items:center;gap:7px}
+.statusline .run{color:#56d364;font-weight:700}.statusline .off{color:#ff6b74;font-weight:700}
+.statusline .dot{width:9px;height:9px;border-radius:50%;background:#636b80}
+.statusline .dot.on{background:#56d364;box-shadow:0 0 8px #56d364}.statusline .dot.offc{background:#ff6b74}
+.tabs{display:flex;gap:4px;margin-top:16px;overflow-x:auto;padding-bottom:3px}
+.tabs a{white-space:nowrap;color:#8b93a7;font-size:13.5px;padding:8px 13px;border-radius:9px;cursor:pointer}
+.tabs a:hover{background:#151c2b;color:#dfe4ee}
+.tabs a.on{background:#17233f;color:#fff;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
+.stat{position:relative;overflow:hidden;background:#10141f;border:1px solid #1b2232;border-radius:14px;padding:16px 17px}
+.stat .lbl{color:#7b8498;font-size:12px;font-weight:600;margin-bottom:9px}
+.stat .val{font-size:21px;font-weight:800}
+.stat .val small{font-size:13px;color:#8b93a7;font-weight:600}
+.stat .wm{position:absolute;right:-6px;bottom:-10px;font-size:52px;opacity:.06;line-height:1}
+.worksplit{display:flex;gap:16px;align-items:stretch;margin-bottom:16px}
+.pwr{display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+.pwr button{width:92px;height:96px;border-radius:14px;border:1px solid #1f2738;background:#10141f;color:#aeb6c8;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:600}
+.pwr button .g{font-size:26px}
+.pwr button:hover{filter:brightness(1.25)}
+.pwr .start:hover{border-color:#2aa863;color:#73e39a}
+.pwr .restart:hover{border-color:#b89b2a;color:#f0d873}
+.pwr .stop{border-color:#5c1f24;color:#ff8a93}.pwr .stop:hover{background:#2a1013}
+.pwr button:disabled{opacity:.35;cursor:not-allowed;filter:none}
+.termwrap{flex:1;display:flex;flex-direction:column;background:#070a11;border:1px solid #1b2230;border-radius:14px;overflow:hidden;min-width:0}
+.termbar{display:flex;align-items:center;justify-content:flex-end;padding:8px 14px;border-bottom:1px solid #141b28}
+.termbar .x{color:#5b667e;cursor:pointer;font-size:15px}
+.console{flex:1;height:440px;overflow:auto;padding:13px 16px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;color:#c2ccdd;white-space:pre-wrap;word-break:break-word}
+.console .in{color:#6fe39a}.console .warn{color:#f0c674}.console .err{color:#ff7b84}
+.prompt{display:flex;align-items:center;border-top:1px solid #141b28;background:#0a0f18}
+.prompt .c{color:#56d364;font-weight:800;padding:0 4px 0 15px;font-size:16px}
+.prompt input{flex:1;background:transparent;border:0;outline:0;color:#e7eaf2;font-family:Consolas,Menlo,monospace;font-size:13px;padding:14px 10px}
+.prompt button{background:#1b2c52;border:0;color:#9db4ff;font-weight:700;padding:0 20px;cursor:pointer;align-self:stretch;border-radius:9px;margin:7px}
+.prompt button:hover{background:#223a6b;color:#fff}
+.charts{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.chart{background:#10141f;border:1px solid #1b2232;border-radius:14px;padding:16px 18px}
+.chart .t{font-size:14px;font-weight:700;margin-bottom:4px}
+.chart .cur{color:#8b93a7;font-size:12px;margin-bottom:8px}
+.chart svg{width:100%;height:120px;display:block}
+.login{max-width:390px;margin:9vh auto;background:#10141f;border:1px solid #1b2232;border-radius:18px;padding:28px}
+.login h2{margin:0 0 4px;font-size:20px}.login .m{color:#8b93a7;font-size:13px;margin-bottom:18px}
+.login input{width:100%;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:11px;padding:12px 13px;font-size:14px;margin-bottom:11px}
+.login button{width:100%;background:#2f52d8;border:0;color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+.login button:hover{background:#3a60ee}
 #lerr,#err{color:#ff8a98;font-size:13px}
-</style></head><body><div class="wrap">
-<div class="brand">Nare<span>Launcher</span> — консоль сервера</div>
-<div id="name" class="muted"></div>
+.toast{position:fixed;right:18px;bottom:18px;background:#17233f;border:1px solid #2f52d8;color:#dfe6ff;padding:11px 16px;border-radius:11px;font-size:13px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:9}
+.toast.show{opacity:1;transform:none}
+@media(max-width:1050px){.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
+@media(max-width:720px){.side{display:none}.content{padding:14px}.worksplit{flex-direction:column}.pwr{flex-direction:row}.pwr button{flex:1;height:76px}}
+</style></head><body>
 
-<div id="login" class="card" style="max-width:360px">
-  <div class="muted" style="margin-bottom:8px">Вход владельца сервера</div>
-  <input id="u" placeholder="ник"><div style="height:8px"></div>
-  <input id="p" type="password" placeholder="пароль"><div style="height:10px"></div>
-  <button class="pri" onclick="login()">Войти</button>
-  <div id="lerr" style="margin-top:8px"></div>
+<div id="login" class="login">
+  <h2>Панель управления</h2>
+  <div class="m">Войдите под аккаунтом владельца сервера</div>
+  <input id="u" placeholder="ник">
+  <input id="p" type="password" placeholder="пароль" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">Войти</button>
+  <div id="lerr" style="margin-top:10px"></div>
 </div>
 
-<div id="app" style="display:none">
-  <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <div><span id="dot" class="dot off"></span><b id="srv"></b></div>
-      <button onclick="logout()">Выйти</button>
+<div id="app" class="layout" style="display:none">
+  <div class="side">
+    <div class="logo">Nare<span>Панель</span></div>
+    <div class="seclbl">ОБЩЕЕ</div>
+    <div class="nav">
+      <a class="on"><span class="i">▦</span> Мои серверы</a>
+      <a onclick="toast('Аккаунт — в приложении')"><span class="i">◉</span> Аккаунт</a>
+      <a onclick="toast('Поддержка — в приложении')"><span class="i">?</span> Поддержка</a>
+      <a onclick="logout()"><span class="i">⤴</span> Выход</a>
     </div>
-    <div id="err"></div>
-    <div class="console" id="console" style="margin-top:10px"></div>
-    <div class="prompt"><span class="c">&gt;</span>
-      <input id="cmd" placeholder="команда серверу (напр. say привет, op ник, stop)" onkeydown="if(event.key==='Enter')sendCmd()">
-      <button class="pri" onclick="sendCmd()">Ввод</button></div>
+  </div>
+  <div class="content">
+    <div class="panel">
+      <div class="srvtitle" id="srv"></div>
+      <div class="statusline">
+        <div class="it"><span>🌐</span><span id="addr">—</span></div>
+        <div class="it"><span class="dot" id="sdot"></span><span id="sstat" class="off">проверка…</span></div>
+        <div class="it"><span>🖥</span><span id="ssum">Память — · Игроков — · Аптайм —</span></div>
+      </div>
+      <div class="tabs">
+        <a class="on">Консоль</a><a onclick="toast('Файлы — в приложении')">Файлы</a>
+        <a onclick="toast('Игроки — скоро')">Игроки</a><a onclick="toast('Плагины — в приложении')">Плагины</a>
+        <a onclick="toast('Конфиги — в приложении')">Конфиги</a><a onclick="toast('Поддомены')">Поддомены</a>
+        <a onclick="toast('Планировщик — скоро')">Планировщик</a><a onclick="toast('Бэкапы — скоро')">Бэкапы</a>
+        <a onclick="toast('Настройки — в приложении')">Настройки</a><a onclick="toast('Логи')">Логи</a>
+      </div>
+    </div>
+
+    <div id="err" style="margin:-6px 2px 12px;display:none"></div>
+
+    <div class="stats">
+      <div class="stat"><div class="lbl">Загрузка CPU</div><div class="val" id="sCpu">—</div><div class="wm">▞</div></div>
+      <div class="stat"><div class="lbl">Память</div><div class="val" id="sMem">—</div><div class="wm">▤</div></div>
+      <div class="stat"><div class="lbl">Диск</div><div class="val" id="sDisk">—</div><div class="wm">▥</div></div>
+      <div class="stat"><div class="lbl">Игроки</div><div class="val" id="sPl">—</div><div class="wm">☻</div></div>
+      <div class="stat"><div class="lbl">Аптайм</div><div class="val" id="sUp">—</div><div class="wm">◷</div></div>
+    </div>
+
+    <div class="worksplit">
+      <div class="pwr">
+        <button class="start" id="bStart" onclick="power('start')"><span class="g">▶</span>Старт</button>
+        <button class="restart" id="bRestart" onclick="power('restart')"><span class="g">↻</span>Рестарт</button>
+        <button class="stop" id="bStop" onclick="power('stop')"><span class="g">⏻</span>Стоп</button>
+      </div>
+      <div class="termwrap">
+        <div class="termbar"><span class="x" onclick="toast('Консоль ниже')">⛶</span></div>
+        <div class="console" id="console"></div>
+        <div class="prompt"><span class="c">»</span>
+          <input id="cmd" placeholder="Введите команду (без /)…" onkeydown="if(event.key==='Enter')sendCmd()">
+          <button onclick="sendCmd()">Отправить</button></div>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="chart"><div class="t">Загрузка CPU</div><div class="cur" id="cCpu">—</div><svg id="gCpu" viewBox="0 0 300 120" preserveAspectRatio="none"></svg></div>
+      <div class="chart"><div class="t">Память</div><div class="cur" id="cMem">—</div><svg id="gMem" viewBox="0 0 300 120" preserveAspectRatio="none"></svg></div>
+    </div>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 <script>
 function qs(k){var m=new RegExp("[?&]"+k+"=([^&]*)").exec(location.search);return m?decodeURIComponent(m[1]):"";}
 var name=qs("name"), token=sessionStorage.getItem("srv_"+name)||"";
-document.getElementById("name").textContent=name?("Сервер: "+name):"";
-document.getElementById("srv")&&(document.getElementById("srv").textContent=name);
+var MEMLIM=2048; // МБ (Xmx 2G)
+var cpuHist=[], memHist=[];
+var $=function(id){return document.getElementById(id)};
 function api(path,body){body=body||{};body.token=token;body.name=name;
   return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}
-function login(){var u=document.getElementById("u").value.trim(),p=document.getElementById("p").value;
-  document.getElementById("lerr").textContent="";
+function toast(t){var el=$("toast");el.textContent=t;el.classList.add("show");clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove("show")},2500);}
+function gib(mb){return (mb/1024).toFixed(2)+" ";}
+function fmtUp(sec){sec=Math.max(0,sec|0);var d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
+  if(d)return d+"д "+h+"ч";if(h)return h+"ч "+m+"м";return m+"м";}
+function login(){var u=$("u").value.trim(),p=$("p").value;$("lerr").textContent="";
   fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
    .then(function(r){return r.json()}).then(function(d){
-     if(!d.ok){document.getElementById("lerr").textContent=d.error||"не вышло";return;}
+     if(!d.ok){$("lerr").textContent=d.error||"не вышло";return;}
      token=d.token;sessionStorage.setItem("srv_"+name,token);show();
-   }).catch(function(){document.getElementById("lerr").textContent="сервер недоступен";});}
+   }).catch(function(){$("lerr").textContent="сервер недоступен";});}
 function logout(){token="";sessionStorage.removeItem("srv_"+name);show();}
 var timer=null;
 function show(){var on=token.length>0;
-  document.getElementById("login").style.display=on?"none":"block";
-  document.getElementById("app").style.display=on?"block":"none";
-  if(on){document.getElementById("srv").textContent=name;poll();if(timer)clearInterval(timer);timer=setInterval(poll,2000);}
+  $("login").style.display=on?"none":"block";
+  $("app").style.display=on?"flex":"none";
+  if(on){$("srv").textContent=name;$("addr").textContent=name+".narelauncher.winnigames2024.ru";
+    poll();if(timer)clearInterval(timer);timer=setInterval(poll,2000);}
   else if(timer){clearInterval(timer);timer=null;}}
+function setOnline(on){
+  $("sdot").className="dot"+(on?" on":" offc");
+  $("sstat").className=on?"run":"off";$("sstat").textContent=on?"Онлайн":"Оффлайн";
+  $("bStart").disabled=on;$("bStop").disabled=!on;$("bRestart").disabled=!on;}
+function area(svg,hist,max,color){
+  var w=300,h=120,n=hist.length;if(n<2){$(svg).innerHTML="";return;}
+  var step=w/(n-1),pts="";
+  for(var i=0;i<n;i++){var x=i*step,y=h-Math.min(1,hist[i]/max)*(h-6)-3;pts+=(i?" ":"")+x.toFixed(1)+","+y.toFixed(1);}
+  var fill="M0,"+h+" L"+pts.replace(/ /g," L")+" L"+w+","+h+" Z";
+  $(svg).innerHTML='<path d="'+fill+'" fill="'+color+'22"/><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2"/>';
+}
 function poll(){api("/server/weblog",{}).then(function(d){
-  if(!d.ok){document.getElementById("err").textContent=d.error||"нет доступа";if(d.error)logout();return;}
-  document.getElementById("err").textContent="";
-  document.getElementById("dot").className="dot"+(d.online?"":" off");
-  var c=document.getElementById("console");var atBottom=c.scrollHeight-c.scrollTop-c.clientHeight<40;
-  c.innerHTML=(d.lines||[]).map(function(l){return esc(l);}).join("<br>");
+  if(!d.ok){$("err").style.display="block";$("err").textContent=d.error||"нет доступа";if(d.error)logout();return;}
+  $("err").style.display="none";
+  var on=!!d.online;setOnline(on);
+  var st=d.stats;
+  if(st&&on){
+    var cpu=(st.cpu||0)/10;
+    $("sCpu").innerHTML=cpu.toFixed(1)+' <small>%</small>';
+    $("sMem").innerHTML=gib(st.ram||0)+'<small>/ '+gib(MEMLIM).trim()+' GiB</small>';
+    $("sDisk").innerHTML='—';
+    $("sPl").textContent=(st.players!=null?st.players:0);
+    $("sUp").textContent=fmtUp(st.up);
+    $("ssum").textContent="Память "+gib(st.ram||0)+"GiB · Игроков "+(st.players||0)+" · Аптайм "+fmtUp(st.up);
+    $("cCpu").textContent=cpu.toFixed(1)+" %";$("cMem").textContent=gib(st.ram||0)+"GiB";
+    cpuHist.push(cpu);if(cpuHist.length>60)cpuHist.shift();
+    memHist.push(st.ram||0);if(memHist.length>60)memHist.shift();
+    area("gCpu",cpuHist,100,"#5b8cff");area("gMem",memHist,MEMLIM,"#2fd4a7");
+  }else{
+    $("sCpu").textContent="—";$("sMem").textContent="—";$("sDisk").textContent="—";$("sPl").textContent="—";$("sUp").textContent="—";
+    $("ssum").textContent="Память — · Игроков — · Аптайм —";$("cCpu").textContent="—";$("cMem").textContent="—";
+  }
+  var c=$("console");var atBottom=c.scrollHeight-c.scrollTop-c.clientHeight<50;
+  c.innerHTML=(d.lines||[]).map(function(l){var e=esc(l);
+    if(/^>\\s/.test(l))return '<span class="in">'+e+'</span>';
+    if(/WARN|warning/i.test(l))return '<span class="warn">'+e+'</span>';
+    if(/ERROR|severe|exception/i.test(l))return '<span class="err">'+e+'</span>';
+    return e;}).join("<br>");
   if(atBottom)c.scrollTop=c.scrollHeight;
 }).catch(function(){});}
-function sendCmd(){var t=document.getElementById("cmd").value.trim();if(!t)return;
-  api("/server/webcmd",{text:t}).then(function(d){document.getElementById("cmd").value="";if(!d.ok)document.getElementById("err").textContent=d.error||"ошибка";});}
+function power(a){var nm={start:"запуск",restart:"перезапуск",stop:"остановку"};
+  api("/server/control",{action:a}).then(function(d){
+    if(!d.ok){toast(d.error||"не вышло");return;}
+    toast("Команда на "+nm[a]+" отправлена");
+    var c=$("console");c.innerHTML+='<br><span class="in">» '+a+'</span>';c.scrollTop=c.scrollHeight;
+  }).catch(function(){toast("сервер недоступен")});}
+function sendCmd(){var t=$("cmd").value.trim();if(!t)return;
+  api("/server/webcmd",{text:t}).then(function(d){$("cmd").value="";if(!d.ok){$("err").style.display="block";$("err").textContent=d.error||"ошибка";}});}
 show();
-</script></div></body></html>`;
+</script></body></html>`;
 
 function serverConsolePage(req, res) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -1666,6 +1809,14 @@ function serverPush(req, res) {
         const lines = Array.isArray(body.lines) ? body.lines : [];
         for (const l of lines) policy.srvLog[name].push(String(l).slice(0, 500));
         if (policy.srvLog[name].length > 400) policy.srvLog[name] = policy.srvLog[name].slice(-400);
+        if (body.stats && typeof body.stats === 'object') {
+            policy.srvStat[name] = {
+                ram: Number(body.stats.ram) || 0,
+                up: Number(body.stats.up) || 0,
+                players: Number(body.stats.players) || 0,
+                at: now()
+            };
+        }
         send(res, 200, { ok: true });
     });
 }
@@ -1689,12 +1840,39 @@ function srvOwner(token, name) {
     return n === nick.toLowerCase() || n.startsWith(nick.toLowerCase() + '-') || nick === ADMIN;
 }
 
+/** Веб: кнопка питания (start/stop/restart) — в очередь владельцу. */
+function serverControl(req, res) {
+    readJsonBody(req, body => {
+        const name = clean(body.name, 48);
+        const action = clean(body.action, 12);
+        if (!srvOwner(body.token, name)) return send(res, 403, { error: 'не ваш сервер' });
+        if (['start', 'stop', 'restart'].indexOf(action) < 0) return send(res, 400, { error: 'действие?' });
+        const owner = sessionNick(body.token);
+        if (!policy.srvCtl[owner]) policy.srvCtl[owner] = [];
+        policy.srvCtl[owner].push({ name, action });
+        if (policy.srvCtl[owner].length > 50) policy.srvCtl[owner].shift();
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Лаунчер-агент забирает кнопки питания для серверов этого аккаунта. */
+function serverAgent(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const out = policy.srvCtl[nick] || [];
+        if (out.length) policy.srvCtl[nick] = [];
+        send(res, 200, { controls: out });
+    });
+}
+
 /** Веб-консоль: владелец читает лог своего сервера. */
 function serverWebLog(req, res) {
     readJsonBody(req, body => {
         const name = clean(body.name, 48);
         if (!srvOwner(body.token, name)) return send(res, 403, { error: 'не ваш сервер' });
-        send(res, 200, { ok: true, lines: policy.srvLog[name] || [], online: !!(rooms2byNick(name)) });
+        const st = policy.srvStat[name] || null;
+        send(res, 200, { ok: true, lines: policy.srvLog[name] || [], online: !!(rooms2byNick(name)), stats: st });
     });
 }
 
@@ -2635,6 +2813,8 @@ const server = http.createServer((req, res) => {
     if (route === '/server/pull' && req.method === 'POST') return serverPull(req, res);
     if (route === '/server/weblog' && req.method === 'POST') return serverWebLog(req, res);
     if (route === '/server/webcmd' && req.method === 'POST') return serverWebCmd(req, res);
+    if (route === '/server/control' && req.method === 'POST') return serverControl(req, res);
+    if (route === '/server/agent' && req.method === 'POST') return serverAgent(req, res);
     if (route === '/server') return serverConsolePage(req, res);
     if (route === '/resolve') return resolveName(req, res);
 

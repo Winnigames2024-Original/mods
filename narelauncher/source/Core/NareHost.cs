@@ -26,6 +26,7 @@ namespace NareLauncher.Core
         public bool Online { get { return _token.Length > 0 && _publicPort > 0; } }
         public Action<string> OnLog;
         public Action<string> OnCommand;     // команда из веб-консоли -> в stdin сервера
+        public Func<string> StatsJson;        // "ram":..,"up":..,"players":.. для карточек веб-панели
 
         private readonly System.Collections.Generic.List<string> _logBuf = new System.Collections.Generic.List<string>();
         private readonly object _logLock = new object();
@@ -77,17 +78,18 @@ namespace NareLauncher.Core
                         {
                             if (_logBuf.Count > 0) { batch = _logBuf.ToArray(); _logBuf.Clear(); }
                         }
-                        if (batch != null && batch.Length > 0)
-                        {
-                            var sb = new StringBuilder("{\"token\":\"").Append(Esc(_token)).Append("\",\"lines\":[");
+                        var sb = new StringBuilder("{\"token\":\"").Append(Esc(_token)).Append("\",\"lines\":[");
+                        if (batch != null)
                             for (int i = 0; i < batch.Length; i++)
                             {
                                 if (i > 0) sb.Append(',');
                                 sb.Append('"').Append(JsonStr(batch[i])).Append('"');
                             }
-                            sb.Append("]}");
-                            try { HttpPost("/server/push", sb.ToString()); } catch { }
-                        }
+                        sb.Append(']');
+                        var sp = StatsJson;
+                        if (sp != null) { string st = null; try { st = sp(); } catch { } if (!string.IsNullOrEmpty(st)) sb.Append(",\"stats\":{").Append(st).Append('}'); }
+                        sb.Append('}');
+                        try { HttpPost("/server/push", sb.ToString()); } catch { }
 
                         try
                         {

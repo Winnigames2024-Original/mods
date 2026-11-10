@@ -1,8 +1,8 @@
 {
-  "version": "1.50",
+  "version": "1.51",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "32aa31ca5e80d1fd4e19bad8b6a42bbb54124217",
-  "size": 754176,
-  "notes": "Веб-консоль серверов: лаунчер гонит консоль сервера в веб и выполняет команды из веб-консоли (console*.narelauncher через сайт)"
+  "sha1": "ad26cbddd4b8ea4de9b9a02f0cb350725fbf4173",
+  "size": 765440,
+  "notes": "Веб-панель серверов в стиле хостинга (как panel.minecraft-hosting.net): карточки CPU/память/аптайм/игроки, кнопки питания Старт/Рестарт/Стоп прямо из браузера, графики. Кнопки работают, пока лаунчер открыт."
 }

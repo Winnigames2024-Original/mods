@@ -120,6 +120,9 @@ namespace NareLauncher.UI
 
             LoadList();
             Resize += (s, e) => Relayout();
+
+            NareAgent.OnControl = (name, action) => Ui(() => WebPower(name, action));
+            NareAgent.Start();
         }
 
         public override void PageShown() { Relayout(); }
@@ -205,10 +208,15 @@ namespace NareLauncher.UI
         private void StartSel()
         {
             if (_sel == null) { Append("Сначала создай или выбери сервер."); return; }
-            if (_sel.Mgr != null && _sel.Mgr.Running) { Append("Уже запущен."); return; }
+            StartEntry(_sel);
+        }
+
+        private void StartEntry(Entry entry)
+        {
+            if (entry == null) return;
+            if (entry.Mgr != null && entry.Mgr.Running) { Append("Уже запущен."); return; }
             try
             {
-                var entry = _sel;
                 entry.Host = new NareHost(Nick + "-" + entry.Id, entry.Port);
                 entry.Host.OnLog = s => Ui(() => Append("[тоннель] " + s));
                 entry.Host.OnCommand = s => Ui(() =>
@@ -216,6 +224,8 @@ namespace NareLauncher.UI
                     // команда из веб-консоли — выполняем в stdin сервера
                     if (entry.Mgr != null && entry.Mgr.Running) { entry.Mgr.Send(s); Append("[web] > " + s); }
                 });
+
+                entry.Host.StatsJson = () => (entry.Mgr != null ? entry.Mgr.StatsJson() : null);
 
                 entry.Mgr = new ServerManager(entry.Folder, entry.Port);
                 entry.Mgr.OnLine = s =>
@@ -259,7 +269,29 @@ namespace NareLauncher.UI
         private void StopHost(Entry e)
         {
             try { if (e.Host != null) { e.Host.Stop(); e.Host = null; } } catch { }
-            try { if (e.Mgr != null) { e.Mgr.Stop(); } } catch { }
+            var mgr = e.Mgr;
+            if (mgr != null)
+                new System.Threading.Thread(() => { try { mgr.Stop(); } catch { } }) { IsBackground = true }.Start();
+        }
+
+        // Кнопки питания из веб-панели (через NareAgent).
+        private void WebPower(string name, string action)
+        {
+            Entry e = null;
+            foreach (var x in _servers)
+                if (string.Equals((Nick + "-" + x.Id), name, StringComparison.OrdinalIgnoreCase)) { e = x; break; }
+            if (e == null) { Append("[web] неизвестный сервер: " + name); return; }
+            if (action == "start") { Append("[web] запрос запуска «" + e.Id + "»"); StartEntry(e); }
+            else if (action == "stop") { Append("[web] запрос остановки «" + e.Id + "»"); StopHost(e); }
+            else if (action == "restart")
+            {
+                Append("[web] перезапуск «" + e.Id + "»");
+                StopHost(e);
+                var ee = e;
+                var t = new Timer { Interval = 6000 };
+                t.Tick += (s, ev) => { t.Stop(); t.Dispose(); StartEntry(ee); };
+                t.Start();
+            }
         }
 
         private void SendCmd()
