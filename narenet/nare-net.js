@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.32';
+const VERSION = '1.33';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -843,6 +843,7 @@ h1{font-size:20px;margin:0 0 4px} .muted{color:#8b93a7;font-size:13px}
 .card{background:#161b26;border:1px solid #232a3a;border-radius:12px;padding:16px;margin:12px 0}
 input,select{background:#0e1118;border:1px solid #2a3144;color:#e6e9f0;border-radius:8px;padding:9px 11px;font-size:14px;outline:none}
 input:focus{border-color:#4f7cff}
+input:-webkit-autofill,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #0e1118 inset;-webkit-text-fill-color:#e6e9f0;caret-color:#e6e9f0;transition:background-color 9999s ease-in-out 0s}
 button{background:#1d2535;border:1px solid #2a3144;color:#e6e9f0;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
 button:hover{border-color:#4f7cff} button.pri{background:#2f52d8;border-color:#2f52d8} button.red{background:#5a1d26;border-color:#7a2633}
 button.red:hover{border-color:#ff5a6a} button.sm{padding:5px 9px;font-size:12px}
@@ -921,7 +922,8 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
 </div>
 
 <script>
-var token=sessionStorage.getItem("nn_token")||"";
+function setCk(k,v){document.cookie=k+"="+encodeURIComponent(v)+";path=/;max-age=2592000;samesite=lax"}function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){var e=a[i].indexOf("=");if(e>0&&a[i].slice(0,e)===k)return decodeURIComponent(a[i].slice(e+1))}return ""}function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
+var token=getCk("nn_token")||"";
 var state=null, isAdmin=false;
 function api(path,body){body=body||{};body.token=token;
   return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
@@ -932,10 +934,10 @@ function login(){
   fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
    .then(function(r){return r.json()}).then(function(d){
      if(!d.ok){document.getElementById("lmsg").textContent=d.error||"не вышло";return;}
-     token=d.token;sessionStorage.setItem("nn_token",token);load();
+     token=d.token;setCk("nn_token",token);load();
    }).catch(function(){document.getElementById("lmsg").textContent="сервер недоступен";});
 }
-function logout(){stopLogs();token="";sessionStorage.removeItem("nn_token");show(false);}
+function logout(){stopLogs();token="";delCk("nn_token");show(false);}
 function show(app){document.getElementById("app").style.display=app?"block":"none";
   document.getElementById("login").style.display=app?"none":"block";}
 function load(){
@@ -1074,6 +1076,8 @@ a{color:#7aa2ff} .wrap{max-width:860px;margin:0 auto;padding:16px}
 .card{background:#141926;border:1px solid #232a3a;border-radius:14px;padding:16px;margin:12px 0}
 input,textarea,select{background:#0b0e14;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:10px 12px;font-size:14px;outline:none;width:100%}
 input:focus,textarea:focus{border-color:#5b8cff}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #0b0e14 inset;-webkit-text-fill-color:#e7eaf2;caret-color:#e7eaf2;transition:background-color 9999s ease-in-out 0s}
+#login{max-width:380px;margin:8vh auto;padding:26px}#login input{margin-bottom:4px}
 button{background:#1d2535;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:9px 14px;font-size:14px;cursor:pointer}
 button:hover{border-color:#5b8cff} button.pri{background:#2f52d8;border-color:#2f52d8}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -1142,7 +1146,8 @@ button:hover{border-color:#5b8cff} button.pri{background:#2f52d8;border-color:#2
 </div>
 
 <script>
-var token=sessionStorage.getItem("nl_token")||"", me=sessionStorage.getItem("nl_nick")||"";
+function setCk(k,v){document.cookie=k+"="+encodeURIComponent(v)+";path=/;max-age=2592000;samesite=lax"}function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){var e=a[i].indexOf("=");if(e>0&&a[i].slice(0,e)===k)return decodeURIComponent(a[i].slice(e+1))}return ""}function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
+var token=getCk("nl_token")||"", me=getCk("nl_nick")||"";
 function api(path,body,get){
   if(get)return fetch(path).then(function(r){return r.json()});
   body=body||{};body.token=token;
@@ -1156,10 +1161,10 @@ function login(){
   fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
    .then(function(r){return r.json()}).then(function(d){
      if(!d.ok){document.getElementById("lerr").textContent=d.error||"не вышло";return;}
-     token=d.token;me=d.nick;sessionStorage.setItem("nl_token",token);sessionStorage.setItem("nl_nick",me);show();
+     token=d.token;me=d.nick;setCk("nl_token",token);setCk("nl_nick",me);show();
    }).catch(function(){document.getElementById("lerr").textContent="сервер недоступен";});
 }
-function logout(){token="";me="";sessionStorage.removeItem("nl_token");sessionStorage.removeItem("nl_nick");show();}
+function logout(){token="";me="";delCk("nl_token");delCk("nl_nick");show();}
 function show(){
   var on=token.length>0;
   document.getElementById("login").style.display=on?"none":"block";
@@ -1298,6 +1303,7 @@ body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0a0d1
 .login input{width:100%;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:11px;padding:12px 13px;font-size:14px;margin-bottom:11px}
 .login button{width:100%;background:#2f52d8;border:0;color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
 .login button:hover{background:#3a60ee}
+.login input:-webkit-autofill,.login input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #0a0d14 inset;-webkit-text-fill-color:#e7eaf2;caret-color:#e7eaf2;transition:background-color 9999s ease-in-out 0s}
 #lerr,#err{color:#ff8a98;font-size:13px}
 .toast{position:fixed;right:18px;bottom:18px;background:#17233f;border:1px solid #2f52d8;color:#dfe6ff;padding:11px 16px;border-radius:11px;font-size:13px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:9}
 .toast.show{opacity:1;transform:none}
@@ -1376,7 +1382,8 @@ body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0a0d1
 <div class="toast" id="toast"></div>
 <script>
 function qs(k){var m=new RegExp("[?&]"+k+"=([^&]*)").exec(location.search);return m?decodeURIComponent(m[1]):"";}
-var name=qs("name"), token=sessionStorage.getItem("srv_"+name)||"";
+function setCk(k,v){document.cookie=k+"="+encodeURIComponent(v)+";path=/;max-age=2592000;samesite=lax"}function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){var e=a[i].indexOf("=");if(e>0&&a[i].slice(0,e)===k)return decodeURIComponent(a[i].slice(e+1))}return ""}function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
+var name=qs("name"), token=getCk("srv_"+name)||"";
 var MEMLIM=2048; // МБ (Xmx 2G)
 var cpuHist=[], memHist=[];
 var $=function(id){return document.getElementById(id)};
@@ -1391,9 +1398,9 @@ function login(){var u=$("u").value.trim(),p=$("p").value;$("lerr").textContent=
   fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
    .then(function(r){return r.json()}).then(function(d){
      if(!d.ok){$("lerr").textContent=d.error||"не вышло";return;}
-     token=d.token;sessionStorage.setItem("srv_"+name,token);show();
+     token=d.token;setCk("srv_"+name,token);show();
    }).catch(function(){$("lerr").textContent="сервер недоступен";});}
-function logout(){token="";sessionStorage.removeItem("srv_"+name);show();}
+function logout(){token="";delCk("srv_"+name);show();}
 var timer=null;
 function show(){var on=token.length>0;
   $("login").style.display=on?"none":"block";
