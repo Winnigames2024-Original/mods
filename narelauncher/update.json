@@ -1,12 +1,12 @@
 {
-  "version": "1.79",
+  "version": "1.80",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "7071b45dfaffc11e824c6ee1ee3f5017c37b0de3",
-  "size": 855040,
+  "sha1": "8c68abcbed6a6a8f58f5eb0922fff168ed8f7299",
+  "size": 858624,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "234b33709c25bc1f99387f82955a8ea619f19886",
   "smSize": 83968,
-  "notes": "Объявление админа верхней полосой (ник сам + таймер секунд), перезапуск лаунчеров и серверов из админки, ежедневная награда (+1000 монет, +1 сервер). Нужен nare-net 1.46."
+  "notes": "Ежеминутная награда за онлайн (+5 монет/мин) и кнопка «Перенести мир» — локальный мир переносится в сервер (с разбивкой измерений для Paper). Нужен nare-net 1.47."
 }

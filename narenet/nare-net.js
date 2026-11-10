@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.46';
+const VERSION = '1.47';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1967,6 +1967,23 @@ function adminRestart(req, res) {
     });
 }
 
+// Ежеминутная награда: немного монет за то, что игрок онлайн. Раз в минуту.
+const MINUTE_REWARD = 5;
+const MINUTE_COOLDOWN = 60 * 1000;
+function rewardMinute(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        if (now() - (a.lastMinute || 0) < MINUTE_COOLDOWN)
+            return send(res, 200, { ok: true, awarded: 0, coins: a.coins || 0 });
+        a.lastMinute = now();
+        a.coins = (a.coins || 0) + MINUTE_REWARD;
+        saveAccounts();
+        send(res, 200, { ok: true, awarded: MINUTE_REWARD, coins: a.coins });
+    });
+}
+
 // Ежедневная награда: +1000 монет и +1 слот сервера, раз в 20 часов.
 const REWARD_COOLDOWN = 20 * 3600 * 1000;
 function rewardDaily(req, res) {
@@ -3797,6 +3814,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/restart' && req.method === 'POST') return adminRestart(req, res);
     if (route === '/restartflag') return send(res, 200, { ok: true, servers: policy.restartServers || 0, launchers: policy.restartLaunchers || 0 });
     if (route === '/reward/daily' && req.method === 'POST') return rewardDaily(req, res);
+    if (route === '/reward/minute' && req.method === 'POST') return rewardMinute(req, res);
     if (route === '/admin/command' && req.method === 'POST') return adminCommand(req, res);
     if (route === '/admin/together' && req.method === 'POST') return adminTogether(req, res);
     if (route === '/admin/blockmod' && req.method === 'POST') return adminBlockMod(req, res);
