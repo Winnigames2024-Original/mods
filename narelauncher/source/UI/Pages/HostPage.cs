@@ -93,6 +93,12 @@ namespace NareLauncher.UI
         private readonly CardPanel _propsPanel = new CardPanel();
         private readonly TextBox _propsText = new TextBox();
         private Button[] _propsBtns;
+        private Button _launchSave;
+        private readonly Button _tabLaunch = new Button();
+        private readonly CardPanel _launchPanel = new CardPanel();
+        private TextBox _lJar, _lRamMax, _lRamMin, _lArgs;
+        private ComboBox _lJava, _lGc;
+        private Label[] _lLabels;
 
         public HostPage()
         {
@@ -214,11 +220,12 @@ namespace NareLauncher.UI
             _stop.Bounds = new Rectangle(m + 306, by, 150, 40);
 
             int tabY = by + 52;
-            _tabConsole.Bounds = new Rectangle(m, tabY, 104, 30);
-            _tabFiles.Bounds = new Rectangle(m + 108, tabY, 96, 30);
-            _tabJars.Bounds = new Rectangle(m + 208, tabY, 108, 30);
-            _tabProps.Bounds = new Rectangle(m + 320, tabY, 172, 30);
-            var at = _view == "files" ? _tabFiles : _view == "jars" ? _tabJars : _view == "props" ? _tabProps : _tabConsole;
+            _tabConsole.Bounds = new Rectangle(m, tabY, 96, 30);
+            _tabFiles.Bounds = new Rectangle(m + 98, tabY, 82, 30);
+            _tabJars.Bounds = new Rectangle(m + 182, tabY, 96, 30);
+            _tabLaunch.Bounds = new Rectangle(m + 280, tabY, 104, 30);
+            _tabProps.Bounds = new Rectangle(m + 386, tabY, 168, 30);
+            var at = _view == "files" ? _tabFiles : _view == "jars" ? _tabJars : _view == "props" ? _tabProps : _view == "launch" ? _tabLaunch : _tabConsole;
             _tabInk.Bounds = new Rectangle(at.Left, at.Bottom - 1, at.Width, 3);
             _tabInk.BringToFront();
 
@@ -232,8 +239,8 @@ namespace NareLauncher.UI
             _cmd.Bounds = new Rectangle(14, 11, _cmdCard.Width - 28, 20);
 
             var full = new Rectangle(m, cTop, right - m, cBottom - cTop);
-            _filesPanel.Bounds = full; _jarsPanel.Bounds = full; _propsPanel.Bounds = full;
-            LayoutFiles(); LayoutJars(); LayoutProps();
+            _filesPanel.Bounds = full; _jarsPanel.Bounds = full; _propsPanel.Bounds = full; _launchPanel.Bounds = full;
+            LayoutFiles(); LayoutJars(); LayoutProps(); LayoutLaunch();
         }
 
         // ---------- данные ----------
@@ -647,7 +654,7 @@ namespace NareLauncher.UI
 
         private void BuildManage()
         {
-            foreach (var t in new[] { _tabConsole, _tabFiles, _tabJars, _tabProps })
+            foreach (var t in new[] { _tabConsole, _tabFiles, _tabJars, _tabLaunch, _tabProps })
             {
                 t.FlatStyle = FlatStyle.Flat; t.FlatAppearance.BorderSize = 0;
                 t.BackColor = CBg; t.ForeColor = CDim; t.Font = Theme.F(9.5f, FontStyle.Bold);
@@ -656,6 +663,8 @@ namespace NareLauncher.UI
             }
             _tabInk.BackColor = CAccent; _tabInk.Height = 3; Controls.Add(_tabInk); _tabInk.BringToFront();
             _tabConsole.Text = "Консоль"; _tabFiles.Text = "Файлы"; _tabJars.Text = "Моды"; _tabProps.Text = "server.properties";
+            _tabLaunch.Text = "Настройки";
+            _tabLaunch.Click += (s, e) => { ShowView("launch"); LoadLaunch(); };
             _tabConsole.Click += (s, e) => ShowView("console");
             _tabFiles.Click += (s, e) => { ShowView("files"); RefreshFiles(); };
             _tabJars.Click += (s, e) => { ShowView("jars"); RefreshJars(); };
@@ -687,6 +696,15 @@ namespace NareLauncher.UI
             _propsPanel.Controls.Add(_propsText);
             _propsBtns = new[] { Mk("Сохранить", SaveProps), Mk("Перечитать", LoadProps) };
             foreach (var b in _propsBtns) _propsPanel.Controls.Add(b);
+
+            _launchPanel.Visible = false; Controls.Add(_launchPanel);
+            _lJar = LField(); _lRamMax = LField(); _lRamMin = LField(); _lArgs = LField();
+            _lJava = Combo(new object[] { "Авто (по версии)", "Java 8", "Java 17", "Java 21" });
+            _lGc = Combo(new object[] { "G1GC — рекомендуется (4ГБ+)", "ParallelGC — производительность", "SerialGC — слабые ПК", "По умолчанию JVM" });
+            foreach (var c in new Control[] { _lJar, _lRamMax, _lRamMin, _lArgs, _lJava, _lGc }) _launchPanel.Controls.Add(c);
+            _lLabels = new[] { LLab("Исполняемый jar"), LLab("Макс. память, МБ (-Xmx)"), LLab("Мин. память, МБ"), LLab("Версия Java"), LLab("Сборщик мусора (GC)"), LLab("Доп. аргументы JVM") };
+            foreach (var l in _lLabels) _launchPanel.Controls.Add(l);
+            _launchSave = Mk("Сохранить настройки", SaveLaunch); _launchPanel.Controls.Add(_launchSave);
         }
 
         private Button Mk(string text, Action act)
@@ -716,13 +734,14 @@ namespace NareLauncher.UI
         private void ShowView(string v)
         {
             _view = v;
-            bool con = v == "console", fil = v == "files", jar = v == "jars", pr = v == "props";
+            bool con = v == "console", fil = v == "files", jar = v == "jars", pr = v == "props", lau = v == "launch";
             _termCard.Visible = con; _cmdCard.Visible = con; _send.Visible = con;
-            _filesPanel.Visible = fil; _jarsPanel.Visible = jar; _propsPanel.Visible = pr;
+            _filesPanel.Visible = fil; _jarsPanel.Visible = jar; _propsPanel.Visible = pr; _launchPanel.Visible = lau;
             _tabConsole.ForeColor = con ? CText : CDim;
             _tabFiles.ForeColor = fil ? CText : CDim;
             _tabJars.ForeColor = jar ? CText : CDim;
             _tabProps.ForeColor = pr ? CText : CDim;
+            _tabLaunch.ForeColor = lau ? CText : CDim;
             Relayout();
         }
 
@@ -792,6 +811,7 @@ namespace NareLauncher.UI
             if (_view == "files") RefreshFiles();
             else if (_view == "jars") RefreshJars();
             else if (_view == "props") LoadProps();
+            else if (_view == "launch") LoadLaunch();
         }
 
         private void RefreshFiles()
@@ -971,6 +991,54 @@ namespace NareLauncher.UI
             Append("server.properties сохранён.");
         }
 
+        private TextBox LField()
+        {
+            return new TextBox { BorderStyle = BorderStyle.FixedSingle, BackColor = CCard, ForeColor = CText, Font = Theme.F(10f) };
+        }
+        private Label LLab(string t)
+        {
+            return new Label { Text = t, AutoSize = false, ForeColor = CDim, BackColor = Color.Transparent, Font = Theme.F(9f) };
+        }
+        private ComboBox Combo(object[] items)
+        {
+            var c = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = CCard, ForeColor = CText, Font = Theme.F(10f) };
+            c.Items.AddRange(items);
+            return c;
+        }
+        private void LayoutLaunch()
+        {
+            if (_lLabels == null) return;
+            int x = 16, w = Math.Min(460, Math.Max(200, _launchPanel.Width - 32)), y = 14;
+            Control[] fields = { _lJar, _lRamMax, _lRamMin, _lJava, _lGc, _lArgs };
+            for (int i = 0; i < 6; i++)
+            {
+                _lLabels[i].Bounds = new Rectangle(x, y, w, 16); y += 20;
+                fields[i].Bounds = new Rectangle(x, y, w, 26); y += 38;
+            }
+            if (_launchSave != null) _launchSave.Bounds = new Rectangle(x, y + 6, 200, 36);
+        }
+        private void LoadLaunch()
+        {
+            if (_sel == null) return;
+            var c = ServerManager.ReadLaunchCfg(_sel.Folder);
+            _lJar.Text = c.Jar; _lRamMax.Text = c.RamMax.ToString(); _lRamMin.Text = c.RamMin.ToString(); _lArgs.Text = c.Args;
+            _lJava.SelectedIndex = c.JavaMajor == 8 ? 1 : c.JavaMajor == 17 ? 2 : c.JavaMajor == 21 ? 3 : 0;
+            _lGc.SelectedIndex = c.Gc == "parallel" ? 1 : c.Gc == "serial" ? 2 : c.Gc == "none" ? 3 : 0;
+        }
+        private void SaveLaunch()
+        {
+            if (_sel == null) { Append("Выбери сервер."); return; }
+            var c = new ServerManager.LaunchCfg();
+            c.Jar = string.IsNullOrEmpty(_lJar.Text.Trim()) ? "server.jar" : _lJar.Text.Trim();
+            int rx, rn; int.TryParse(_lRamMax.Text.Trim(), out rx); int.TryParse(_lRamMin.Text.Trim(), out rn);
+            c.RamMax = rx >= 256 ? rx : 2048; c.RamMin = rn >= 128 ? rn : 1024;
+            int[] jv = { 0, 8, 17, 21 }; c.JavaMajor = jv[Math.Max(0, _lJava.SelectedIndex)];
+            string[] gv = { "g1", "parallel", "serial", "none" }; c.Gc = gv[Math.Max(0, _lGc.SelectedIndex)];
+            c.Args = _lArgs.Text.Trim();
+            ServerManager.WriteLaunchCfg(_sel.Folder, c);
+            Append("Настройки запуска сохранены — применятся при следующем запуске.");
+        }
+
         // ---------- файловый мост для веб-панели ----------
         private static string JEsc(string v)
         {
@@ -1075,6 +1143,57 @@ namespace NareLauncher.UI
                     }
                     sb.Append("]}");
                     return sb.ToString();
+                }
+                if (action == "launchget")
+                {
+                    var c = ServerManager.ReadLaunchCfg(entry.Folder);
+                    return "{\"ok\":true,\"jar\":\"" + JEsc(c.Jar) + "\",\"ramMax\":" + c.RamMax + ",\"ramMin\":" + c.RamMin + ",\"java\":" + c.JavaMajor + ",\"gc\":\"" + JEsc(c.Gc) + "\",\"args\":\"" + JEsc(c.Args) + "\"}";
+                }
+                if (action == "launchset")
+                {
+                    var j = Json.Parse(content ?? "{}");
+                    var c = new ServerManager.LaunchCfg
+                    {
+                        Jar = j["jar"].AsString("server.jar"),
+                        RamMax = j["ramMax"].AsInt(2048),
+                        RamMin = j["ramMin"].AsInt(1024),
+                        JavaMajor = j["java"].AsInt(0),
+                        Gc = j["gc"].AsString("g1"),
+                        Args = j["args"].AsString("")
+                    };
+                    ServerManager.WriteLaunchCfg(entry.Folder, c);
+                    return "{\"ok\":true}";
+                }
+                if (action == "psearch")
+                {
+                    var meta = ReadMeta(entry.Folder);
+                    bool plugins = SubForFolder(entry.Folder) == "plugins";
+                    string type = plugins ? "plugin" : "mod";
+                    string cat = plugins ? "paper" : (meta[0] == "fabric" ? "fabric" : (meta[0] == "forge" ? "forge" : ""));
+                    var res = ModrinthClient.Search(rel, type, cat, meta[1]);
+                    var sb = new System.Text.StringBuilder("{\"ok\":true,\"items\":[");
+                    for (int i = 0; i < res.Count; i++)
+                    {
+                        if (i > 0) sb.Append(',');
+                        sb.Append("{\"slug\":\"").Append(JEsc(res[i].Slug)).Append("\",\"title\":\"").Append(JEsc(res[i].Title))
+                          .Append("\",\"downloads\":").Append(res[i].Downloads).Append(",\"icon\":\"").Append(JEsc(res[i].IconUrl)).Append("\"}");
+                    }
+                    sb.Append("]}");
+                    return sb.ToString();
+                }
+                if (action == "pinstall")
+                {
+                    var meta = ReadMeta(entry.Folder);
+                    bool plugins = SubForFolder(entry.Folder) == "plugins";
+                    string[] loaders = plugins ? new[] { "paper", "spigot", "bukkit", "purpur", "folia" }
+                        : (meta[0] == "fabric" ? new[] { "fabric", "quilt" } : new[] { "forge", "neoforge" });
+                    var dl = ModrinthClient.Resolve(rel, loaders, meta[1]);
+                    if (dl == null || string.IsNullOrEmpty(dl[0])) return Err("нет совместимой версии");
+                    string sub = Path.Combine(root, SubForFolder(entry.Folder));
+                    Directory.CreateDirectory(sub);
+                    string fname = dl[1].Length > 0 ? dl[1] : rel + ".jar";
+                    ModrinthClient.Download(dl[0], Path.Combine(sub, fname));
+                    return "{\"ok\":true,\"file\":\"" + JEsc(fname) + "\"}";
                 }
                 return Err("неизвестное действие");
             }

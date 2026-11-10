@@ -62,24 +62,33 @@ namespace NareLauncher.Core
             File.WriteAllText(Path.Combine(Folder, "eula.txt"), "eula=true\n");
             WriteProps();
 
-            string java = JavaExe2();
+            var cfg = ReadLaunchCfg(Folder);
+            string java = cfg.JavaMajor > 0 ? JavaExeFor(cfg.JavaMajor) : JavaExe2();
             if (java == null)
                 throw new InvalidOperationException("Не найдена Java для запуска сервера.");
+
+            string mem = "-Xmx" + cfg.RamMax + "M -Xms" + cfg.RamMin + "M";
+            string gc = GcFlag(cfg.Gc);
+            string extra = (cfg.Args ?? "").Trim();
+            string jvm = (mem + " " + gc + " " + extra).Trim();
 
             string launchFile = Path.Combine(Folder, "nare_launch.txt");
             string args;
             if (File.Exists(launchFile))
             {
-                args = (File.ReadAllText(launchFile) ?? "").Trim();   // Forge: @user_jvm_args.txt @libraries/.../win_args.txt nogui
+                // Forge: память/GC/доп.аргументы пишем в user_jvm_args.txt
+                try { File.WriteAllText(Path.Combine(Folder, "user_jvm_args.txt"), jvm + "\n"); } catch { }
+                args = (File.ReadAllText(launchFile) ?? "").Trim();   // @user_jvm_args.txt @libraries/.../win_args.txt nogui
                 if (args.Length == 0)
                     throw new InvalidOperationException("nare_launch.txt пуст — переустановите ядро Forge.");
             }
             else
             {
-                string jar = Path.Combine(Folder, "server.jar");
+                string jarName = string.IsNullOrEmpty(cfg.Jar) ? "server.jar" : cfg.Jar;
+                string jar = Path.Combine(Folder, jarName);
                 if (!File.Exists(jar))
-                    throw new FileNotFoundException("В папке сервера нет server.jar. Нажмите «Скачать jar» и выберите ядро.");
-                args = "-Xmx2G -Xms1G -jar \"server.jar\" nogui";
+                    throw new FileNotFoundException("В папке сервера нет " + jarName + ". Нажмите «Скачать jar» и выберите ядро.");
+                args = jvm + " -jar \"" + jarName + "\" nogui";
             }
 
             var psi = new ProcessStartInfo
@@ -259,6 +268,58 @@ namespace NareLauncher.Core
             }
             catch { }
             return "";
+        }
+
+        public class LaunchCfg
+        {
+            public string Jar = "server.jar";
+            public int RamMax = 2048, RamMin = 1024;
+            public int JavaMajor = 0;      // 0 = авто по версии
+            public string Gc = "g1";       // g1 | parallel | serial | none
+            public string Args = "";
+        }
+
+        public static LaunchCfg ReadLaunchCfg(string folder)
+        {
+            var c = new LaunchCfg();
+            try
+            {
+                string f = Path.Combine(folder, "nare_launch.json");
+                if (File.Exists(f))
+                {
+                    var j = Json.Parse(File.ReadAllText(f));
+                    c.Jar = j["jar"].AsString("server.jar");
+                    c.RamMax = Math.Max(256, j["ramMax"].AsInt(2048));
+                    c.RamMin = Math.Max(128, j["ramMin"].AsInt(1024));
+                    if (c.RamMin > c.RamMax) c.RamMin = c.RamMax;
+                    c.JavaMajor = j["java"].AsInt(0);
+                    c.Gc = j["gc"].AsString("g1");
+                    c.Args = j["args"].AsString("");
+                }
+            }
+            catch { }
+            return c;
+        }
+
+        public static void WriteLaunchCfg(string folder, LaunchCfg c)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("{\"jar\":\"").Append((c.Jar ?? "server.jar").Replace("\\", "/").Replace("\"", ""))
+              .Append("\",\"ramMax\":").Append(c.RamMax).Append(",\"ramMin\":").Append(c.RamMin)
+              .Append(",\"java\":").Append(c.JavaMajor).Append(",\"gc\":\"").Append(c.Gc ?? "g1")
+              .Append("\",\"args\":\"").Append((c.Args ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"")).Append("\"}");
+            File.WriteAllText(Path.Combine(folder, "nare_launch.json"), sb.ToString());
+        }
+
+        private static string GcFlag(string gc)
+        {
+            switch ((gc ?? "").ToLowerInvariant())
+            {
+                case "parallel": return "-XX:+UseParallelGC";
+                case "serial": return "-XX:+UseSerialGC";
+                case "none": return "";
+                default: return "-XX:+UseG1GC";
+            }
         }
 
         /// <summary>Нужная major-версия Java для версии Minecraft.</summary>

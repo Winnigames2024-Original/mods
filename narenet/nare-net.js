@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.41';
+const VERSION = '1.42';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1342,6 +1342,7 @@ const SERVER_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 .crumb{padding:10px 16px;color:#8b93a7;font-size:12.5px;border-bottom:1px solid #1b2232}.crumb b{color:#dfe4ee}
 .editor textarea{width:100%;height:480px;background:#070a11;border:0;color:#e7eaf2;font-family:Consolas,monospace;font-size:12.5px;padding:14px 16px;outline:none;resize:none;white-space:pre}
 .empty{color:#7b8498;text-align:center;padding:40px}
+.frm label{display:block;color:#8b93a7;font-size:12px;margin:12px 0 4px}.frm input,.frm select{width:100%;max-width:440px;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:8px;padding:9px 11px;font-size:13px}.frm .hint{color:#636b80;font-size:11px;margin-top:3px;max-width:440px}
 .login{max-width:380px;margin:9vh auto;background:#10141f;border:1px solid #1b2232;border-radius:16px;padding:26px}
 .login h2{margin:0 0 4px}.login .m{color:#8b93a7;font-size:13px;margin-bottom:16px}
 .login input{width:100%;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:10px;padding:12px;font-size:14px;margin-bottom:10px}
@@ -1414,8 +1415,8 @@ function login(){var u=V("u").value.trim(),p=V("p").value;V("lerr").textContent=
      token=d.token;setCk("srv_"+name,token);show();}).catch(function(){V("lerr").textContent="сервер недоступен";});}
 function logout(){token="";delCk("srv_"+name);show();}
 
-var TABS=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["settings","server.properties"],["logs","Логи"]];
-var NAV=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["settings","Настройки"],["logs","Логи"]];
+var TABS=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["launch","Настройки"],["settings","server.properties"],["logs","Логи"]];
+var NAV=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["launch","Настройки"],["settings","server.properties"],["logs","Логи"]];
 function tabsHtml(arr){var h="";for(var i=0;i<arr.length;i++){h+='<a data-act="go" data-arg="'+arr[i][0]+'">'+arr[i][1]+'</a>';}return h;}
 function buildNav(){ V("tabs").innerHTML=tabsHtml(TABS); V("snav").innerHTML=tabsHtml(NAV)+'<a data-act="logout">Выход</a>'; }
 function go(t){ tab=t; markTabs(); render(); }
@@ -1429,6 +1430,7 @@ document.addEventListener("click", function(e){
   else if(a==="up")upDir(); else if(a==="open")openEditor(g); else if(a==="del")delFile(g);
   else if(a==="save")saveEditor(); else if(a==="cmd")pcmd(g); else if(a==="send")sendCmd();
   else if(a==="power")power(g); else if(a==="refresh")render(); else if(a==="poll")poll();
+  else if(a==="launchsave")saveLaunch(); else if(a==="psearch")doPSearch(); else if(a==="pinstall")doPInstall(g); else if(a==="ban")doBan(g);
 });
 document.addEventListener("keydown", function(e){
   if(e.key!=="Enter")return;
@@ -1481,6 +1483,7 @@ function render(){ var v=V("view");
   if(tab==="plugins"){ renderPlugins(); return; }
   if(tab==="settings"){ openEditor("server.properties"); return; }
   if(tab==="files"){ renderFiles(curPath); return; }
+  if(tab==="launch"){ renderLaunch(); return; }
 }
 
 function renderFiles(path){ curPath=path||""; tab="files"; markTabs(); var v=V("view");
@@ -1501,8 +1504,12 @@ function openEditor(path){ editPath=path; tab=(path==="server.properties"?"setti
 }
 function saveEditor(){ var c=V("edit").value; fsCall("write",editPath,c).then(function(r){ toast(r.ok?"Сохранено":(r.error||"ошибка")); }).catch(function(ex){ toast(ex.message); }); }
 
-function renderPlugins(){ tab="plugins"; markTabs(); var v=V("view"); v.innerHTML='<div class="card"><div class="cardhd">Плагины / Моды<div class="sp"></div><button class="btn gray" data-act="go" data-arg="plugins">Обновить</button></div><div class="flist" id="plist"><div class="empty">загрузка…</div></div></div>';
-  fsCall("plugins").then(function(r){ if(!r.ok){ V("plist").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
+function renderPlugins(){ tab="plugins"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="cardhd">Каталог плагинов / модов<div class="sp"></div></div><div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #1b2232"><input id="psq" placeholder="Поиск в каталоге (Modrinth)…" style="flex:1;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:8px;padding:9px 11px"><button class="btn" data-act="psearch">Искать</button></div><div class="flist" id="pcat" style="max-height:300px"></div></div>'
+   +'<div class="card" style="margin-top:14px"><div class="cardhd">Установленные<div class="sp"></div><button class="btn gray" data-act="go" data-arg="plugins">Обновить</button></div><div class="flist" id="plist"><div class="empty">загрузка…</div></div></div>';
+  doPSearch(); loadInstalled();
+}
+function loadInstalled(){ fsCall("plugins").then(function(r){ if(!r.ok){ V("plist").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
     var items=r.items||[]; if(!items.length){ V("plist").innerHTML='<div class="empty">папка '+esc(r.sub)+' пуста</div>'; return; }
     var h=""; for(var i=0;i<items.length;i++){ h+='<div class="frow"><span class="ic">🧩</span><span class="nm">'+esc(items[i])+'</span><span class="x" data-act="del" data-arg="'+at(r.sub+"/"+items[i])+'">✕</span></div>'; } V("plist").innerHTML=h;
   }).catch(function(ex){ V("plist").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
@@ -1514,6 +1521,31 @@ function renderPlayers(){ tab="players"; markTabs(); var v=V("view"); v.innerHTM
   }).catch(function(ex){ V("plrs").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
 }
 function pcmd(c){ api("/server/webcmd",{text:c}).then(function(){ toast("Команда: "+c); setTimeout(renderPlayers,800); }); }
+
+function renderLaunch(){ tab="launch"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="cardhd">Настройки запуска<div class="sp"></div><button class="btn green" data-act="launchsave">Сохранить</button></div><div style="padding:16px" id="lform"><div class="empty">загрузка…</div></div></div>';
+  fsCall("launchget").then(function(c){ if(!c.ok){ V("lform").innerHTML='<div class="empty">'+esc(c.error||"ошибка")+'</div>'; return; } V("lform").innerHTML=launchForm(c); }).catch(function(ex){ V("lform").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
+}
+function opt(val,cur,t){ return '<option value="'+val+'"'+(String(cur)===String(val)?" selected":"")+'>'+t+'</option>'; }
+function launchForm(c){ return '<div class="frm">'
+  +'<label>Исполняемый jar</label><input id="f_jar" value="'+at(c.jar||"server.jar")+'">'
+  +'<label>Макс. память, МБ</label><input id="f_rmax" type="number" value="'+(c.ramMax||2048)+'"><div class="hint">Сколько ОЗУ максимум отдать серверу (-Xmx)</div>'
+  +'<label>Мин. память, МБ</label><input id="f_rmin" type="number" value="'+(c.ramMin||1024)+'">'
+  +'<label>Версия Java</label><select id="f_java">'+opt(0,c.java,"Авто (по версии)")+opt(8,c.java,"Java 8")+opt(17,c.java,"Java 17")+opt(21,c.java,"Java 21")+'</select>'
+  +'<label>Сборщик мусора (GC)</label><select id="f_gc">'+opt("g1",c.gc,"G1GC — рекомендуется, от 4 ГБ")+opt("parallel",c.gc,"ParallelGC — производительность")+opt("serial",c.gc,"SerialGC — слабые ПК")+opt("none",c.gc,"По умолчанию JVM")+'</select><div class="hint">G1GC: частые короткие паузы, лучшие тайминги. Parallel: чаще, короче паузы. Serial: однопоточный, редкие но длинные паузы.</div>'
+  +'<label>Доп. аргументы JVM</label><input id="f_args" value="'+at(c.args||"")+'">'
+  +'</div>'; }
+function saveLaunch(){ var c={jar:V("f_jar").value.trim()||"server.jar",ramMax:parseInt(V("f_rmax").value)||2048,ramMin:parseInt(V("f_rmin").value)||1024,java:parseInt(V("f_java").value)||0,gc:V("f_gc").value,args:V("f_args").value.trim()};
+  fsCall("launchset","",JSON.stringify(c)).then(function(r){ toast(r.ok?"Сохранено — применится при следующем запуске":(r.error||"ошибка")); }).catch(function(ex){ toast(ex.message); }); }
+
+function doPSearch(){ var q=V("psq")?V("psq").value.trim():""; V("pcat").innerHTML='<div class="empty">поиск в каталоге…</div>';
+  fsCall("psearch",q).then(function(r){ if(!r.ok){ V("pcat").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
+    var items=r.items||[]; if(!items.length){ V("pcat").innerHTML='<div class="empty">ничего не найдено</div>'; return; }
+    var h=''; for(var i=0;i<items.length;i++){ var it=items[i]; h+='<div class="frow"><span class="ic">🧩</span><span class="nm">'+esc(it.title)+'</span><span class="sz">'+(it.downloads>1000?(Math.round(it.downloads/1000)+" тыс"):it.downloads)+'</span><button class="btn green" data-act="pinstall" data-arg="'+at(it.slug)+'">Установить</button></div>'; } V("pcat").innerHTML=h;
+  }).catch(function(ex){ V("pcat").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; }); }
+function doPInstall(slug){ toast("Устанавливаю…"); fsCall("pinstall",slug).then(function(r){ toast(r.ok?("Установлено: "+r.file):(r.error||"не вышло")); if(tab==="plugins")loadInstalled(); }).catch(function(ex){ toast(ex.message); }); }
+
+function doBan(n){ var reason=prompt("Причина бана игрока "+n+":",""); if(reason===null)return; var dur=prompt("На сколько? (1d, 2h, 30m — пусто = навсегда):",""); var cmd=(dur&&dur.trim())?("tempban "+n+" "+dur.trim()+" "+reason):("ban "+n+" "+reason); api("/server/webcmd",{text:cmd}).then(function(){ toast("Бан отправлен: "+n); setTimeout(renderPlayers,900); }); }
 
 var lb=V("loginBtn"); if(lb) lb.addEventListener("click", login);
 show();

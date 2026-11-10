@@ -1,8 +1,8 @@
 {
-  "version": "1.72",
+  "version": "1.73",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "0e24450ff0ba1d4fe1f2cbd9118749c3d6529fe8",
-  "size": 832512,
-  "notes": "Баннер эвента больше не перекрывает скин (страница отодвигается вниз), картинка показывается целиком (fit) на тёмном фоне, баннер ниже."
+  "sha1": "f6181be33c01ecdebd7ed696946919fa4672367d",
+  "size": 838656,
+  "notes": "Вкладка «Настройки» (jar, память Xmx/Xms, версия Java, сборщик GC, доп.аргументы) — в приложении и в вебе, применяется при запуске. Установка плагинов из веба (каталог Modrinth). Бан игрока с причиной и сроком в веб-панели."
 }
