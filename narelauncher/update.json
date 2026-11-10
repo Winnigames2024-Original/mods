@@ -1,12 +1,12 @@
 {
-  "version": "1.80",
+  "version": "1.81",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "8c68abcbed6a6a8f58f5eb0922fff168ed8f7299",
-  "size": 858624,
+  "sha1": "3315df6d5b3d782f1b1a89fc5b06c1a1e2e16835",
+  "size": 859648,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "234b33709c25bc1f99387f82955a8ea619f19886",
   "smSize": 83968,
-  "notes": "Ежеминутная награда за онлайн (+5 монет/мин) и кнопка «Перенести мир» — локальный мир переносится в сервер (с разбивкой измерений для Paper). Нужен nare-net 1.47."
+  "notes": "Эффект вылетающих +N в кликере. (Мод 2.10.0: значок NV и микрофон над игроками, сила в ESP — собирается отдельно.)"
 }
