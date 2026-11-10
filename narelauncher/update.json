@@ -4,5 +4,9 @@
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
   "sha1": "98f85bd6579c56c04174778d08f2e9375f084780",
   "size": 838144,
-  "notes": "Сервер теперь запускается в отдельном ServerManager.exe (своя консоль и управление, держит тоннель и веб-панель). Лаунчер скачивает ServerManager.exe автоматически при первом запуске сервера."
+  "smFile": "ServerManager.exe",
+  "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
+  "smSha1": "734cc94ffdf6a4bcb07b8876dbe3851fee83082a",
+  "smSize": 71168,
+  "notes": "Сервер запускается в отдельном ServerManager.exe. update.exe держит его рядом с лаунчером свежим; если его нет — лаунчер докачает сам при первом запуске сервера."
 }
