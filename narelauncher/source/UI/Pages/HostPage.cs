@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Net;
 using System.IO;
@@ -72,6 +73,23 @@ namespace NareLauncher.UI
         private readonly Button _send = new Button();
 
         private readonly Timer _stats = new Timer();
+
+        // под-вкладки управления (как в хостинг-панели)
+        private readonly Button _tabConsole = new Button();
+        private readonly Button _tabFiles = new Button();
+        private readonly Button _tabJars = new Button();
+        private readonly Button _tabProps = new Button();
+        private string _view = "console";
+        private readonly CardPanel _filesPanel = new CardPanel();
+        private readonly ListBox _filesList = new ListBox();
+        private Button[] _filesBtns;
+        private readonly CardPanel _jarsPanel = new CardPanel();
+        private readonly ListBox _jarsList = new ListBox();
+        private readonly Label _jarsTitle = new Label();
+        private Button[] _jarsBtns;
+        private readonly CardPanel _propsPanel = new CardPanel();
+        private readonly TextBox _propsText = new TextBox();
+        private Button[] _propsBtns;
 
         public HostPage()
         {
@@ -156,9 +174,11 @@ namespace NareLauncher.UI
             _send.Click += (s, e) => SendCmd();
             Controls.Add(_send);
 
+            BuildManage();
             LoadList();
             LoadRemote();
             SetOnline(false);
+            ShowView("console");
 
             _stats.Interval = 1500;
             _stats.Tick += (s, e) => UpdateStats();
@@ -190,15 +210,24 @@ namespace NareLauncher.UI
             _restart.Bounds = new Rectangle(m + 158, by, 140, 40);
             _stop.Bounds = new Rectangle(m + 306, by, 150, 40);
 
-            int ty = by + 52, cmdY = Height - 54;
-            if (cmdY < ty + 120) cmdY = ty + 120;
-            _termCard.Bounds = new Rectangle(m, ty, right - m, cmdY - ty - 12);
+            int tabY = by + 52;
+            _tabConsole.Bounds = new Rectangle(m, tabY, 104, 30);
+            _tabFiles.Bounds = new Rectangle(m + 108, tabY, 96, 30);
+            _tabJars.Bounds = new Rectangle(m + 208, tabY, 108, 30);
+            _tabProps.Bounds = new Rectangle(m + 320, tabY, 172, 30);
+
+            int cTop = tabY + 38, cBottom = Math.Max(cTop + 120, Height - 14);
+            int cmdY = cBottom - 40;
+            _termCard.Bounds = new Rectangle(m, cTop, right - m, cmdY - cTop - 10);
             _termBar.Bounds = new Rectangle(14, 8, _termCard.Width - 28, 20);
             _log.Bounds = new Rectangle(12, 32, _termCard.Width - 24, _termCard.Height - 42);
-
             _send.Bounds = new Rectangle(right - 110, cmdY, 110, 40);
             _cmdCard.Bounds = new Rectangle(m, cmdY, _send.Left - m - 10, 40);
             _cmd.Bounds = new Rectangle(14, 11, _cmdCard.Width - 28, 20);
+
+            var full = new Rectangle(m, cTop, right - m, cBottom - cTop);
+            _filesPanel.Bounds = full; _jarsPanel.Bounds = full; _propsPanel.Bounds = full;
+            LayoutFiles(); LayoutJars(); LayoutProps();
         }
 
         // ---------- данные ----------
@@ -348,6 +377,8 @@ namespace NareLauncher.UI
             _srvName.Text = Nick + "-" + _sel.Id;
             _addr.Text = "🌐 " + Nick + "-" + _sel.Id + "." + DOMAIN + "   ·   локальный порт " + _sel.Port;
             UpdateStats();
+            UpdateJarsLabel();
+            RefreshActiveView();
         }
 
         private void CreateServer()
@@ -393,6 +424,8 @@ namespace NareLauncher.UI
                     if (entry.Mgr != null && entry.Mgr.Running) { entry.Mgr.Send(s); Append("[web] > " + s); }
                 });
                 entry.Host.StatsJson = () => (entry.Mgr != null ? entry.Mgr.StatsJson() : null);
+                var meta = ReadMeta(entry.Folder);
+                entry.Host.Loader = meta[0]; entry.Host.McVersion = meta[1];
 
                 entry.Mgr = new ServerManager(entry.Folder, entry.Port);
                 entry.Mgr.OnLine = s =>
@@ -600,6 +633,230 @@ namespace NareLauncher.UI
             };
             card.Controls.Add(cap); card.Controls.Add(val);
             return val;
+        }
+
+        // ---------- управление сервером (файлы/моды/плагины/настройки) ----------
+
+        private void BuildManage()
+        {
+            foreach (var t in new[] { _tabConsole, _tabFiles, _tabJars, _tabProps })
+            {
+                t.FlatStyle = FlatStyle.Flat; t.FlatAppearance.BorderSize = 0;
+                t.BackColor = CBg; t.ForeColor = CDim; t.Font = Theme.F(9.5f, FontStyle.Bold);
+                t.Cursor = Cursors.Hand;
+                Controls.Add(t);
+            }
+            _tabConsole.Text = "Консоль"; _tabFiles.Text = "Файлы"; _tabJars.Text = "Моды"; _tabProps.Text = "server.properties";
+            _tabConsole.Click += (s, e) => ShowView("console");
+            _tabFiles.Click += (s, e) => { ShowView("files"); RefreshFiles(); };
+            _tabJars.Click += (s, e) => { ShowView("jars"); RefreshJars(); };
+            _tabProps.Click += (s, e) => { ShowView("props"); LoadProps(); };
+
+            _filesPanel.Visible = false; Controls.Add(_filesPanel);
+            _filesList.BorderStyle = BorderStyle.None; _filesList.BackColor = CTermBg; _filesList.ForeColor = CText; _filesList.Font = new Font("Consolas", 9.5f);
+            _filesPanel.Controls.Add(_filesList);
+            _filesBtns = new[] { Mk("Открыть папку", OpenServerFolder), Mk("Обновить", RefreshFiles), Mk("Удалить", DeleteSelectedFile) };
+            foreach (var b in _filesBtns) _filesPanel.Controls.Add(b);
+
+            _jarsPanel.Visible = false; Controls.Add(_jarsPanel);
+            _jarsTitle.AutoSize = false; _jarsTitle.BackColor = Color.Transparent; _jarsTitle.ForeColor = CDim; _jarsTitle.Font = Theme.F(9f);
+            _jarsPanel.Controls.Add(_jarsTitle);
+            _jarsList.BorderStyle = BorderStyle.None; _jarsList.BackColor = CTermBg; _jarsList.ForeColor = CText; _jarsList.Font = new Font("Consolas", 9.5f);
+            _jarsPanel.Controls.Add(_jarsList);
+            _jarsBtns = new[] { Mk("Добавить", AddJar), Mk("Удалить", DeleteJar), Mk("Папка", OpenJarsFolder) };
+            foreach (var b in _jarsBtns) _jarsPanel.Controls.Add(b);
+
+            _propsPanel.Visible = false; Controls.Add(_propsPanel);
+            _propsText.Multiline = true; _propsText.ScrollBars = ScrollBars.Both; _propsText.WordWrap = false;
+            _propsText.BorderStyle = BorderStyle.None; _propsText.BackColor = CTermBg; _propsText.ForeColor = CText; _propsText.Font = new Font("Consolas", 9.5f);
+            _propsPanel.Controls.Add(_propsText);
+            _propsBtns = new[] { Mk("Сохранить", SaveProps), Mk("Перечитать", LoadProps) };
+            foreach (var b in _propsBtns) _propsPanel.Controls.Add(b);
+        }
+
+        private Button Mk(string text, Action act)
+        {
+            var b = new Button();
+            StyleBtn(b, text, CCard, CText, CBorder);
+            b.Font = Theme.F(9f, FontStyle.Bold);
+            b.Click += (s, e) => { try { act(); } catch (Exception ex) { MessageBox.Show(ex.Message); } };
+            return b;
+        }
+
+        private void ShowView(string v)
+        {
+            _view = v;
+            bool con = v == "console", fil = v == "files", jar = v == "jars", pr = v == "props";
+            _termCard.Visible = con; _cmdCard.Visible = con; _send.Visible = con;
+            _filesPanel.Visible = fil; _jarsPanel.Visible = jar; _propsPanel.Visible = pr;
+            _tabConsole.ForeColor = con ? CText : CDim;
+            _tabFiles.ForeColor = fil ? CText : CDim;
+            _tabJars.ForeColor = jar ? CText : CDim;
+            _tabProps.ForeColor = pr ? CText : CDim;
+            Relayout();
+        }
+
+        private void LayoutFiles()
+        {
+            int w = _filesPanel.Width, x = 12;
+            if (_filesBtns != null) foreach (var b in _filesBtns) { b.Bounds = new Rectangle(x, 10, 120, 28); x += 128; }
+            _filesList.Bounds = new Rectangle(12, 48, w - 24, Math.Max(40, _filesPanel.Height - 60));
+        }
+        private void LayoutJars()
+        {
+            int w = _jarsPanel.Width, x = 12;
+            _jarsTitle.Bounds = new Rectangle(12, 12, w - 24, 18);
+            if (_jarsBtns != null) foreach (var b in _jarsBtns) { b.Bounds = new Rectangle(x, 36, 110, 28); x += 118; }
+            _jarsList.Bounds = new Rectangle(12, 72, w - 24, Math.Max(40, _jarsPanel.Height - 84));
+        }
+        private void LayoutProps()
+        {
+            int w = _propsPanel.Width, x = 12;
+            if (_propsBtns != null) foreach (var b in _propsBtns) { b.Bounds = new Rectangle(x, 10, 120, 28); x += 128; }
+            _propsText.Bounds = new Rectangle(12, 48, w - 24, Math.Max(40, _propsPanel.Height - 60));
+        }
+
+        private string[] ReadMeta(string folder)
+        {
+            try
+            {
+                string f = Path.Combine(folder, "nare_core.txt");
+                if (File.Exists(f))
+                {
+                    var p = File.ReadAllText(f).Split('|');
+                    return new[] { p.Length > 0 ? p[0].Trim() : "", p.Length > 1 ? p[1].Trim() : "" };
+                }
+            }
+            catch { }
+            return new[] { "", "" };
+        }
+        private string CoreOf(Entry e) { return e == null ? "" : ReadMeta(e.Folder)[0]; }
+        private string JarsSub()
+        {
+            string core = CoreOf(_sel);
+            if (core == "paper") return "plugins";
+            if (core == "forge" || core == "fabric") return "mods";
+            if (_sel != null)
+            {
+                if (Directory.Exists(Path.Combine(_sel.Folder, "plugins"))) return "plugins";
+                if (Directory.Exists(Path.Combine(_sel.Folder, "mods"))) return "mods";
+            }
+            return "mods";
+        }
+        private void UpdateJarsLabel()
+        {
+            bool plugins = JarsSub() == "plugins";
+            _tabJars.Text = plugins ? "Плагины" : "Моды";
+            _jarsTitle.Text = plugins ? "Плагины (папка plugins) — для Paper" : "Моды (папка mods) — для Forge/Fabric";
+        }
+        private void RefreshActiveView()
+        {
+            if (_view == "files") RefreshFiles();
+            else if (_view == "jars") RefreshJars();
+            else if (_view == "props") LoadProps();
+        }
+
+        private void RefreshFiles()
+        {
+            _filesList.Items.Clear();
+            if (_sel == null) { _filesList.Items.Add("(выбери сервер)"); return; }
+            try
+            {
+                Directory.CreateDirectory(_sel.Folder);
+                foreach (var d in Directory.GetDirectories(_sel.Folder)) _filesList.Items.Add("[папка] " + Path.GetFileName(d));
+                foreach (var f in Directory.GetFiles(_sel.Folder)) _filesList.Items.Add(Path.GetFileName(f));
+                if (_filesList.Items.Count == 0) _filesList.Items.Add("(папка пуста)");
+            }
+            catch (Exception ex) { _filesList.Items.Add("ошибка: " + ex.Message); }
+        }
+        private void OpenServerFolder()
+        {
+            if (_sel == null) return;
+            Directory.CreateDirectory(_sel.Folder);
+            Process.Start("explorer.exe", "\"" + _sel.Folder + "\"");
+        }
+        private void DeleteSelectedFile()
+        {
+            if (_sel == null || _filesList.SelectedItem == null) return;
+            string name = _filesList.SelectedItem.ToString();
+            if (name.StartsWith("(")) return;
+            bool dir = name.StartsWith("[папка] ");
+            if (dir) name = name.Substring("[папка] ".Length);
+            string full = Path.Combine(_sel.Folder, name);
+            if (MessageBox.Show("Удалить «" + name + "»?", "Удаление", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (dir) Directory.Delete(full, true); else File.Delete(full);
+            RefreshFiles();
+        }
+
+        private void RefreshJars()
+        {
+            UpdateJarsLabel();
+            _jarsList.Items.Clear();
+            if (_sel == null) { _jarsList.Items.Add("(выбери сервер)"); return; }
+            try
+            {
+                string sub = Path.Combine(_sel.Folder, JarsSub());
+                Directory.CreateDirectory(sub);
+                foreach (var f in Directory.GetFiles(sub, "*.jar")) _jarsList.Items.Add(Path.GetFileName(f));
+                if (_jarsList.Items.Count == 0) _jarsList.Items.Add("(пусто — нажми «Добавить»)");
+            }
+            catch (Exception ex) { _jarsList.Items.Add("ошибка: " + ex.Message); }
+        }
+        private void AddJar()
+        {
+            if (_sel == null) return;
+            using (var ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Jar (*.jar)|*.jar"; ofd.Multiselect = true;
+                ofd.Title = JarsSub() == "plugins" ? "Выбери плагины (.jar)" : "Выбери моды (.jar)";
+                if (ofd.ShowDialog(FindForm()) != DialogResult.OK) return;
+                string sub = Path.Combine(_sel.Folder, JarsSub());
+                Directory.CreateDirectory(sub);
+                foreach (var src in ofd.FileNames)
+                {
+                    try { File.Copy(src, Path.Combine(sub, Path.GetFileName(src)), true); }
+                    catch (Exception ex) { MessageBox.Show("Не скопировалось " + Path.GetFileName(src) + ": " + ex.Message); }
+                }
+            }
+            RefreshJars();
+        }
+        private void DeleteJar()
+        {
+            if (_sel == null || _jarsList.SelectedItem == null) return;
+            string name = _jarsList.SelectedItem.ToString();
+            if (name.StartsWith("(")) return;
+            string full = Path.Combine(_sel.Folder, JarsSub(), name);
+            if (MessageBox.Show("Удалить «" + name + "»?", "Удаление", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            File.Delete(full);
+            RefreshJars();
+        }
+        private void OpenJarsFolder()
+        {
+            if (_sel == null) return;
+            string sub = Path.Combine(_sel.Folder, JarsSub());
+            Directory.CreateDirectory(sub);
+            Process.Start("explorer.exe", "\"" + sub + "\"");
+        }
+
+        private void LoadProps()
+        {
+            if (_sel == null) { _propsText.Text = ""; return; }
+            string f = Path.Combine(_sel.Folder, "server.properties");
+            try
+            {
+                _propsText.Text = File.Exists(f)
+                    ? File.ReadAllText(f).Replace("\n", "\r\n").Replace("\r\r\n", "\r\n")
+                    : "# server.properties создастся при первом запуске сервера.\r\n# Можно задать настройки заранее и сохранить — лаунчер их применит\r\n# (кроме server-port и online-mode, они ставятся автоматически).\r\n";
+            }
+            catch (Exception ex) { _propsText.Text = "ошибка чтения: " + ex.Message; }
+        }
+        private void SaveProps()
+        {
+            if (_sel == null) return;
+            string f = Path.Combine(_sel.Folder, "server.properties");
+            Directory.CreateDirectory(_sel.Folder);
+            File.WriteAllText(f, _propsText.Text.Replace("\r\n", "\n"));
+            Append("server.properties сохранён.");
         }
 
         // ---------- кастомные контролы ----------

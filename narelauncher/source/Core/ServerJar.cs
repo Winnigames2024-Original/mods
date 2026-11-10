@@ -21,18 +21,24 @@ namespace NareLauncher.Core
             string launchMarker = Path.Combine(folder, "nare_launch.txt");
             try { if (File.Exists(launchMarker)) File.Delete(launchMarker); } catch { }
 
-            if (type == "forge") { InstallForge(version, folder, log); return; }
+            if (type == "forge")
+            {
+                InstallForge(version, folder, log);
+            }
+            else
+            {
+                string dest = Path.Combine(folder, "server.jar");
+                string url;
+                if (type == "paper") url = PaperUrl(version, log);
+                else if (type == "fabric") url = FabricUrl(version, log);
+                else url = VanillaUrl(version, log);
 
-            string dest = Path.Combine(folder, "server.jar");
-            string url;
-            if (type == "paper") url = PaperUrl(version, log);
-            else if (type == "fabric") url = FabricUrl(version, log);
-            else url = VanillaUrl(version, log);
-
-            if (string.IsNullOrEmpty(url)) throw new Exception("не нашёл ссылку на jar для версии " + version);
-            if (log != null) log("Скачиваю: " + url);
-            DownloadFile(url, dest);
-            if (log != null) log("Готово: server.jar (" + (new FileInfo(dest).Length / 1024 / 1024) + " МБ)");
+                if (string.IsNullOrEmpty(url)) throw new Exception("не нашёл ссылку на jar для версии " + version);
+                if (log != null) log("Скачиваю: " + url);
+                DownloadFile(url, dest);
+                if (log != null) log("Готово: server.jar (" + (new FileInfo(dest).Length / 1024 / 1024) + " МБ)");
+            }
+            try { File.WriteAllText(Path.Combine(folder, "nare_core.txt"), type + "|" + version); } catch { }
         }
 
         // -------------------- Fabric --------------------

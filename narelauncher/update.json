@@ -1,8 +1,8 @@
 {
-  "version": "1.58",
+  "version": "1.59",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "2d1f02e45dee6a646767a833e79bca1e5a56fff6",
-  "size": 792576,
-  "notes": "Данные серверов (id, путь, порт) сохраняются на нашем сервере по аккаунту и восстанавливаются при входе. Плюс видимость в «Вместе»/«Публичных», выбор ядра, фиксы."
+  "sha1": "35820e3cf273a27a76124adb42093f1a71f159a4",
+  "size": 799744,
+  "notes": "Управление сервером: под-вкладки Консоль/Файлы/Моды или Плагины (Плагины только для Paper)/server.properties. Фикс ошибки запуска «server» (сервер анонсил себя версией server)."
 }

@@ -27,6 +27,8 @@ namespace NareLauncher.Core
         public Action<string> OnLog;
         public Action<string> OnCommand;     // команда из веб-консоли -> в stdin сервера
         public Func<string> StatsJson;        // "ram":..,"up":..,"players":.. для карточек веб-панели
+        public string McVersion = "";         // версия Minecraft сервера (для анонса)
+        public string Loader = "";            // ядро: paper/forge/fabric/vanilla
 
         private readonly System.Collections.Generic.List<string> _logBuf = new System.Collections.Generic.List<string>();
         private readonly object _logLock = new object();
@@ -139,7 +141,7 @@ namespace NareLauncher.Core
             if (_token.Length > 0) sb.Append("\"token\":\"").Append(Esc(_token)).Append("\",");
             sb.Append("\"nick\":\"").Append(Esc(_name)).Append("\",");
             sb.Append("\"port\":").Append(_localPort).Append(',');
-            sb.Append("\"mode\":\"tunnel\",\"version\":\"server\",\"loader\":\"vanilla\",");
+            sb.Append("\"mode\":\"tunnel\",\"version\":\"").Append(Esc(McVersion)).Append("\",\"loader\":\"").Append(Esc(Loader)).Append("\",");
             sb.Append("\"world\":\"сервер\",\"players\":0,\"max\":20,\"dedic\":true}");
             string resp = HttpPost("/announce", sb.ToString());
             if (resp == null) return;
