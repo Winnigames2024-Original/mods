@@ -35,6 +35,7 @@ const DATA_DIR = process.env.NARENET_DIR || '/var/lib/narenet';
 const FILES_DIR = path.join(DATA_DIR, 'files');
 const SHOTS_DIR = path.join(DATA_DIR, 'shots');
 const VIDEOS_DIR = path.join(DATA_DIR, 'videos');
+const EVTIMG_DIR = path.join(DATA_DIR, 'eventimg');
 
 const TUNNEL_FROM = Number(process.env.NARENET_TUNNEL_FROM || 30000);
 const TUNNEL_TO = Number(process.env.NARENET_TUNNEL_TO || 30060);
@@ -46,17 +47,19 @@ const FILES_MAX = 3 * 1024 * 1024 * 1024;
 const BODY_MAX = 512 * 1024;          // json объявления
 const SHOT_MAX = 1536 * 1024;         // json со скriншотом (base64)
 const VIDEO_FILE_MAX = 300 * 1024 * 1024;   // один ролик
+const EVTIMG_MAX = 8 * 1024 * 1024;         // одна картинка эвента
 const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.36';
+const VERSION = '1.37';
 
 // ---------------------------------------------------------------- хозяйство
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
 fs.mkdirSync(SHOTS_DIR, { recursive: true });
 fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+fs.mkdirSync(EVTIMG_DIR, { recursive: true });
 
 function now() { return Date.now(); }
 
@@ -511,6 +514,8 @@ if (!policy.srvCtl) policy.srvCtl = {};
 if (!policy.srvStat) policy.srvStat = {};
 if (!policy.videos) policy.videos = [];
 if (!policy.hostServers) policy.hostServers = {};
+if (!policy.events) policy.events = [];
+if (!policy.eventImgs) policy.eventImgs = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -2892,6 +2897,134 @@ function hostList(req, res) {
     });
 }
 
+// ========================= ЭВЕНТЫ =========================
+function evById(id) { return policy.events.find(e => e.id === id) || null; }
+function evPublic(e, joined) {
+    return {
+        id: e.id, name: e.name, desc: e.desc || '', accent: e.accent || '',
+        coins: e.coins || 0, active: !!e.active,
+        notifyTitle: e.notifyTitle || '', notifyText: e.notifyText || '',
+        images: e.images || [],
+        joined: !!joined
+    };
+}
+
+// список активных эвентов для приложения (+ отметка, заходил ли уже)
+function eventsActive(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        const out = policy.events.filter(e => e.active).map(e => evPublic(e, nick && e.joined && e.joined[nick]));
+        send(res, 200, { ok: true, events: out });
+    });
+}
+
+// заход на эвент: один раз начисляет монеты и отдаёт уведомление
+function eventsJoin(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const e = evById(clean(body.id, 20));
+        if (!e || !e.active) return send(res, 404, { error: 'эвент не активен' });
+        if (!e.joined) e.joined = {};
+        let awarded = 0;
+        const a = acc(nick);
+        if (!e.joined[nick]) {
+            e.joined[nick] = now();
+            awarded = Math.max(0, Number(e.coins) || 0);
+            if (awarded > 0) { a.coins = (a.coins || 0) + awarded; saveAccounts(); }
+            savePolicy();
+        }
+        send(res, 200, {
+            ok: true, awarded, coins: a.coins || 0, first: awarded > 0 || (e.joined[nick] === now()),
+            notify: { title: e.notifyTitle || '', text: e.notifyText || '' }, name: e.name
+        });
+    });
+}
+
+// загрузка картинки эвента (админ): PUT сырые байты, заголовок x-nare-token
+function eventImgUpload(req, res) {
+    const nick = sessionNick(req.headers['x-nare-token'] || query(req).token);
+    if (!isAdmin(nick)) return send(res, 403, { error: 'нужен админ' });
+    const mime = String(req.headers['content-type'] || '');
+    if (!/^image\/(png|jpeg|jpg|webp|gif)$/.test(mime)) return send(res, 400, { error: 'только картинки' });
+    const declared = Number(req.headers['content-length']) || 0;
+    if (declared > EVTIMG_MAX) return send(res, 413, { error: 'картинка больше 8 МБ' });
+    const id = crypto.randomBytes(8).toString('hex');
+    const full = path.join(EVTIMG_DIR, id + '.bin'), temp = full + '.part';
+    const out = fs.createWriteStream(temp);
+    let size = 0, bad = false;
+    const stop = (c, b) => { if (bad) return; bad = true; out.destroy(); try { fs.unlinkSync(temp); } catch (e) {} req.destroy(); send(res, c, b); };
+    req.on('data', ch => { size += ch.length; if (size > EVTIMG_MAX) return stop(413, { error: 'слишком большая' }); out.write(ch); });
+    req.on('error', () => stop(400, { error: 'передача прервалась' }));
+    req.on('end', () => {
+        if (bad) return;
+        out.end(() => {
+            try { fs.renameSync(temp, full); } catch (e) { return send(res, 500, { error: 'не записалось' }); }
+            policy.eventImgs[id] = mime; savePolicy();
+            send(res, 200, { ok: true, url: '/events/img/' + id });
+        });
+    });
+}
+function eventImgServe(req, res, id) {
+    const mime = policy.eventImgs[id];
+    const full = path.join(EVTIMG_DIR, id + '.bin');
+    let info;
+    try { info = fs.statSync(full); } catch (e) { return send(res, 404, { error: 'нет картинки' }); }
+    res.writeHead(200, { 'Content-Type': mime || 'image/png', 'Content-Length': info.size, 'Cache-Control': 'public, max-age=604800' });
+    fs.createReadStream(full).pipe(res);
+}
+
+// ---- админ ----
+function eventsAll(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        send(res, 200, { ok: true, events: policy.events.map(e => ({
+            id: e.id, name: e.name, desc: e.desc || '', accent: e.accent || '', coins: e.coins || 0,
+            active: !!e.active, notifyTitle: e.notifyTitle || '', notifyText: e.notifyText || '',
+            images: e.images || [], joins: e.joined ? Object.keys(e.joined).length : 0
+        })) });
+    });
+}
+function eventsSave(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const name = clean(body.name, 80);
+        if (!name) return send(res, 400, { error: 'нужно название' });
+        let e = body.id ? evById(clean(body.id, 20)) : null;
+        if (!e) {
+            e = { id: crypto.randomBytes(6).toString('hex'), active: false, joined: {}, at: now() };
+            policy.events.push(e);
+        }
+        e.name = name;
+        e.desc = clean(body.desc, 400);
+        e.accent = /^#?[0-9a-fA-F]{6}$/.test(body.accent || '') ? (body.accent[0] === '#' ? body.accent : '#' + body.accent) : '';
+        e.coins = Math.max(0, Math.min(100000, Math.trunc(Number(body.coins) || 0)));
+        e.notifyTitle = clean(body.notifyTitle, 80);
+        e.notifyText = clean(body.notifyText, 400);
+        if (Array.isArray(body.images)) e.images = body.images.slice(0, 80).map(u => clean(u, 300)).filter(Boolean);
+        savePolicy();
+        send(res, 200, { ok: true, id: e.id });
+    });
+}
+function eventsState(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const e = evById(clean(body.id, 20));
+        if (!e) return send(res, 404, { error: 'нет эвента' });
+        e.active = !!body.active;
+        savePolicy();
+        send(res, 200, { ok: true, active: e.active });
+    });
+}
+function eventsDelete(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        policy.events = policy.events.filter(e => e.id !== clean(body.id, 20));
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
 function profileGet(req, res) {
     const q = query(req);
     const nick = clean(q.nick, 16);
@@ -3261,6 +3394,14 @@ const server = http.createServer((req, res) => {
     if (route === '/top') return coinsTop(req, res);
     if (route === '/profile/get') return profileGet(req, res);
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
+    if (route === '/events' && req.method === 'POST') return eventsActive(req, res);
+    if (route === '/events/join' && req.method === 'POST') return eventsJoin(req, res);
+    if (route === '/events/img/upload' && (req.method === 'PUT' || req.method === 'POST')) return eventImgUpload(req, res);
+    if (route.startsWith('/events/img/')) return eventImgServe(req, res, clean(route.slice(12), 20));
+    if (route === '/events/all' && req.method === 'POST') return eventsAll(req, res);
+    if (route === '/events/save' && req.method === 'POST') return eventsSave(req, res);
+    if (route === '/events/state' && req.method === 'POST') return eventsState(req, res);
+    if (route === '/events/delete' && req.method === 'POST') return eventsDelete(req, res);
     if (route === '/host/list' && req.method === 'POST') return hostList(req, res);
     if (route === '/video/create' && req.method === 'POST') return videoCreate(req, res);
     if (route.startsWith('/video/raw/') && (req.method === 'PUT' || req.method === 'POST')) return videoRaw(req, res, clean(route.slice(11), 20));

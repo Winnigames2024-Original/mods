@@ -106,9 +106,21 @@ namespace NareLauncher.UI.Pages
 
         private static string Pick(NareDropDown d) { return d.SelectedItem == null ? "" : d.SelectedItem.ToString(); }
 
+        private readonly NareButton _eventsBtn = new NareButton { Text = "⚡ Эвенты", Style = BtnStyle.Accent, Size = new Size(150, 34) };
+
         public AdminPage()
         {
             Controls.Add(_scroll);
+
+            _eventsBtn.Click += (s, e) =>
+            {
+                if (Token.Length == 0) { Host.EnsureAuth(); return; }
+                using (var f = new EventsAdminForm(Token)) f.ShowDialog(FindForm());
+            };
+            Controls.Add(_eventsBtn);
+            _eventsBtn.BringToFront();
+            _eventsBtn.Location = new Point(20, 12);
+            Resize += (s, e) => { _eventsBtn.Location = new Point(Math.Max(20, Width - _eventsBtn.Width - 24), 12); };
 
             string[] titles = { "БАН ИГРОКА", "ПРЕДУПРЕЖДЕНИЕ", "ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ",
                 "ЗАПРЕТ «ВМЕСТЕ»", "БЛОКИРОВКА МОДОВ", "МОДЕРАЦИЯ СЕРВЕРОВ", "ОБНОВЛЕНИЕ",

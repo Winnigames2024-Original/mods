@@ -48,6 +48,9 @@ namespace NareLauncher.UI
         private long _chatSeen = -1;       // игрок: время последнего увиденного ответа админа
         private long _adminChatSeen = -1;  // админ: время последнего увиденного сообщения игрока
         private readonly System.Windows.Forms.Timer _guard = new System.Windows.Forms.Timer { Interval = 15000 };
+        private readonly System.Windows.Forms.Timer _eventTimer = new System.Windows.Forms.Timer { Interval = 45000 };
+        private readonly System.Collections.Generic.HashSet<string> _eventSeen = new System.Collections.Generic.HashSet<string>();
+        private Panel _eventBanner;
         private int _warnShown = -1;     // сколько предупреждений уже показали (с диска, на игрока)
         private long _broadcastShown = -1; // время последнего показанного объявления (с диска)
         private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
@@ -88,6 +91,9 @@ namespace NareLauncher.UI
 
             _toasts = new ToastHost();
             _content.Controls.Add(_toasts);
+            _eventBanner = new Panel { Dock = DockStyle.Top, Height = 0, BackColor = Theme.Panel, Visible = false };
+            _content.Controls.Add(_eventBanner);
+            _eventBanner.BringToFront();
 
             // системный значок в трее — для уведомлений Windows (как у Telegram)
             try
@@ -430,6 +436,11 @@ namespace NareLauncher.UI
 
             _guard.Tick += delegate { CheckPolicy(); };
             _guard.Start();
+            _eventTimer.Tick += delegate { CheckEvents(); };
+            _eventTimer.Start();
+            var evKick = new System.Windows.Forms.Timer { Interval = 2500 };
+            evKick.Tick += delegate { evKick.Stop(); evKick.Dispose(); CheckEvents(); };
+            evKick.Start();
             CheckPolicy();
         }
 
@@ -619,6 +630,108 @@ namespace NareLauncher.UI
         /// Уведомление о новом сообщении: всплывашка в окне + системное уведомление
         /// Windows в трее (как у Telegram) + звук.
         /// </summary>
+        // ---- эвенты: монеты за заход, уведомление, картинки на главном меню ----
+        private void CheckEvents()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null || string.IsNullOrEmpty(acc.Token)) return;
+            string tok = acc.Token;
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    var list = NareLauncher.Core.NareEvents.Active(tok);
+                    foreach (var ev in list)
+                    {
+                        if (ev.Joined || _eventSeen.Contains(ev.Id)) continue;
+                        _eventSeen.Add(ev.Id);
+                        var jr = NareLauncher.Core.NareEvents.Join(tok, ev.Id);
+                        if (jr.Ok)
+                        {
+                            string t = string.IsNullOrEmpty(jr.NotifyTitle) ? ("Эвент: " + jr.Name) : jr.NotifyTitle;
+                            string b = jr.NotifyText ?? "";
+                            if (jr.Awarded > 0) b = (b.Length > 0 ? b + "\n" : "") + "+" + jr.Awarded + " монет";
+                            if (t.Length > 0) { try { BeginInvoke((Action)(() => Notify(t, b))); } catch { } }
+                        }
+                    }
+                    try { BeginInvoke((Action)(() => ShowEventBanner(list))); } catch { }
+                }
+                catch { }
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private void ShowEventBanner(System.Collections.Generic.List<NareLauncher.Core.NareEvent> list)
+        {
+            NareLauncher.Core.NareEvent ev = null;
+            foreach (var x in list) if (x.Active) { ev = x; break; }
+            if (ev == null) { _eventBanner.Visible = false; _eventBanner.Height = 0; return; }
+
+            _eventBanner.Controls.Clear();
+            Color accent = ParseHex(ev.Accent, Theme.Accent);
+            _eventBanner.BackColor = Theme.Panel;
+            bool hasImgs = ev.Images != null && ev.Images.Count > 0;
+            _eventBanner.Height = hasImgs ? 112 : 64;
+            _eventBanner.Visible = true;
+            _eventBanner.Tag = accent;
+            _eventBanner.Paint -= EventBannerPaint; _eventBanner.Paint += EventBannerPaint;
+            _eventBanner.Invalidate();
+
+            var title = new Label { Text = ev.Name, Font = Theme.F(13f, FontStyle.Bold), ForeColor = Theme.Text, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 9, _eventBanner.Width - 80, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var desc = new Label { Text = ev.Desc, ForeColor = Theme.Dim, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 33, _eventBanner.Width - 80, 18), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var close = new Label { Text = "✕", Font = Theme.F(11f, FontStyle.Bold), ForeColor = Theme.Dim, AutoSize = true, BackColor = Color.Transparent, Cursor = Cursors.Hand, Location = new Point(_eventBanner.Width - 30, 10), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            close.Click += (s, e) => { _eventBanner.Visible = false; _eventBanner.Height = 0; };
+            _eventBanner.Controls.Add(title); _eventBanner.Controls.Add(desc); _eventBanner.Controls.Add(close);
+
+            if (hasImgs)
+            {
+                var flow = new FlowLayoutPanel { Bounds = new Rectangle(16, 56, _eventBanner.Width - 32, 50), BackColor = Color.Transparent, WrapContents = false, AutoScroll = true, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+                foreach (var url in ev.Images)
+                {
+                    var pb = new PictureBox { Size = new Size(84, 46), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Theme.Bg, Margin = new Padding(0, 0, 8, 0) };
+                    LoadEventImg(url, pb);
+                    flow.Controls.Add(pb);
+                }
+                _eventBanner.Controls.Add(flow);
+            }
+            _eventBanner.BringToFront();
+        }
+
+        private void EventBannerPaint(object sender, PaintEventArgs e)
+        {
+            var p = sender as Panel; if (p == null) return;
+            Color a = p.Tag is Color ? (Color)p.Tag : Theme.Accent;
+            using (var b = new SolidBrush(a)) e.Graphics.FillRectangle(b, 0, 0, 5, p.Height);
+        }
+
+        private static void LoadEventImg(string url, PictureBox pb)
+        {
+            new System.Threading.Thread(() =>
+            {
+                var bytes = NareLauncher.Core.NareEvents.DownloadImage(url);
+                if (bytes == null) return;
+                try
+                {
+                    var img = System.Drawing.Image.FromStream(new System.IO.MemoryStream(bytes));
+                    try { if (pb.IsHandleCreated) pb.BeginInvoke((Action)(() => { try { pb.Image = img; } catch { } })); } catch { }
+                }
+                catch { }
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private static Color ParseHex(string hex, Color fallback)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(hex)) return fallback;
+                hex = hex.TrimStart('#');
+                if (hex.Length != 6) return fallback;
+                return Color.FromArgb(Convert.ToInt32(hex.Substring(0, 2), 16), Convert.ToInt32(hex.Substring(2, 2), 16), Convert.ToInt32(hex.Substring(4, 2), 16));
+            }
+            catch { return fallback; }
+        }
+
         public void Notify(string title, string body)
         {
             if (_toasts != null) _toasts.Push(title, body, () => OpenChats());

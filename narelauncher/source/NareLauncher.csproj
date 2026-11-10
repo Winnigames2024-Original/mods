@@ -105,6 +105,7 @@
     <Compile Include="Core\NareHost.cs" />
     <Compile Include="Core\NareAgent.cs" />
     <Compile Include="Core\NareVideo.cs" />
+    <Compile Include="Core\NareEvents.cs" />
     <Compile Include="Core\ModrinthClient.cs" />
     <Compile Include="Core\ServerManager.cs" />
     <Compile Include="Core\ServerJar.cs" />
@@ -112,6 +113,7 @@
     <Compile Include="UI\Pages\VideosPage.cs" />
     <Compile Include="UI\NareProfileForm.cs" />
     <Compile Include="UI\WheelFilter.cs" />
+    <Compile Include="UI\EventsAdminForm.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\SkinDocument.cs" />
