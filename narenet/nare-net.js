@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.43';
+const VERSION = '1.44';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3350,6 +3350,89 @@ function coinsDaily(req, res) {
     });
 }
 
+// ------------------------------------------------------------------- кликер 67
+const CLICK_MAX_BATCH = 200;        // максимум кликов за один запрос
+const CLICK_OFFLINE_CAP = 12 * 3600; // не больше 12 часов пассивного дохода за раз
+
+// Старт как «кликер 67»: +67 за клик, полная выносливость под это.
+function clickerState(a) {
+    if (!a.clk) a.clk = { click: 67, auto: 0, energyMax: 6700, energy: 6700, regen: 20, last: now() };
+    const c = a.clk;
+    if (c.energyMax == null) c.energyMax = 6700;
+    if (c.energy == null) c.energy = c.energyMax;
+    if (c.regen == null) c.regen = 20;
+    if (c.last == null) c.last = now();
+    return c;
+}
+function clickerPriceClick(c)  { return 20 * c.click; }
+function clickerPriceAuto(c)   { return 50 * (c.auto + 1); }
+function clickerPriceEnergy(c) { return Math.round(30 * (c.energyMax / 100)); }
+function clickerPriceRegen(c)  { return Math.round(40 * (c.regen / 5)); }
+
+function clickerAccrue(a) {
+    const c = clickerState(a);
+    const dt = Math.max(0, now() - c.last);
+    c.last = now();
+    const sec = Math.floor(dt / 1000);
+    if (sec > 0) {
+        // пассивный доход (c ограничением на оффлайн)
+        if (c.auto > 0) a.coins = (a.coins || 0) + Math.min(sec, CLICK_OFFLINE_CAP) * c.auto;
+        // восстановление выносливости (само упирается в потолок)
+        c.energy = Math.min(c.energyMax, c.energy + sec * c.regen);
+    }
+    return c;
+}
+function clickerPayload(a, c) {
+    return { ok: true, coins: a.coins || 0, click: c.click, auto: c.auto,
+             energy: Math.floor(c.energy), energyMax: c.energyMax, regen: c.regen,
+             priceClick: clickerPriceClick(c), priceAuto: clickerPriceAuto(c),
+             priceEnergy: clickerPriceEnergy(c), priceRegen: clickerPriceRegen(c) };
+}
+function clickerGet(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick); const c = clickerAccrue(a); saveAccounts();
+        send(res, 200, clickerPayload(a, c));
+    });
+}
+function clickerClick(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick); const c = clickerAccrue(a);
+        const want = Math.max(1, Math.min(CLICK_MAX_BATCH, Math.trunc(Number(body && body.count) || 1)));
+        // каждый тап стоит выносливости, равной силе клика (как в Hamster Kombat)
+        const afford = c.click > 0 ? Math.floor(c.energy / c.click) : 0;
+        const did = Math.min(want, afford);
+        if (did > 0) { a.coins = (a.coins || 0) + did * c.click; c.energy -= did * c.click; }
+        saveAccounts();
+        send(res, 200, { ok: true, coins: a.coins, did: did,
+                         energy: Math.floor(c.energy), energyMax: c.energyMax });
+    });
+}
+function clickerUpgrade(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick); const c = clickerAccrue(a);
+        const what = body && body.what;
+        const price = what === 'click' ? clickerPriceClick(c)
+                    : what === 'auto' ? clickerPriceAuto(c)
+                    : what === 'energy' ? clickerPriceEnergy(c)
+                    : what === 'regen' ? clickerPriceRegen(c) : 0;
+        if (!price) return send(res, 400, { error: 'что качаем?' });
+        if ((a.coins || 0) < price) return send(res, 402, { error: 'нужно ' + price + ' монет' });
+        a.coins -= price;
+        if (what === 'click') c.click++;
+        else if (what === 'auto') c.auto++;
+        else if (what === 'energy') { c.energyMax += 1000; c.energy += 1000; }
+        else if (what === 'regen') c.regen += 5;
+        saveAccounts();
+        send(res, 200, clickerPayload(a, c));
+    });
+}
+
 /** Перевод монет другому игроку. */
 function coinsSend(req, res) {
     readJsonBody(req, body => {
@@ -3599,6 +3682,9 @@ const server = http.createServer((req, res) => {
     if (route === '/coins/earn' && req.method === 'POST') return coinsEarn(req, res);
     if (route === '/coins/daily' && req.method === 'POST') return coinsDaily(req, res);
     if (route === '/coins/send' && req.method === 'POST') return coinsSend(req, res);
+    if (route === '/clicker/get' && req.method === 'POST') return clickerGet(req, res);
+    if (route === '/clicker/click' && req.method === 'POST') return clickerClick(req, res);
+    if (route === '/clicker/upgrade' && req.method === 'POST') return clickerUpgrade(req, res);
     if (route === '/top') return coinsTop(req, res);
     if (route === '/profile/get') return profileGet(req, res);
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);

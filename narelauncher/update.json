@@ -1,12 +1,12 @@
 {
-  "version": "1.76",
+  "version": "1.77",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "d11514ce5b98c82350c228af5a67403baf2e1928",
-  "size": 841216,
+  "sha1": "2dd3155c900cba350a09659b6cd1949484b40f63",
+  "size": 850432,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "7aec87a9a19a1ea97b7c2d40051c8ad5ba880993",
   "smSize": 82432,
-  "notes": "Бэкапы мира, вайтлист/операторы, графики нагрузки, анти-лаг TNT и автозапуск при старте ПК — в ServerManager.exe и веб-панели (nare-net 1.43)."
+  "notes": "Кликер 67 в Эвенте 67: +67 за клик, монеты на аккаунт, выносливость (как в Hamster Kombat), пассивный доход и прокачки. Нужен nare-net 1.44 на VPS."
 }
