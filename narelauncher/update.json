@@ -1,8 +1,8 @@
 {
-  "version": "1.65",
+  "version": "1.66",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "0df7fb971084a5695190b7d9e6c1215f4b59a162",
-  "size": 810496,
-  "notes": "Основные кнопки в «Мои серверы» (Запустить/Рестарт/Остановить/Создать/Скачать jar/Ввод) — скруглённые, с заливкой и ховером."
+  "sha1": "86380c1f7b2f50e4010b72e091fd7379e0a98b47",
+  "size": 811008,
+  "notes": "Прокрутка колёсиком мыши работает везде (каталог плагинов, лента видео, списки) — крутится панель под курсором, без фокуса."
 }

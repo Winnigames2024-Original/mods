@@ -52,6 +52,7 @@ namespace NareLauncher
                 return;
             }
 
+            Application.AddMessageFilter(new NareLauncher.UI.WheelFilter());
             Application.Run(new MainForm());
         }
     }

@@ -111,6 +111,7 @@
     <Compile Include="UI\Pages\HostPage.cs" />
     <Compile Include="UI\Pages\VideosPage.cs" />
     <Compile Include="UI\NareProfileForm.cs" />
+    <Compile Include="UI\WheelFilter.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\SkinDocument.cs" />
