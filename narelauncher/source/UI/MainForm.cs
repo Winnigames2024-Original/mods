@@ -51,6 +51,7 @@ namespace NareLauncher.UI
         private readonly System.Windows.Forms.Timer _eventTimer = new System.Windows.Forms.Timer { Interval = 45000 };
         private readonly System.Collections.Generic.HashSet<string> _eventSeen = new System.Collections.Generic.HashSet<string>();
         private Panel _eventBanner;
+        private System.Drawing.Image _bannerImg;
         private int _warnShown = -1;     // сколько предупреждений уже показали (с диска, на игрока)
         private long _broadcastShown = -1; // время последнего показанного объявления (с диска)
         private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
@@ -290,6 +291,7 @@ namespace NareLauncher.UI
                 _pages[i].Visible = (i == index);
 
             _pages[index].BringToFront();
+            if (_eventBanner != null && _eventBanner.Visible) _eventBanner.BringToFront();
             try { _pages[index].PageShown(); }
             catch (Exception ex) { Log.Error("Ошибка на странице " + index, ex); }
         }
@@ -678,17 +680,16 @@ namespace NareLauncher.UI
 
             if (hasImgs)
             {
-                Color dk = Darken(accent);
-                _eventBanner.BackColor = dk;
-                _eventBanner.Height = 152;
-                var pic = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = dk };
-                LoadEventImg(ev.Images[0], pic);
-                _eventBanner.Controls.Add(pic);
+                _bannerImg = null;
+                _eventBanner.BackColor = Darken(accent);
+                _eventBanner.Height = 150;
+                LoadBannerCover(ev.Images[0]);
                 close.Location = new Point(_eventBanner.Width - 32, 8);
                 _eventBanner.Controls.Add(close); close.BringToFront();
             }
             else
             {
+                _bannerImg = null;
                 _eventBanner.BackColor = Theme.Panel;
                 _eventBanner.Height = 64;
                 var title = new Label { Text = ev.Name, Font = Theme.F(13f, FontStyle.Bold), ForeColor = Theme.Text, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 9, _eventBanner.Width - 80, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
@@ -708,8 +709,37 @@ namespace NareLauncher.UI
         private void EventBannerPaint(object sender, PaintEventArgs e)
         {
             var p = sender as Panel; if (p == null) return;
+            if (_bannerImg != null)
+            {
+                try
+                {
+                    float sc = Math.Max((float)p.Width / _bannerImg.Width, (float)p.Height / _bannerImg.Height);
+                    int dw = (int)(_bannerImg.Width * sc), dh = (int)(_bannerImg.Height * sc);
+                    int dx = (p.Width - dw) / 2, dy = (p.Height - dh) / 2;
+                    e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    e.Graphics.DrawImage(_bannerImg, dx, dy, dw, dh);
+                    return;
+                }
+                catch { }
+            }
             Color a = p.Tag is Color ? (Color)p.Tag : Theme.Accent;
             using (var b = new SolidBrush(a)) e.Graphics.FillRectangle(b, 0, 0, 5, p.Height);
+        }
+
+        private void LoadBannerCover(string url)
+        {
+            new System.Threading.Thread(() =>
+            {
+                var bytes = NareLauncher.Core.NareEvents.DownloadImage(url);
+                if (bytes == null) return;
+                try
+                {
+                    var img = System.Drawing.Image.FromStream(new System.IO.MemoryStream(bytes));
+                    try { if (_eventBanner.IsHandleCreated) _eventBanner.BeginInvoke((Action)(() => { _bannerImg = img; _eventBanner.Invalidate(); })); } catch { }
+                }
+                catch { }
+            })
+            { IsBackground = true }.Start();
         }
 
         private static void LoadEventImg(string url, PictureBox pb)

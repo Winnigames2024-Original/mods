@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.40';
+const VERSION = '1.41';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1313,7 +1313,7 @@ const SERVER_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 .statusline{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:#9aa4ba;font-size:13px;margin-top:8px}
 .statusline .run{color:#56d364;font-weight:700}.statusline .off{color:#ff6b74;font-weight:700}
 .dot{width:9px;height:9px;border-radius:50%;background:#636b80}.dot.on{background:#56d364;box-shadow:0 0 8px #56d364}.dot.offc{background:#ff6b74}
-.tabs{display:flex;gap:3px;margin-top:14px;overflow-x:auto;border-bottom:1px solid #1b2232;padding-bottom:0}
+.tabs{display:flex;gap:3px;margin-top:14px;overflow-x:auto;border-bottom:1px solid #1b2232}
 .tabs a{white-space:nowrap;color:#8b93a7;font-size:13.5px;padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs a:hover{color:#dfe4ee}.tabs a.on{color:#fff;border-bottom-color:#5b8cff;font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
@@ -1336,15 +1336,11 @@ const SERVER_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 .prompt input{flex:1;background:transparent;border:0;outline:0;color:#e7eaf2;font-family:Consolas,monospace;font-size:13px;padding:13px 10px}
 .prompt button{background:#1b2c52;border:0;color:#9db4ff;font-weight:700;padding:0 18px;cursor:pointer;align-self:stretch;border-radius:8px;margin:7px}
 .flist{max-height:520px;overflow:auto}
-.frow{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #141b26;cursor:pointer;font-size:13.5px}
-.frow:hover{background:#141b2b}.frow .ic{width:18px;text-align:center}.frow .nm{flex:1}.frow .sz{color:#7b8498;font-size:12px}
-.frow .x{color:#ff8a93;padding:2px 8px;border-radius:6px}.frow .x:hover{background:#3a1518}
-.crumb{padding:10px 16px;color:#8b93a7;font-size:12.5px;border-bottom:1px solid #1b2232}
-.crumb b{color:#dfe4ee}
-.editor{display:flex;flex-direction:column}
+.frow{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #141b26;font-size:13.5px}
+.frow:hover{background:#141b2b}.frow .ic{width:18px;text-align:center}.frow .nm{flex:1;cursor:pointer}.frow .sz{color:#7b8498;font-size:12px}
+.frow .x{color:#ff8a93;padding:2px 8px;border-radius:6px;cursor:pointer}.frow .x:hover{background:#3a1518}
+.crumb{padding:10px 16px;color:#8b93a7;font-size:12.5px;border-bottom:1px solid #1b2232}.crumb b{color:#dfe4ee}
 .editor textarea{width:100%;height:480px;background:#070a11;border:0;color:#e7eaf2;font-family:Consolas,monospace;font-size:12.5px;padding:14px 16px;outline:none;resize:none;white-space:pre}
-.plist .frow{cursor:default}
-.players .frow .op{color:#9db4ff}.players .frow .kick{color:#ff8a93}
 .empty{color:#7b8498;text-align:center;padding:40px}
 .login{max-width:380px;margin:9vh auto;background:#10141f;border:1px solid #1b2232;border-radius:16px;padding:26px}
 .login h2{margin:0 0 4px}.login .m{color:#8b93a7;font-size:13px;margin-bottom:16px}
@@ -1359,8 +1355,8 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px #0a0d14 inset;-webkit-tex
 </style></head><body>
 <div id="login" class="login">
   <h2>Панель управления</h2><div class="m">Войдите под аккаунтом владельца сервера</div>
-  <input id="u" placeholder="ник"><input id="p" type="password" placeholder="пароль" onkeydown="if(event.key==='Enter')login()">
-  <button onclick="login()">Войти</button><div id="lerr" style="margin-top:10px"></div>
+  <input id="u" placeholder="ник"><input id="p" type="password" placeholder="пароль">
+  <button id="loginBtn">Войти</button><div id="lerr" style="margin-top:10px"></div>
 </div>
 <div id="app" class="layout" style="display:none">
   <div class="side">
@@ -1385,9 +1381,9 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px #0a0d14 inset;-webkit-tex
       <div class="stat"><div class="lbl">Игроки</div><div class="val" id="sPl">—</div></div>
     </div>
     <div class="pwr">
-      <button class="start" id="bStart" onclick="power('start')">▶ Запустить</button>
-      <button class="restart" id="bRestart" onclick="power('restart')">↻ Рестарт</button>
-      <button class="stop" id="bStop" onclick="power('stop')">■ Остановить</button>
+      <button class="start" id="bStart" data-act="power" data-arg="start">▶ Запустить</button>
+      <button class="restart" id="bRestart" data-act="power" data-arg="restart">↻ Рестарт</button>
+      <button class="stop" id="bStop" data-act="power" data-arg="stop">■ Остановить</button>
     </div>
     <div id="err" style="margin-bottom:10px"></div>
     <div id="view"></div>
@@ -1400,11 +1396,12 @@ function setCk(k,v){document.cookie=k+"="+encodeURIComponent(v)+";path=/;max-age
 function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){var e=a[i].indexOf("=");if(e>0&&a[i].slice(0,e)===k)return decodeURIComponent(a[i].slice(e+1))}return ""}
 function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
 var name=qs("name"), token=getCk("srv_"+name)||"", MEMLIM=2048;
-var tab="console", curPath="", editPath="";
+var tab="console", curPath="", editPath="", lastLines=[];
 var V=function(id){return document.getElementById(id)};
 function api(path,body){body=body||{};body.token=token;body.name=name;
   return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
-function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return c==="&"?"&amp;":c==="<"?"&lt;":c===">"?"&gt;":"&quot;";});}
+function at(s){return esc(s).replace(/"/g,"&quot;");}
 function toast(t){var el=V("toast");el.textContent=t;el.classList.add("show");clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove("show")},2600);}
 function ini(s){s=s||"?";return s.charAt(0).toUpperCase()}
 function gib(mb){return (mb/1024).toFixed(2)}
@@ -1418,25 +1415,37 @@ function login(){var u=V("u").value.trim(),p=V("p").value;V("lerr").textContent=
 function logout(){token="";delCk("srv_"+name);show();}
 
 var TABS=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["settings","server.properties"],["logs","Логи"]];
-var NAV=[["console","▸_ Консоль"],["files","🗁 Файлы"],["players","👤 Игроки"],["plugins","🧩 Плагины"],["settings","⚙ Настройки"],["logs","📜 Логи"],["account","◉ Аккаунт"]];
-function buildNav(){
-  V("tabs").innerHTML=TABS.map(function(t){return '<a data-t="'+t[0]+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</a>';}).join("");
-  V("snav").innerHTML=NAV.map(function(t){return '<a data-t="'+t[0]+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</a>';}).join("")+'<a onclick="logout()">⤴ Выход</a>';
-}
-function go(t){ if(t==="account"){ alert("Аккаунт: "+name+"\\nВладелец управляет сервером тут."); return; } tab=t; markTabs(); render(); }
-function markTabs(){ var all=document.querySelectorAll("[data-t]"); for(var i=0;i<all.length;i++){ all[i].classList.toggle("on", all[i].getAttribute("data-t")===tab); } }
+var NAV=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["settings","Настройки"],["logs","Логи"]];
+function tabsHtml(arr){var h="";for(var i=0;i<arr.length;i++){h+='<a data-act="go" data-arg="'+arr[i][0]+'">'+arr[i][1]+'</a>';}return h;}
+function buildNav(){ V("tabs").innerHTML=tabsHtml(TABS); V("snav").innerHTML=tabsHtml(NAV)+'<a data-act="logout">Выход</a>'; }
+function go(t){ tab=t; markTabs(); render(); }
+function markTabs(){ var all=document.querySelectorAll("[data-act=go]"); for(var i=0;i<all.length;i++){ all[i].classList.toggle("on", all[i].getAttribute("data-arg")===tab); } }
+
+document.addEventListener("click", function(e){
+  var el=e.target; while(el && el!==document && !el.getAttribute("data-act")) el=el.parentNode;
+  if(!el || el===document) return;
+  var a=el.getAttribute("data-act"), g=el.getAttribute("data-arg")||"";
+  if(a==="go")go(g); else if(a==="logout")logout(); else if(a==="cd")renderFiles(g);
+  else if(a==="up")upDir(); else if(a==="open")openEditor(g); else if(a==="del")delFile(g);
+  else if(a==="save")saveEditor(); else if(a==="cmd")pcmd(g); else if(a==="send")sendCmd();
+  else if(a==="power")power(g); else if(a==="refresh")render(); else if(a==="poll")poll();
+});
+document.addEventListener("keydown", function(e){
+  if(e.key!=="Enter")return;
+  if(e.target && e.target.id==="cmd")sendCmd();
+  else if(e.target && (e.target.id==="u"||e.target.id==="p"))login();
+});
 
 var timer=null;
 function show(){var on=token.length>0;
   V("login").style.display=on?"none":"block"; V("app").style.display=on?"flex":"none";
   if(on){ V("srv").textContent=name; V("addr").textContent=name+".narelauncher.winnigames2024.ru";
-    V("who").innerHTML='<span class="ava" title="'+esc(name)+'">'+ini(name)+'</span>';
+    V("who").innerHTML='<span class="ava" title="'+at(name)+'">'+ini(name)+'</span>';
     buildNav(); markTabs(); render(); poll(); if(timer)clearInterval(timer); timer=setInterval(poll,2000);
   } else if(timer){clearInterval(timer);timer=null;}}
 
 function setOnline(on){ V("sdot").className="dot"+(on?" on":" offc"); V("sstat").className=on?"run":"off"; V("sstat").textContent=on?"Онлайн":"Оффлайн";
   V("bStart").disabled=on; V("bStop").disabled=!on; V("bRestart").disabled=!on; }
-var lastLines=[];
 function poll(){ api("/server/weblog",{}).then(function(d){
   if(!d.ok){ if(d.error)logout(); return; }
   var on=!!d.online; setOnline(on); var st=d.stats;
@@ -1444,14 +1453,13 @@ function poll(){ api("/server/weblog",{}).then(function(d){
   else { V("sCpu").textContent="—";V("sMem").textContent="—";V("sUp").textContent="—";V("sPl").textContent="—"; }
   lastLines=d.lines||[];
   if(tab==="console"){ var c=V("console"); if(c){ var atB=c.scrollHeight-c.scrollTop-c.clientHeight<60; c.innerHTML=renderLog(lastLines); if(atB)c.scrollTop=c.scrollHeight; } }
-  if(tab==="logs"){ var lg=V("logbox"); if(lg){ lg.innerHTML=renderLog(lastLines); } }
+  if(tab==="logs"){ var lg=V("logbox"); if(lg) lg.innerHTML=renderLog(lastLines); }
 }).catch(function(){}); }
-function renderLog(lines){ return (lines||[]).map(function(l){var e=esc(l); if(/^>\\s/.test(l))return '<span class="in">'+e+'</span>'; if(/WARN/i.test(l))return '<span class="warn">'+e+'</span>'; if(/ERROR|severe|exception/i.test(l))return '<span class="err">'+e+'</span>'; return e;}).join("<br>"); }
+function renderLog(lines){ return (lines||[]).map(function(l){var e=esc(l); if(/^&gt;/.test(e))return '<span class="in">'+e+'</span>'; if(/WARN/i.test(l))return '<span class="warn">'+e+'</span>'; if(/ERROR|severe|exception/i.test(l))return '<span class="err">'+e+'</span>'; return e;}).join("<br>"); }
 
 function power(a){ var nm={start:"запуск",restart:"перезапуск",stop:"остановку"}; api("/server/control",{action:a}).then(function(d){ toast(d.ok?("Команда на "+nm[a]+" отправлена"):(d.error||"не вышло")); }); }
-function sendCmd(){ var el=V("cmd"); var t=(el.value||"").trim(); if(!t)return; api("/server/webcmd",{text:t}).then(function(){}); el.value=""; }
+function sendCmd(){ var el=V("cmd"); if(!el)return; var t=(el.value||"").trim(); if(!t)return; api("/server/webcmd",{text:t}).then(function(){}); el.value=""; }
 
-// --- файловый RPC ---
 function fsCall(action,path,content){
   return api("/server/fs",{action:action,path:path||"",content:content}).then(function(d){
     if(!d.ok) throw new Error(d.error||"ошибка"); var id=d.id;
@@ -1463,48 +1471,51 @@ function fsCall(action,path,content){
   });
 }
 
-function render(){
-  var v=V("view");
+function render(){ var v=V("view");
   if(tab==="console"){
-    v.innerHTML='<div class="card"><div class="cardhd">Консоль сервера<div class="sp"></div></div><div class="console" id="console"></div><div class="prompt"><span class="c">»</span><input id="cmd" placeholder="Введите команду (без /)…" onkeydown="if(event.key===\'Enter\')sendCmd()"><button onclick="sendCmd()">Отправить</button></div></div>';
-    V("console").innerHTML=renderLog(lastLines); var c=V("console"); c.scrollTop=c.scrollHeight; return;
+    v.innerHTML='<div class="card"><div class="cardhd">Консоль сервера<div class="sp"></div></div><div class="console" id="console"></div><div class="prompt"><span class="c">&raquo;</span><input id="cmd" placeholder="Введите команду (без /)…"><button data-act="send">Отправить</button></div></div>';
+    V("console").innerHTML=renderLog(lastLines); V("console").scrollTop=V("console").scrollHeight; return;
   }
-  if(tab==="logs"){ v.innerHTML='<div class="card"><div class="cardhd">Логи сервера<div class="sp"></div><button class="btn gray" onclick="poll()">Обновить</button></div><div class="console" id="logbox" style="height:600px"></div></div>'; V("logbox").innerHTML=renderLog(lastLines); return; }
+  if(tab==="logs"){ v.innerHTML='<div class="card"><div class="cardhd">Логи сервера<div class="sp"></div><button class="btn gray" data-act="poll">Обновить</button></div><div class="console" id="logbox" style="height:600px"></div></div>'; V("logbox").innerHTML=renderLog(lastLines); return; }
   if(tab==="players"){ renderPlayers(); return; }
   if(tab==="plugins"){ renderPlugins(); return; }
-  if(tab==="settings"){ openEditor("server.properties","server.properties"); return; }
+  if(tab==="settings"){ openEditor("server.properties"); return; }
   if(tab==="files"){ renderFiles(curPath); return; }
 }
 
-function renderFiles(path){ curPath=path||""; var v=V("view");
-  v.innerHTML='<div class="card"><div class="crumb">📁 <b>/'+esc(curPath)+'</b></div><div class="cardhd"><button class="btn gray" onclick="upDir()">⬆ Вверх</button><div class="sp"></div><button class="btn gray" onclick="renderFiles(curPath)">Обновить</button></div><div class="flist" id="flist"><div class="empty">загрузка…</div></div></div>';
+function renderFiles(path){ curPath=path||""; tab="files"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="crumb">📁 <b>/'+esc(curPath)+'</b></div><div class="cardhd"><button class="btn gray" data-act="up">⬆ Вверх</button><div class="sp"></div><button class="btn gray" data-act="cd" data-arg="'+at(curPath)+'">Обновить</button></div><div class="flist" id="flist"><div class="empty">загрузка…</div></div></div>';
   fsCall("list",curPath).then(function(r){ if(!r.ok){ V("flist").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
     var es=r.entries||[]; if(!es.length){ V("flist").innerHTML='<div class="empty">пусто</div>'; return; }
-    V("flist").innerHTML=es.map(function(e){ var pp=(curPath?curPath+"/":"")+e.name;
-      return '<div class="frow"><span class="ic">'+(e.dir?"📁":"📄")+'</span><span class="nm" onclick="'+(e.dir?'renderFiles(\''+esc(pp)+'\')':'openEditor(\''+esc(pp)+'\',\''+esc(e.name)+'\')')+'">'+esc(e.name)+'</span><span class="sz">'+(e.dir?"":fmtSz(e.size))+'</span><span class="x" onclick="delFile(\''+esc(pp)+'\')">✕</span></div>';
-    }).join(""); }).catch(function(ex){ V("flist").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
+    var h=""; for(var i=0;i<es.length;i++){ var e=es[i]; var pp=(curPath?curPath+"/":"")+e.name;
+      h+='<div class="frow"><span class="ic">'+(e.dir?"📁":"📄")+'</span><span class="nm" data-act="'+(e.dir?"cd":"open")+'" data-arg="'+at(pp)+'">'+esc(e.name)+'</span><span class="sz">'+(e.dir?"":fmtSz(e.size))+'</span><span class="x" data-act="del" data-arg="'+at(pp)+'">✕</span></div>';
+    } V("flist").innerHTML=h;
+  }).catch(function(ex){ V("flist").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
 }
-function upDir(){ var p=curPath.replace(/\/?[^\/]*$/,""); renderFiles(p); }
-function delFile(path){ if(!confirm("Удалить «"+path+"»?"))return; fsCall("delete",path).then(function(){ toast("Удалено"); renderFiles(curPath); }); }
+function upDir(){ var i=curPath.lastIndexOf("/"); renderFiles(i>0?curPath.slice(0,i):""); }
+function delFile(path){ if(!confirm("Удалить «"+path+"»?"))return; fsCall("delete",path).then(function(){ toast("Удалено"); if(tab==="plugins")renderPlugins(); else renderFiles(curPath); }); }
 
-function openEditor(path,label){ editPath=path; var v=V("view");
-  v.innerHTML='<div class="card editor"><div class="cardhd">✎ '+esc(label||path)+'<div class="sp"></div><button class="btn gray" onclick="go(\'files\')">← Файлы</button><button class="btn green" onclick="saveEditor()">💾 Сохранить</button></div><textarea id="edit" spellcheck="false">загрузка…</textarea></div>';
-  fsCall("read",path).then(function(r){ if(!r.ok){ V("edit").value=r.error||"не прочитать"; return; } V("edit").value=r.content||""; }).catch(function(ex){ V("edit").value=ex.message; });
+function openEditor(path){ editPath=path; tab=(path==="server.properties"?"settings":tab); markTabs(); var label=path.split("/").pop(); var v=V("view");
+  v.innerHTML='<div class="card editor"><div class="cardhd">✎ '+esc(label)+'<div class="sp"></div><button class="btn gray" data-act="go" data-arg="files">← Файлы</button><button class="btn green" data-act="save">💾 Сохранить</button></div><textarea id="edit" spellcheck="false">загрузка…</textarea></div>';
+  fsCall("read",path).then(function(r){ V("edit").value=r.ok?(r.content||""):(r.error||"не прочитать"); }).catch(function(ex){ V("edit").value=ex.message; });
 }
 function saveEditor(){ var c=V("edit").value; fsCall("write",editPath,c).then(function(r){ toast(r.ok?"Сохранено":(r.error||"ошибка")); }).catch(function(ex){ toast(ex.message); }); }
 
-function renderPlugins(){ var v=V("view"); v.innerHTML='<div class="card plist"><div class="cardhd">Плагины / Моды<div class="sp"></div><button class="btn gray" onclick="renderPlugins()">Обновить</button></div><div class="flist" id="plist"><div class="empty">загрузка…</div></div></div>';
+function renderPlugins(){ tab="plugins"; markTabs(); var v=V("view"); v.innerHTML='<div class="card"><div class="cardhd">Плагины / Моды<div class="sp"></div><button class="btn gray" data-act="go" data-arg="plugins">Обновить</button></div><div class="flist" id="plist"><div class="empty">загрузка…</div></div></div>';
   fsCall("plugins").then(function(r){ if(!r.ok){ V("plist").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
     var items=r.items||[]; if(!items.length){ V("plist").innerHTML='<div class="empty">папка '+esc(r.sub)+' пуста</div>'; return; }
-    V("plist").innerHTML=items.map(function(n){ return '<div class="frow"><span class="ic">🧩</span><span class="nm">'+esc(n)+'</span><span class="x" onclick="delFile(\''+esc(r.sub+"/"+n)+'\')">✕</span></div>'; }).join(""); });
+    var h=""; for(var i=0;i<items.length;i++){ h+='<div class="frow"><span class="ic">🧩</span><span class="nm">'+esc(items[i])+'</span><span class="x" data-act="del" data-arg="'+at(r.sub+"/"+items[i])+'">✕</span></div>'; } V("plist").innerHTML=h;
+  }).catch(function(ex){ V("plist").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
 }
-function renderPlayers(){ var v=V("view"); v.innerHTML='<div class="card players"><div class="cardhd">Игроки онлайн<div class="sp"></div><button class="btn gray" onclick="renderPlayers()">Обновить</button></div><div class="flist" id="plrs"><div class="empty">загрузка…</div></div></div>';
+function renderPlayers(){ tab="players"; markTabs(); var v=V("view"); v.innerHTML='<div class="card"><div class="cardhd">Игроки онлайн<div class="sp"></div><button class="btn gray" data-act="go" data-arg="players">Обновить</button></div><div class="flist" id="plrs"><div class="empty">загрузка…</div></div></div>';
   fsCall("players").then(function(r){ if(!r.ok){ V("plrs").innerHTML='<div class="empty">'+esc(r.error||"ошибка")+'</div>'; return; }
     var ps=r.players||[]; if(!ps.length){ V("plrs").innerHTML='<div class="empty">никого нет онлайн</div>'; return; }
-    V("plrs").innerHTML=ps.map(function(n){ return '<div class="frow"><span class="ava" style="width:26px;height:26px;font-size:13px">'+ini(n)+'</span><span class="nm">'+esc(n)+'</span><button class="btn" onclick="pcmd(\'op '+esc(n)+'\')">OP</button><button class="btn gray" onclick="pcmd(\'deop '+esc(n)+'\')">deOP</button><button class="btn red" onclick="pcmd(\'kick '+esc(n)+'\')">Кик</button></div>'; }).join(""); });
+    var h=""; for(var i=0;i<ps.length;i++){ var n=ps[i]; h+='<div class="frow"><span class="ava" style="width:26px;height:26px;font-size:13px">'+ini(n)+'</span><span class="nm">'+esc(n)+'</span><button class="btn" data-act="cmd" data-arg="'+at("op "+n)+'">OP</button><button class="btn gray" data-act="cmd" data-arg="'+at("deop "+n)+'">deOP</button><button class="btn red" data-act="cmd" data-arg="'+at("kick "+n)+'">Кик</button></div>'; } V("plrs").innerHTML=h;
+  }).catch(function(ex){ V("plrs").innerHTML='<div class="empty">'+esc(ex.message)+'</div>'; });
 }
 function pcmd(c){ api("/server/webcmd",{text:c}).then(function(){ toast("Команда: "+c); setTimeout(renderPlayers,800); }); }
 
+var lb=V("loginBtn"); if(lb) lb.addEventListener("click", login);
 show();
 </script></body></html>`;
 

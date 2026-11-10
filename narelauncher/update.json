@@ -1,8 +1,8 @@
 {
-  "version": "1.70",
+  "version": "1.71",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "7d9d633d137ecfeee19fd77a5980f0cf92f36649",
-  "size": 832000,
-  "notes": "Веб-панель сервера полностью рабочая: Файлы (просмотр/редактирование/удаление), server.properties, Плагины/Моды, Игроки (OP/кик), Логи, большая консоль. Файловый мост веб↔лаунчер↔ПК."
+  "sha1": "f09234c192b7d64864bf47e5fb09a623559f54ab",
+  "size": 832512,
+  "notes": "Баннер эвента на главном меню — картинкой во всю ширину (cover, без полей), держится поверх на всех вкладках."
 }
