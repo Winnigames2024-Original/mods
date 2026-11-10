@@ -667,7 +667,7 @@ namespace NareLauncher.UI
         {
             NareLauncher.Core.NareEvent ev = null;
             foreach (var x in list) if (x.Active) { ev = x; break; }
-            if (ev == null) { _eventBanner.Visible = false; _eventBanner.Height = 0; return; }
+            if (ev == null) { _eventBanner.Visible = false; _eventBanner.Height = 0; try { _content.PerformLayout(); } catch { } return; }
 
             _eventBanner.Controls.Clear();
             Color accent = ParseHex(ev.Accent, Theme.Accent);
@@ -682,7 +682,7 @@ namespace NareLauncher.UI
             {
                 _bannerImg = null;
                 _eventBanner.BackColor = Darken(accent);
-                _eventBanner.Height = 150;
+                _eventBanner.Height = 120;
                 LoadBannerCover(ev.Images[0]);
                 close.Location = new Point(_eventBanner.Width - 32, 8);
                 _eventBanner.Controls.Add(close); close.BringToFront();
@@ -699,6 +699,7 @@ namespace NareLauncher.UI
             }
             _eventBanner.Visible = true;
             _eventBanner.BringToFront();
+            try { _content.PerformLayout(); } catch { }
         }
 
         private static Color Darken(Color c)
@@ -709,11 +710,13 @@ namespace NareLauncher.UI
         private void EventBannerPaint(object sender, PaintEventArgs e)
         {
             var p = sender as Panel; if (p == null) return;
+            Color acc = p.Tag is Color ? (Color)p.Tag : Theme.Accent;
             if (_bannerImg != null)
             {
                 try
                 {
-                    float sc = Math.Max((float)p.Width / _bannerImg.Width, (float)p.Height / _bannerImg.Height);
+                    using (var bg = new SolidBrush(Darken(acc))) e.Graphics.FillRectangle(bg, 0, 0, p.Width, p.Height);
+                    float sc = Math.Min((float)p.Width / _bannerImg.Width, (float)p.Height / _bannerImg.Height);
                     int dw = (int)(_bannerImg.Width * sc), dh = (int)(_bannerImg.Height * sc);
                     int dx = (p.Width - dw) / 2, dy = (p.Height - dh) / 2;
                     e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
@@ -722,8 +725,7 @@ namespace NareLauncher.UI
                 }
                 catch { }
             }
-            Color a = p.Tag is Color ? (Color)p.Tag : Theme.Accent;
-            using (var b = new SolidBrush(a)) e.Graphics.FillRectangle(b, 0, 0, 5, p.Height);
+            using (var b = new SolidBrush(acc)) e.Graphics.FillRectangle(b, 0, 0, 5, p.Height);
         }
 
         private void LoadBannerCover(string url)

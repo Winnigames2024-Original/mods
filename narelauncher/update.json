@@ -1,8 +1,8 @@
 {
-  "version": "1.71",
+  "version": "1.72",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "f09234c192b7d64864bf47e5fb09a623559f54ab",
+  "sha1": "0e24450ff0ba1d4fe1f2cbd9118749c3d6529fe8",
   "size": 832512,
-  "notes": "Баннер эвента на главном меню — картинкой во всю ширину (cover, без полей), держится поверх на всех вкладках."
+  "notes": "Баннер эвента больше не перекрывает скин (страница отодвигается вниз), картинка показывается целиком (fit) на тёмном фоне, баннер ниже."
 }
