@@ -140,7 +140,7 @@ namespace NareLauncher.Core
             sb.Append("\"nick\":\"").Append(Esc(_name)).Append("\",");
             sb.Append("\"port\":").Append(_localPort).Append(',');
             sb.Append("\"mode\":\"tunnel\",\"version\":\"server\",\"loader\":\"vanilla\",");
-            sb.Append("\"world\":\"сервер\",\"players\":0,\"max\":20}");
+            sb.Append("\"world\":\"сервер\",\"players\":0,\"max\":20,\"dedic\":true}");
             string resp = HttpPost("/announce", sb.ToString());
             if (resp == null) return;
             var j = Json.Parse(resp);

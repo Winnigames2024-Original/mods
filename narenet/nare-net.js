@@ -50,7 +50,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.34';
+const VERSION = '1.35';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -307,6 +307,7 @@ function announce(req, res) {
         room.loader = clean(body.loader, 16);
         room.world = clean(body.world, 64);
         room.players = Number(body.players) || 1;
+        room.dedic = !!body.dedic;
         room.max = Number(body.max) || 8;
         room.note = clean(body.note, 120);
         room.mods = modsOf(body.mods);
@@ -2546,6 +2547,27 @@ function serversPublic(req, res) {
         .map(x => ({ id: x.id, owner: x.owner, name: x.name,
                      ip: x.hideIp ? '' : x.ip, hideIp: !!x.hideIp,
                      version: x.version, loader: x.loader, desc: x.desc, reward: x.reward || COIN_REWARD }));
+
+    // живые выделенные серверы «Мои серверы» — показываем, пока запущены
+    for (const room of rooms.values()) {
+        if (!room.dedic) continue;
+        if (now() - (room.seen || 0) > ROOM_LIFE) continue;
+        const nk = room.nick || '';
+        const dash = nk.indexOf('-');
+        const owner = dash > 0 ? nk.slice(0, dash) : nk;
+        out.push({
+            id: 'dedic-' + nk,
+            owner: owner,
+            name: nk,
+            ip: nk + '.narelauncher.winnigames2024.ru',
+            hideIp: false,
+            version: room.version || '',
+            loader: room.loader || '',
+            desc: 'Выделенный сервер NareLauncher (запущен на ПК владельца)',
+            reward: COIN_REWARD,
+            dedic: true
+        });
+    }
     send(res, 200, { servers: out });
 }
 

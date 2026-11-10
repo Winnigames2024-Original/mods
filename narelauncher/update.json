@@ -1,8 +1,8 @@
 {
-  "version": "1.56",
+  "version": "1.57",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "8d7cdb9a5b1dc64efa67243369b55139e5f4c1e9",
+  "sha1": "e3d808cf42043896ae242baa2c68593d26a45dd8",
   "size": 790528,
-  "notes": "Фикс скачивания Paper (перешёл на новый Fill API v3; старый отдавал 410). Выбор ядра Forge/Fabric/Vanilla/Paper, фикс вылета."
+  "notes": "Запущенные серверы «Мои серверы» теперь видны в «Вместе» и в «Публичных серверах» (пока запущены). Плюс Paper v3, выбор ядра Forge/Fabric/Vanilla/Paper, фиксы."
 }
