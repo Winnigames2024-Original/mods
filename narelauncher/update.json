@@ -1,8 +1,8 @@
 {
-  "version": "1.60",
+  "version": "1.61",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "7f35d06598a1b7969333563123b4fd627a0dc2fc",
-  "size": 804352,
-  "notes": "Вкладка Плагины/Моды — каталог Modrinth: ищешь, выбираешь из списка, «Установить» качает прямо в папку. Авто-подбор по версии и ядру сервера. Кнопка «На сайте»."
+  "sha1": "3f3bfab54fa267f364c47d22c46178dab010bd81",
+  "size": 806912,
+  "notes": "Карточки плагинов с иконками. Java подбирается под версию сервера (1.21->Java21) — фикс ошибки ремаппера плагинов Paper. Версия сервера больше не улетает в клиент (фикс запуска)."
 }

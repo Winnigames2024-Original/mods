@@ -84,7 +84,7 @@ namespace NareLauncher.UI
         private readonly ListBox _filesList = new ListBox();
         private Button[] _filesBtns;
         private readonly CardPanel _jarsPanel = new CardPanel();
-        private readonly ListBox _jarsList = new ListBox();
+        private readonly FlowLayoutPanel _jarsFlow = new FlowLayoutPanel();
         private readonly Label _jarsTitle = new Label();
         private readonly TextBox _jarsSearch = new TextBox();
         private List<ModProject> _catalog = new List<ModProject>();
@@ -666,10 +666,10 @@ namespace NareLauncher.UI
             _jarsSearch.BorderStyle = BorderStyle.FixedSingle; _jarsSearch.BackColor = Color.FromArgb(18, 18, 18); _jarsSearch.ForeColor = CText; _jarsSearch.Font = Theme.F(10f);
             _jarsSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SearchCatalog(); } };
             _jarsPanel.Controls.Add(_jarsSearch);
-            _jarsList.BorderStyle = BorderStyle.None; _jarsList.BackColor = CTermBg; _jarsList.ForeColor = CText; _jarsList.Font = new Font("Consolas", 9.5f);
-            _jarsList.DoubleClick += (s, e) => InstallSelected();
-            _jarsPanel.Controls.Add(_jarsList);
-            _jarsBtns = new[] { Mk("Искать", SearchCatalog), Mk("Установить", InstallSelected), Mk("Папка", OpenJarsFolder), Mk("На сайте", OpenOnSite) };
+            _jarsFlow.AutoScroll = true; _jarsFlow.WrapContents = false; _jarsFlow.FlowDirection = FlowDirection.TopDown;
+            _jarsFlow.BackColor = CTermBg; _jarsFlow.Padding = new Padding(6);
+            _jarsPanel.Controls.Add(_jarsFlow);
+            _jarsBtns = new[] { Mk("Искать", SearchCatalog), Mk("Папка", OpenJarsFolder), Mk("На сайте", OpenOnSite) };
             foreach (var b in _jarsBtns) _jarsPanel.Controls.Add(b);
 
             _propsPanel.Visible = false; Controls.Add(_propsPanel);
@@ -714,7 +714,14 @@ namespace NareLauncher.UI
             _jarsTitle.Bounds = new Rectangle(12, 10, w - 24, 18);
             _jarsSearch.Bounds = new Rectangle(12, 32, w - 24, 28);
             if (_jarsBtns != null) foreach (var b in _jarsBtns) { b.Bounds = new Rectangle(x, 66, 118, 28); x += 126; }
-            _jarsList.Bounds = new Rectangle(12, 102, w - 24, Math.Max(40, _jarsPanel.Height - 114));
+            _jarsFlow.Bounds = new Rectangle(12, 102, w - 24, Math.Max(40, _jarsPanel.Height - 114));
+            SizeCards();
+        }
+        private void SizeCards()
+        {
+            int cw = _jarsFlow.ClientSize.Width - 10;
+            if (cw < 120) cw = 120;
+            foreach (Control c in _jarsFlow.Controls) if (c is Panel) c.Width = cw;
         }
         private void LayoutProps()
         {
@@ -803,7 +810,7 @@ namespace NareLauncher.UI
 
         private void SearchCatalog()
         {
-            if (_sel == null) { _jarsList.Items.Clear(); _jarsList.Items.Add("(выбери сервер)"); return; }
+            if (_sel == null) { _jarsFlow.Controls.Clear(); return; }
             bool plugins = JarsSub() == "plugins";
             string core = CoreOf(_sel);
             string type = plugins ? "plugin" : "mod";
@@ -812,30 +819,71 @@ namespace NareLauncher.UI
             string q = (_jarsSearch.Text ?? "").Trim();
             _jarsTitle.Text = (plugins ? "Плагины для Paper" : "Моды для " + (cat == "" ? "сервера" : cat))
                             + (ver.Length > 0 ? "  ·  версия " + ver : "  ·  любая версия");
-            _jarsList.Items.Clear();
-            _jarsList.Items.Add("поиск в каталоге...");
+            _jarsFlow.Controls.Clear();
+            _jarsFlow.Controls.Add(new Label { Text = "поиск в каталоге…", AutoSize = true, ForeColor = CDim, BackColor = Color.Transparent, Margin = new Padding(8) });
             new System.Threading.Thread(() =>
             {
                 var res = ModrinthClient.Search(q, type, cat, ver);
                 Ui(() =>
                 {
                     _catalog = res;
-                    _jarsList.Items.Clear();
-                    if (res.Count == 0) { _jarsList.Items.Add("(ничего не найдено для этой версии)"); return; }
-                    foreach (var pr in res)
-                        _jarsList.Items.Add(pr.Title + "   —   " + VideosPage.Nfmt(pr.Downloads) + " загрузок   —   " + pr.Desc);
-                    _jarsList.SelectedIndex = 0;
+                    _jarsFlow.Controls.Clear();
+                    if (res.Count == 0)
+                    {
+                        _jarsFlow.Controls.Add(new Label { Text = "(ничего не найдено для этой версии)", AutoSize = true, ForeColor = CDim, BackColor = Color.Transparent, Margin = new Padding(8) });
+                        return;
+                    }
+                    foreach (var pr in res) _jarsFlow.Controls.Add(BuildPluginCard(pr));
+                    SizeCards();
                 });
             })
             { IsBackground = true }.Start();
         }
 
-        private void InstallSelected()
+        private Panel BuildPluginCard(ModProject pr)
         {
-            if (_sel == null) return;
-            int i = _jarsList.SelectedIndex;
-            if (_catalog == null || i < 0 || i >= _catalog.Count) { Append("Выбери плагин/мод из списка."); return; }
-            var proj = _catalog[i];
+            var card = new Panel { Height = 80, BackColor = CCard, Margin = new Padding(0, 0, 0, 8) };
+
+            var pic = new PictureBox { Dock = DockStyle.Left, Width = 80, SizeMode = PictureBoxSizeMode.Zoom, BackColor = CTermBg };
+            card.Controls.Add(pic);
+
+            var install = new Button { Dock = DockStyle.Right, Width = 120 };
+            StyleBtn(install, "Установить", Color.FromArgb(18, 58, 34), CGreen, Color.FromArgb(28, 92, 53));
+            install.Font = Theme.F(9.5f, FontStyle.Bold);
+            var proj = pr;
+            install.Click += (s, e) => InstallProject(proj);
+            card.Controls.Add(install);
+
+            var mid = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+            var title = new Label { Text = pr.Title, Bounds = new Rectangle(12, 8, 400, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CText, BackColor = Color.Transparent, Font = Theme.F(11f, FontStyle.Bold) };
+            var meta = new Label { Text = VideosPage.Nfmt(pr.Downloads) + " загрузок", Bounds = new Rectangle(12, 32, 400, 16), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CAccent, BackColor = Color.Transparent, Font = Theme.F(8.5f, FontStyle.Bold) };
+            var desc = new Label { Text = pr.Desc, Bounds = new Rectangle(12, 50, 400, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CDim, BackColor = Color.Transparent, Font = Theme.F(8.5f) };
+            mid.Controls.Add(desc); mid.Controls.Add(meta); mid.Controls.Add(title);
+            card.Controls.Add(mid);
+
+            if (!string.IsNullOrEmpty(pr.IconUrl)) LoadIcon(pr.IconUrl, pic);
+            return card;
+        }
+
+        private void LoadIcon(string url, PictureBox pic)
+        {
+            new System.Threading.Thread(() =>
+            {
+                var bytes = ModrinthClient.DownloadData(url);
+                if (bytes == null) return;
+                try
+                {
+                    var img = Image.FromStream(new MemoryStream(bytes));
+                    Ui(() => { try { pic.Image = img; } catch { } });
+                }
+                catch { }
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private void InstallProject(ModProject proj)
+        {
+            if (_sel == null || proj == null) return;
             bool plugins = JarsSub() == "plugins";
             string core = CoreOf(_sel);
             string[] loaders = plugins
@@ -860,6 +908,7 @@ namespace NareLauncher.UI
             })
             { IsBackground = true }.Start();
         }
+
 
         private void OpenOnSite()
         {

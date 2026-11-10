@@ -106,9 +106,13 @@ namespace NareLauncher.UI.Pages
                 return;
             }
 
+            // версия сервера — это версия СЕРВЕРА, не клиента: "server"/"vanilla"/пусто
+            // не годятся как версия для запуска игры — тогда играем на выбранной версии
+            string sv = server.Version ?? "";
+            if (sv == "server" || sv == "vanilla") sv = "";
             var request = new PlayLink.Request
             {
-                Version = string.IsNullOrEmpty(server.Version) ? "" : server.Version,
+                Version = sv,
                 Loader = string.IsNullOrEmpty(server.Loader) ? "vanilla" : server.Loader,
                 Server = ip
             };

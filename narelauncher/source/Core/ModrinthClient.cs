@@ -8,7 +8,7 @@ namespace NareLauncher.Core
 {
     public class ModProject
     {
-        public string Slug = "", Title = "", Desc = "";
+        public string Slug = "", Title = "", Desc = "", IconUrl = "";
         public int Downloads;
     }
 
@@ -40,6 +40,7 @@ namespace NareLauncher.Core
                     Slug = h["slug"].AsString(h["project_id"].AsString("")),
                     Title = h["title"].AsString(""),
                     Desc = h["description"].AsString(""),
+                    IconUrl = h["icon_url"].AsString(""),
                     Downloads = h["downloads"].AsInt(0)
                 });
             }
@@ -77,6 +78,19 @@ namespace NareLauncher.Core
                 if (firstAny != null && firstAny[0].Length > 0) return firstAny;
             }
             return null;
+        }
+
+        public static byte[] DownloadData(string url)
+        {
+            try
+            {
+                using (var wc = new WebClient())
+                {
+                    wc.Headers.Add("User-Agent", UA);
+                    return wc.DownloadData(url);
+                }
+            }
+            catch { return null; }
         }
 
         public static void Download(string url, string dest)

@@ -51,7 +51,7 @@ namespace NareLauncher.Core
             File.WriteAllText(Path.Combine(Folder, "eula.txt"), "eula=true\n");
             WriteProps();
 
-            string java = JavaExe();
+            string java = JavaExe2();
             if (java == null)
                 throw new InvalidOperationException("Не найдена Java для запуска сервера.");
 
@@ -177,16 +177,62 @@ namespace NareLauncher.Core
             lines.Add(key + "=" + value);
         }
 
-        /// <summary>java.exe (с консолью) из лучшей найденной Java; для 1.21 нужна 21+.</summary>
-        public static string JavaExe()
+        /// <summary>java.exe под версию этого сервера (MC 1.21→Java21, 1.18–1.20→17, ≤1.16→8).</summary>
+        public static string JavaExe() { return JavaExeFor(0); }
+
+        public string JavaExe2() { return JavaExeFor(RequiredJava(ReadMcVersion())); }
+
+        private static string JavaExeFor(int required)
         {
             var all = JavaLocator.FindAll();
-            if (all == null || all.Count == 0) return "java"; // надежда на PATH
-            var best = all.OrderByDescending(j => j.Major).FirstOrDefault();
-            if (best == null) return "java";
-            string dir = Path.GetDirectoryName(best.Path) ?? "";
+            if (all == null || all.Count == 0) return "java";
+            JavaInstall pick = null;
+            if (required > 0)
+            {
+                // точное совпадение по major
+                foreach (var j in all) if (j.Major == required) { pick = j; break; }
+                // иначе наименьшая major >= required
+                if (pick == null)
+                {
+                    foreach (var j in all.OrderBy(x => x.Major))
+                        if (j.Major >= required) { pick = j; break; }
+                }
+            }
+            if (pick == null) pick = all.OrderByDescending(j => j.Major).FirstOrDefault();
+            if (pick == null) return "java";
+            string dir = Path.GetDirectoryName(pick.Path) ?? "";
             string javaExe = Path.Combine(dir, "java.exe");
-            return File.Exists(javaExe) ? javaExe : best.Path;
+            return File.Exists(javaExe) ? javaExe : pick.Path;
+        }
+
+        private string ReadMcVersion()
+        {
+            try
+            {
+                string f = Path.Combine(Folder, "nare_core.txt");
+                if (File.Exists(f))
+                {
+                    var p = File.ReadAllText(f).Split('|');
+                    if (p.Length > 1) return p[1].Trim();
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        /// <summary>Нужная major-версия Java для версии Minecraft.</summary>
+        public static int RequiredJava(string mc)
+        {
+            if (string.IsNullOrEmpty(mc)) return 21;   // по умолчанию современная
+            var p = mc.Split('.');
+            int minor = 0, patch = 0;
+            if (p.Length > 1) int.TryParse(new string(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.TakeWhile(p[1], char.IsDigit))), out minor);
+            if (p.Length > 2) int.TryParse(new string(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.TakeWhile(p[2], char.IsDigit))), out patch);
+            if (minor >= 21) return 21;
+            if (minor == 20) return patch >= 5 ? 21 : 17;
+            if (minor >= 18) return 17;
+            if (minor == 17) return 17;
+            return 8;
         }
     }
 }
