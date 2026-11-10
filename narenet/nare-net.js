@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.29';
+const VERSION = '1.30';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1052,6 +1052,185 @@ function adminLogs(req, res) {
         if (!needStaff(body, res)) return;
         send(res, 200, { ok: true, lines: LOG_BUF });
     });
+}
+
+const APP_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NareLauncher</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0b0e14;color:#e7eaf2}
+a{color:#7aa2ff} .wrap{max-width:860px;margin:0 auto;padding:16px}
+.brand{font-size:22px;font-weight:800;letter-spacing:.3px} .brand span{color:#5b8cff}
+.muted{color:#8b93a7;font-size:13px}
+.card{background:#141926;border:1px solid #232a3a;border-radius:14px;padding:16px;margin:12px 0}
+input,textarea,select{background:#0b0e14;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:10px 12px;font-size:14px;outline:none;width:100%}
+input:focus,textarea:focus{border-color:#5b8cff}
+button{background:#1d2535;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:9px 14px;font-size:14px;cursor:pointer}
+button:hover{border-color:#5b8cff} button.pri{background:#2f52d8;border-color:#2f52d8}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.nav button{padding:7px 12px} .nav button.on{background:#2f52d8;border-color:#2f52d8}
+.coins{font-weight:800;color:#ffd24a} .tag{color:#9db6ff}
+.msg{padding:8px 10px;border-radius:8px;background:#0e1320;margin:6px 0} .msg.me{background:#17233f}
+.msg b{color:#9db6ff;font-size:12px}
+.pl{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #202636}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#56d364;margin-right:6px}
+.dot.off{background:#596173}
+#err{color:#ff8a98;font-size:13px;min-height:16px}
+.sec{display:none} .sec.on{display:block}
+.chat{max-height:380px;overflow:auto}
+</style></head><body><div class="wrap">
+<div class="row" style="justify-content:space-between">
+  <div class="brand">Nare<span>Launcher</span></div>
+  <div id="whoami" class="muted"></div>
+</div>
+
+<div id="login" class="card" style="max-width:360px">
+  <div class="muted" style="margin-bottom:8px">Вход в аккаунт NareLauncher</div>
+  <div class="row"><input id="u" placeholder="ник" autocomplete="username"></div>
+  <div class="row" style="margin-top:8px"><input id="p" type="password" placeholder="пароль" autocomplete="current-password"></div>
+  <div class="row" style="margin-top:10px"><button class="pri" onclick="login()">Войти</button></div>
+  <div id="lerr" style="color:#ff8a98;font-size:13px;margin-top:8px"></div>
+  <div class="muted" style="margin-top:10px">Запуск своего сервера — только в приложении (сервер на ПК). Остальное — тут.</div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="nav">
+    <button data-s="profile" onclick="go('profile')">Профиль</button>
+    <button data-s="chat" onclick="go('chat')">Чат с админом</button>
+    <button data-s="top" onclick="go('top')">Топ</button>
+    <button data-s="players" onclick="go('players')">Игроки</button>
+    <button data-s="tags" onclick="go('tags')">Теги</button>
+    <button onclick="logout()">Выйти</button>
+  </div>
+  <div id="err"></div>
+
+  <div id="s-profile" class="sec card">
+    <div class="row" style="justify-content:space-between">
+      <div><b id="pnick"></b> <span id="ptag" class="tag"></span></div>
+      <div>Монеты: <span id="pcoins" class="coins">0</span></div>
+    </div>
+    <div class="row" style="margin-top:10px"><input id="pstatus" placeholder="статус (о себе)"></div>
+    <div class="row" style="margin-top:8px"><button onclick="saveStatus()">Сохранить статус</button>
+      <button class="pri" onclick="daily()">Ежедневный бонус</button></div>
+    <div id="dailymsg" class="muted" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:12px"><input id="chatname" placeholder="отображаемое имя в чатах (платно)"><button onclick="setName()">Задать</button></div>
+  </div>
+
+  <div id="s-chat" class="sec card">
+    <div class="chat" id="chatbox"></div>
+    <div class="row" style="margin-top:8px"><input id="cmsg" placeholder="сообщение администратору" onkeydown="if(event.key==='Enter')sendMsg()"><button class="pri" onclick="sendMsg()">Отправить</button></div>
+  </div>
+
+  <div id="s-top" class="sec card"><div id="topbox"></div></div>
+
+  <div id="s-players" class="sec card">
+    <div class="row"><input id="q" placeholder="поиск по нику" oninput="doSearch()"></div>
+    <div id="plbox" style="margin-top:10px"></div>
+  </div>
+
+  <div id="s-tags" class="sec card"><div id="tagbox"></div></div>
+</div>
+
+<script>
+var token=sessionStorage.getItem("nl_token")||"", me=sessionStorage.getItem("nl_nick")||"";
+function api(path,body,get){
+  if(get)return fetch(path).then(function(r){return r.json()});
+  body=body||{};body.token=token;
+  return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}
+function err(t){document.getElementById("err").textContent=t||"";}
+function login(){
+  var u=document.getElementById("u").value.trim(),p=document.getElementById("p").value;
+  document.getElementById("lerr").textContent="";
+  fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
+   .then(function(r){return r.json()}).then(function(d){
+     if(!d.ok){document.getElementById("lerr").textContent=d.error||"не вышло";return;}
+     token=d.token;me=d.nick;sessionStorage.setItem("nl_token",token);sessionStorage.setItem("nl_nick",me);show();
+   }).catch(function(){document.getElementById("lerr").textContent="сервер недоступен";});
+}
+function logout(){token="";me="";sessionStorage.removeItem("nl_token");sessionStorage.removeItem("nl_nick");show();}
+function show(){
+  var on=token.length>0;
+  document.getElementById("login").style.display=on?"none":"block";
+  document.getElementById("app").style.display=on?"block":"none";
+  document.getElementById("whoami").textContent=on?("Вы вошли как "+me):"";
+  if(on){go("profile");loadProfile();}
+}
+function go(sec){
+  var secs=["profile","chat","top","players","tags"];
+  secs.forEach(function(x){document.getElementById("s-"+x).classList.toggle("on",x===sec);});
+  document.querySelectorAll(".nav button[data-s]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-s")===sec);});
+  err("");
+  if(sec==="chat")loadChat();
+  if(sec==="top")loadTop();
+  if(sec==="tags")loadTags();
+}
+function loadProfile(){
+  api("/profile/get?nick="+encodeURIComponent(me),null,true).then(function(d){
+    if(!d.ok)return;
+    document.getElementById("pnick").textContent=d.nick;
+    document.getElementById("pcoins").textContent=d.coins;
+    document.getElementById("ptag").textContent=d.tag||"";
+    document.getElementById("pstatus").value=d.status||"";
+  });
+}
+function saveStatus(){api("/profile/status",{status:document.getElementById("pstatus").value}).then(function(d){err(d.ok?"":(d.error||"ошибка"));});}
+function daily(){api("/coins/daily",{}).then(function(d){
+  if(!d.ok){document.getElementById("dailymsg").textContent=d.error||"ошибка";return;}
+  document.getElementById("dailymsg").textContent=d.awarded>0?("+"+d.awarded+" монет!"):("уже брали, через ~"+d.nextIn+" ч");
+  document.getElementById("pcoins").textContent=d.coins;});}
+function setName(){var n=document.getElementById("chatname").value.trim();if(!n)return;
+  api("/chatname/set",{name:n}).then(function(d){err(d.ok?"имя задано":(d.error||"ошибка"));});}
+function loadChat(){
+  api("/ban/chat",{}).then(function(d){
+    var box=document.getElementById("chatbox");if(!d.messages){box.innerHTML='<div class="muted">нет сообщений</div>';return;}
+    box.innerHTML=d.messages.map(function(m){
+      var who=m.fromName||m.from; var mine=m.from===me&&!m.admin;
+      var name=(m.admin?"Администратор":who)+(m.tag?(" "+m.tag):"");
+      return '<div class="msg '+(mine?"me":"")+'"><b>'+esc(name)+'</b><br>'+esc(m.deleted?"сообщение удалено":m.text)+'</div>';
+    }).join("");box.scrollTop=box.scrollHeight;
+  });
+}
+function sendMsg(){var t=document.getElementById("cmsg").value.trim();if(!t)return;
+  api("/ban/send",{text:t}).then(function(d){document.getElementById("cmsg").value="";loadChat();});}
+function loadTop(){
+  api("/top",null,true).then(function(d){
+    var b=document.getElementById("topbox");if(!d.top){b.textContent="пусто";return;}
+    b.innerHTML=d.top.map(function(t,i){return '<div class="pl"><span>'+(i+1)+'. '+esc(t.nick)+'</span><span class="coins">'+t.coins+'</span></div>';}).join("");
+  });
+}
+function doSearch(){var q=document.getElementById("q").value.trim();
+  if(!q){document.getElementById("plbox").innerHTML="";return;}
+  api("/search?q="+encodeURIComponent(q),null,true).then(function(d){
+    var b=document.getElementById("plbox");
+    b.innerHTML=(d.players||[]).map(function(pp){
+      return '<div class="pl"><span><span class="dot '+(pp.online?"":"off")+'"></span>'+esc(pp.nick)+' '+esc(pp.tag||"")+'</span><span class="coins">'+pp.coins+'</span></div>';
+    }).join("")||'<div class="muted">никого не найдено</div>';
+  });
+}
+function loadTags(){
+  api("/tags/list",{}).then(function(d){
+    var b=document.getElementById("tagbox");var list=d.tags||d.list||[];
+    if(!list.length){b.textContent="теги недоступны";return;}
+    b.innerHTML=list.map(function(t){
+      var owned=t.owned; var id=t.id;
+      return '<div class="pl"><span>'+esc(t.label||t.name||id)+' <span class="muted">'+(t.price?(t.price+" монет"):"")+'</span></span>'+
+        (owned?'<button onclick="equipTag(\\''+id+'\\')">Надеть</button>':'<button class="pri" onclick="buyTag(\\''+id+'\\')">Купить</button>')+'</span></div>';
+    }).join("");
+  });
+}
+function buyTag(id){api("/tags/buy",{id:id}).then(function(d){err(d.ok?"куплено":(d.error||"ошибка"));loadTags();loadProfile();});}
+function equipTag(id){api("/tags/equip",{id:id}).then(function(d){err(d.ok?"надето":(d.error||"ошибка"));loadProfile();});}
+show();
+</script>
+</div></body></html>`;
+
+function appPage(req, res) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(APP_HTML);
 }
 
 function panelPage(req, res) {
@@ -2267,6 +2446,7 @@ const server = http.createServer((req, res) => {
     if (route === '/account/logout/others' && req.method === 'POST') return accountLogoutOthers(req, res);
 
     // --- лаунчер спрашивает про себя
+    if (route === '/app' || route === '/' || route === '') return appPage(req, res);
     if (route === '/panel' || route === '/panel/') return panelPage(req, res);
     if (route === '/admin/logs' && req.method === 'POST') return adminLogs(req, res);
     if (route === '/status') return status(req, res);
