@@ -1,8 +1,8 @@
 {
-  "version": "1.66",
+  "version": "1.67",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "86380c1f7b2f50e4010b72e091fd7379e0a98b47",
+  "sha1": "8d74cf74e171836c2d4c8cd431d7404c10452e9e",
   "size": 811008,
-  "notes": "Прокрутка колёсиком мыши работает везде (каталог плагинов, лента видео, списки) — крутится панель под курсором, без фокуса."
+  "notes": "Окно лаунчера больше: 1460x900 (минимум 1120x700)."
 }

@@ -60,8 +60,8 @@ namespace NareLauncher.UI
             Text = "NareLauncher";
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1000, 640);
-            Size = new Size(1180, 720);
+            MinimumSize = new Size(1120, 700);
+            Size = new Size(1460, 900);
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
             Font = Theme.F(9.5f);
