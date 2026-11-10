@@ -493,7 +493,7 @@ namespace NareLauncher.UI
         private class PillLabel : Control
         {
             public bool On;
-            public PillLabel() { DoubleBuffered = true; BackColor = Color.Transparent; }
+            public PillLabel() { DoubleBuffered = true; SetStyle(ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
             protected override void OnPaint(PaintEventArgs e)
             {
                 var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;

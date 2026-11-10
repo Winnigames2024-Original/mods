@@ -1,8 +1,8 @@
 {
-  "version": "1.53",
+  "version": "1.54",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "19e4d579b3a961d1b6c3447da7f1df3be7afa634",
+  "sha1": "d1e71e30373a04f50e1b34994b1a762d731586d5",
   "size": 785920,
-  "notes": "NareVideo — система как YouTube: новая вкладка «Видео» (лента, поиск, загрузка роликов), форма канала/профиля NareProfileForm, просмотр в браузере с HTML5-плеером. Веб: narelauncher.winnigames2024.ru/videos"
+  "notes": "Фикс вылета при запуске (прозрачный фон у статус-пилюли и аватара). Вкладка «Видео» (NareVideo) и форма канала NareProfileForm."
 }

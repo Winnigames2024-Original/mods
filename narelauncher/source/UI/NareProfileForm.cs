@@ -155,7 +155,7 @@ namespace NareLauncher.UI
         private class AvatarCircle : Control
         {
             public char Letter = '?';
-            public AvatarCircle() { DoubleBuffered = true; BackColor = Color.Transparent; }
+            public AvatarCircle() { DoubleBuffered = true; SetStyle(ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
             protected override void OnPaint(PaintEventArgs e)
             {
                 var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
