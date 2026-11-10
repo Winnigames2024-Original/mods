@@ -1,8 +1,8 @@
 {
-  "version": "1.52",
+  "version": "1.53",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "4b9f0860906669a921b983ecfe9cf96fdc53f148",
-  "size": 771072,
-  "notes": "Вкладка «Мои серверы» в стиле хостинг-панели: карточка сервера со статусом Онлайн/Оффлайн, карточки CPU/Память/Аптайм/Игроки, цветные кнопки питания, тёмная консоль-терминал."
+  "sha1": "19e4d579b3a961d1b6c3447da7f1df3be7afa634",
+  "size": 785920,
+  "notes": "NareVideo — система как YouTube: новая вкладка «Видео» (лента, поиск, загрузка роликов), форма канала/профиля NareProfileForm, просмотр в браузере с HTML5-плеером. Веб: narelauncher.winnigames2024.ru/videos"
 }

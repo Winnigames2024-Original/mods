@@ -34,6 +34,7 @@ const HOST = process.env.NARENET_BIND || '0.0.0.0';
 const DATA_DIR = process.env.NARENET_DIR || '/var/lib/narenet';
 const FILES_DIR = path.join(DATA_DIR, 'files');
 const SHOTS_DIR = path.join(DATA_DIR, 'shots');
+const VIDEOS_DIR = path.join(DATA_DIR, 'videos');
 
 const TUNNEL_FROM = Number(process.env.NARENET_TUNNEL_FROM || 30000);
 const TUNNEL_TO = Number(process.env.NARENET_TUNNEL_TO || 30060);
@@ -43,16 +44,19 @@ const ANNOUNCE_MIN = 3 * 1000;        // чаще чем раз в 3 секун�
 const FILE_MAX = 32 * 1024 * 1024;    // один файл
 const FILES_MAX = 3 * 1024 * 1024 * 1024;
 const BODY_MAX = 512 * 1024;          // json объявления
-const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
+const SHOT_MAX = 1536 * 1024;         // json со скriншотом (base64)
+const VIDEO_FILE_MAX = 300 * 1024 * 1024;   // один ролик
+const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.33';
+const VERSION = '1.34';
 
 // ---------------------------------------------------------------- хозяйство
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
 fs.mkdirSync(SHOTS_DIR, { recursive: true });
+fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 
 function now() { return Date.now(); }
 
@@ -504,6 +508,7 @@ if (!policy.srvLog) policy.srvLog = {};
 if (!policy.srvCmd) policy.srvCmd = {};
 if (!policy.srvCtl) policy.srvCtl = {};
 if (!policy.srvStat) policy.srvStat = {};
+if (!policy.videos) policy.videos = [];
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -1458,6 +1463,218 @@ function sendCmd(){var t=$("cmd").value.trim();if(!t)return;
   api("/server/webcmd",{text:t}).then(function(d){$("cmd").value="";if(!d.ok){$("err").style.display="block";$("err").textContent=d.error||"ошибка";}});}
 show();
 </script></body></html>`;
+
+const VIDEOS_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>NareVideo</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Roboto,Segoe UI,system-ui,sans-serif;background:#0f0f0f;color:#f1f1f1}
+a{color:inherit;text-decoration:none}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:8px 18px;background:#0f0f0f;border-bottom:1px solid #222}
+.logo{display:flex;align-items:center;gap:7px;font-size:19px;font-weight:800;cursor:pointer}
+.logo .p{display:inline-flex;width:28px;height:20px;background:#ff0033;border-radius:5px;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.logo span{color:#ff4d6a}
+.search{flex:1;max-width:560px;margin:0 auto;display:flex}
+.search input{flex:1;background:#121212;border:1px solid #303030;border-right:0;color:#f1f1f1;border-radius:20px 0 0 20px;padding:9px 16px;font-size:14px;outline:none}
+.search input:focus{border-color:#3ea6ff}
+.search button{background:#222;border:1px solid #303030;color:#f1f1f1;border-radius:0 20px 20px 0;padding:0 18px;cursor:pointer}
+.top .up{background:#272727;border:0;color:#f1f1f1;border-radius:18px;padding:9px 15px;cursor:pointer;font-weight:600;font-size:13px;display:flex;gap:7px;align-items:center}
+.top .up:hover{background:#333}
+.top .me{display:flex;align-items:center;gap:9px}
+.ava{width:34px;height:34px;border-radius:50%;background:#ff0033;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;text-transform:uppercase}
+.wrap{max-width:1280px;margin:0 auto;padding:22px 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px 14px}
+.vcard{cursor:pointer}
+.thumb{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#1c1c1c;display:flex;align-items:center;justify-content:center}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .ph{color:#555;font-size:30px}
+.thumb .dur{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.8);color:#fff;font-size:11px;padding:1px 5px;border-radius:5px}
+.vmeta{display:flex;gap:11px;margin-top:11px}
+.vmeta .t{font-size:14.5px;font-weight:600;line-height:1.3;max-height:2.6em;overflow:hidden}
+.vmeta .c{color:#aaa;font-size:12.5px;margin-top:4px}
+.watch{display:grid;grid-template-columns:1fr 360px;gap:24px}
+@media(max-width:1000px){.watch{grid-template-columns:1fr}}
+video{width:100%;border-radius:12px;background:#000;max-height:72vh}
+.wtitle{font-size:20px;font-weight:700;margin:14px 0 10px}
+.chrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #222;flex-wrap:wrap}
+.chrow .nm{font-weight:600}.chrow .sb{color:#aaa;font-size:12px}
+.sub{background:#f1f1f1;color:#0f0f0f;border:0;border-radius:18px;padding:9px 16px;font-weight:700;cursor:pointer}
+.acts{margin-left:auto;display:flex;gap:9px}
+.pillbtn{background:#272727;border:0;color:#f1f1f1;border-radius:18px;padding:9px 15px;cursor:pointer;font-weight:600;display:flex;gap:7px;align-items:center}
+.pillbtn:hover{background:#333}.pillbtn.on{background:#263; color:#9f9}
+.descbox{background:#1c1c1c;border-radius:12px;padding:13px 15px;margin-top:14px;font-size:14px;white-space:pre-wrap;color:#e5e5e5}
+.descbox .s{color:#aaa;font-size:13px;margin-bottom:6px}
+.cmts{margin-top:22px}.cmts h3{font-size:16px}
+.cmtadd{display:flex;gap:10px;align-items:center;margin:12px 0 18px}
+.cmtadd input{flex:1;background:transparent;border:0;border-bottom:1px solid #333;color:#f1f1f1;padding:8px 2px;outline:none}
+.cmtadd input:focus{border-color:#aaa}
+.cmt{display:flex;gap:12px;margin:14px 0}.cmt .b{font-size:13px}.cmt .n{font-weight:600}.cmt .n small{color:#aaa;font-weight:400;margin-left:7px}
+.side .vcard{display:flex;gap:9px;margin-bottom:11px}
+.side .thumb{width:168px;flex-shrink:0;border-radius:9px}
+.side .t{font-size:13.5px;font-weight:600;max-height:3.6em;overflow:hidden}
+.side .c{color:#aaa;font-size:12px;margin-top:3px}
+.chhead{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.chhead .big{width:80px;height:80px;font-size:34px}
+.chhead .nm{font-size:24px;font-weight:800}.chhead .sb{color:#aaa}
+.empty{color:#888;text-align:center;padding:60px 0}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:40}
+.modal.on{display:flex}
+.sheet{background:#181818;border:1px solid #303030;border-radius:16px;padding:22px;width:460px;max-width:94vw}
+.sheet h3{margin:0 0 14px}
+.sheet input,.sheet textarea{width:100%;background:#0f0f0f;border:1px solid #303030;color:#f1f1f1;border-radius:9px;padding:10px 12px;font-size:14px;margin-bottom:10px;outline:none}
+.sheet textarea{min-height:72px;resize:vertical}
+.drop{border:1px dashed #3a3a3a;border-radius:11px;padding:18px;text-align:center;color:#aaa;cursor:pointer;margin-bottom:12px}
+.drop:hover{border-color:#3ea6ff;color:#ddd}
+.bar{height:7px;background:#222;border-radius:5px;overflow:hidden;margin:4px 0 12px;display:none}
+.bar i{display:block;height:100%;width:0;background:#ff0033;transition:.2s}
+.sheet .go{width:100%;background:#ff0033;border:0;color:#fff;border-radius:20px;padding:12px;font-weight:700;cursor:pointer}
+.sheet .go:disabled{opacity:.5}
+.sheet .x{float:right;cursor:pointer;color:#aaa}
+#err{color:#ff8a98;font-size:13px}
+.linkbtn{color:#3ea6ff;cursor:pointer}
+</style></head><body>
+<div class="top">
+  <div class="logo" onclick="goFeed()"><span class="p">&#9654;</span>Nare<span>Video</span></div>
+  <div class="search"><input id="q" placeholder="Поиск" onkeydown="if(event.key==='Enter')doSearch()"><button onclick="doSearch()">&#128269;</button></div>
+  <button class="up" onclick="openUpload()">&#8593; Загрузить</button>
+  <div class="me" id="me"></div>
+</div>
+<div class="wrap" id="view"></div>
+
+<div class="modal" id="um"><div class="sheet">
+  <span class="x" onclick="closeUpload()">&#10005;</span><h3>Загрузить видео</h3>
+  <div id="ustep1">
+    <div class="drop" id="drop" onclick="document.getElementById('file').click()">Нажми и выбери видеофайл (mp4/webm, до 300 МБ)</div>
+    <input type="file" id="file" accept="video/mp4,video/webm,video/ogg" style="display:none" onchange="pick()">
+    <input id="vtitle" placeholder="Название">
+    <textarea id="vdesc" placeholder="Описание"></textarea>
+    <div class="bar" id="bar"><i id="barfill"></i></div>
+    <button class="go" id="gobtn" onclick="doUpload()" disabled>Опубликовать</button>
+    <div id="uerr" style="color:#ff8a98;font-size:13px;margin-top:8px"></div>
+  </div>
+</div></div>
+
+<div class="modal" id="lm"><div class="sheet" style="width:360px">
+  <span class="x" onclick="document.getElementById('lm').classList.remove('on')">&#10005;</span><h3>Вход</h3>
+  <input id="lu" placeholder="ник"><input id="lp" type="password" placeholder="пароль" onkeydown="if(event.key==='Enter')doLogin()">
+  <button class="go" style="background:#3ea6ff" onclick="doLogin()">Войти</button>
+  <div id="lerr" style="color:#ff8a98;font-size:13px;margin-top:8px"></div>
+</div></div>
+
+<script>
+function setCk(k,v){document.cookie=k+"="+encodeURIComponent(v)+";path=/;max-age=2592000;samesite=lax"}
+function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){var e=a[i].indexOf("=");if(e>0&&a[i].slice(0,e)===k)return decodeURIComponent(a[i].slice(e+1))}return ""}
+function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
+var token=getCk("nv_token")||"", me=getCk("nv_nick")||"";
+var V=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
+function ini(s){s=s||"?";return s.charAt(0).toUpperCase()}
+function ago(t){var d=(Date.now()-t)/1000;if(d<60)return"только что";if(d<3600)return Math.floor(d/60)+" мин назад";if(d<86400)return Math.floor(d/3600)+" ч назад";if(d<2592000)return Math.floor(d/86400)+" дн назад";return Math.floor(d/2592000)+" мес назад"}
+function nfmt(n){n=n||0;if(n>=1e6)return(n/1e6).toFixed(1)+" млн";if(n>=1e3)return(n/1e3).toFixed(1)+" тыс";return""+n}
+function fmtDur(s){s=s|0;if(!s)return"";var m=Math.floor(s/60),x=s%60;return m+":"+(x<10?"0":"")+x}
+function jget(u){return fetch(u).then(function(r){return r.json()})}
+function jpost(u,b){b=b||{};b.token=token;return fetch(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json()})}
+function renderMe(){V("me").innerHTML=token?('<div class="ava" title="'+esc(me)+'" onclick="location.hash=\'#/channel/\'+encodeURIComponent(me)">'+ini(me)+'</div>'):('<span class="linkbtn" onclick="V(\'lm\').classList.add(\'on\')">Войти</span>')}
+function thumbHtml(v){var t=v.thumb?('<img src="'+esc(v.thumb)+'">'):('<div class="ph">&#9654;</div>');var d=v.dur?('<div class="dur">'+fmtDur(v.dur)+'</div>'):'';return'<div class="thumb">'+t+d+'</div>'}
+function card(v){return'<div class="vcard" onclick="location.hash=\'#/watch/'+v.id+'\'">'+thumbHtml(v)+
+  '<div class="vmeta"><div class="ava" style="width:36px;height:36px;font-size:15px">'+ini(v.user)+'</div><div><div class="t">'+esc(v.title)+'</div>'+
+  '<div class="c">'+esc(v.user)+'</div><div class="c">'+nfmt(v.views)+' просмотров · '+ago(v.at)+'</div></div></div></div>'}
+
+function goFeed(){location.hash="#/"}
+function doSearch(){var q=V("q").value.trim();location.hash="#/search/"+encodeURIComponent(q)}
+
+function feed(q,channel){
+  V("view").innerHTML='<div class="empty">Загрузка…</div>';
+  var u="/video/list";var qs=[];if(q)qs.push("q="+encodeURIComponent(q));if(channel)qs.push("channel="+encodeURIComponent(channel));if(qs.length)u+="?"+qs.join("&");
+  jget(u).then(function(d){
+    var vs=(d&&d.videos)||[];
+    if(channel){
+      jget("/profile/get?nick="+encodeURIComponent(channel)).then(function(p){
+        var head='<div class="chhead"><div class="ava big">'+ini((p&&p.username)||channel)+'</div><div><div class="nm">'+esc((p&&p.username)||channel)+'</div><div class="sb">'+(p&&p.subs?nfmt(p.subs.length):0)+' подписчиков · '+vs.length+' видео</div>'+((p&&p.status)?'<div class="sb">'+esc(p.status)+'</div>':'')+'</div></div>';
+        V("view").innerHTML=head+(vs.length?('<div class="grid">'+vs.map(card).join("")+'</div>'):'<div class="empty">Пока нет видео</div>');
+      });
+      return;
+    }
+    V("view").innerHTML=vs.length?('<div class="grid">'+vs.map(card).join("")+'</div>'):'<div class="empty">Пока нет видео. Будь первым — жми «Загрузить».</div>';
+  });
+}
+
+function watch(id){
+  V("view").innerHTML='<div class="empty">Загрузка…</div>';
+  fetch("/video/view?id="+id,{method:"POST"}).catch(function(){});
+  jget("/video/get?id="+id).then(function(d){
+    if(!d||!d.ok){V("view").innerHTML='<div class="empty">Видео не найдено</div>';return}
+    var v=d.video,ch=d.channel;
+    var liked=false;
+    var left='<video controls autoplay src="/video/stream/'+v.id+'"></video>'+
+      '<div class="wtitle">'+esc(v.title)+'</div>'+
+      '<div class="chrow"><div class="ava">'+ini(ch.user)+'</div><div><div class="nm">'+esc(ch.user)+'</div><div class="sb">'+nfmt(ch.subs)+' подписчиков</div></div>'+
+      '<button class="sub" onclick="location.hash=\'#/channel/\'+encodeURIComponent(\''+esc(ch.nick)+'\')">Канал</button>'+
+      '<div class="acts"><button class="pillbtn" id="likebtn" onclick="like(\''+v.id+'\')">&#128077; <span id="likec">'+nfmt(v.likes)+'</span></button>'+
+      (((v.nick===me)||0)?'<button class="pillbtn" onclick="delVid(\''+v.id+'\')">&#128465; Удалить</button>':'')+'</div></div>'+
+      '<div class="descbox"><div class="s">'+nfmt(v.views)+' просмотров · '+ago(v.at)+'</div>'+(v.desc?esc(v.desc):'<span style="color:#888">Без описания</span>')+'</div>'+
+      '<div class="cmts"><h3 id="ch3">Комментарии: '+((v.comments||[]).length)+'</h3>'+
+      (token?('<div class="cmtadd"><div class="ava" style="width:34px;height:34px;font-size:15px">'+ini(me)+'</div><input id="cin" placeholder="Напишите комментарий…" onkeydown="if(event.key===\'Enter\')addCmt(\''+v.id+'\')"><button class="pillbtn" onclick="addCmt(\''+v.id+'\')">Отпр.</button></div>'):'<div class="sb" style="color:#aaa;margin:10px 0"><span class="linkbtn" onclick="V(\'lm\').classList.add(\'on\')">Войдите</span>, чтобы комментировать</div>')+
+      '<div id="cmtlist">'+(v.comments||[]).slice().reverse().map(function(c){return'<div class="cmt"><div class="ava" style="width:36px;height:36px;font-size:15px">'+ini(c.user)+'</div><div class="b"><div class="n">'+esc(c.user)+'<small>'+ago(c.at)+'</small></div><div>'+esc(c.text)+'</div></div></div>'}).join("")+'</div></div>';
+    jget("/video/list").then(function(r){
+      var others=((r&&r.videos)||[]).filter(function(x){return x.id!==v.id}).slice(0,20);
+      var side='<div class="side">'+others.map(function(x){return'<div class="vcard" onclick="location.hash=\'#/watch/'+x.id+'\'">'+thumbHtml(x)+'<div><div class="t">'+esc(x.title)+'</div><div class="c">'+esc(x.user)+'</div><div class="c">'+nfmt(x.views)+' просм. · '+ago(x.at)+'</div></div></div>'}).join("")+'</div>';
+      V("view").innerHTML='<div class="watch"><div>'+left+'</div>'+side+'</div>';
+    });
+  });
+}
+function like(id){if(!token){V("lm").classList.add("on");return}jpost("/video/like",{id:id}).then(function(d){if(d.ok){V("likec").textContent=nfmt(d.likes);V("likebtn").classList.toggle("on",d.liked)}})}
+function addCmt(id){var el=V("cin");var t=(el.value||"").trim();if(!t)return;jpost("/video/comment",{id:id,text:t}).then(function(d){if(d.ok)watch(id)})}
+function delVid(id){if(!confirm("Удалить видео?"))return;jpost("/video/delete",{id:id}).then(function(d){if(d.ok)goFeed();else alert(d.error||"не вышло")})}
+
+function doLogin(){var u=V("lu").value.trim(),p=V("lp").value;V("lerr").textContent="";
+  fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})}).then(function(r){return r.json()}).then(function(d){
+    if(!d.ok){V("lerr").textContent=d.error||"не вышло";return}
+    token=d.token;me=d.nick;setCk("nv_token",token);setCk("nv_nick",me);V("lm").classList.remove("on");renderMe();route();
+  }).catch(function(){V("lerr").textContent="сервер недоступен"});}
+
+var pickedFile=null,pickedThumb="",pickedDur=0;
+function openUpload(){if(!token){V("lm").classList.add("on");return}V("um").classList.add("on")}
+function closeUpload(){V("um").classList.remove("on")}
+function pick(){var f=V("file").files[0];if(!f)return;pickedFile=f;V("drop").textContent=f.name+" ("+(f.size/1048576).toFixed(1)+" МБ)";
+  if(!V("vtitle").value)V("vtitle").value=f.name.replace(/\.[^.]+$/,"");
+  V("gobtn").disabled=false;
+  try{var url=URL.createObjectURL(f);var vd=document.createElement("video");vd.preload="metadata";vd.muted=true;vd.src=url;
+    vd.onloadedmetadata=function(){pickedDur=Math.floor(vd.duration)||0;vd.currentTime=Math.min(1,(vd.duration||2)/2)};
+    vd.onseeked=function(){try{var cv=document.createElement("canvas");cv.width=320;cv.height=180;cv.getContext("2d").drawImage(vd,0,0,320,180);pickedThumb=cv.toDataURL("image/jpeg",0.7)}catch(e){}URL.revokeObjectURL(url)};
+  }catch(e){}
+}
+function doUpload(){
+  if(!pickedFile){V("uerr").textContent="выбери файл";return}
+  var title=V("vtitle").value.trim()||pickedFile.name;var desc=V("vdesc").value.trim();
+  var mime=pickedFile.type||"video/mp4";if(!/^video\/(mp4|webm|ogg)$/.test(mime))mime="video/mp4";
+  V("gobtn").disabled=true;V("uerr").textContent="";
+  jpost("/video/create",{title:title,desc:desc,mime:mime,thumb:pickedThumb,dur:pickedDur}).then(function(d){
+    if(!d.ok){V("uerr").textContent=d.error||"не вышло";V("gobtn").disabled=false;return}
+    var id=d.id;V("bar").style.display="block";
+    var xhr=new XMLHttpRequest();xhr.open("PUT","/video/raw/"+id);xhr.setRequestHeader("x-nare-token",token);xhr.setRequestHeader("content-type",mime);
+    xhr.upload.onprogress=function(e){if(e.lengthComputable)V("barfill").style.width=(e.loaded/e.total*100)+"%"};
+    xhr.onload=function(){try{var r=JSON.parse(xhr.responseText)}catch(e){r={}}
+      if(r.ok){closeUpload();V("bar").style.display="none";V("barfill").style.width="0";pickedFile=null;V("file").value="";V("vtitle").value="";V("vdesc").value="";V("drop").textContent="Нажми и выбери видеофайл";V("gobtn").disabled=true;location.hash="#/watch/"+id}
+      else{V("uerr").textContent=r.error||"ошибка загрузки";V("gobtn").disabled=false}};
+    xhr.onerror=function(){V("uerr").textContent="сеть отвалилась";V("gobtn").disabled=false};
+    xhr.send(pickedFile);
+  });
+}
+
+function route(){var h=location.hash||"#/";
+  if(h.indexOf("#/watch/")===0){watch(h.slice(8));return}
+  if(h.indexOf("#/channel/")===0){feed(null,decodeURIComponent(h.slice(10)));return}
+  if(h.indexOf("#/search/")===0){var q=decodeURIComponent(h.slice(9));V("q").value=q;feed(q,null);return}
+  feed(null,null);
+}
+window.addEventListener("hashchange",route);
+renderMe();route();
+</script></body></html>`;
+
+function videosPage(req, res) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(VIDEOS_HTML);
+}
 
 function serverConsolePage(req, res) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -2466,6 +2683,168 @@ function chatNameClear(req, res) {
 function shotPath(id) { return path.join(SHOTS_DIR, id + '.png'); }
 
 /** Профиль игрока: статус, статистика, список скриншотов. */
+// ======================= ВИДЕО (как YouTube) =======================
+function vidPath(id) { return path.join(VIDEOS_DIR, String(id).replace(/[^0-9a-f]/gi, '') + '.bin'); }
+function vidById(id) { return policy.videos.find(v => v.id === id) || null; }
+function vidPublic(v, full) {
+    const o = {
+        id: v.id, nick: v.nick, user: v.user || v.nick, title: v.title, desc: full ? (v.desc || '') : undefined,
+        thumb: v.thumb || '', mime: v.mime || 'video/mp4', at: v.at, dur: v.dur || 0,
+        views: v.views || 0, likes: (v.likes || []).length, ready: !!v.ready
+    };
+    if (full) o.comments = (v.comments || []).map(c => ({ user: c.user, nick: c.nick, text: c.text, at: c.at }));
+    return o;
+}
+function vidsTotal() {
+    let t = 0;
+    try { for (const n of fs.readdirSync(VIDEOS_DIR)) { try { t += fs.statSync(path.join(VIDEOS_DIR, n)).size; } catch (e) {} } } catch (e) {}
+    return t;
+}
+
+function videoCreate(req, res) {
+    readJsonBodyLimit(req, SHOT_MAX, body => {
+        if (!body) return send(res, 413, { error: 'слишком большое превью' });
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const title = clean(body.title, 120) || 'Без названия';
+        const desc = clean(body.desc, 2000);
+        const mime = /^video\/(mp4|webm|ogg)$/.test(body.mime || '') ? body.mime : 'video/mp4';
+        let thumb = String(body.thumb || '');
+        if (thumb && !/^data:image\/(png|jpeg|webp);base64,/.test(thumb)) thumb = '';
+        if (thumb.length > 400 * 1024) thumb = '';
+        const a = acc(nick);
+        const v = {
+            id: crypto.randomBytes(8).toString('hex'), nick, user: a.username || nick,
+            title, desc, mime, thumb, at: now(), dur: Number(body.dur) || 0,
+            views: 0, likes: [], comments: [], ready: false
+        };
+        policy.videos.push(v);
+        if (policy.videos.length > 5000) policy.videos = policy.videos.slice(-5000);
+        savePolicy();
+        send(res, 200, { ok: true, id: v.id });
+    });
+}
+
+function videoRaw(req, res, id) {
+    const v = vidById(id);
+    if (!v) return send(res, 404, { error: 'нет такого видео' });
+    const nick = sessionNick(req.headers['x-nare-token'] || query(req).token);
+    if (!nick || nick !== v.nick) return send(res, 403, { error: 'не ваше видео' });
+    const declared = Number(req.headers['content-length']) || 0;
+    if (declared > VIDEO_FILE_MAX) return send(res, 413, { error: 'ролик больше ' + (VIDEO_FILE_MAX / 1048576) + ' МБ' });
+    if (vidsTotal() + (declared || 1) > VIDEOS_MAX) return send(res, 507, { error: 'нет места для видео' });
+    const full = vidPath(id), temp = full + '.part';
+    const out = fs.createWriteStream(temp);
+    let size = 0, bad = false;
+    const stop = (code, b) => { if (bad) return; bad = true; out.destroy(); try { fs.unlinkSync(temp); } catch (e) {} req.destroy(); send(res, code, b); };
+    req.on('data', ch => { size += ch.length; if (size > VIDEO_FILE_MAX) return stop(413, { error: 'ролик слишком большой' }); out.write(ch); });
+    req.on('error', () => stop(400, { error: 'передача прервалась' }));
+    req.on('end', () => {
+        if (bad) return;
+        out.end(() => {
+            try { fs.renameSync(temp, full); } catch (e) { return send(res, 500, { error: 'не записалось' }); }
+            v.size = size; v.ready = true; savePolicy();
+            send(res, 200, { ok: true, id, size });
+        });
+    });
+}
+
+function videoStream(req, res, id) {
+    const v = vidById(id);
+    if (!v) return send(res, 404, { error: 'нет такого видео' });
+    const full = vidPath(id);
+    let info;
+    try { info = fs.statSync(full); } catch (e) { return send(res, 404, { error: 'файл видео не готов' }); }
+    const mime = v.mime || 'video/mp4';
+    const range = req.headers.range;
+    if (range) {
+        const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+        let start = m[1] ? parseInt(m[1], 10) : 0;
+        let end = m[2] ? parseInt(m[2], 10) : info.size - 1;
+        if (isNaN(start) || start < 0) start = 0;
+        if (isNaN(end) || end >= info.size) end = info.size - 1;
+        if (start > end) { res.writeHead(416, { 'Content-Range': 'bytes */' + info.size }); return res.end(); }
+        res.writeHead(206, {
+            'Content-Type': mime, 'Accept-Ranges': 'bytes',
+            'Content-Range': 'bytes ' + start + '-' + end + '/' + info.size,
+            'Content-Length': (end - start + 1), 'Cache-Control': 'public, max-age=604800'
+        });
+        return fs.createReadStream(full, { start, end }).pipe(res);
+    }
+    res.writeHead(200, { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Length': info.size, 'Cache-Control': 'public, max-age=604800' });
+    fs.createReadStream(full).pipe(res);
+}
+
+function videoList(req, res) {
+    const q = query(req);
+    const ch = clean(q.channel, 16).toLowerCase();
+    const term = clean(q.q, 60).toLowerCase();
+    let list = policy.videos.filter(v => v.ready);
+    if (ch) list = list.filter(v => v.nick === ch);
+    if (term) list = list.filter(v => (v.title || '').toLowerCase().indexOf(term) >= 0 || (v.user || '').toLowerCase().indexOf(term) >= 0);
+    list = list.slice().sort((a, b) => b.at - a.at).slice(0, 200).map(v => vidPublic(v, false));
+    send(res, 200, { ok: true, videos: list });
+}
+
+function videoGet(req, res) {
+    const v = vidById(clean(query(req).id, 20));
+    if (!v || !v.ready) return send(res, 404, { error: 'нет такого видео' });
+    const a = accounts[v.nick] ? acc(v.nick) : null;
+    send(res, 200, { ok: true, video: vidPublic(v, true),
+        channel: { nick: v.nick, user: v.user || v.nick, subs: a ? (a.subs || [v.nick]).length : 0, status: a ? (a.status || '') : '' } });
+}
+
+function videoView(req, res) {
+    const v = vidById(clean((query(req).id) || '', 20));
+    if (v) { v.views = (v.views || 0) + 1; savePolicy(); }
+    send(res, 200, { ok: true });
+}
+
+function videoLike(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const v = vidById(clean(body.id, 20));
+        if (!v) return send(res, 404, { error: 'нет видео' });
+        v.likes = v.likes || [];
+        const i = v.likes.indexOf(nick);
+        if (i >= 0) v.likes.splice(i, 1); else v.likes.push(nick);
+        savePolicy();
+        send(res, 200, { ok: true, likes: v.likes.length, liked: i < 0 });
+    });
+}
+
+function videoComment(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const v = vidById(clean(body.id, 20));
+        if (!v) return send(res, 404, { error: 'нет видео' });
+        const text = clean(body.text, 500);
+        if (!text) return send(res, 400, { error: 'пусто' });
+        const a = acc(nick);
+        v.comments = v.comments || [];
+        v.comments.push({ nick, user: a.username || nick, text, at: now() });
+        if (v.comments.length > 1000) v.comments = v.comments.slice(-1000);
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
+function videoDelete(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const v = vidById(clean(body.id, 20));
+        if (!v) return send(res, 404, { error: 'нет видео' });
+        if (v.nick !== nick && !isAdmin(nick)) return send(res, 403, { error: 'не ваше видео' });
+        try { fs.unlinkSync(vidPath(v.id)); } catch (e) {}
+        policy.videos = policy.videos.filter(x => x.id !== v.id);
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
 function profileGet(req, res) {
     const q = query(req);
     const nick = clean(q.nick, 16);
@@ -2834,6 +3213,16 @@ const server = http.createServer((req, res) => {
     if (route === '/coins/send' && req.method === 'POST') return coinsSend(req, res);
     if (route === '/top') return coinsTop(req, res);
     if (route === '/profile/get') return profileGet(req, res);
+    if (route === '/video/create' && req.method === 'POST') return videoCreate(req, res);
+    if (route.startsWith('/video/raw/') && (req.method === 'PUT' || req.method === 'POST')) return videoRaw(req, res, clean(route.slice(11), 20));
+    if (route.startsWith('/video/stream/')) return videoStream(req, res, clean(route.slice(14), 20));
+    if (route === '/video/list') return videoList(req, res);
+    if (route === '/video/get') return videoGet(req, res);
+    if (route === '/video/view' && req.method === 'POST') return videoView(req, res);
+    if (route === '/video/like' && req.method === 'POST') return videoLike(req, res);
+    if (route === '/video/comment' && req.method === 'POST') return videoComment(req, res);
+    if (route === '/video/delete' && req.method === 'POST') return videoDelete(req, res);
+    if (route === '/videos' || route === '/video') return videosPage(req, res);
     if (route === '/profile/status' && req.method === 'POST') return profileStatus(req, res);
     if (route === '/profile/shot/add' && req.method === 'POST') return profileShotAdd(req, res);
     if (route === '/profile/shot/del' && req.method === 'POST') return profileShotDel(req, res);
