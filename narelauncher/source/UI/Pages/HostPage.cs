@@ -80,6 +80,7 @@ namespace NareLauncher.UI
         private readonly Button _tabJars = new Button();
         private readonly Button _tabProps = new Button();
         private string _view = "console";
+        private readonly Panel _tabInk = new Panel();
         private readonly CardPanel _filesPanel = new CardPanel();
         private readonly ListBox _filesList = new ListBox();
         private Button[] _filesBtns;
@@ -217,6 +218,9 @@ namespace NareLauncher.UI
             _tabFiles.Bounds = new Rectangle(m + 108, tabY, 96, 30);
             _tabJars.Bounds = new Rectangle(m + 208, tabY, 108, 30);
             _tabProps.Bounds = new Rectangle(m + 320, tabY, 172, 30);
+            var at = _view == "files" ? _tabFiles : _view == "jars" ? _tabJars : _view == "props" ? _tabProps : _tabConsole;
+            _tabInk.Bounds = new Rectangle(at.Left, at.Bottom - 1, at.Width, 3);
+            _tabInk.BringToFront();
 
             int cTop = tabY + 38, cBottom = Math.Max(cTop + 120, Height - 14);
             int cmdY = cBottom - 40;
@@ -648,6 +652,7 @@ namespace NareLauncher.UI
                 t.Cursor = Cursors.Hand;
                 Controls.Add(t);
             }
+            _tabInk.BackColor = CAccent; _tabInk.Height = 3; Controls.Add(_tabInk); _tabInk.BringToFront();
             _tabConsole.Text = "Консоль"; _tabFiles.Text = "Файлы"; _tabJars.Text = "Моды"; _tabProps.Text = "server.properties";
             _tabConsole.Click += (s, e) => ShowView("console");
             _tabFiles.Click += (s, e) => { ShowView("files"); RefreshFiles(); };
@@ -655,7 +660,9 @@ namespace NareLauncher.UI
             _tabProps.Click += (s, e) => { ShowView("props"); LoadProps(); };
 
             _filesPanel.Visible = false; Controls.Add(_filesPanel);
-            _filesList.BorderStyle = BorderStyle.None; _filesList.BackColor = CTermBg; _filesList.ForeColor = CText; _filesList.Font = new Font("Consolas", 9.5f);
+            _filesList.BorderStyle = BorderStyle.None; _filesList.BackColor = CTermBg; _filesList.ForeColor = CText; _filesList.Font = Theme.F(9.5f);
+            _filesList.DrawMode = DrawMode.OwnerDrawFixed; _filesList.ItemHeight = 26;
+            _filesList.DrawItem += DarkListDraw(_filesList);
             _filesPanel.Controls.Add(_filesList);
             _filesBtns = new[] { Mk("Открыть папку", OpenServerFolder), Mk("Обновить", RefreshFiles), Mk("Удалить", DeleteSelectedFile) };
             foreach (var b in _filesBtns) _filesPanel.Controls.Add(b);
@@ -687,6 +694,21 @@ namespace NareLauncher.UI
             b.Font = Theme.F(9f, FontStyle.Bold);
             b.Click += (s, e) => { try { act(); } catch (Exception ex) { MessageBox.Show(ex.Message); } };
             return b;
+        }
+
+        private DrawItemEventHandler DarkListDraw(ListBox lb)
+        {
+            return (s, e) =>
+            {
+                if (e.Index < 0 || e.Index >= lb.Items.Count) return;
+                bool sel = (e.State & DrawItemState.Selected) != 0;
+                using (var b = new SolidBrush(sel ? Color.FromArgb(23, 35, 63) : CTermBg)) e.Graphics.FillRectangle(b, e.Bounds);
+                string txt = lb.Items[e.Index].ToString();
+                Color fg = txt.StartsWith("[папка]") ? CAccent : (txt.StartsWith("(") ? CDim : CText);
+                TextRenderer.DrawText(e.Graphics, txt, lb.Font,
+                    new Rectangle(e.Bounds.X + 10, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height),
+                    fg, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            };
         }
 
         private void ShowView(string v)

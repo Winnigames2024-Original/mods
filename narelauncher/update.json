@@ -1,8 +1,8 @@
 {
-  "version": "1.63",
+  "version": "1.64",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "a1c4aeb0625813448495d5dd4ef27b567598d30c",
-  "size": 808448,
-  "notes": "Фикс «мир занят другим процессом» (DirectoryLock): перед запуском убивается зависший сервер прошлого запуска по PID-файлу. Сервер снова стартует."
+  "sha1": "ababf543026c3b897528609d75c7a58ec93d5b9e",
+  "size": 809472,
+  "notes": "Полировка «Мои серверы»: под-вкладки с подчёркиванием активной, список файлов в тёмной теме (не белый системный list)."
 }
