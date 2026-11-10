@@ -1,12 +1,12 @@
 {
-  "version": "1.74",
+  "version": "1.75",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "98f85bd6579c56c04174778d08f2e9375f084780",
+  "sha1": "026f6dc6b23f3bb044dc7c215469258dfabae2bd",
   "size": 838144,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "734cc94ffdf6a4bcb07b8876dbe3851fee83082a",
-  "smSize": 71168,
-  "notes": "Сервер запускается в отдельном ServerManager.exe. update.exe держит его рядом с лаунчером свежим; если его нет — лаунчер докачает сам при первом запуске сервера."
+  "smSha1": "f0befa5287a8e3d77118b081de179ec13451b28d",
+  "smSize": 73728,
+  "notes": "Системные уведомления Windows (вход/выход игроков, запуск/стоп) вместо внутри-оконных; ServerManager.exe сворачивается в трей и работает в фоне; починены карточки плагинов."
 }

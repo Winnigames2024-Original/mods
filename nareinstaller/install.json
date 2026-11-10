@@ -1,8 +1,8 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "file": "NareInstaller.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/nareinstaller/NareInstaller.exe",
-  "sha1": "c1751214dff4845f0e67896756adc4da450da4b1",
+  "sha1": "8cdcfe5b325dd0127d665fe7568552f141087630",
   "size": 899072,
-  "notes": "ставит лаунчер 1.74 + ServerManager.exe рядом + update.exe (update.exe держит ServerManager.exe свежим при каждом запуске)"
+  "notes": "ставит лаунчер 1.75 + ServerManager.exe рядом + update.exe"
 }
