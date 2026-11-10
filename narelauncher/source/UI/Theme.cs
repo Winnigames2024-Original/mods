@@ -10,7 +10,8 @@ namespace NareLauncher.UI
     public enum Ico
     {
         Play, Versions, Mods, Account, Settings, Console,
-        Minimize, Close, Folder, Download, Trash, Refresh, Search, Plus, Check, Arrow, Stop, Skin
+        Minimize, Close, Folder, Download, Trash, Refresh, Search, Plus, Check, Arrow, Stop, Skin,
+        Video, Chat, Server, Users
     }
 
     public static class Theme
@@ -159,6 +160,60 @@ namespace NareLauncher.UI
                                 new PointF(x + w * 0.26f, y + h * 0.84f)
                             };
                             g.FillPolygon(brush, pts);
+                            break;
+                        }
+
+                    case Ico.Video:
+                        {
+                            g.DrawRectangle(pen, x + w * 0.12f, y + h * 0.26f, w * 0.60f, h * 0.48f);
+                            var pts2 = new[]
+                            {
+                                new PointF(x + w * 0.74f, y + h * 0.36f),
+                                new PointF(x + w * 0.90f, y + h * 0.26f),
+                                new PointF(x + w * 0.90f, y + h * 0.74f),
+                                new PointF(x + w * 0.74f, y + h * 0.64f)
+                            };
+                            g.DrawPolygon(pen, pts2);
+                            var play = new[]
+                            {
+                                new PointF(x + w * 0.30f, y + h * 0.38f),
+                                new PointF(x + w * 0.52f, cy),
+                                new PointF(x + w * 0.30f, y + h * 0.62f)
+                            };
+                            g.FillPolygon(brush, play);
+                            break;
+                        }
+
+                    case Ico.Chat:
+                        {
+                            var path = new GraphicsPath();
+                            path.AddArc(x + w * 0.12f, y + h * 0.16f, w * 0.20f, h * 0.20f, 180, 90);
+                            path.AddArc(x + w * 0.68f, y + h * 0.16f, w * 0.20f, h * 0.20f, 270, 90);
+                            path.AddArc(x + w * 0.68f, y + h * 0.42f, w * 0.20f, h * 0.20f, 0, 90);
+                            path.AddLine(x + w * 0.40f, y + h * 0.62f, x + w * 0.40f, y + h * 0.80f);
+                            path.AddLine(x + w * 0.40f, y + h * 0.80f, x + w * 0.26f, y + h * 0.62f);
+                            path.AddArc(x + w * 0.12f, y + h * 0.42f, w * 0.20f, h * 0.20f, 90, 90);
+                            path.CloseFigure();
+                            g.DrawPath(pen, path);
+                            path.Dispose();
+                            break;
+                        }
+
+                    case Ico.Server:
+                        {
+                            g.DrawRectangle(pen, x + w * 0.16f, y + h * 0.20f, w * 0.68f, h * 0.24f);
+                            g.DrawRectangle(pen, x + w * 0.16f, y + h * 0.54f, w * 0.68f, h * 0.24f);
+                            g.FillEllipse(brush, x + w * 0.24f, y + h * 0.29f, w * 0.07f, h * 0.07f);
+                            g.FillEllipse(brush, x + w * 0.24f, y + h * 0.63f, w * 0.07f, h * 0.07f);
+                            break;
+                        }
+
+                    case Ico.Users:
+                        {
+                            g.DrawEllipse(pen, x + w * 0.30f, y + h * 0.14f, w * 0.30f, h * 0.30f);
+                            g.DrawArc(pen, x + w * 0.18f, y + h * 0.50f, w * 0.54f, h * 0.52f, 200, 140);
+                            g.DrawArc(pen, x + w * 0.58f, y + h * 0.20f, w * 0.26f, h * 0.26f, 300, 180);
+                            g.DrawArc(pen, x + w * 0.58f, y + h * 0.52f, w * 0.34f, h * 0.44f, 250, 110);
                             break;
                         }
                     case Ico.Stop:
