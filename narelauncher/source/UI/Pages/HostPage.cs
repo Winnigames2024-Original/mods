@@ -46,8 +46,8 @@ namespace NareLauncher.UI
         private Entry _sel;
 
         private readonly ComboBox _list = new ComboBox();
-        private readonly Button _create = new Button();
-        private readonly Button _dl = new Button();
+        private readonly RoundBtn _create = new RoundBtn();
+        private readonly RoundBtn _dl = new RoundBtn();
 
         private readonly CardPanel _hdr = new CardPanel();
         private readonly Label _srvName = new Label();
@@ -60,9 +60,9 @@ namespace NareLauncher.UI
         private readonly CardPanel _plCard = new CardPanel();
         private Label _cpuVal, _memVal, _upVal, _plVal;
 
-        private readonly Button _start = new Button();
-        private readonly Button _restart = new Button();
-        private readonly Button _stop = new Button();
+        private readonly RoundBtn _start = new RoundBtn();
+        private readonly RoundBtn _restart = new RoundBtn();
+        private readonly RoundBtn _stop = new RoundBtn();
 
         private readonly CardPanel _termCard = new CardPanel();
         private readonly Label _termBar = new Label();
@@ -70,7 +70,7 @@ namespace NareLauncher.UI
 
         private readonly CardPanel _cmdCard = new CardPanel();
         private readonly TextBox _cmd = new TextBox();
-        private readonly Button _send = new Button();
+        private readonly RoundBtn _send = new RoundBtn();
 
         private readonly Timer _stats = new Timer();
 
@@ -112,7 +112,7 @@ namespace NareLauncher.UI
             _list.SelectedIndexChanged += (s, e) => SelectIndex(_list.SelectedIndex);
             Controls.Add(_list);
 
-            StyleBtn(_create, "Создать сервер", CCard, CAccent, CAccent);
+            StyleBtn(_create, "Создать сервер", Color.FromArgb(27, 44, 82), Color.FromArgb(157, 180, 255), Color.FromArgb(40, 64, 116));
             _create.Bounds = new Rectangle(336, 73, 160, 30);
             _create.Click += (s, e) => CreateServer();
             Controls.Add(_create);
@@ -144,13 +144,13 @@ namespace NareLauncher.UI
             Controls.Add(_cpuCard); Controls.Add(_memCard); Controls.Add(_upCard); Controls.Add(_plCard);
 
             // кнопки питания
-            StyleBtn(_start, "▶  Запустить", CCard, CGreen, CBorder);
+            StyleBtn(_start, "▶  Запустить", Color.FromArgb(17, 54, 32), Color.FromArgb(120, 230, 160), Color.FromArgb(28, 92, 53));
             _start.Click += (s, e) => StartSel();
             Controls.Add(_start);
-            StyleBtn(_restart, "↻  Рестарт", CCard, CAmber, CBorder);
+            StyleBtn(_restart, "↻  Рестарт", Color.FromArgb(54, 45, 17), Color.FromArgb(240, 210, 120), Color.FromArgb(92, 76, 28));
             _restart.Click += (s, e) => RestartSel();
             Controls.Add(_restart);
-            StyleBtn(_stop, "⏻  Остановить", CCard, CRed, Color.FromArgb(92, 31, 36));
+            StyleBtn(_stop, "⏻  Остановить", Color.FromArgb(54, 20, 23), Color.FromArgb(255, 140, 150), Color.FromArgb(92, 31, 36));
             _stop.Click += (s, e) => StopSel();
             Controls.Add(_stop);
 
@@ -623,6 +623,7 @@ namespace NareLauncher.UI
             b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(bg, 0.15f);
             b.BackColor = bg; b.ForeColor = fg;
             b.Font = Theme.F(10f, FontStyle.Bold); b.Cursor = Cursors.Hand;
+            var rb = b as RoundBtn; if (rb != null) rb.Border = border;
         }
 
         private Label StatCard(CardPanel card, string caption)
@@ -689,7 +690,7 @@ namespace NareLauncher.UI
 
         private Button Mk(string text, Action act)
         {
-            var b = new Button();
+            var b = new RoundBtn();
             StyleBtn(b, text, CCard, CText, CBorder);
             b.Font = Theme.F(9f, FontStyle.Bold);
             b.Click += (s, e) => { try { act(); } catch (Exception ex) { MessageBox.Show(ex.Message); } };
@@ -983,6 +984,34 @@ namespace NareLauncher.UI
             gp.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
             gp.CloseFigure();
             return gp;
+        }
+
+        private class RoundBtn : Button
+        {
+            public int Radius = 10;
+            public Color Border = Color.Transparent;
+            private bool _hover;
+            public RoundBtn()
+            {
+                FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0;
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+                MouseEnter += (s, e) => { _hover = true; Invalidate(); };
+                MouseLeave += (s, e) => { _hover = false; Invalidate(); };
+            }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+                Color bg = !Enabled ? Color.FromArgb(22, 26, 36) : (_hover ? ControlPaint.Light(BackColor, 0.14f) : BackColor);
+                var r = new Rectangle(0, 0, Width - 1, Height - 1);
+                using (var gp = Round(r, Radius))
+                {
+                    using (var b = new SolidBrush(bg)) g.FillPath(b, gp);
+                    if (Border.A > 0) using (var p = new Pen(Border)) g.DrawPath(p, gp);
+                }
+                Color fg = Enabled ? ForeColor : Color.FromArgb(110, 118, 136);
+                TextRenderer.DrawText(g, Text, Font, ClientRectangle, fg,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
         }
 
         private class CardPanel : Panel

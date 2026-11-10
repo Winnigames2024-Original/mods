@@ -1,8 +1,8 @@
 {
-  "version": "1.64",
+  "version": "1.65",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "ababf543026c3b897528609d75c7a58ec93d5b9e",
-  "size": 809472,
-  "notes": "Полировка «Мои серверы»: под-вкладки с подчёркиванием активной, список файлов в тёмной теме (не белый системный list)."
+  "sha1": "0df7fb971084a5695190b7d9e6c1215f4b59a162",
+  "size": 810496,
+  "notes": "Основные кнопки в «Мои серверы» (Запустить/Рестарт/Остановить/Создать/Скачать jar/Ввод) — скруглённые, с заливкой и ховером."
 }
