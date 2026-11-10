@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.44';
+const VERSION = '1.45';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3356,18 +3356,20 @@ const CLICK_OFFLINE_CAP = 12 * 3600; // не больше 12 часов пасс
 
 // Старт как «кликер 67»: +67 за клик, полная выносливость под это.
 function clickerState(a) {
-    if (!a.clk) a.clk = { click: 67, auto: 0, energyMax: 6700, energy: 6700, regen: 20, last: now() };
+    if (!a.clk) a.clk = { click: 67, auto: 0, energyMax: 6700, energy: 6700, regen: 10, last: now() };
     const c = a.clk;
     if (c.energyMax == null) c.energyMax = 6700;
     if (c.energy == null) c.energy = c.energyMax;
-    if (c.regen == null) c.regen = 20;
+    if (c.regen == null) c.regen = 10;
     if (c.last == null) c.last = now();
     return c;
 }
-function clickerPriceClick(c)  { return 20 * c.click; }
-function clickerPriceAuto(c)   { return 50 * (c.auto + 1); }
-function clickerPriceEnergy(c) { return Math.round(30 * (c.energyMax / 100)); }
-function clickerPriceRegen(c)  { return Math.round(40 * (c.regen / 5)); }
+// Цены пропорциональны текущему значению: прокачка удваивает значение —
+// значит и цена сама удваивается с каждым уровнем.
+function clickerPriceClick(c)  { return 10 * c.click; }
+function clickerPriceAuto(c)   { return c.auto <= 0 ? 50 : 100 * c.auto; }
+function clickerPriceEnergy(c) { return Math.round(c.energyMax / 2); }
+function clickerPriceRegen(c)  { return 30 * c.regen; }
 
 function clickerAccrue(a) {
     const c = clickerState(a);
@@ -3424,10 +3426,11 @@ function clickerUpgrade(req, res) {
         if (!price) return send(res, 400, { error: 'что качаем?' });
         if ((a.coins || 0) < price) return send(res, 402, { error: 'нужно ' + price + ' монет' });
         a.coins -= price;
-        if (what === 'click') c.click++;
-        else if (what === 'auto') c.auto++;
-        else if (what === 'energy') { c.energyMax += 1000; c.energy += 1000; }
-        else if (what === 'regen') c.regen += 5;
+        // всё удваивается: и значение, и (через цену-пропорцию) следующая цена
+        if (what === 'click') c.click *= 2;
+        else if (what === 'auto') c.auto = c.auto <= 0 ? 1 : c.auto * 2;
+        else if (what === 'energy') { const add = c.energyMax; c.energyMax *= 2; c.energy += add; }
+        else if (what === 'regen') c.regen *= 2;
         saveAccounts();
         send(res, 200, clickerPayload(a, c));
     });
