@@ -209,16 +209,26 @@ namespace NareLauncher.UI
             try
             {
                 var entry = _sel;
-                entry.Mgr = new ServerManager(entry.Folder, entry.Port);
-                entry.Mgr.OnLine = s => Ui(() => Append(s));
-                entry.Mgr.OnExit = () => Ui(() => { Append("Сервер остановлен."); StopHost(entry); });
-                entry.Mgr.Start();
-
                 entry.Host = new NareHost(Nick + "-" + entry.Id, entry.Port);
                 entry.Host.OnLog = s => Ui(() => Append("[тоннель] " + s));
+                entry.Host.OnCommand = s => Ui(() =>
+                {
+                    // команда из веб-консоли — выполняем в stdin сервера
+                    if (entry.Mgr != null && entry.Mgr.Running) { entry.Mgr.Send(s); Append("[web] > " + s); }
+                });
+
+                entry.Mgr = new ServerManager(entry.Folder, entry.Port);
+                entry.Mgr.OnLine = s =>
+                {
+                    Ui(() => Append(s));
+                    if (entry.Host != null) entry.Host.PushLog(s);   // в веб-консоль
+                };
+                entry.Mgr.OnExit = () => Ui(() => { Append("Сервер остановлен."); StopHost(entry); });
+                entry.Mgr.Start();
                 entry.Host.Start();
 
                 Append("Запуск... адрес: " + Nick + "-" + entry.Id + "." + DOMAIN);
+                Append("Веб-консоль: http://" + DOMAIN + "/server?name=" + Nick + "-" + entry.Id);
             }
             catch (Exception ex) { Append("Ошибка запуска: " + ex.Message); }
         }

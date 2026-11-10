@@ -47,7 +47,7 @@ const SHOT_MAX = 1536 * 1024;         // json со скриншотом (base64)
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.30';
+const VERSION = '1.31';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -484,6 +484,8 @@ const policy = loadJson(POLICY_FILE, {
     broadcast: null,                            // { text, at }
     commands: [],                               // очередь команд серверу (плагин WMine)
     worldCommands: {},                          // nick хоста -> [команды] для его мира «Вместе» (без плагина)
+    srvLog: {},                                 // имя сервера -> [строки лога] (кольцо)
+    srvCmd: {},                                 // имя сервера -> [команды в stdin от веб-консоли]
     appeals: [],                                // [ { nick, text, at } ]
     servers: [],                                // рекламные серверы на модерации/одобренные
     chats: {},                                  // nick -> [ { from, text, at } ]: переписка
@@ -496,6 +498,8 @@ const policy = loadJson(POLICY_FILE, {
 if (!policy.chats) policy.chats = {};
 if (!policy.updateTargets) policy.updateTargets = {};
 if (!policy.worldCommands) policy.worldCommands = {};
+if (!policy.srvLog) policy.srvLog = {};
+if (!policy.srvCmd) policy.srvCmd = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -1228,6 +1232,88 @@ show();
 </script>
 </div></body></html>`;
 
+const SERVER_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Консоль сервера — NareLauncher</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Roboto,system-ui,sans-serif;background:#0b0e14;color:#e7eaf2}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+.brand{font-size:20px;font-weight:800}.brand span{color:#5b8cff}.muted{color:#8b93a7;font-size:13px}
+.card{background:#141926;border:1px solid #232a3a;border-radius:14px;padding:16px;margin:12px 0}
+input{background:#0b0e14;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:10px 12px;font-size:14px;width:100%}
+button{background:#1d2535;border:1px solid #2a3144;color:#e7eaf2;border-radius:9px;padding:9px 14px;cursor:pointer}
+button.pri{background:#2f52d8;border-color:#2f52d8}button:hover{border-color:#5b8cff}
+.row{display:flex;gap:10px;align-items:center}
+.console{background:#06080d;border:1px solid #1c2230;border-radius:10px;padding:12px;height:420px;overflow:auto;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.5;color:#aeb9cc;white-space:pre-wrap;word-break:break-word}
+.prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
+.prompt .c{color:#6fe39a;font-family:monospace;font-weight:700}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#56d364;margin-right:6px}.dot.off{background:#596173}
+#lerr,#err{color:#ff8a98;font-size:13px}
+</style></head><body><div class="wrap">
+<div class="brand">Nare<span>Launcher</span> — консоль сервера</div>
+<div id="name" class="muted"></div>
+
+<div id="login" class="card" style="max-width:360px">
+  <div class="muted" style="margin-bottom:8px">Вход владельца сервера</div>
+  <input id="u" placeholder="ник"><div style="height:8px"></div>
+  <input id="p" type="password" placeholder="пароль"><div style="height:10px"></div>
+  <button class="pri" onclick="login()">Войти</button>
+  <div id="lerr" style="margin-top:8px"></div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><span id="dot" class="dot off"></span><b id="srv"></b></div>
+      <button onclick="logout()">Выйти</button>
+    </div>
+    <div id="err"></div>
+    <div class="console" id="console" style="margin-top:10px"></div>
+    <div class="prompt"><span class="c">&gt;</span>
+      <input id="cmd" placeholder="команда серверу (напр. say привет, op ник, stop)" onkeydown="if(event.key==='Enter')sendCmd()">
+      <button class="pri" onclick="sendCmd()">Ввод</button></div>
+  </div>
+</div>
+<script>
+function qs(k){var m=new RegExp("[?&]"+k+"=([^&]*)").exec(location.search);return m?decodeURIComponent(m[1]):"";}
+var name=qs("name"), token=sessionStorage.getItem("srv_"+name)||"";
+document.getElementById("name").textContent=name?("Сервер: "+name):"";
+document.getElementById("srv")&&(document.getElementById("srv").textContent=name);
+function api(path,body){body=body||{};body.token=token;body.name=name;
+  return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}
+function login(){var u=document.getElementById("u").value.trim(),p=document.getElementById("p").value;
+  document.getElementById("lerr").textContent="";
+  fetch("/account/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nick:u,password:p})})
+   .then(function(r){return r.json()}).then(function(d){
+     if(!d.ok){document.getElementById("lerr").textContent=d.error||"не вышло";return;}
+     token=d.token;sessionStorage.setItem("srv_"+name,token);show();
+   }).catch(function(){document.getElementById("lerr").textContent="сервер недоступен";});}
+function logout(){token="";sessionStorage.removeItem("srv_"+name);show();}
+var timer=null;
+function show(){var on=token.length>0;
+  document.getElementById("login").style.display=on?"none":"block";
+  document.getElementById("app").style.display=on?"block":"none";
+  if(on){document.getElementById("srv").textContent=name;poll();if(timer)clearInterval(timer);timer=setInterval(poll,2000);}
+  else if(timer){clearInterval(timer);timer=null;}}
+function poll(){api("/server/weblog",{}).then(function(d){
+  if(!d.ok){document.getElementById("err").textContent=d.error||"нет доступа";if(d.error)logout();return;}
+  document.getElementById("err").textContent="";
+  document.getElementById("dot").className="dot"+(d.online?"":" off");
+  var c=document.getElementById("console");var atBottom=c.scrollHeight-c.scrollTop-c.clientHeight<40;
+  c.innerHTML=(d.lines||[]).map(function(l){return esc(l);}).join("<br>");
+  if(atBottom)c.scrollTop=c.scrollHeight;
+}).catch(function(){});}
+function sendCmd(){var t=document.getElementById("cmd").value.trim();if(!t)return;
+  api("/server/webcmd",{text:t}).then(function(d){document.getElementById("cmd").value="";if(!d.ok)document.getElementById("err").textContent=d.error||"ошибка";});}
+show();
+</script></div></body></html>`;
+
+function serverConsolePage(req, res) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(SERVER_HTML);
+}
+
 function appPage(req, res) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(APP_HTML);
@@ -1568,6 +1654,68 @@ function resolveName(req, res) {
         }
     }
     send(res, 404, { error: 'мир не найден или закрыт' });
+}
+
+/** Лаунчер шлёт строки консоли своего сервера (авторизация — токеном комнаты). */
+function serverPush(req, res) {
+    readJsonBody(req, body => {
+        const room = body && body.token ? rooms.get(body.token) : null;
+        if (!room) return send(res, 403, { error: 'нет комнаты' });
+        const name = room.nick;
+        if (!policy.srvLog[name]) policy.srvLog[name] = [];
+        const lines = Array.isArray(body.lines) ? body.lines : [];
+        for (const l of lines) policy.srvLog[name].push(String(l).slice(0, 500));
+        if (policy.srvLog[name].length > 400) policy.srvLog[name] = policy.srvLog[name].slice(-400);
+        send(res, 200, { ok: true });
+    });
+}
+
+/** Лаунчер забирает команды из веб-консоли для своего сервера. */
+function serverPull(req, res) {
+    readJsonBody(req, body => {
+        const room = body && body.token ? rooms.get(body.token) : null;
+        if (!room) return send(res, 403, { error: 'нет комнаты' });
+        const name = room.nick;
+        const out = policy.srvCmd[name] || [];
+        if (out.length) { policy.srvCmd[name] = []; }
+        send(res, 200, { commands: out });
+    });
+}
+
+function srvOwner(token, name) {
+    const nick = sessionNick(token);
+    if (!nick) return false;
+    const n = String(name || '').toLowerCase();
+    return n === nick.toLowerCase() || n.startsWith(nick.toLowerCase() + '-') || nick === ADMIN;
+}
+
+/** Веб-консоль: владелец читает лог своего сервера. */
+function serverWebLog(req, res) {
+    readJsonBody(req, body => {
+        const name = clean(body.name, 48);
+        if (!srvOwner(body.token, name)) return send(res, 403, { error: 'не ваш сервер' });
+        send(res, 200, { ok: true, lines: policy.srvLog[name] || [], online: !!(rooms2byNick(name)) });
+    });
+}
+
+/** Веб-консоль: владелец шлёт команду в stdin сервера. */
+function serverWebCmd(req, res) {
+    readJsonBody(req, body => {
+        const name = clean(body.name, 48);
+        const text = clean(body.text, 300);
+        if (!srvOwner(body.token, name)) return send(res, 403, { error: 'не ваш сервер' });
+        if (!text) return send(res, 400, { error: 'пусто' });
+        if (!policy.srvCmd[name]) policy.srvCmd[name] = [];
+        policy.srvCmd[name].push(text);
+        if (policy.srvCmd[name].length > 100) policy.srvCmd[name].shift();
+        send(res, 200, { ok: true });
+    });
+}
+
+function rooms2byNick(name) {
+    const low = String(name || '').toLowerCase();
+    for (const r of rooms.values()) if ((r.nick || '').toLowerCase() === low && now() - r.seen < ROOM_LIFE) return r;
+    return null;
 }
 
 /** Мод-хост забирает команды для своего мира «Вместе». Авторизация — токеном комнаты. */
@@ -2483,6 +2631,11 @@ const server = http.createServer((req, res) => {
     if (route === '/commands') return serverCommands(req, res);
     if (route === '/admin/worldcommand' && req.method === 'POST') return adminWorldCommand(req, res);
     if (route === '/world/commands' && req.method === 'POST') return worldCommandsPull(req, res);
+    if (route === '/server/push' && req.method === 'POST') return serverPush(req, res);
+    if (route === '/server/pull' && req.method === 'POST') return serverPull(req, res);
+    if (route === '/server/weblog' && req.method === 'POST') return serverWebLog(req, res);
+    if (route === '/server/webcmd' && req.method === 'POST') return serverWebCmd(req, res);
+    if (route === '/server') return serverConsolePage(req, res);
     if (route === '/resolve') return resolveName(req, res);
 
     // реклама серверов и монеты

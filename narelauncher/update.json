@@ -1,8 +1,8 @@
 {
-  "version": "1.49",
+  "version": "1.50",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "539606ea2b481752fd975be4ef35b967083e1ad8",
-  "size": 752640,
-  "notes": "Исправлен вылет при старте (вкладка «Мои серверы»). Кнопка «Скачать jar» — сервер качается сам: Paper или ванила по версии"
+  "sha1": "32aa31ca5e80d1fd4e19bad8b6a42bbb54124217",
+  "size": 754176,
+  "notes": "Веб-консоль серверов: лаунчер гонит консоль сервера в веб и выполняет команды из веб-консоли (console*.narelauncher через сайт)"
 }

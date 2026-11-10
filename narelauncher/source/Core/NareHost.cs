@@ -25,6 +25,20 @@ namespace NareLauncher.Core
         public int PublicPort { get { return _publicPort; } }
         public bool Online { get { return _token.Length > 0 && _publicPort > 0; } }
         public Action<string> OnLog;
+        public Action<string> OnCommand;     // команда из веб-консоли -> в stdin сервера
+
+        private readonly System.Collections.Generic.List<string> _logBuf = new System.Collections.Generic.List<string>();
+        private readonly object _logLock = new object();
+
+        /// <summary>Строка консоли сервера для веб-консоли (буферизуется и улетает пачкой).</summary>
+        public void PushLog(string line)
+        {
+            lock (_logLock)
+            {
+                _logBuf.Add(line);
+                if (_logBuf.Count > 300) _logBuf.RemoveRange(0, _logBuf.Count - 300);
+            }
+        }
 
         public NareHost(string name, int localPort)
         {
@@ -46,6 +60,55 @@ namespace NareLauncher.Core
             _stop = false;
             new Thread(BeatLoop) { IsBackground = true, Name = "narehost-beat" }.Start();
             new Thread(ControlLoop) { IsBackground = true, Name = "narehost-control" }.Start();
+            new Thread(RelayLoop) { IsBackground = true, Name = "narehost-relay" }.Start();
+        }
+
+        // Гонит консоль сервера в веб и тащит команды из веб-консоли обратно в stdin.
+        private void RelayLoop()
+        {
+            while (!_stop)
+            {
+                try
+                {
+                    if (_token.Length > 0)
+                    {
+                        string[] batch = null;
+                        lock (_logLock)
+                        {
+                            if (_logBuf.Count > 0) { batch = _logBuf.ToArray(); _logBuf.Clear(); }
+                        }
+                        if (batch != null && batch.Length > 0)
+                        {
+                            var sb = new StringBuilder("{\"token\":\"").Append(Esc(_token)).Append("\",\"lines\":[");
+                            for (int i = 0; i < batch.Length; i++)
+                            {
+                                if (i > 0) sb.Append(',');
+                                sb.Append('"').Append(JsonStr(batch[i])).Append('"');
+                            }
+                            sb.Append("]}");
+                            try { HttpPost("/server/push", sb.ToString()); } catch { }
+                        }
+
+                        try
+                        {
+                            string resp = HttpPost("/server/pull", "{\"token\":\"" + Esc(_token) + "\"}");
+                            if (resp != null)
+                            {
+                                var j = Json.Parse(resp);
+                                foreach (var c in j["commands"].Items)
+                                {
+                                    string cmd = c.AsString("");
+                                    var h = OnCommand;
+                                    if (h != null && cmd.Length > 0) h(cmd);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+                for (int i = 0; i < 15 && !_stop; i++) Thread.Sleep(100);   // ~1.5с
+            }
         }
 
         public void Stop()
@@ -165,6 +228,23 @@ namespace NareLauncher.Core
         }
 
         private static string Esc(string s) { return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""); }
+
+        private static string JsonStr(string s)
+        {
+            s = s ?? "";
+            var sb = new StringBuilder(s.Length + 8);
+            foreach (char c in s)
+            {
+                if (c == '\\') sb.Append("\\\\");
+                else if (c == '"') sb.Append("\\\"");
+                else if (c == '\n') sb.Append("\\n");
+                else if (c == '\r') sb.Append("\\r");
+                else if (c == '\t') sb.Append("\\t");
+                else if (c < 0x20) sb.Append(' ');
+                else sb.Append(c);
+            }
+            return sb.ToString();
+        }
 
         private static string HttpPost(string route, string body)
         {
