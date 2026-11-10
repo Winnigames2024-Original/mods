@@ -141,24 +141,23 @@ namespace NareLauncher.Core
 
         private static string PaperUrl(string version, Action<string> log)
         {
-            string buildsJson = Get("https://api.papermc.io/v2/projects/paper/versions/" + version + "/builds");
-            var root = Json.Parse(buildsJson);
-            var builds = root["builds"];
-            long best = -1;
-            string file = null;
-            foreach (var b in builds.Items)
+            // Новый Fill API v3 (старый v2 отключён — отдаёт 410).
+            string json = Get("https://fill.papermc.io/v3/projects/paper/versions/" + version + "/builds");
+            var root = Json.Parse(json);   // массив билдов, новейшие сверху
+            long best = -1, bestAny = -1;
+            string url = null, urlAny = null;
+            foreach (var b in root.Items)
             {
-                long num = b["build"].AsLong(0);
-                if (num >= best)
-                {
-                    best = num;
-                    file = b["downloads"]["application"]["name"].AsString("");
-                }
+                long id = b["id"].AsLong(0);
+                string dl = b["downloads"]["server:default"]["url"].AsString("");
+                if (string.IsNullOrEmpty(dl)) continue;
+                if (id > bestAny) { bestAny = id; urlAny = dl; }
+                if (b["channel"].AsString("") == "STABLE" && id > best) { best = id; url = dl; }
             }
-            if (best < 0 || string.IsNullOrEmpty(file)) return null;
+            if (string.IsNullOrEmpty(url)) { url = urlAny; best = bestAny; }
+            if (string.IsNullOrEmpty(url)) return null;
             if (log != null) log("Paper " + version + ", сборка " + best);
-            return "https://api.papermc.io/v2/projects/paper/versions/" + version +
-                   "/builds/" + best + "/downloads/" + file;
+            return url;
         }
 
         private static string VanillaUrl(string version, Action<string> log)
