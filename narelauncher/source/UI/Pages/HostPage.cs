@@ -86,6 +86,8 @@ namespace NareLauncher.UI
         private readonly CardPanel _jarsPanel = new CardPanel();
         private readonly ListBox _jarsList = new ListBox();
         private readonly Label _jarsTitle = new Label();
+        private readonly TextBox _jarsSearch = new TextBox();
+        private List<ModProject> _catalog = new List<ModProject>();
         private Button[] _jarsBtns;
         private readonly CardPanel _propsPanel = new CardPanel();
         private readonly TextBox _propsText = new TextBox();
@@ -661,9 +663,13 @@ namespace NareLauncher.UI
             _jarsPanel.Visible = false; Controls.Add(_jarsPanel);
             _jarsTitle.AutoSize = false; _jarsTitle.BackColor = Color.Transparent; _jarsTitle.ForeColor = CDim; _jarsTitle.Font = Theme.F(9f);
             _jarsPanel.Controls.Add(_jarsTitle);
+            _jarsSearch.BorderStyle = BorderStyle.FixedSingle; _jarsSearch.BackColor = Color.FromArgb(18, 18, 18); _jarsSearch.ForeColor = CText; _jarsSearch.Font = Theme.F(10f);
+            _jarsSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SearchCatalog(); } };
+            _jarsPanel.Controls.Add(_jarsSearch);
             _jarsList.BorderStyle = BorderStyle.None; _jarsList.BackColor = CTermBg; _jarsList.ForeColor = CText; _jarsList.Font = new Font("Consolas", 9.5f);
+            _jarsList.DoubleClick += (s, e) => InstallSelected();
             _jarsPanel.Controls.Add(_jarsList);
-            _jarsBtns = new[] { Mk("Добавить", AddJar), Mk("Удалить", DeleteJar), Mk("Папка", OpenJarsFolder) };
+            _jarsBtns = new[] { Mk("Искать", SearchCatalog), Mk("Установить", InstallSelected), Mk("Папка", OpenJarsFolder), Mk("На сайте", OpenOnSite) };
             foreach (var b in _jarsBtns) _jarsPanel.Controls.Add(b);
 
             _propsPanel.Visible = false; Controls.Add(_propsPanel);
@@ -705,9 +711,10 @@ namespace NareLauncher.UI
         private void LayoutJars()
         {
             int w = _jarsPanel.Width, x = 12;
-            _jarsTitle.Bounds = new Rectangle(12, 12, w - 24, 18);
-            if (_jarsBtns != null) foreach (var b in _jarsBtns) { b.Bounds = new Rectangle(x, 36, 110, 28); x += 118; }
-            _jarsList.Bounds = new Rectangle(12, 72, w - 24, Math.Max(40, _jarsPanel.Height - 84));
+            _jarsTitle.Bounds = new Rectangle(12, 10, w - 24, 18);
+            _jarsSearch.Bounds = new Rectangle(12, 32, w - 24, 28);
+            if (_jarsBtns != null) foreach (var b in _jarsBtns) { b.Bounds = new Rectangle(x, 66, 118, 28); x += 126; }
+            _jarsList.Bounds = new Rectangle(12, 102, w - 24, Math.Max(40, _jarsPanel.Height - 114));
         }
         private void LayoutProps()
         {
@@ -791,44 +798,76 @@ namespace NareLauncher.UI
         private void RefreshJars()
         {
             UpdateJarsLabel();
-            _jarsList.Items.Clear();
-            if (_sel == null) { _jarsList.Items.Add("(выбери сервер)"); return; }
-            try
-            {
-                string sub = Path.Combine(_sel.Folder, JarsSub());
-                Directory.CreateDirectory(sub);
-                foreach (var f in Directory.GetFiles(sub, "*.jar")) _jarsList.Items.Add(Path.GetFileName(f));
-                if (_jarsList.Items.Count == 0) _jarsList.Items.Add("(пусто — нажми «Добавить»)");
-            }
-            catch (Exception ex) { _jarsList.Items.Add("ошибка: " + ex.Message); }
+            SearchCatalog();
         }
-        private void AddJar()
+
+        private void SearchCatalog()
+        {
+            if (_sel == null) { _jarsList.Items.Clear(); _jarsList.Items.Add("(выбери сервер)"); return; }
+            bool plugins = JarsSub() == "plugins";
+            string core = CoreOf(_sel);
+            string type = plugins ? "plugin" : "mod";
+            string cat = plugins ? "paper" : (core == "fabric" ? "fabric" : (core == "forge" ? "forge" : ""));
+            string ver = ReadMeta(_sel.Folder)[1];
+            string q = (_jarsSearch.Text ?? "").Trim();
+            _jarsTitle.Text = (plugins ? "Плагины для Paper" : "Моды для " + (cat == "" ? "сервера" : cat))
+                            + (ver.Length > 0 ? "  ·  версия " + ver : "  ·  любая версия");
+            _jarsList.Items.Clear();
+            _jarsList.Items.Add("поиск в каталоге...");
+            new System.Threading.Thread(() =>
+            {
+                var res = ModrinthClient.Search(q, type, cat, ver);
+                Ui(() =>
+                {
+                    _catalog = res;
+                    _jarsList.Items.Clear();
+                    if (res.Count == 0) { _jarsList.Items.Add("(ничего не найдено для этой версии)"); return; }
+                    foreach (var pr in res)
+                        _jarsList.Items.Add(pr.Title + "   —   " + VideosPage.Nfmt(pr.Downloads) + " загрузок   —   " + pr.Desc);
+                    _jarsList.SelectedIndex = 0;
+                });
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private void InstallSelected()
         {
             if (_sel == null) return;
-            using (var ofd = new OpenFileDialog())
+            int i = _jarsList.SelectedIndex;
+            if (_catalog == null || i < 0 || i >= _catalog.Count) { Append("Выбери плагин/мод из списка."); return; }
+            var proj = _catalog[i];
+            bool plugins = JarsSub() == "plugins";
+            string core = CoreOf(_sel);
+            string[] loaders = plugins
+                ? new[] { "paper", "spigot", "bukkit", "purpur", "folia" }
+                : (core == "fabric" ? new[] { "fabric", "quilt" } : new[] { "forge", "neoforge" });
+            string ver = ReadMeta(_sel.Folder)[1];
+            string sub = Path.Combine(_sel.Folder, JarsSub());
+            Append("Устанавливаю «" + proj.Title + "»...");
+            ShowView("console");
+            new System.Threading.Thread(() =>
             {
-                ofd.Filter = "Jar (*.jar)|*.jar"; ofd.Multiselect = true;
-                ofd.Title = JarsSub() == "plugins" ? "Выбери плагины (.jar)" : "Выбери моды (.jar)";
-                if (ofd.ShowDialog(FindForm()) != DialogResult.OK) return;
-                string sub = Path.Combine(_sel.Folder, JarsSub());
-                Directory.CreateDirectory(sub);
-                foreach (var src in ofd.FileNames)
+                try
                 {
-                    try { File.Copy(src, Path.Combine(sub, Path.GetFileName(src)), true); }
-                    catch (Exception ex) { MessageBox.Show("Не скопировалось " + Path.GetFileName(src) + ": " + ex.Message); }
+                    var dl = ModrinthClient.Resolve(proj.Slug, loaders, ver);
+                    if (dl == null || string.IsNullOrEmpty(dl[0])) { Ui(() => Append("Нет совместимой версии «" + proj.Title + "».")); return; }
+                    Directory.CreateDirectory(sub);
+                    string fname = dl[1].Length > 0 ? dl[1] : proj.Slug + ".jar";
+                    ModrinthClient.Download(dl[0], Path.Combine(sub, fname));
+                    Ui(() => Append("Установлено: " + fname + "  →  " + JarsSub()));
                 }
-            }
-            RefreshJars();
+                catch (Exception ex) { Ui(() => Append("Не установилось: " + ex.Message)); }
+            })
+            { IsBackground = true }.Start();
         }
-        private void DeleteJar()
+
+        private void OpenOnSite()
         {
-            if (_sel == null || _jarsList.SelectedItem == null) return;
-            string name = _jarsList.SelectedItem.ToString();
-            if (name.StartsWith("(")) return;
-            string full = Path.Combine(_sel.Folder, JarsSub(), name);
-            if (MessageBox.Show("Удалить «" + name + "»?", "Удаление", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            File.Delete(full);
-            RefreshJars();
+            bool plugins = JarsSub() == "plugins";
+            string q = (_jarsSearch.Text ?? "").Trim();
+            string url = "https://modrinth.com/" + (plugins ? "plugins" : "mods");
+            if (q.Length > 0) url += "?q=" + Uri.EscapeDataString(q);
+            try { Process.Start(url); } catch { }
         }
         private void OpenJarsFolder()
         {

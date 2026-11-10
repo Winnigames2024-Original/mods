@@ -1,8 +1,8 @@
 {
-  "version": "1.59",
+  "version": "1.60",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "35820e3cf273a27a76124adb42093f1a71f159a4",
-  "size": 799744,
-  "notes": "Управление сервером: под-вкладки Консоль/Файлы/Моды или Плагины (Плагины только для Paper)/server.properties. Фикс ошибки запуска «server» (сервер анонсил себя версией server)."
+  "sha1": "7f35d06598a1b7969333563123b4fd627a0dc2fc",
+  "size": 804352,
+  "notes": "Вкладка Плагины/Моды — каталог Modrinth: ищешь, выбираешь из списка, «Установить» качает прямо в папку. Авто-подбор по версии и ядру сервера. Кнопка «На сайте»."
 }
