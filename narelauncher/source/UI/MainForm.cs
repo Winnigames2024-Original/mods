@@ -669,32 +669,40 @@ namespace NareLauncher.UI
 
             _eventBanner.Controls.Clear();
             Color accent = ParseHex(ev.Accent, Theme.Accent);
-            _eventBanner.BackColor = Theme.Panel;
             bool hasImgs = ev.Images != null && ev.Images.Count > 0;
-            _eventBanner.Height = hasImgs ? 112 : 64;
-            _eventBanner.Visible = true;
             _eventBanner.Tag = accent;
             _eventBanner.Paint -= EventBannerPaint; _eventBanner.Paint += EventBannerPaint;
-            _eventBanner.Invalidate();
 
-            var title = new Label { Text = ev.Name, Font = Theme.F(13f, FontStyle.Bold), ForeColor = Theme.Text, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 9, _eventBanner.Width - 80, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-            var desc = new Label { Text = ev.Desc, ForeColor = Theme.Dim, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 33, _eventBanner.Width - 80, 18), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-            var close = new Label { Text = "✕", Font = Theme.F(11f, FontStyle.Bold), ForeColor = Theme.Dim, AutoSize = true, BackColor = Color.Transparent, Cursor = Cursors.Hand, Location = new Point(_eventBanner.Width - 30, 10), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            var close = new Label { Text = "✕", Font = Theme.F(12f, FontStyle.Bold), ForeColor = Color.White, AutoSize = true, BackColor = Color.Transparent, Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
             close.Click += (s, e) => { _eventBanner.Visible = false; _eventBanner.Height = 0; };
-            _eventBanner.Controls.Add(title); _eventBanner.Controls.Add(desc); _eventBanner.Controls.Add(close);
 
             if (hasImgs)
             {
-                var flow = new FlowLayoutPanel { Bounds = new Rectangle(16, 56, _eventBanner.Width - 32, 50), BackColor = Color.Transparent, WrapContents = false, AutoScroll = true, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                foreach (var url in ev.Images)
-                {
-                    var pb = new PictureBox { Size = new Size(84, 46), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Theme.Bg, Margin = new Padding(0, 0, 8, 0) };
-                    LoadEventImg(url, pb);
-                    flow.Controls.Add(pb);
-                }
-                _eventBanner.Controls.Add(flow);
+                Color dk = Darken(accent);
+                _eventBanner.BackColor = dk;
+                _eventBanner.Height = 152;
+                var pic = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = dk };
+                LoadEventImg(ev.Images[0], pic);
+                _eventBanner.Controls.Add(pic);
+                close.Location = new Point(_eventBanner.Width - 32, 8);
+                _eventBanner.Controls.Add(close); close.BringToFront();
             }
+            else
+            {
+                _eventBanner.BackColor = Theme.Panel;
+                _eventBanner.Height = 64;
+                var title = new Label { Text = ev.Name, Font = Theme.F(13f, FontStyle.Bold), ForeColor = Theme.Text, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 9, _eventBanner.Width - 80, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+                var desc = new Label { Text = ev.Desc, ForeColor = Theme.Dim, AutoSize = false, BackColor = Color.Transparent, Bounds = new Rectangle(18, 33, _eventBanner.Width - 80, 18), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+                close.Location = new Point(_eventBanner.Width - 30, 10);
+                _eventBanner.Controls.Add(title); _eventBanner.Controls.Add(desc); _eventBanner.Controls.Add(close);
+            }
+            _eventBanner.Visible = true;
             _eventBanner.BringToFront();
+        }
+
+        private static Color Darken(Color c)
+        {
+            return Color.FromArgb(Math.Max(0, (int)(c.R * 0.22)), Math.Max(0, (int)(c.G * 0.22)), Math.Max(0, (int)(c.B * 0.22)));
         }
 
         private void EventBannerPaint(object sender, PaintEventArgs e)
