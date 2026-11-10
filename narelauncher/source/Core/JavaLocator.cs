@@ -232,6 +232,7 @@ namespace NareLauncher.Core
         }
 
         /// <summary>Какая Java требуется версии игры.</summary>
+#if !SERVERMANAGER_EXE
         public static int RequiredMajor(Json resolved)
         {
             int major = resolved["javaVersion"]["majorVersion"].AsInt(0);
@@ -272,11 +273,13 @@ namespace NareLauncher.Core
             }
             return exact ?? higher ?? any;
         }
+#endif
 
         public const string AdoptiumTemplate =
             "https://api.adoptium.net/v3/binary/latest/{0}/ga/windows/x64/jre/hotspot/normal/eclipse";
 
         /// <summary>Скачивает и распаковывает JRE нужной версии в папку runtime лаунчера.</summary>
+#if !SERVERMANAGER_EXE
         public static async Task<JavaInstall> DownloadJavaAsync(int major, IProgress<InstallStatus> progress,
                                                                 CancellationToken ct)
         {
@@ -321,5 +324,6 @@ namespace NareLauncher.Core
             Log.Info("Java скачана: " + exe);
             return info ?? new JavaInstall { Path = exe, Major = major };
         }
+#endif
     }
 }

@@ -40,6 +40,7 @@ namespace NareLauncher.UI
             public int Port;
             public ServerManager Mgr;
             public NareHost Host;
+            public Process ExtProc;
         }
 
         private readonly List<Entry> _servers = new List<Entry>();
@@ -427,35 +428,50 @@ namespace NareLauncher.UI
         private void StartEntry(Entry entry)
         {
             if (entry == null) return;
-            if (entry.Mgr != null && entry.Mgr.Running) { Append("Уже запущен."); return; }
+            if (entry.ExtProc != null && !entry.ExtProc.HasExited) { Append("Уже запущен (окно ServerManager)."); return; }
             try
             {
-                entry.Host = new NareHost(Nick + "-" + entry.Id, entry.Port);
-                entry.Host.OnLog = s => Ui(() => Append("[тоннель] " + s));
-                entry.Host.OnCommand = s => Ui(() =>
-                {
-                    if (entry.Mgr != null && entry.Mgr.Running) { entry.Mgr.Send(s); Append("[web] > " + s); }
-                });
-                entry.Host.StatsJson = () => (entry.Mgr != null ? entry.Mgr.StatsJson() : null);
-                entry.Host.OnFs = (action, pth, content) => HandleFs(entry, action, pth, content);
-                var meta = ReadMeta(entry.Folder);
-                entry.Host.Loader = meta[0]; entry.Host.McVersion = meta[1];
+                // параметры для ServerManager.exe
+                string name = Nick + "-" + entry.Id;
+                File.WriteAllText(Path.Combine(entry.Folder, "nare_run.json"),
+                    "{\"name\":\"" + name + "\",\"port\":" + entry.Port + "}");
 
-                entry.Mgr = new ServerManager(entry.Folder, entry.Port);
-                entry.Mgr.OnLine = s =>
+                string exe = EnsureSmExe();
+                if (exe == null) { Append("Не нашёл и не смог скачать ServerManager.exe."); return; }
+
+                var psi = new ProcessStartInfo
                 {
-                    Ui(() => Append(s));
-                    if (entry.Host != null) entry.Host.PushLog(s);
+                    FileName = exe,
+                    Arguments = "\"" + entry.Folder + "\"",
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetDirectoryName(exe)
                 };
-                entry.Mgr.OnExit = () => Ui(() => { Append("Сервер остановлен."); StopHost(entry); if (_sel == entry) SetOnline(false); });
-                entry.Mgr.Start();
-                entry.Host.Start();
-
-                Append("Запуск... адрес: " + Nick + "-" + entry.Id + "." + DOMAIN);
-                Append("Веб-панель: http://" + DOMAIN + "/server?name=" + Nick + "-" + entry.Id);
+                entry.ExtProc = Process.Start(psi);
+                Append("Сервер запущен в отдельном окне ServerManager.exe");
+                Append("Адрес: " + name + "." + DOMAIN);
+                Append("Веб-панель: http://" + DOMAIN + "/server?name=" + name);
                 if (_sel == entry) SetOnline(true);
             }
             catch (Exception ex) { Append("Ошибка запуска: " + ex.Message); }
+        }
+
+        private static string _smExe;
+        private string EnsureSmExe()
+        {
+            try
+            {
+                string dir = System.Windows.Forms.Application.StartupPath;
+                string path = Path.Combine(dir, "ServerManager.exe");
+                if (File.Exists(path)) return path;
+                Append("Скачиваю ServerManager.exe...");
+                using (var wc = new System.Net.WebClient())
+                {
+                    wc.Headers.Add("User-Agent", "NareLauncher");
+                    wc.DownloadFile("https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe", path);
+                }
+                return File.Exists(path) ? path : null;
+            }
+            catch (Exception ex) { Append("ServerManager.exe: " + ex.Message); return null; }
         }
 
         /// <summary>Диалог выбора ядра: forge|fabric|vanilla|paper или null (отмена).</summary>
@@ -536,6 +552,9 @@ namespace NareLauncher.UI
 
         private void StopHost(Entry e)
         {
+            try { if (e.ExtProc != null && !e.ExtProc.HasExited) e.ExtProc.CloseMainWindow(); } catch { }
+            try { if (e.ExtProc != null && !e.ExtProc.HasExited) { System.Threading.Thread.Sleep(400); if (!e.ExtProc.HasExited) e.ExtProc.Kill(); } } catch { }
+            e.ExtProc = null;
             try { if (e.Host != null) { e.Host.Stop(); e.Host = null; } } catch { }
             var mgr = e.Mgr;
             if (mgr != null)
@@ -586,10 +605,10 @@ namespace NareLauncher.UI
 
         private void UpdateStats()
         {
-            var m = (_sel != null) ? _sel.Mgr : null;
-            bool on = m != null && m.Running;
+            bool on = _sel != null && _sel.ExtProc != null && !SafeExited(_sel.ExtProc);
             if (_pill.On != on) SetOnline(on);
-            if (!on) return;
+            var m = (_sel != null) ? _sel.Mgr : null;
+            if (m == null || !m.Running) return;
             try { m.SampleCpu(); } catch { }
             _cpuVal.Text = m.CpuPct.ToString("0.0") + " %";
             _memVal.Text = (m.RamMb / 1024.0).ToString("0.00") + " / 2 GiB";
@@ -597,6 +616,7 @@ namespace NareLauncher.UI
             _plVal.Text = m.Players.ToString();
         }
 
+        private static bool SafeExited(Process p) { try { return p.HasExited; } catch { return true; } }
         private static string FmtUp(int sec)
         {
             if (sec < 0) sec = 0;

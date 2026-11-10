@@ -1,8 +1,8 @@
 {
-  "version": "1.73",
+  "version": "1.74",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "f6181be33c01ecdebd7ed696946919fa4672367d",
-  "size": 838656,
-  "notes": "Вкладка «Настройки» (jar, память Xmx/Xms, версия Java, сборщик GC, доп.аргументы) — в приложении и в вебе, применяется при запуске. Установка плагинов из веба (каталог Modrinth). Бан игрока с причиной и сроком в веб-панели."
+  "sha1": "98f85bd6579c56c04174778d08f2e9375f084780",
+  "size": 838144,
+  "notes": "Сервер теперь запускается в отдельном ServerManager.exe (своя консоль и управление, держит тоннель и веб-панель). Лаунчер скачивает ServerManager.exe автоматически при первом запуске сервера."
 }
