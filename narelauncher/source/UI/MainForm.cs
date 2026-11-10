@@ -219,7 +219,7 @@ namespace NareLauncher.UI
         private void BuildSidebar()
         {
             string[] titles = { "Играть", "Версии", "Моды и паки", "Сборка", "Серверы", "Вместе", "Мои серверы", "Скин", "Вещи", "Аккаунты", "Настройки", "Консоль", "Профиль", "Публичные", "Чаты", "Админ" };
-            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Account, Ico.Arrow, Ico.Account, Ico.Settings };
+            Ico[] icons = { Ico.Play, Ico.Versions, Ico.Mods, Ico.Folder, Ico.Arrow, Ico.Account, Ico.Folder, Ico.Skin, Ico.Skin, Ico.Account, Ico.Settings, Ico.Console, Ico.Account, Ico.Arrow, Ico.Account, Ico.Settings };
 
             int y = 12;
             for (int i = 0; i < titles.Length; i++)

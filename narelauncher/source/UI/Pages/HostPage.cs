@@ -34,6 +34,7 @@ namespace NareLauncher.UI
         private readonly NareLabel _addr = new NareLabel();
         private readonly NareButton _start = new NareButton();
         private readonly NareButton _stop = new NareButton();
+        private readonly NareButton _dl = new NareButton();
         private readonly TextBox _log = new TextBox();
         private readonly NareTextBox _cmd = new NareTextBox();
         private readonly NareButton _send = new NareButton();
@@ -90,6 +91,12 @@ namespace NareLauncher.UI
             _stop.Bounds = new Rectangle(152, 140, 120, 32);
             _stop.Click += (s, e) => StopSel();
             Controls.Add(_stop);
+
+            _dl.Style = BtnStyle.Subtle;
+            _dl.Text = "Скачать jar";
+            _dl.Bounds = new Rectangle(280, 140, 130, 32);
+            _dl.Click += (s, e) => DownloadJar();
+            Controls.Add(_dl);
 
             _log.Multiline = true;
             _log.ReadOnly = true;
@@ -214,6 +221,27 @@ namespace NareLauncher.UI
                 Append("Запуск... адрес: " + Nick + "-" + entry.Id + "." + DOMAIN);
             }
             catch (Exception ex) { Append("Ошибка запуска: " + ex.Message); }
+        }
+
+        private void DownloadJar()
+        {
+            if (_sel == null) { Append("Сначала создай или выбери сервер."); return; }
+            string ver = InputPrompt.Ask(FindForm(), "Версия Minecraft (напр. 1.21.4):", "1.21.4");
+            if (string.IsNullOrEmpty(ver)) return;
+            var r = MessageBox.Show("Да — Paper (плагины, быстрее).\nНет — ванильный сервер Mojang.",
+                "Тип сервера", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            string type = r == DialogResult.Yes ? "paper" : "vanilla";
+            var entry = _sel;
+            Append("Скачивание " + type + " " + ver + "...");
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    ServerJar.Download(type, ver, entry.Folder, s => Ui(() => Append(s)));
+                    Ui(() => Append("Jar скачан. Теперь жми «Запустить»."));
+                }
+                catch (Exception ex) { Ui(() => Append("Не удалось скачать jar: " + ex.Message)); }
+            }) { IsBackground = true }.Start();
         }
 
         private void StopSel() { if (_sel != null) StopHost(_sel); }
