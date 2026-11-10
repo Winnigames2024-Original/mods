@@ -1,8 +1,8 @@
 {
-  "version": "1.47",
+  "version": "1.48",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "3a28fbcb6fc1c523c2cfda4921a038da98488437",
-  "size": 735744,
-  "notes": "Исправлено зависание и вылет чата при правой кнопке на сообщении. Цветные коды в именах: &red:ВЛАДЕЛЕЦ, &blue:текст, &random:текст (переливается радугой)"
+  "sha1": "29038b1f06bbf1e85f0d9ec213a15087ec7bafa5",
+  "size": 749056,
+  "notes": "Вкладка «Мои серверы»: запуск выделенного сервера на ПК с доступом по адресу ник-id.narelauncher.winnigames2024.ru (тоннель до NareNet), консоль и команды"
 }

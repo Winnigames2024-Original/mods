@@ -102,6 +102,9 @@
     <Compile Include="Core\Net.cs" />
     <Compile Include="Core\Translate.cs" />
     <Compile Include="Core\NareColors.cs" />
+    <Compile Include="Core\NareHost.cs" />
+    <Compile Include="Core\ServerManager.cs" />
+    <Compile Include="UI\Pages\HostPage.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\SkinDocument.cs" />

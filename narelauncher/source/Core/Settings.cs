@@ -73,6 +73,9 @@ namespace NareLauncher.Core
         /// <summary>Все известные сборные пункты, через точку с запятой.</summary>
         public string NareNetHosts = "151.245.217.104:2445";
 
+        /// <summary>Выделенные серверы игрока (хостинг): строки «id|папка|порт», разделитель — перевод строки.</summary>
+        public string HostServers = "";
+
         public static Settings Current = new Settings();
 
         public static void Load()
