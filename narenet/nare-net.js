@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.42';
+const VERSION = '1.43';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1398,6 +1398,7 @@ function getCk(k){var a=document.cookie.split("; ");for(var i=0;i<a.length;i++){
 function delCk(k){document.cookie=k+"=;path=/;max-age=0"}
 var name=qs("name"), token=getCk("srv_"+name)||"", MEMLIM=2048;
 var tab="console", curPath="", editPath="", lastLines=[];
+var histCpu=[], histMem=[], histPl=[], HIST=60;
 var V=function(id){return document.getElementById(id)};
 function api(path,body){body=body||{};body.token=token;body.name=name;
   return fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json()});}
@@ -1415,8 +1416,8 @@ function login(){var u=V("u").value.trim(),p=V("p").value;V("lerr").textContent=
      token=d.token;setCk("srv_"+name,token);show();}).catch(function(){V("lerr").textContent="сервер недоступен";});}
 function logout(){token="";delCk("srv_"+name);show();}
 
-var TABS=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["launch","Настройки"],["settings","server.properties"],["logs","Логи"]];
-var NAV=[["console","Консоль"],["files","Файлы"],["players","Игроки"],["plugins","Плагины"],["launch","Настройки"],["settings","server.properties"],["logs","Логи"]];
+var TABS=[["console","Консоль"],["graph","Нагрузка"],["files","Файлы"],["players","Игроки"],["access","Доступ"],["plugins","Плагины"],["backups","Бэкапы"],["launch","Настройки"],["settings","server.properties"],["logs","Логи"]];
+var NAV=TABS;
 function tabsHtml(arr){var h="";for(var i=0;i<arr.length;i++){h+='<a data-act="go" data-arg="'+arr[i][0]+'">'+arr[i][1]+'</a>';}return h;}
 function buildNav(){ V("tabs").innerHTML=tabsHtml(TABS); V("snav").innerHTML=tabsHtml(NAV)+'<a data-act="logout">Выход</a>'; }
 function go(t){ tab=t; markTabs(); render(); }
@@ -1431,6 +1432,10 @@ document.addEventListener("click", function(e){
   else if(a==="save")saveEditor(); else if(a==="cmd")pcmd(g); else if(a==="send")sendCmd();
   else if(a==="power")power(g); else if(a==="refresh")render(); else if(a==="poll")poll();
   else if(a==="launchsave")saveLaunch(); else if(a==="psearch")doPSearch(); else if(a==="pinstall")doPInstall(g); else if(a==="ban")doBan(g);
+  else if(a==="backup")doBackup(); else if(a==="brestore")doRestore(g);
+  else if(a==="wladd")listAdd("wl_add","wlin","вайтлист"); else if(a==="wldel")listAct("wl_remove",g,"вайтлист");
+  else if(a==="opadd")listAdd("op_add","opin","операторы"); else if(a==="opdel")listAct("op_remove",g,"операторы");
+  else if(a==="antisave")saveAnti();
 });
 document.addEventListener("keydown", function(e){
   if(e.key!=="Enter")return;
@@ -1451,11 +1456,13 @@ function setOnline(on){ V("sdot").className="dot"+(on?" on":" offc"); V("sstat")
 function poll(){ api("/server/weblog",{}).then(function(d){
   if(!d.ok){ if(d.error)logout(); return; }
   var on=!!d.online; setOnline(on); var st=d.stats;
-  if(st&&on){ V("sCpu").textContent=((st.cpu||0)/10).toFixed(1)+" %"; V("sMem").textContent=gib(st.ram||0)+" / "+(MEMLIM/1024)+" GiB"; V("sUp").textContent=fmtUp(st.up); V("sPl").textContent=(st.players!=null?st.players:0); }
-  else { V("sCpu").textContent="—";V("sMem").textContent="—";V("sUp").textContent="—";V("sPl").textContent="—"; }
+  if(st&&on){ V("sCpu").textContent=((st.cpu||0)/10).toFixed(1)+" %"; V("sMem").textContent=gib(st.ram||0)+" / "+(MEMLIM/1024)+" GiB"; V("sUp").textContent=fmtUp(st.up); V("sPl").textContent=(st.players!=null?st.players:0);
+    pushHist((st.cpu||0)/10, (st.ram||0), (st.players!=null?st.players:0)); }
+  else { V("sCpu").textContent="—";V("sMem").textContent="—";V("sUp").textContent="—";V("sPl").textContent="—"; pushHist(0,0,0); }
   lastLines=d.lines||[];
   if(tab==="console"){ var c=V("console"); if(c){ var atB=c.scrollHeight-c.scrollTop-c.clientHeight<60; c.innerHTML=renderLog(lastLines); if(atB)c.scrollTop=c.scrollHeight; } }
   if(tab==="logs"){ var lg=V("logbox"); if(lg) lg.innerHTML=renderLog(lastLines); }
+  if(tab==="graph"){ drawGraph(); }
 }).catch(function(){}); }
 function renderLog(lines){ return (lines||[]).map(function(l){var e=esc(l); if(/^&gt;/.test(e))return '<span class="in">'+e+'</span>'; if(/WARN/i.test(l))return '<span class="warn">'+e+'</span>'; if(/ERROR|severe|exception/i.test(l))return '<span class="err">'+e+'</span>'; return e;}).join("<br>"); }
 
@@ -1484,7 +1491,64 @@ function render(){ var v=V("view");
   if(tab==="settings"){ openEditor("server.properties"); return; }
   if(tab==="files"){ renderFiles(curPath); return; }
   if(tab==="launch"){ renderLaunch(); return; }
+  if(tab==="graph"){ renderGraph(); return; }
+  if(tab==="backups"){ renderBackups(); return; }
+  if(tab==="access"){ renderAccess(); return; }
 }
+
+// ---- Нагрузка: живой график ----
+function pushHist(cpu,memMb,pl){ histCpu.push(cpu); histMem.push(memMb); histPl.push(pl); if(histCpu.length>HIST){histCpu.shift();histMem.shift();histPl.shift();} }
+function renderGraph(){ tab="graph"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="cardhd">Нагрузка сервера <span style="color:#8b93a7;font-weight:400;margin-left:8px">последние ~2 минуты</span><div class="sp"></div>'
+    +'<span style="color:#56d364;font-size:12px">● CPU</span> <span style="color:#9db4ff;font-size:12px;margin-left:10px">● Память</span> <span style="color:#f0c85a;font-size:12px;margin-left:10px">● Игроки</span></div>'
+    +'<div style="padding:14px 16px"><canvas id="gcanvas" width="900" height="300" style="width:100%;height:300px;background:#070a11;border:1px solid #1b2232;border-radius:10px"></canvas></div></div>';
+  drawGraph();
+}
+function drawGraph(){ var c=V("gcanvas"); if(!c)return; var g=c.getContext("2d"); var W=c.width,H=c.height; g.clearRect(0,0,W,H);
+  g.strokeStyle="#141a28"; g.lineWidth=1; for(var i=0;i<=4;i++){var y=H*i/4; g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
+  function line(arr,max,col){ if(arr.length<2)return; g.strokeStyle=col;g.lineWidth=2;g.beginPath();
+    for(var i=0;i<arr.length;i++){ var x=W*i/(HIST-1); var y=H-(Math.min(arr[i],max)/max)*(H-6)-3; if(i===0)g.moveTo(x,y);else g.lineTo(x,y);} g.stroke(); }
+  var maxMem=Math.max(MEMLIM,512); var maxPl=Math.max.apply(null,histPl.concat([4]));
+  line(histCpu,100,"#56d364"); line(histMem,maxMem,"#9db4ff"); line(histPl,maxPl,"#f0c85a");
+}
+
+// ---- Бэкапы ----
+function renderBackups(){ tab="backups"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="cardhd">Бэкапы мира<div class="sp"></div><button class="btn green" data-act="backup">💾 Сделать бэкап</button></div>'
+    +'<div style="padding:10px 16px;color:#8b93a7;font-size:13px">Сохраняет миры и ключевые файлы в <b>backups/</b>. Восстановление — только при остановленном сервере.</div>'
+    +'<div class="flist" id="blist"><div class="empty">загрузка…</div></div></div>';
+  loadBackups();
+}
+function loadBackups(){ fsCall("backuplist","").then(function(r){ var items=r.items||[];
+  if(!items.length){ V("blist").innerHTML='<div class="empty">бэкапов пока нет</div>'; return; }
+  var h=""; for(var i=0;i<items.length;i++){ var n=items[i]; h+='<div class="frow"><span class="ic">🗄️</span><span class="nm">'+esc(n)+'</span><button class="btn" data-act="brestore" data-arg="'+at(n)+'">Восстановить</button></div>'; }
+  V("blist").innerHTML=h;
+}).catch(function(e){ V("blist").innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+function doBackup(){ toast("Делаю бэкап…"); fsCall("backup","").then(function(r){ toast("Бэкап готов: "+(r.file||"")); loadBackups(); }).catch(function(e){ toast(e.message); }); }
+function doRestore(n){ if(!confirm("Восстановить мир из "+n+"? Текущий мир будет заменён. Сервер должен быть остановлен."))return; fsCall("backuprestore",n).then(function(){ toast("Мир восстановлен из "+n); }).catch(function(e){ toast(e.message); }); }
+
+// ---- Доступ: вайтлист, операторы, анти-лаг ----
+function renderAccess(){ tab="access"; markTabs(); var v=V("view");
+  v.innerHTML='<div class="card"><div class="cardhd">Белый список (whitelist)<div class="sp"></div></div>'
+    +'<div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #1b2232"><input id="wlin" placeholder="ник игрока" style="flex:1;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:8px;padding:9px 11px"><button class="btn green" data-act="wladd">Добавить</button></div>'
+    +'<div class="flist" id="wllist"><div class="empty">загрузка…</div></div></div>'
+    +'<div class="card" style="margin-top:14px"><div class="cardhd">Операторы (OP)<div class="sp"></div></div>'
+    +'<div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #1b2232"><input id="opin" placeholder="ник игрока" style="flex:1;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:8px;padding:9px 11px"><button class="btn green" data-act="opadd">Выдать OP</button></div>'
+    +'<div class="flist" id="oplist"><div class="empty">загрузка…</div></div></div>'
+    +'<div class="card" style="margin-top:14px"><div class="cardhd">Анти-лаг<div class="sp"></div></div>'
+    +'<div style="padding:14px 16px"><label style="display:flex;align-items:center;gap:10px;color:#e7eaf2"><input type="checkbox" id="antiOn"> Убивать TNT, если на сервере больше <input id="antiMax" type="number" min="10" max="2000" step="10" value="100" style="width:80px;background:#0a0d14;border:1px solid #242c3e;color:#e7eaf2;border-radius:6px;padding:6px 8px"> шт.</label>'
+    +'<div style="margin-top:10px"><button class="btn green" data-act="antisave">Сохранить</button></div></div></div>';
+  loadList("wl_list","wllist","wldel"); loadList("op_list","oplist","opdel"); loadAnti();
+}
+function loadList(action,box,delAct){ fsCall(action,"").then(function(r){ var items=r.items||[];
+  if(!items.length){ V(box).innerHTML='<div class="empty">пусто</div>'; return; }
+  var h=""; for(var i=0;i<items.length;i++){ var n=items[i]; h+='<div class="frow"><span class="ava" style="width:26px;height:26px;font-size:13px">'+ini(n)+'</span><span class="nm">'+esc(n)+'</span><button class="btn red" data-act="'+delAct+'" data-arg="'+at(n)+'">Убрать</button></div>'; }
+  V(box).innerHTML=h;
+}).catch(function(e){ V(box).innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+function listAdd(action,inputId,label){ var el=V(inputId); var n=(el.value||"").trim(); if(!n)return; fsCall(action,n).then(function(){ toast(label+": добавлен "+n); el.value=""; renderAccess(); }).catch(function(e){ toast(e.message); }); }
+function listAct(action,n,label){ fsCall(action,n).then(function(){ toast(label+": убран "+n); renderAccess(); }).catch(function(e){ toast(e.message); }); }
+function loadAnti(){ fsCall("antilagget","").then(function(r){ if(V("antiOn")){V("antiOn").checked=!!r.on; V("antiMax").value=r.max||100;} }).catch(function(){}); }
+function saveAnti(){ fsCall("antilagset","",JSON.stringify({on:V("antiOn").checked,max:parseInt(V("antiMax").value,10)||100})).then(function(){ toast("Анти-лаг сохранён"); }).catch(function(e){ toast(e.message); }); }
 
 function renderFiles(path){ curPath=path||""; tab="files"; markTabs(); var v=V("view");
   v.innerHTML='<div class="card"><div class="crumb">📁 <b>/'+esc(curPath)+'</b></div><div class="cardhd"><button class="btn gray" data-act="up">⬆ Вверх</button><div class="sp"></div><button class="btn gray" data-act="cd" data-arg="'+at(curPath)+'">Обновить</button></div><div class="flist" id="flist"><div class="empty">загрузка…</div></div></div>';

@@ -1,12 +1,12 @@
 {
-  "version": "1.75",
+  "version": "1.76",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "026f6dc6b23f3bb044dc7c215469258dfabae2bd",
-  "size": 838144,
+  "sha1": "d11514ce5b98c82350c228af5a67403baf2e1928",
+  "size": 841216,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "f0befa5287a8e3d77118b081de179ec13451b28d",
-  "smSize": 73728,
-  "notes": "Системные уведомления Windows (вход/выход игроков, запуск/стоп) вместо внутри-оконных; ServerManager.exe сворачивается в трей и работает в фоне; починены карточки плагинов."
+  "smSha1": "7aec87a9a19a1ea97b7c2d40051c8ad5ba880993",
+  "smSize": 82432,
+  "notes": "Бэкапы мира, вайтлист/операторы, графики нагрузки, анти-лаг TNT и автозапуск при старте ПК — в ServerManager.exe и веб-панели (nare-net 1.43)."
 }
