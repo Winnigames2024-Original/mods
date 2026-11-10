@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.45';
+const VERSION = '1.46';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -878,6 +878,9 @@ function statusFor(nick, tok) {
         blockedTogether: !!policy.together[nick],
         warnings: list,
         broadcast: policy.broadcast,
+        restartLaunchers: policy.restartLaunchers || 0,
+        restartServers: policy.restartServers || 0,
+        serverSlots: (a && a.serverSlots) || 0,
         update: updateFor(nick),
         blockedMods: policy.mods,
         coins: a ? a.coins : 0,
@@ -937,6 +940,17 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
       <button class="red" onclick="modUpdate()">⚠ Обновить мод у всех</button>
       <button onclick="load()">Обновить</button>
       <button onclick="logout()">Выйти</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input id="bcText" placeholder="Текст объявления вверху приложения" style="flex:1;min-width:220px">
+      <input id="bcSec" type="number" min="0" max="3600" value="10" title="сколько секунд показывать" style="width:90px">
+      <button class="pri" onclick="sendBroadcast()">Показать всем</button>
+      <button onclick="clearBroadcast()">Убрать</button>
+    </div>
+    <div class="muted" style="margin-top:4px">Ваш ник подставится сам. 0 секунд — висит, пока не уберёте.</div>
+    <div class="row" style="margin-top:10px">
+      <button class="red" onclick="restartAll('launchers')">⟳ Перезапустить лаунчеры у всех</button>
+      <button class="red" onclick="restartAll('servers')">⟳ Перезапустить все серверы</button>
     </div>
   </div>
   <div class="card">
@@ -1060,6 +1074,13 @@ function modUpdate(){
   if(!confirm("Разослать всем онлайн-игрокам срочное оповещение: вышло обновление мода, перезапустите лаунчер?"))return;
   api("/admin/broadcast",{text:"⚠ Вышло обновление мода. Перезапустите лаунчер, чтобы получить новую версию."}).then(function(d){
     if(d.ok)msg("оповещение об обновлении мода разослано всем онлайн",true);else msg(d.error||"ошибка (нужны права админа)",false);});}
+function sendBroadcast(){var t=(document.getElementById("bcText").value||"").trim();if(!t){msg("впишите текст",false);return;}
+  var s=parseInt(document.getElementById("bcSec").value,10)||0;
+  api("/admin/broadcast",{text:t,seconds:s}).then(function(d){done(d,"объявление показано всем");});}
+function clearBroadcast(){api("/admin/broadcast",{text:"",seconds:0}).then(function(d){done(d,"объявление убрано");});}
+function restartAll(what){var n=what==="servers"?"все серверы":"лаунчеры у всех онлайн";
+  if(!confirm("Точно перезапустить "+n+"?"))return;
+  api("/admin/restart",{what:what}).then(function(d){done(d,"перезапуск разослан: "+n);});}
 var logTimer=null;
 function pollLogs(){
   api("/admin/logs",{}).then(function(d){
@@ -1181,7 +1202,8 @@ button:hover{border-color:#5b8cff} button.pri{background:#2f52d8;border-color:#2
     </div>
     <div class="row" style="margin-top:10px"><input id="pstatus" placeholder="статус (о себе)"></div>
     <div class="row" style="margin-top:8px"><button onclick="saveStatus()">Сохранить статус</button>
-      <button class="pri" onclick="daily()">Ежедневный бонус</button></div>
+      <button class="pri" onclick="daily()">Ежедневный бонус</button>
+      <button class="pri" onclick="reward()">🎁 Награда дня</button></div>
     <div id="dailymsg" class="muted" style="margin-top:8px"></div>
     <div class="row" style="margin-top:12px"><input id="chatname" placeholder="отображаемое имя в чатах (платно)"><button onclick="setName()">Задать</button></div>
   </div>
@@ -1251,6 +1273,10 @@ function daily(){api("/coins/daily",{}).then(function(d){
   if(!d.ok){document.getElementById("dailymsg").textContent=d.error||"ошибка";return;}
   document.getElementById("dailymsg").textContent=d.awarded>0?("+"+d.awarded+" монет!"):("уже брали, через ~"+d.nextIn+" ч");
   document.getElementById("pcoins").textContent=d.coins;});}
+function reward(){api("/reward/daily",{}).then(function(d){
+  if(!d.ok){document.getElementById("dailymsg").textContent=d.error||"ошибка";return;}
+  document.getElementById("dailymsg").textContent=d.awarded?("Награда дня: +1000 монет и +1 сервер! Слотов: "+d.slots):("уже брали, через ~"+d.nextInH+" ч");
+  if(d.coins!=null)document.getElementById("pcoins").textContent=d.coins;});}
 function setName(){var n=document.getElementById("chatname").value.trim();if(!n)return;
   api("/chatname/set",{name:n}).then(function(d){err(d.ok?"имя задано":(d.error||"ошибка"));});}
 function loadChat(){
@@ -1918,9 +1944,46 @@ function adminBroadcast(req, res) {
     readJsonBody(req, body => {
         if (!needAdmin(body, res)) return;
         const text = clean(body.text, 300);
-        policy.broadcast = text ? { text, at: now() } : null;
+        const nick = sessionNick(body.token) || ADMIN;              // кто написал — ставится сам
+        const secs = Math.max(0, Math.min(3600, Math.trunc(Number(body.seconds) || 0)));
+        policy.broadcast = text
+            ? { text, nick, at: now(), until: secs > 0 ? now() + secs * 1000 : 0, secs }
+            : null;
         savePolicy();
         send(res, 200, { ok: true });
+    });
+}
+
+// Перезапуск у всех: ставим отметку времени, клиенты видят её в статусе.
+function adminRestart(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const what = body && body.what;
+        if (what === 'launchers' || what === 'all') policy.restartLaunchers = now();
+        if (what === 'servers' || what === 'all') policy.restartServers = now();
+        savePolicy();
+        log('перезапуск запрошен:', what);
+        send(res, 200, { ok: true });
+    });
+}
+
+// Ежедневная награда: +1000 монет и +1 слот сервера, раз в 20 часов.
+const REWARD_COOLDOWN = 20 * 3600 * 1000;
+function rewardDaily(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const left = REWARD_COOLDOWN - (now() - (a.lastReward || 0));
+        if (left > 0)
+            return send(res, 200, { ok: true, awarded: false, coins: a.coins || 0,
+                                    slots: a.serverSlots || 0, nextInH: Math.ceil(left / 3600000) });
+        a.coins = (a.coins || 0) + 1000;
+        a.serverSlots = (a.serverSlots || 0) + 1;
+        a.lastReward = now();
+        saveAccounts();
+        log('ежедневная награда', nick, '+1000 монет, +1 сервер');
+        send(res, 200, { ok: true, awarded: true, coins: a.coins, slots: a.serverSlots });
     });
 }
 
@@ -3731,6 +3794,9 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/unban' && req.method === 'POST') return adminUnban(req, res);
     if (route === '/admin/warn' && req.method === 'POST') return adminWarn(req, res);
     if (route === '/admin/broadcast' && req.method === 'POST') return adminBroadcast(req, res);
+    if (route === '/admin/restart' && req.method === 'POST') return adminRestart(req, res);
+    if (route === '/restartflag') return send(res, 200, { ok: true, servers: policy.restartServers || 0, launchers: policy.restartLaunchers || 0 });
+    if (route === '/reward/daily' && req.method === 'POST') return rewardDaily(req, res);
     if (route === '/admin/command' && req.method === 'POST') return adminCommand(req, res);
     if (route === '/admin/together' && req.method === 'POST') return adminTogether(req, res);
     if (route === '/admin/blockmod' && req.method === 'POST') return adminBlockMod(req, res);

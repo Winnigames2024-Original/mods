@@ -1,12 +1,12 @@
 {
-  "version": "1.78",
+  "version": "1.79",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "240825b51451ca976ee1b7df0f776ea186ef8dfa",
-  "size": 850432,
+  "sha1": "7071b45dfaffc11e824c6ee1ee3f5017c37b0de3",
+  "size": 855040,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "7aec87a9a19a1ea97b7c2d40051c8ad5ba880993",
-  "smSize": 82432,
-  "notes": "Кликер 67: прокачки ×2 (значение и цена удваиваются), прокачка восстановления выносливости, всё хранится на сервере. Нужен nare-net 1.45 на VPS."
+  "smSha1": "234b33709c25bc1f99387f82955a8ea619f19886",
+  "smSize": 83968,
+  "notes": "Объявление админа верхней полосой (ник сам + таймер секунд), перезапуск лаунчеров и серверов из админки, ежедневная награда (+1000 монет, +1 сервер). Нужен nare-net 1.46."
 }
