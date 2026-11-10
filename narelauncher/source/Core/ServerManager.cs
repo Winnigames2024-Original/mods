@@ -51,18 +51,30 @@ namespace NareLauncher.Core
             File.WriteAllText(Path.Combine(Folder, "eula.txt"), "eula=true\n");
             WriteProps();
 
-            string jar = Path.Combine(Folder, "server.jar");
-            if (!File.Exists(jar))
-                throw new FileNotFoundException("В папке сервера нет server.jar. Положите серверный jar как server.jar.");
-
             string java = JavaExe();
             if (java == null)
                 throw new InvalidOperationException("Не найдена Java для запуска сервера.");
 
+            string launchFile = Path.Combine(Folder, "nare_launch.txt");
+            string args;
+            if (File.Exists(launchFile))
+            {
+                args = (File.ReadAllText(launchFile) ?? "").Trim();   // Forge: @user_jvm_args.txt @libraries/.../win_args.txt nogui
+                if (args.Length == 0)
+                    throw new InvalidOperationException("nare_launch.txt пуст — переустановите ядро Forge.");
+            }
+            else
+            {
+                string jar = Path.Combine(Folder, "server.jar");
+                if (!File.Exists(jar))
+                    throw new FileNotFoundException("В папке сервера нет server.jar. Нажмите «Скачать jar» и выберите ядро.");
+                args = "-Xmx2G -Xms1G -jar \"server.jar\" nogui";
+            }
+
             var psi = new ProcessStartInfo
             {
                 FileName = java,
-                Arguments = "-Xmx2G -Xms1G -jar \"server.jar\" nogui",
+                Arguments = args,
                 WorkingDirectory = Folder,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -166,7 +178,7 @@ namespace NareLauncher.Core
         }
 
         /// <summary>java.exe (с консолью) из лучшей найденной Java; для 1.21 нужна 21+.</summary>
-        private static string JavaExe()
+        public static string JavaExe()
         {
             var all = JavaLocator.FindAll();
             if (all == null || all.Count == 0) return "java"; // надежда на PATH

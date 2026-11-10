@@ -1,8 +1,8 @@
 {
-  "version": "1.54",
+  "version": "1.55",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "d1e71e30373a04f50e1b34994b1a762d731586d5",
-  "size": 785920,
-  "notes": "Фикс вылета при запуске (прозрачный фон у статус-пилюли и аватара). Вкладка «Видео» (NareVideo) и форма канала NareProfileForm."
+  "sha1": "4a06edebfad0fc9899d2a2219a882e40e6df2eb5",
+  "size": 790528,
+  "notes": "Выбор ядра сервера: Forge / Fabric / Vanilla / Paper (кнопка «Скачать jar»). Forge ставится установщиком автоматически, Fabric — готовый server-jar. (включает фикс вылета 1.54)"
 }

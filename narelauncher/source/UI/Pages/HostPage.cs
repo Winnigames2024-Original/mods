@@ -309,14 +309,56 @@ namespace NareLauncher.UI
             catch (Exception ex) { Append("Ошибка запуска: " + ex.Message); }
         }
 
+        /// <summary>Диалог выбора ядра: forge|fabric|vanilla|paper или null (отмена).</summary>
+        private string ChooseCore()
+        {
+            using (var dlg = new Form())
+            {
+                dlg.Text = "Тип сервера";
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+                dlg.ClientSize = new Size(340, 236);
+                dlg.BackColor = CBg; dlg.ForeColor = CText; dlg.Font = Theme.F(10f);
+
+                dlg.Controls.Add(new Label
+                {
+                    Text = "Выбери ядро сервера:", AutoSize = false, Bounds = new Rectangle(18, 14, 300, 22),
+                    ForeColor = CDim, BackColor = Color.Transparent
+                });
+
+                string result = null;
+                var defs = new[] {
+                    new[]{"forge","Forge","моды Forge (ставится установщиком)"},
+                    new[]{"fabric","Fabric","моды Fabric (лёгкий, быстрый)"},
+                    new[]{"vanilla","Vanilla","чистый сервер Mojang"},
+                    new[]{"paper","Paper","плагины, оптимизирован"}
+                };
+                int y = 44;
+                foreach (var d in defs)
+                {
+                    var b = new Button();
+                    StyleBtn(b, d[1] + "  —  " + d[2], CCard, CText, CBorder);
+                    b.TextAlign = ContentAlignment.MiddleLeft;
+                    b.Font = Theme.F(9.5f, FontStyle.Bold);
+                    b.Bounds = new Rectangle(18, y, 304, 40);
+                    string code = d[0];
+                    b.Click += (s, e) => { result = code; dlg.DialogResult = DialogResult.OK; dlg.Close(); };
+                    dlg.Controls.Add(b);
+                    y += 46;
+                }
+                dlg.ShowDialog(FindForm());
+                return result;
+            }
+        }
+
         private void DownloadJar()
         {
             if (_sel == null) { Append("Сначала создай или выбери сервер."); return; }
+            string type = ChooseCore();
+            if (type == null) return;
             string ver = InputPrompt.Ask(FindForm(), "Версия Minecraft (напр. 1.21.4):", "1.21.4");
             if (string.IsNullOrEmpty(ver)) return;
-            var r = MessageBox.Show("Да — Paper (плагины, быстрее).\nНет — ванильный сервер Mojang.",
-                "Тип сервера", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            string type = r == DialogResult.Yes ? "paper" : "vanilla";
             var entry = _sel;
             Append("Скачивание " + type + " " + ver + "...");
             new System.Threading.Thread(() =>
