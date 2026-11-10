@@ -26,6 +26,7 @@ namespace NareLauncher.Core
         public bool Online { get { return _token.Length > 0 && _publicPort > 0; } }
         public Action<string> OnLog;
         public Action<string> OnCommand;     // команда из веб-консоли -> в stdin сервера
+        public Func<string, string, string, string> OnFs;   // (action,path,content) -> результат JSON
         public Func<string> StatsJson;        // "ram":..,"up":..,"players":.. для карточек веб-панели
         public string McVersion = "";         // версия Minecraft сервера (для анонса)
         public string Loader = "";            // ядро: paper/forge/fabric/vanilla
@@ -104,6 +105,30 @@ namespace NareLauncher.Core
                                     string cmd = c.AsString("");
                                     var h = OnCommand;
                                     if (h != null && cmd.Length > 0) h(cmd);
+                                }
+                            }
+                        }
+                        catch { }
+
+                        try
+                        {
+                            string fr = HttpPost("/server/fspull", "{\"token\":\"" + Esc(_token) + "\"}");
+                            if (fr != null)
+                            {
+                                var jf = Json.Parse(fr);
+                                foreach (var rq in jf["requests"].Items)
+                                {
+                                    string id = rq["id"].AsString("");
+                                    string action = rq["action"].AsString("");
+                                    string pathv = rq["path"].AsString("");
+                                    string content = rq["content"].AsString(null);
+                                    string result = "{\"ok\":false,\"error\":\"нет обработчика\"}";
+                                    var hf = OnFs;
+                                    if (hf != null) { try { result = hf(action, pathv, content); } catch (Exception ex) { result = "{\"ok\":false,\"error\":\"" + JsonStr(ex.Message) + "\"}"; } }
+                                    if (id.Length > 0)
+                                    {
+                                        try { HttpPost("/server/fspush", "{\"token\":\"" + Esc(_token) + "\",\"id\":\"" + Esc(id) + "\",\"result\":" + result + "}"); } catch { }
+                                    }
                                 }
                             }
                         }

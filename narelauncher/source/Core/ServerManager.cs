@@ -16,6 +16,7 @@ namespace NareLauncher.Core
         private Process _proc;
         private DateTime _startedAt;
         private int _players;
+        private readonly System.Collections.Generic.HashSet<string> _online = new System.Collections.Generic.HashSet<string>();
         private TimeSpan _lastCpu;
         private DateTime _lastCpuAt;
         private double _cpuPct;
@@ -24,6 +25,15 @@ namespace NareLauncher.Core
         public int Port { get; private set; }
         public bool Running { get { return _proc != null && !_proc.HasExited; } }
         public int Players { get { return _players; } }
+        public string[] OnlineNames { get { lock (_online) { var a = new string[_online.Count]; _online.CopyTo(a); return a; } } }
+        private static string LastToken(string s)
+        {
+            s = (s ?? "").TrimEnd();
+            int sp = s.LastIndexOf(' ');
+            string t = sp >= 0 ? s.Substring(sp + 1) : s;
+            foreach (char c in t) if (!(char.IsLetterOrDigit(c) || c == '_')) return "";
+            return t;
+        }
         public double CpuPct { get { return Running ? _cpuPct : 0; } }
         public int RamMb
         {
@@ -91,6 +101,7 @@ namespace NareLauncher.Core
             _proc.Exited += (s, e) => { var h = OnExit; if (h != null) h(); };
             _startedAt = DateTime.UtcNow;
             _players = 0;
+            lock (_online) _online.Clear();
             _proc.Start();
             try { File.WriteAllText(Path.Combine(Folder, "nare_pid.txt"), _proc.Id.ToString()); } catch { }
             _proc.BeginOutputReadLine();
@@ -144,8 +155,11 @@ namespace NareLauncher.Core
         {
             try
             {
-                if (s.IndexOf(" joined the game", StringComparison.Ordinal) >= 0) _players++;
-                else if (s.IndexOf(" left the game", StringComparison.Ordinal) >= 0 && _players > 0) _players--;
+                int ji = s.IndexOf(" joined the game", StringComparison.Ordinal);
+                int li = s.IndexOf(" left the game", StringComparison.Ordinal);
+                if (ji > 0) { var nm = LastToken(s.Substring(0, ji)); if (nm.Length > 0) lock (_online) _online.Add(nm); }
+                else if (li > 0) { var nm = LastToken(s.Substring(0, li)); if (nm.Length > 0) lock (_online) _online.Remove(nm); }
+                lock (_online) _players = _online.Count;
             }
             catch { }
             var h = OnLine; if (h != null) h(s);

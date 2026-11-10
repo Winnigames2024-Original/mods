@@ -430,6 +430,7 @@ namespace NareLauncher.UI
                     if (entry.Mgr != null && entry.Mgr.Running) { entry.Mgr.Send(s); Append("[web] > " + s); }
                 });
                 entry.Host.StatsJson = () => (entry.Mgr != null ? entry.Mgr.StatsJson() : null);
+                entry.Host.OnFs = (action, pth, content) => HandleFs(entry, action, pth, content);
                 var meta = ReadMeta(entry.Folder);
                 entry.Host.Loader = meta[0]; entry.Host.McVersion = meta[1];
 
@@ -968,6 +969,116 @@ namespace NareLauncher.UI
             Directory.CreateDirectory(_sel.Folder);
             File.WriteAllText(f, _propsText.Text.Replace("\r\n", "\n"));
             Append("server.properties сохранён.");
+        }
+
+        // ---------- файловый мост для веб-панели ----------
+        private static string JEsc(string v)
+        {
+            v = v ?? "";
+            var b = new System.Text.StringBuilder(v.Length + 8);
+            foreach (char c in v)
+            {
+                if (c == '\\') b.Append("\\\\");
+                else if (c == '"') b.Append("\\\"");
+                else if (c == '\n') b.Append("\\n");
+                else if (c == '\r') b.Append("\\r");
+                else if (c == '\t') b.Append("\\t");
+                else if (c < 0x20) b.Append(' ');
+                else b.Append(c);
+            }
+            return b.ToString();
+        }
+        private static string Err(string m) { return "{\"ok\":false,\"error\":\"" + JEsc(m) + "\"}"; }
+
+        private string SubForFolder(string folder)
+        {
+            string core = "";
+            try { string f = Path.Combine(folder, "nare_core.txt"); if (File.Exists(f)) { var p = File.ReadAllText(f).Split('|'); core = p.Length > 0 ? p[0].Trim() : ""; } } catch { }
+            if (core == "paper") return "plugins";
+            if (core == "forge" || core == "fabric") return "mods";
+            if (Directory.Exists(Path.Combine(folder, "plugins"))) return "plugins";
+            return "mods";
+        }
+
+        private string HandleFs(Entry entry, string action, string rel, string content)
+        {
+            try
+            {
+                string root = Path.GetFullPath(entry.Folder);
+                Directory.CreateDirectory(root);
+                rel = (rel ?? "").Replace('\\', '/').TrimStart('/');
+                string full = Path.GetFullPath(Path.Combine(root, rel));
+                if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return Err("путь вне папки");
+
+                if (action == "list")
+                {
+                    string dir = (rel.Length == 0) ? root : full;
+                    if (!Directory.Exists(dir)) return Err("нет папки");
+                    var sb = new System.Text.StringBuilder("{\"ok\":true,\"path\":\"" + JEsc(rel) + "\",\"entries\":[");
+                    bool first = true;
+                    foreach (var d in Directory.GetDirectories(dir))
+                    {
+                        if (!first) sb.Append(','); first = false;
+                        sb.Append("{\"name\":\"").Append(JEsc(Path.GetFileName(d))).Append("\",\"dir\":true,\"size\":0}");
+                    }
+                    foreach (var f in Directory.GetFiles(dir))
+                    {
+                        if (!first) sb.Append(','); first = false;
+                        long sz = 0; try { sz = new FileInfo(f).Length; } catch { }
+                        sb.Append("{\"name\":\"").Append(JEsc(Path.GetFileName(f))).Append("\",\"dir\":false,\"size\":").Append(sz).Append('}');
+                    }
+                    sb.Append("]}");
+                    return sb.ToString();
+                }
+                if (action == "read")
+                {
+                    if (!File.Exists(full)) return Err("нет файла");
+                    var fi = new FileInfo(full);
+                    if (fi.Length > 1024 * 1024) return Err("файл больше 1 МБ — редактируй в приложении");
+                    string txt = File.ReadAllText(full);
+                    return "{\"ok\":true,\"content\":\"" + JEsc(txt) + "\"}";
+                }
+                if (action == "write")
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(full));
+                    File.WriteAllText(full, content ?? "");
+                    return "{\"ok\":true}";
+                }
+                if (action == "delete")
+                {
+                    if (Directory.Exists(full)) Directory.Delete(full, true);
+                    else if (File.Exists(full)) File.Delete(full);
+                    return "{\"ok\":true}";
+                }
+                if (action == "plugins")
+                {
+                    string sub = SubForFolder(entry.Folder);
+                    string dir = Path.Combine(root, sub);
+                    Directory.CreateDirectory(dir);
+                    var sb = new System.Text.StringBuilder("{\"ok\":true,\"sub\":\"" + sub + "\",\"items\":[");
+                    bool first = true;
+                    foreach (var f in Directory.GetFiles(dir, "*.jar"))
+                    {
+                        if (!first) sb.Append(','); first = false;
+                        sb.Append('"').Append(JEsc(Path.GetFileName(f))).Append('"');
+                    }
+                    sb.Append("]}");
+                    return sb.ToString();
+                }
+                if (action == "players")
+                {
+                    var sb = new System.Text.StringBuilder("{\"ok\":true,\"players\":[");
+                    if (entry.Mgr != null)
+                    {
+                        var names = entry.Mgr.OnlineNames;
+                        for (int i = 0; i < names.Length; i++) { if (i > 0) sb.Append(','); sb.Append('"').Append(JEsc(names[i])).Append('"'); }
+                    }
+                    sb.Append("]}");
+                    return sb.ToString();
+                }
+                return Err("неизвестное действие");
+            }
+            catch (Exception ex) { return Err(ex.Message); }
         }
 
         // ---------- кастомные контролы ----------
