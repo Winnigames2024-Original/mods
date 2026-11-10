@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Net;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
@@ -156,6 +157,7 @@ namespace NareLauncher.UI
             Controls.Add(_send);
 
             LoadList();
+            LoadRemote();
             SetOnline(false);
 
             _stats.Interval = 1500;
@@ -201,6 +203,11 @@ namespace NareLauncher.UI
 
         // ---------- данные ----------
 
+        private string Token
+        {
+            get { var a = AccountStore.Selected; return a == null ? "" : (a.Token ?? ""); }
+        }
+
         private string Nick
         {
             get { var a = AccountStore.Selected; return (a == null ? "player" : a.Name).ToLowerInvariant(); }
@@ -229,6 +236,101 @@ namespace NareLauncher.UI
                 sb.Append(e.Id).Append('|').Append(e.Folder).Append('|').Append(e.Port).Append('\n');
             Settings.Current.HostServers = sb.ToString();
             Settings.Save();
+            SaveRemote();
+        }
+
+        // --- синхронизация списка серверов с нашим сервером (по аккаунту) ---
+        private void SaveRemote()
+        {
+            string tok = Token;
+            if (tok.Length == 0) return;
+            var sb = new StringBuilder("{\"token\":\"" + Esc(tok) + "\",\"servers\":[");
+            for (int i = 0; i < _servers.Count; i++)
+            {
+                var e = _servers[i];
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"id\":\"").Append(Esc(e.Id)).Append("\",\"folder\":\"")
+                  .Append(Esc(e.Folder)).Append("\",\"port\":").Append(e.Port).Append('}');
+            }
+            sb.Append("]}");
+            string body = sb.ToString();
+            new System.Threading.Thread(() => { try { HttpPost("/host/save", body); } catch { } }) { IsBackground = true }.Start();
+        }
+
+        private void LoadRemote()
+        {
+            string tok = Token;
+            if (tok.Length == 0) return;
+            new System.Threading.Thread(() =>
+            {
+                string resp = null;
+                try { resp = HttpPost("/host/list", "{\"token\":\"" + Esc(tok) + "\"}"); } catch { }
+                if (resp == null) return;
+                try
+                {
+                    var j = Json.Parse(resp);
+                    var remote = new List<Entry>();
+                    foreach (var v in j["servers"].Items)
+                        remote.Add(new Entry { Id = v["id"].AsString(""), Folder = v["folder"].AsString(""), Port = v["port"].AsInt(25600) });
+                    Ui(() => MergeRemote(remote));
+                }
+                catch { }
+            }) { IsBackground = true }.Start();
+        }
+
+        private void MergeRemote(List<Entry> remote)
+        {
+            bool changed = false;
+            foreach (var r in remote)
+            {
+                if (string.IsNullOrEmpty(r.Id)) continue;
+                bool found = false;
+                foreach (var e in _servers) if (e.Id == r.Id) { found = true; break; }
+                if (!found) { _servers.Add(r); changed = true; }
+            }
+            if (changed)
+            {
+                SaveList();
+                RefreshList();
+            }
+        }
+
+        private static string Esc(string s)
+        {
+            s = s ?? "";
+            var b = new StringBuilder(s.Length + 8);
+            foreach (char c in s)
+            {
+                if (c == '\\') b.Append("\\\\");
+                else if (c == '"') b.Append("\\\"");
+                else if (c == '\n') b.Append("\\n");
+                else if (c == '\r') b.Append("\\r");
+                else if (c == '\t') b.Append("\\t");
+                else if (c < 0x20) b.Append(' ');
+                else b.Append(c);
+            }
+            return b.ToString();
+        }
+
+        private static string HttpPost(string route, string body)
+        {
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create("http://" + NareNet.Where + route);
+                req.Method = "POST"; req.ContentType = "application/json"; req.Timeout = 12000;
+                var data = Encoding.UTF8.GetBytes(body);
+                req.ContentLength = data.Length;
+                using (var st = req.GetRequestStream()) st.Write(data, 0, data.Length);
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var rd = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    return rd.ReadToEnd();
+            }
+            catch (WebException we)
+            {
+                try { using (var rd = new StreamReader(we.Response.GetResponseStream(), Encoding.UTF8)) return rd.ReadToEnd(); }
+                catch { return null; }
+            }
+            catch { return null; }
         }
 
         private void RefreshList()

@@ -1,8 +1,8 @@
 {
-  "version": "1.57",
+  "version": "1.58",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "e3d808cf42043896ae242baa2c68593d26a45dd8",
-  "size": 790528,
-  "notes": "Запущенные серверы «Мои серверы» теперь видны в «Вместе» и в «Публичных серверах» (пока запущены). Плюс Paper v3, выбор ядра Forge/Fabric/Vanilla/Paper, фиксы."
+  "sha1": "2d1f02e45dee6a646767a833e79bca1e5a56fff6",
+  "size": 792576,
+  "notes": "Данные серверов (id, путь, порт) сохраняются на нашем сервере по аккаунту и восстанавливаются при входе. Плюс видимость в «Вместе»/«Публичных», выбор ядра, фиксы."
 }

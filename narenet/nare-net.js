@@ -50,7 +50,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.35';
+const VERSION = '1.36';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -510,6 +510,7 @@ if (!policy.srvCmd) policy.srvCmd = {};
 if (!policy.srvCtl) policy.srvCtl = {};
 if (!policy.srvStat) policy.srvStat = {};
 if (!policy.videos) policy.videos = [];
+if (!policy.hostServers) policy.hostServers = {};
 if (!policy.chatAssign) policy.chatAssign = {};
 if (!Array.isArray(policy.admins)) policy.admins = [];
 if (!Array.isArray(policy.moderators)) policy.moderators = [];
@@ -2867,6 +2868,30 @@ function videoDelete(req, res) {
     });
 }
 
+// ---- выделенные серверы «Мои серверы»: хранение списка/путей на нашем сервере ----
+function hostSave(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const arr = Array.isArray(body.servers) ? body.servers : [];
+        const out = arr.slice(0, 50).map(x => ({
+            id: clean(x.id, 40),
+            folder: clean(x.folder, 300),
+            port: Math.min(65535, Math.max(1, Number(x.port) || 25600))
+        })).filter(x => x.id);
+        policy.hostServers[nick] = out;
+        savePolicy();
+        send(res, 200, { ok: true, count: out.length });
+    });
+}
+function hostList(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        send(res, 200, { ok: true, servers: policy.hostServers[nick] || [] });
+    });
+}
+
 function profileGet(req, res) {
     const q = query(req);
     const nick = clean(q.nick, 16);
@@ -3235,6 +3260,8 @@ const server = http.createServer((req, res) => {
     if (route === '/coins/send' && req.method === 'POST') return coinsSend(req, res);
     if (route === '/top') return coinsTop(req, res);
     if (route === '/profile/get') return profileGet(req, res);
+    if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
+    if (route === '/host/list' && req.method === 'POST') return hostList(req, res);
     if (route === '/video/create' && req.method === 'POST') return videoCreate(req, res);
     if (route.startsWith('/video/raw/') && (req.method === 'PUT' || req.method === 'POST')) return videoRaw(req, res, clean(route.slice(11), 20));
     if (route.startsWith('/video/stream/')) return videoStream(req, res, clean(route.slice(14), 20));
