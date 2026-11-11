@@ -29,6 +29,14 @@ function api_get($path) {
     return json_decode($r, true) ?: [];
 }
 
+/** Первая буква имени заглавной — работает и без расширения mbstring. */
+function initial($name) {
+    $name = (string)$name;
+    if ($name === '') return '?';
+    if (function_exists('mb_substr')) return mb_strtoupper(mb_substr($name, 0, 1));
+    return strtoupper(substr($name, 0, 1));
+}
+
 function me()    { return $_SESSION['nick'] ?? null; }
 function token() { return $_SESSION['token'] ?? null; }
 function require_login() { if (!me()) { header('Location: /login/'); exit; } }

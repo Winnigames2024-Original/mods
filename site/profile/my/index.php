@@ -7,7 +7,7 @@ $p = api_get('/profile/get?nick=' . urlencode($nick));
 $PAGE_TITLE = 'Мой профиль — NareLauncher';
 $PAGE_DESC  = 'Ваш профиль NareLauncher: статус, монеты, тег.';
 require __DIR__ . '/../../_inc/head.php';
-$letter = mb_strtoupper(mb_substr($p['username'] ?? $nick, 0, 1));
+$letter = initial($p['username'] ?? $nick);
 ?>
 <div class="panel">
   <div class="prof">

@@ -16,7 +16,7 @@ require __DIR__ . '/../../_inc/head.php';
     <p style="margin-top:12px"><a class="btn ghost" href="/home/">На главную</a></p>
   </div>
 <?php else:
-  $letter = mb_strtoupper(mb_substr($name, 0, 1)); ?>
+  $letter = initial($name); ?>
   <div class="panel">
     <div class="prof">
       <div class="ava"><?= h($letter) ?></div>

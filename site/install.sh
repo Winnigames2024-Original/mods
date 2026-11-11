@@ -23,7 +23,7 @@ fi
 echo "==> Ставлю пакеты (nginx, php-fpm, php-curl, git)…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y nginx php-fpm php-curl git curl
+apt-get install -y nginx php-fpm php-curl php-mbstring git curl
 
 echo "==> Тяну сайт из репозитория…"
 if [ -d "$SRC/.git" ]; then
