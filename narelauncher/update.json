@@ -1,12 +1,12 @@
 {
-  "version": "1.82",
+  "version": "1.83",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "e11dd36b968c022cdb7d82aec7e42f4fa0c24a7b",
-  "size": 859136,
+  "sha1": "311a8938ec1419ece42fa25016e7aaf3d9f86fae",
+  "size": 861696,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "234b33709c25bc1f99387f82955a8ea619f19886",
-  "smSize": 83968,
-  "notes": "Починены съехавшие заголовки секций в админ-панели (лишний Row сдвигал их на один)."
+  "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
+  "smSize": 84992,
+  "notes": "Гибрид-сервер (Arclight): моды + плагины на одном сервере. При создании выбор NeoForge/Fabric, в управлении переключатель Моды/Плагины. Версии 1.21.1/1.21/1.20.4."
 }
