@@ -61,7 +61,6 @@ server {
     }
 
     location ~ \.php\$ {
-        try_files \$uri @node;
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:$FPM_SOCK;
     }
