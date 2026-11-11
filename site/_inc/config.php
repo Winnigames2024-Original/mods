@@ -37,6 +37,23 @@ function initial($name) {
     return strtoupper(substr($name, 0, 1));
 }
 
+/** Рендер тега вида "&red:ВЛАДЕЛЕЦ" в цветной HTML-span. */
+function render_tag($tag) {
+    $tag = (string)$tag;
+    if ($tag === '') return '';
+    $map = [
+        'red' => '#ff6b74', 'green' => '#56d364', 'blue' => '#5b8cff', 'gold' => '#ffd24a',
+        'yellow' => '#ffd24a', 'aqua' => '#4fd6e0', 'cyan' => '#4fd6e0', 'purple' => '#b57bff',
+        'pink' => '#ff8fcf', 'orange' => '#ff9f45', 'gray' => '#8b93a7', 'grey' => '#8b93a7',
+        'white' => '#e7eaf2', 'black' => '#20232c',
+    ];
+    if (preg_match('/^&(\w+):(.*)$/u', $tag, $m)) {
+        $col = $map[strtolower($m[1])] ?? '#9db6ff';
+        return '<span style="color:' . $col . '">' . h($m[2]) . '</span>';
+    }
+    return h($tag);
+}
+
 function me()    { return $_SESSION['nick'] ?? null; }
 function token() { return $_SESSION['token'] ?? null; }
 function require_login() { if (!me()) { header('Location: /login/'); exit; } }

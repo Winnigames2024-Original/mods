@@ -26,7 +26,7 @@ require __DIR__ . '/../../_inc/head.php';
           <?php elseif (!empty($p['moderator'])): ?><span class="badge">модератор</span><?php endif; ?>
           <?php if (!empty($p['online'])): ?><span class="badge on">онлайн</span><?php endif; ?>
         </h1>
-        <div class="muted">@<?= h($p['nick'] ?? $user) ?> <?php if (!empty($p['tag'])): ?>· <span class="tag"><?= h($p['tag']) ?></span><?php endif; ?></div>
+        <div class="muted">@<?= h($p['nick'] ?? $user) ?> <?php if (!empty($p['tag'])): ?>· <span class="tag"><?= render_tag($p["tag"]) ?></span><?php endif; ?></div>
         <?php if (!empty($p['status'])): ?><div style="margin-top:6px"><?= h($p['status']) ?></div><?php endif; ?>
       </div>
     </div>
