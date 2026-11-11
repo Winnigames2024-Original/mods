@@ -90,6 +90,34 @@ nginx -t
 systemctl reload nginx
 systemctl enable nginx >/dev/null 2>&1 || true
 
+echo "==> Настраиваю автообновление (systemd-таймер, каждые 5 минут)…"
+chmod +x "$SRC/site/update.sh"
+cat > /etc/systemd/system/narelauncher-update.service <<UNIT
+[Unit]
+Description=NareLauncher: автообновление сайта и nare-net из GitHub
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$SRC/site/update.sh
+UNIT
+
+cat > /etc/systemd/system/narelauncher-update.timer <<UNIT
+[Unit]
+Description=NareLauncher: проверять обновления каждые 5 минут
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now narelauncher-update.timer >/dev/null 2>&1 || true
+
 echo
 echo "================================================================"
 echo " Готово. Сайт: http://$DOMAIN/"
@@ -101,4 +129,8 @@ echo "   certbot --nginx -d $DOMAIN"
 echo
 echo " Проверь, что NareNet (Node) слушает 127.0.0.1:$NODE_PORT —"
 echo " его панели и API теперь доступны через этот же домен."
+echo
+echo " Автообновление включено: каждые 5 минут VPS тянет GitHub и сам"
+echo " применяет изменения сайта и nare-net.js (рестарт narenet только"
+echo " если файл поменялся). Статус: systemctl status narelauncher-update.timer"
 echo "================================================================"
