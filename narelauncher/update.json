@@ -1,12 +1,12 @@
 {
-  "version": "1.81",
+  "version": "1.82",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "3315df6d5b3d782f1b1a89fc5b06c1a1e2e16835",
-  "size": 859648,
+  "sha1": "e11dd36b968c022cdb7d82aec7e42f4fa0c24a7b",
+  "size": 859136,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "234b33709c25bc1f99387f82955a8ea619f19886",
   "smSize": 83968,
-  "notes": "Эффект вылетающих +N в кликере. (Мод 2.10.0: значок NV и микрофон над игроками, сила в ESP — собирается отдельно.)"
+  "notes": "Починены съехавшие заголовки секций в админ-панели (лишний Row сдвигал их на один)."
 }
