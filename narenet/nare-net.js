@@ -52,7 +52,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.47';
+const VERSION = '1.48';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -952,6 +952,13 @@ th{color:#8b93a7;font-weight:600} tr:hover td{background:#131824}
       <button class="red" onclick="restartAll('launchers')">⟳ Перезапустить лаунчеры у всех</button>
       <button class="red" onclick="restartAll('servers')">⟳ Перезапустить все серверы</button>
     </div>
+    <div class="row" style="margin-top:10px">
+      <input id="promoCode" placeholder="ПРОМОКОД" style="width:160px;text-transform:uppercase">
+      <input id="promoVal" type="number" min="1" placeholder="монет" style="width:110px">
+      <input id="promoMax" type="number" min="1" value="1" placeholder="активаций" style="width:120px">
+      <button class="pri" onclick="createPromo()">Создать промокод</button>
+    </div>
+    <div class="muted" style="margin-top:4px">Игроки вводят код в профиле и получают монеты. «Активаций» — на сколько игроков хватит.</div>
   </div>
   <div class="card">
     <div class="row"><input id="q" placeholder="поиск по нику…" oninput="draw()" style="flex:1;min-width:200px"></div>
@@ -1081,6 +1088,9 @@ function clearBroadcast(){api("/admin/broadcast",{text:"",seconds:0}).then(funct
 function restartAll(what){var n=what==="servers"?"все серверы":"лаунчеры у всех онлайн";
   if(!confirm("Точно перезапустить "+n+"?"))return;
   api("/admin/restart",{what:what}).then(function(d){done(d,"перезапуск разослан: "+n);});}
+function createPromo(){var c=(document.getElementById("promoCode").value||"").trim();var v=parseInt(document.getElementById("promoVal").value,10)||0;var m=parseInt(document.getElementById("promoMax").value,10)||1;
+  if(!c||!v){msg("код и сумма",false);return;}
+  api("/admin/promo/create",{code:c,value:v,max:m}).then(function(d){done(d,d.ok?("промокод "+d.code+" на "+d.value+" монет × "+d.max):null,d);});}
 var logTimer=null;
 function pollLogs(){
   api("/admin/logs",{}).then(function(d){
@@ -1205,6 +1215,13 @@ button:hover{border-color:#5b8cff} button.pri{background:#2f52d8;border-color:#2
       <button class="pri" onclick="daily()">Ежедневный бонус</button>
       <button class="pri" onclick="reward()">🎁 Награда дня</button></div>
     <div id="dailymsg" class="muted" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:12px"><input id="promoIn" placeholder="промокод" style="text-transform:uppercase"><button class="pri" onclick="redeemPromo()">Активировать</button></div>
+    <div id="promomsg" class="muted" style="margin-top:6px"></div>
+    <div style="margin-top:14px;border-top:1px solid #1b2232;padding-top:12px">
+      <b>🎰 Рулетка</b> <span class="muted">— ставь монеты, умножай удачу (×0, ×1.5, ×2, ×5)</span>
+      <div class="row" style="margin-top:8px"><input id="betIn" type="number" min="1" placeholder="ставка" style="width:140px"><button class="pri" onclick="spin()">Крутить</button></div>
+      <div id="spinmsg" class="muted" style="margin-top:6px"></div>
+    </div>
     <div class="row" style="margin-top:12px"><input id="chatname" placeholder="отображаемое имя в чатах (платно)"><button onclick="setName()">Задать</button></div>
   </div>
 
@@ -1277,6 +1294,15 @@ function reward(){api("/reward/daily",{}).then(function(d){
   if(!d.ok){document.getElementById("dailymsg").textContent=d.error||"ошибка";return;}
   document.getElementById("dailymsg").textContent=d.awarded?("Награда дня: +1000 монет и +1 сервер! Слотов: "+d.slots):("уже брали, через ~"+d.nextInH+" ч");
   if(d.coins!=null)document.getElementById("pcoins").textContent=d.coins;});}
+function redeemPromo(){var c=(document.getElementById("promoIn").value||"").trim();if(!c)return;
+  api("/promo/redeem",{code:c}).then(function(d){
+    document.getElementById("promomsg").textContent=d.ok?("+"+d.value+" монет!"):(d.error||"ошибка");
+    if(d.ok&&d.coins!=null)document.getElementById("pcoins").textContent=d.coins;});}
+function spin(){var b=parseInt(document.getElementById("betIn").value,10)||0;if(b<1){document.getElementById("spinmsg").textContent="впишите ставку";return;}
+  api("/roulette/spin",{bet:b}).then(function(d){
+    if(!d.ok){document.getElementById("spinmsg").textContent=d.error||"ошибка";return;}
+    document.getElementById("spinmsg").textContent=d.mult===0?("×0 — ставка "+d.bet+" сгорела"):("×"+d.mult+" — выигрыш "+d.win+" монет!");
+    if(d.coins!=null)document.getElementById("pcoins").textContent=d.coins;});}
 function setName(){var n=document.getElementById("chatname").value.trim();if(!n)return;
   api("/chatname/set",{name:n}).then(function(d){err(d.ok?"имя задано":(d.error||"ошибка"));});}
 function loadChat(){
@@ -1981,6 +2007,54 @@ function rewardMinute(req, res) {
         a.coins = (a.coins || 0) + MINUTE_REWARD;
         saveAccounts();
         send(res, 200, { ok: true, awarded: MINUTE_REWARD, coins: a.coins });
+    });
+}
+
+// ---------------------------------------------------------------- промокоды
+function adminPromoCreate(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const code = (body.code || '').trim().toUpperCase();
+        const value = Math.max(1, Math.trunc(Number(body.value) || 0));
+        const max = Math.max(1, Math.trunc(Number(body.max) || 1));
+        if (!code || !value) return send(res, 400, { error: 'нужны код и сумма' });
+        if (!policy.promos) policy.promos = {};
+        policy.promos[code] = { value, max, used: [] };
+        savePolicy();
+        send(res, 200, { ok: true, code, value, max });
+    });
+}
+function promoRedeem(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const code = (body.code || '').trim().toUpperCase();
+        const p = policy.promos && policy.promos[code];
+        if (!p) return send(res, 404, { error: 'нет такого кода' });
+        if (p.used.indexOf(nick) >= 0) return send(res, 400, { error: 'вы уже активировали этот код' });
+        if (p.used.length >= p.max) return send(res, 400, { error: 'код исчерпан' });
+        p.used.push(nick); savePolicy();
+        const a = acc(nick); a.coins = (a.coins || 0) + p.value; saveAccounts();
+        send(res, 200, { ok: true, value: p.value, coins: a.coins });
+    });
+}
+
+// ---------------------------------------------------------------- рулетка
+// Ставка монет: шанс потерять или умножить. Небольшой «дом» (EV ~0.96).
+function rouletteSpin(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(nick);
+        const bet = Math.max(1, Math.trunc(Number(body && body.bet) || 0));
+        if ((a.coins || 0) < bet) return send(res, 402, { error: 'не хватает монет' });
+        a.coins -= bet;
+        const r = Math.random();
+        let mult;
+        if (r < 0.52) mult = 0; else if (r < 0.82) mult = 1.5; else if (r < 0.95) mult = 2; else mult = 5;
+        const win = Math.floor(bet * mult);
+        a.coins += win; saveAccounts();
+        send(res, 200, { ok: true, mult, win, bet, coins: a.coins });
     });
 }
 
@@ -3815,6 +3889,9 @@ const server = http.createServer((req, res) => {
     if (route === '/restartflag') return send(res, 200, { ok: true, servers: policy.restartServers || 0, launchers: policy.restartLaunchers || 0 });
     if (route === '/reward/daily' && req.method === 'POST') return rewardDaily(req, res);
     if (route === '/reward/minute' && req.method === 'POST') return rewardMinute(req, res);
+    if (route === '/admin/promo/create' && req.method === 'POST') return adminPromoCreate(req, res);
+    if (route === '/promo/redeem' && req.method === 'POST') return promoRedeem(req, res);
+    if (route === '/roulette/spin' && req.method === 'POST') return rouletteSpin(req, res);
     if (route === '/admin/command' && req.method === 'POST') return adminCommand(req, res);
     if (route === '/admin/together' && req.method === 'POST') return adminTogether(req, res);
     if (route === '/admin/blockmod' && req.method === 'POST') return adminBlockMod(req, res);
