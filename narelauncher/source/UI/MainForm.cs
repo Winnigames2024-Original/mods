@@ -54,6 +54,8 @@ namespace NareLauncher.UI
         private System.Drawing.Image _bannerImg;
         private int _warnShown = -1;     // сколько предупреждений уже показали (с диска, на игрока)
         private long _broadcastShown = -1; // время последнего показанного объявления (с диска)
+        private Panel _adminBar;          // верхняя полоса-объявление от админа
+        private long _restartHandledL = -1; // время отработанного перезапуска лаунчера
         private bool _updatePrompting;   // чтобы окно обновления не всплывало дважды
         private long _updateHandledAt = -1; // время последнего отработанного экстренного обновления
         private bool _loggingOut;        // идёт выход после отвязки устройства
@@ -443,6 +445,9 @@ namespace NareLauncher.UI
             var evKick = new System.Windows.Forms.Timer { Interval = 2500 };
             evKick.Tick += delegate { evKick.Stop(); evKick.Dispose(); CheckEvents(); };
             evKick.Start();
+            var minuteTimer = new System.Windows.Forms.Timer { Interval = 60000 };
+            minuteTimer.Tick += delegate { ClaimMinuteReward(); };
+            minuteTimer.Start();
             CheckPolicy();
         }
 
@@ -534,17 +539,20 @@ namespace NareLauncher.UI
                 EmergencyMark.SaveKey("warns_" + nick, _warnShown);
             }
 
-            // объявление для всех — один раз на каждого, даже после перезапуска
-            if (policy.HasBroadcast)
+            // объявление от админа — верхняя полоса, пока активно (по времени)
+            bool bcActive = policy.HasBroadcast && !string.IsNullOrEmpty(policy.Broadcast)
+                && (policy.BroadcastUntil == 0 || NowMs() < policy.BroadcastUntil);
+            if (bcActive) ShowAdminBar(policy.BroadcastNick, policy.Broadcast);
+            else HideAdminBar();
+
+            // перезапуск лаунчера по команде админа
+            if (_restartHandledL < 0) _restartHandledL = EmergencyMark.LoadKey("restartL");
+            if (policy.RestartLaunchers > _restartHandledL)
             {
-                if (_broadcastShown < 0) _broadcastShown = EmergencyMark.LoadKey("broadcast");
-                if (policy.BroadcastAt > _broadcastShown)
-                {
-                    _broadcastShown = policy.BroadcastAt;
-                    EmergencyMark.SaveKey("broadcast", policy.BroadcastAt);
-                    MessageBox.Show(this, policy.Broadcast,
-                        "Объявление", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                _restartHandledL = policy.RestartLaunchers;
+                EmergencyMark.SaveKey("restartL", policy.RestartLaunchers);
+                try { Application.Restart(); } catch { }
+                try { Environment.Exit(0); } catch { }
             }
 
             // экстренное обновление — срабатывает по времени объявления, а не по
@@ -697,9 +705,82 @@ namespace NareLauncher.UI
                 close.Location = new Point(_eventBanner.Width - 30, 10);
                 _eventBanner.Controls.Add(title); _eventBanner.Controls.Add(desc); _eventBanner.Controls.Add(close);
             }
+            // Кликер 67 — отдельная кнопка на эвенте «67»
+            bool is67 = (ev.Id != null && ev.Id.IndexOf("67", StringComparison.Ordinal) >= 0)
+                        || (ev.Name != null && ev.Name.IndexOf("67", StringComparison.Ordinal) >= 0);
+            var acc67 = AccountStore.Selected;
+            if (is67 && acc67 != null && !string.IsNullOrEmpty(acc67.Token))
+            {
+                var play = new Button
+                {
+                    Text = "🪙 Кликер 67",
+                    FlatStyle = FlatStyle.Flat,
+                    ForeColor = Color.White,
+                    BackColor = Darken(accent),
+                    Font = Theme.F(10f, FontStyle.Bold),
+                    Size = new Size(140, 32),
+                    Cursor = Cursors.Hand,
+                    Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+                };
+                play.FlatAppearance.BorderColor = accent;
+                play.Location = new Point(16, _eventBanner.Height - 42);
+                play.Click += (s, e) =>
+                {
+                    try { using (var f = new NareClickerForm(acc67.Token, accent)) f.ShowDialog(this); }
+                    catch (Exception ex) { Notify("Кликер", "Не открылся: " + ex.Message); }
+                };
+                _eventBanner.Controls.Add(play); play.BringToFront();
+            }
+
             _eventBanner.Visible = true;
             _eventBanner.BringToFront();
             try { _content.PerformLayout(); } catch { }
+        }
+
+        private static long NowMs() { return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); }
+
+        /// <summary>Ежеминутная награда за онлайн — тихо начисляется, при начислении лёгкий тост.</summary>
+        private async void ClaimMinuteReward()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null || string.IsNullOrEmpty(acc.Token)) return;
+            try
+            {
+                int got = await NareAuth.MinuteRewardAsync(acc.Token, System.Threading.CancellationToken.None);
+                if (got > 0 && _toasts != null) _toasts.Push("Награда за онлайн", "+" + got + " монет", null);
+            }
+            catch { }
+        }
+
+        /// <summary>Верхняя полоса-объявление от админа (как плашка в Telegram).</summary>
+        private void ShowAdminBar(string nick, string text)
+        {
+            if (_adminBar == null)
+            {
+                _adminBar = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = Theme.Accent };
+                var lbl = new Label { Name = "txt", AutoSize = false, Dock = DockStyle.Fill, ForeColor = Color.White, BackColor = Color.Transparent, Font = Theme.F(10f, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(16, 0, 40, 0) };
+                var x = new Label { Text = "✕", AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent, Cursor = Cursors.Hand, Font = Theme.F(11f, FontStyle.Bold), Anchor = AnchorStyles.Right | AnchorStyles.Top };
+                x.Click += (s, e) => HideAdminBar();
+                _adminBar.Controls.Add(lbl);
+                _adminBar.Controls.Add(x);
+                _adminBar.Resize += (s, e) => { x.Location = new Point(_adminBar.Width - 28, 9); };
+                _content.Controls.Add(_adminBar);
+                x.Location = new Point(_adminBar.Width - 28, 9);
+            }
+            var t = _adminBar.Controls["txt"] as Label;
+            if (t != null) t.Text = "📢 " + (string.IsNullOrEmpty(nick) ? "" : nick + ": ") + text;
+            _adminBar.Visible = true;
+            _adminBar.BringToFront();
+            try { _content.PerformLayout(); } catch { }
+        }
+
+        private void HideAdminBar()
+        {
+            if (_adminBar != null && _adminBar.Visible)
+            {
+                _adminBar.Visible = false;
+                try { _content.PerformLayout(); } catch { }
+            }
         }
 
         private static Color Darken(Color c)
@@ -774,11 +855,8 @@ namespace NareLauncher.UI
 
         public void Notify(string title, string body)
         {
-            if (_toasts != null) _toasts.Push(title, body, () => OpenChats());
-
-            // системное уведомление Windows — показываем, когда окно не в фокусе
-            bool focused = (ActiveForm == this) && WindowState != FormWindowState.Minimized;
-            if (_tray != null && !focused)
+            // Уведомления Windows (в систему, не внутри окна) — показываем всегда.
+            if (_tray != null)
             {
                 try { _tray.ShowBalloonTip(5000, title, body ?? "", ToolTipIcon.Info); } catch { }
             }

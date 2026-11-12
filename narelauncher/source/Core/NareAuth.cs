@@ -24,7 +24,13 @@ namespace NareLauncher.Core
 
         public bool HasBroadcast;
         public string Broadcast = "";
+        public string BroadcastNick = "";
         public long BroadcastAt;
+        public long BroadcastUntil;   // 0 — висит, пока не уберут
+
+        public long RestartLaunchers;
+        public long RestartServers;
+        public long ServerSlots;
 
         public bool HasUpdate;
         public string UpdateVersion = "";
@@ -184,7 +190,9 @@ namespace NareLauncher.Core
             {
                 policy.HasBroadcast = true;
                 policy.Broadcast = broadcast["text"].AsString("");
+                policy.BroadcastNick = broadcast["nick"].AsString("");
                 policy.BroadcastAt = broadcast["at"].AsLong(0);
+                policy.BroadcastUntil = broadcast["until"].AsLong(0);
             }
 
             var update = json["update"];
@@ -209,6 +217,9 @@ namespace NareLauncher.Core
             policy.IsAdmin = json["admin"].AsBool(false);
             policy.IsModerator = json["moderator"].AsBool(false);
             policy.Maintenance = json["maintenance"].AsString("");
+            policy.RestartLaunchers = json["restartLaunchers"].AsLong(0);
+            policy.RestartServers = json["restartServers"].AsLong(0);
+            policy.ServerSlots = json["serverSlots"].AsLong(0);
 
             return policy;
         }
@@ -254,11 +265,29 @@ namespace NareLauncher.Core
             await PostAsync("/admin/warn", body, ct).ConfigureAwait(false);
         }
 
-        public static async Task BroadcastAsync(string token, string text, CancellationToken ct)
+        public static async Task BroadcastAsync(string token, string text, int seconds, CancellationToken ct)
         {
             var body = Admin(token);
             body.Set("text", text);
+            body.Set("seconds", seconds);
             await PostAsync("/admin/broadcast", body, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>Перезапустить у всех: what = "launchers" | "servers" | "all".</summary>
+        public static async Task RestartAsync(string token, string what, CancellationToken ct)
+        {
+            var body = Admin(token);
+            body.Set("what", what);
+            await PostAsync("/admin/restart", body, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>Ежеминутная награда за онлайн. Возвращает сколько начислено (0 — ещё рано).</summary>
+        public static async Task<int> MinuteRewardAsync(string token, CancellationToken ct)
+        {
+            var body = Json.NewObject();
+            body.Set("token", token);
+            var j = await PostAsync("/reward/minute", body, ct).ConfigureAwait(false);
+            return j == null ? 0 : j["awarded"].AsInt(0);
         }
 
         public static async Task CommandAsync(string token, string text, CancellationToken ct)

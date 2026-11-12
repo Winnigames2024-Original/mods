@@ -1,12 +1,12 @@
 {
-  "version": "1.85",
+  "version": "1.86",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "93872deb6a3e42f9bb272f9ea4c4e6e5e77dc13f",
+  "sha1": "eac4ccd935a514723f91e862be738f5034d8b415",
   "size": 866304,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "«Мои серверы» теперь находит сервера из папки servers/, даже если их нет в сохранённой настройке (после переустановки/ручного создания)."
+  "notes": "Исправлен выбор версии для гибрида (Arclight): раньше 1.21.1 ошибочно скачивал 1.21.11 (совпадение по подстроке). Теперь версия подбирается точно, а если нужной нет — показывается список доступных."
 }

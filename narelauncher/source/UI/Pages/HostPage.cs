@@ -49,6 +49,8 @@ namespace NareLauncher.UI
         private readonly ComboBox _list = new ComboBox();
         private readonly RoundBtn _create = new RoundBtn();
         private readonly RoundBtn _dl = new RoundBtn();
+        private readonly RoundBtn _import = new RoundBtn();
+        private readonly RoundBtn _net = new RoundBtn();
 
         private readonly CardPanel _hdr = new CardPanel();
         private readonly Label _srvName = new Label();
@@ -89,6 +91,7 @@ namespace NareLauncher.UI
         private readonly FlowLayoutPanel _jarsFlow = new FlowLayoutPanel();
         private readonly Label _jarsTitle = new Label();
         private readonly TextBox _jarsSearch = new TextBox();
+        private Button _hybridModsBtn, _hybridPlugsBtn;
         private List<ModProject> _catalog = new List<ModProject>();
         private Button[] _jarsBtns;
         private readonly CardPanel _propsPanel = new CardPanel();
@@ -124,10 +127,20 @@ namespace NareLauncher.UI
             _create.Click += (s, e) => CreateServer();
             Controls.Add(_create);
 
-            StyleBtn(_dl, "Скачать jar", CCard, CDim, CBorder);
+            StyleBtn(_dl, "Ядро / версия", CCard, CDim, CBorder);
             _dl.Bounds = new Rectangle(508, 73, 150, 30);
             _dl.Click += (s, e) => DownloadJar();
             Controls.Add(_dl);
+
+            StyleBtn(_import, "Перенести мир", CCard, CDim, CBorder);
+            _import.Bounds = new Rectangle(668, 73, 150, 30);
+            _import.Click += (s, e) => ImportWorld();
+            Controls.Add(_import);
+
+            StyleBtn(_net, "IP и порты", CCard, CDim, CBorder);
+            _net.Bounds = new Rectangle(828, 73, 130, 30);
+            _net.Click += (s, e) => ShowServerNetwork();
+            Controls.Add(_net);
 
             // карточка сервера
             _hdr.Bounds = new Rectangle(24, 114, 760, 92);
@@ -269,6 +282,44 @@ namespace NareLauncher.UI
                 int.TryParse(p[2], out port);
                 _servers.Add(new Entry { Id = p[0], Folder = p[1], Port = port });
             }
+
+            // Подхватываем сервера из папки servers/, которых нет в настройке
+            // (например после переустановки или если создавались вручную).
+            try
+            {
+                string root = Path.Combine(Paths.DataDir, "servers");
+                if (Directory.Exists(root))
+                {
+                    bool added = false;
+                    foreach (var dir in Directory.GetDirectories(root))
+                    {
+                        string id = Path.GetFileName(dir);
+                        bool known = false;
+                        foreach (var e in _servers) if (string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase)) { known = true; break; }
+                        if (known) continue;
+
+                        int port = 25600 + _servers.Count;
+                        try
+                        {
+                            string rj = Path.Combine(dir, "nare_run.json");
+                            if (File.Exists(rj)) { var j = Json.Parse(File.ReadAllText(rj)); int pp = j["port"].AsInt(0); if (pp > 0) port = pp; }
+                        }
+                        catch { }
+                        _servers.Add(new Entry { Id = id, Folder = dir, Port = port });
+                        added = true;
+                    }
+                    if (added)
+                    {
+                        var sb2 = new StringBuilder();
+                        foreach (var e in _servers)
+                            sb2.Append(e.Id).Append('|').Append(e.Folder).Append('|').Append(e.Port).Append('\n');
+                        Settings.Current.HostServers = sb2.ToString();
+                        Settings.Save();
+                    }
+                }
+            }
+            catch { }
+
             RefreshList();
         }
 
@@ -483,7 +534,7 @@ namespace NareLauncher.UI
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.MaximizeBox = false; dlg.MinimizeBox = false;
-                dlg.ClientSize = new Size(340, 236);
+                dlg.ClientSize = new Size(340, 336);
                 dlg.BackColor = CBg; dlg.ForeColor = CText; dlg.Font = Theme.F(10f);
 
                 dlg.Controls.Add(new Label
@@ -497,7 +548,9 @@ namespace NareLauncher.UI
                     new[]{"forge","Forge","моды Forge (ставится установщиком)"},
                     new[]{"fabric","Fabric","моды Fabric (лёгкий, быстрый)"},
                     new[]{"vanilla","Vanilla","чистый сервер Mojang"},
-                    new[]{"paper","Paper","плагины, оптимизирован"}
+                    new[]{"paper","Paper","плагины, оптимизирован"},
+                    new[]{"hybrid-neoforge","Гибрид NeoForge","моды NeoForge + плагины (Arclight, 1.21.1)"},
+                    new[]{"hybrid-fabric","Гибрид Fabric","моды Fabric + плагины (Arclight, 1.21.1)"}
                 };
                 int y = 44;
                 foreach (var d in defs)
@@ -522,7 +575,11 @@ namespace NareLauncher.UI
             if (_sel == null) { Append("Сначала создай или выбери сервер."); return; }
             string type = ChooseCore();
             if (type == null) return;
-            string ver = InputPrompt.Ask(FindForm(), "Версия Minecraft (напр. 1.21.4):", "1.21.4");
+            string defVer = type.StartsWith("hybrid") ? "1.21.1" : "1.21.4";
+            string hint = type.StartsWith("hybrid")
+                ? "Версия для гибрида (есть 1.21.1 / 1.21 / 1.20.4):"
+                : "Версия Minecraft (напр. 1.21.4):";
+            string ver = InputPrompt.Ask(FindForm(), hint, defVer);
             if (string.IsNullOrEmpty(ver)) return;
             var entry = _sel;
             Append("Скачивание " + type + " " + ver + "...");
@@ -532,9 +589,82 @@ namespace NareLauncher.UI
                 {
                     ServerJar.Download(type, ver, entry.Folder, s => Ui(() => Append(s)));
                     Ui(() => Append("Jar скачан. Теперь жми «Запустить»."));
+                    // авто-установка NareVisuals на Forge 1.21.4 (мод именно под Forge 1.21.4)
+                    if (ver == "1.21.4" && type == "forge") AutoInstallVisuals(entry.Folder);
                 }
                 catch (Exception ex) { Ui(() => Append("Не удалось скачать jar: " + ex.Message)); }
             }) { IsBackground = true }.Start();
+        }
+
+        /// <summary>Кладёт встроенный NareVisuals в папку mods сервера (Forge 1.21.4).</summary>
+        private void AutoInstallVisuals(string folder)
+        {
+            try
+            {
+                BundledMods.JarSource vis = null;
+                foreach (var s in BundledMods.Sources())
+                    if (s.Name.StartsWith("forge_narevisuals", StringComparison.OrdinalIgnoreCase)) { vis = s; break; }
+                if (vis == null) { Ui(() => Append("NareVisuals не найден в сборке лаунчера — пропускаю.")); return; }
+                string mods = Path.Combine(folder, "mods");
+                Directory.CreateDirectory(mods);
+                File.WriteAllBytes(Path.Combine(mods, vis.Name), vis.Data);
+                Ui(() => Append("Мод NareVisuals добавлен на сервер (" + vis.Name + ")."));
+            }
+            catch (Exception ex) { Ui(() => Append("NareVisuals не добавлен: " + ex.Message)); }
+        }
+
+        /// <summary>Показывает прямой IP сервера и проверяет известные порты на нём.</summary>
+        private void ShowServerNetwork()
+        {
+            if (_sel == null) { Append("Сначала выбери сервер."); return; }
+            string host = Nick + "-" + _sel.Id + ".narelauncher.winnigames2024.ru";
+            Append("Определяю IP и проверяю порты: " + host + " …");
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    string ip = "(не определился)";
+                    try { var a = Dns.GetHostAddresses(host); if (a.Length > 0) ip = a[0].ToString(); } catch { }
+                    Ui(() => Append("Прямой IP: " + ip + "   (адрес входа: " + host + ")"));
+
+                    var ports = new[] {
+                        new object[]{25565,"Minecraft Java (TCP)"},
+                        new object[]{25575,"RCON (TCP)"},
+                        new object[]{2445,"NareNet"},
+                        new object[]{24454,"Voice Chat (TCP-проба)"},
+                        new object[]{80,"HTTP"},
+                        new object[]{443,"HTTPS"},
+                        new object[]{8080,"Web alt"},
+                        new object[]{22,"SSH"}
+                    };
+                    string target = ip == "(не определился)" ? host : ip;
+                    foreach (var p in ports)
+                    {
+                        int port = (int)p[0]; string label = (string)p[1];
+                        bool open = PortOpen(target, port, 700);
+                        Ui(() => Append("  порт " + port + " (" + label + "): " + (open ? "ОТКРЫТ" : "закрыт/не отвечает")));
+                    }
+                    Ui(() => Append("Готово. UDP-порты (Bedrock 19132 и т.п.) так не проверить."));
+                }
+                catch (Exception ex) { Ui(() => Append("Сеть: " + ex.Message)); }
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private static bool PortOpen(string host, int port, int ms)
+        {
+            try
+            {
+                using (var c = new System.Net.Sockets.TcpClient())
+                {
+                    var ar = c.BeginConnect(host, port, null, null);
+                    bool ok = ar.AsyncWaitHandle.WaitOne(ms);
+                    if (!ok) return false;
+                    c.EndConnect(ar);
+                    return true;
+                }
+            }
+            catch { return false; }
         }
 
         private void StopSel() { if (_sel != null) { StopHost(_sel); SetOnline(false); } }
@@ -639,6 +769,89 @@ namespace NareLauncher.UI
             _log.AppendText(s + "\r\n");
         }
 
+        // ---------------------------------------------------------- перенос мира
+        private void ImportWorld()
+        {
+            if (_sel == null) { Append("Сначала выбери сервер в списке."); return; }
+            string saves = "";
+            try { saves = Path.Combine(Paths.DefaultGameRoot, "saves"); } catch { }
+            using (var dlg = new FolderBrowserDialog())
+            {
+                dlg.Description = "Выбери папку локального мира (обычно .minecraft/saves/<мир>)";
+                if (Directory.Exists(saves)) dlg.SelectedPath = saves;
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+
+                string src = dlg.SelectedPath;
+                if (!File.Exists(Path.Combine(src, "level.dat")))
+                {
+                    MessageBox.Show(this, "В этой папке нет level.dat — это не мир Minecraft.", "Перенос мира", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                string wname = Path.GetFileName(src.TrimEnd('\\', '/'));
+                if (MessageBox.Show(this, "Перенести мир «" + wname + "» в этот сервер?\nТекущий мир сервера будет заменён.", "Перенос мира", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+
+                bool paper = CoreOf(_sel) == "paper";
+                string folder = _sel.Folder;
+                _import.Enabled = false;
+                Append("Переношу мир «" + wname + "»…");
+                new System.Threading.Thread(() =>
+                {
+                    string msg;
+                    try { ImportWorldInto(src, folder, paper); msg = "Мир перенесён. Запусти сервер."; }
+                    catch (Exception ex) { msg = "Перенос не удался: " + ex.Message; }
+                    Ui(() => { Append(msg); _import.Enabled = true; });
+                })
+                { IsBackground = true }.Start();
+            }
+        }
+
+        private static void ImportWorldInto(string src, string folder, bool paper)
+        {
+            string world = Path.Combine(folder, "world");
+            foreach (var w in new[] { "world", "world_nether", "world_the_end" })
+            {
+                try { string p = Path.Combine(folder, w); if (Directory.Exists(p)) Directory.Delete(p, true); } catch { }
+            }
+            CopyDir(src, world);
+
+            if (paper)
+            {
+                // у Paper измерения — отдельные папки; выносим DIM-1 и DIM1 из мира
+                string dimN = Path.Combine(world, "DIM-1");
+                string dimE = Path.Combine(world, "DIM1");
+                if (Directory.Exists(dimN))
+                {
+                    string dst = Path.Combine(folder, "world_nether");
+                    CopyDir(dimN, Path.Combine(dst, "DIM-1"));
+                    CopyLevelDat(world, dst);
+                    try { Directory.Delete(dimN, true); } catch { }
+                }
+                if (Directory.Exists(dimE))
+                {
+                    string dst = Path.Combine(folder, "world_the_end");
+                    CopyDir(dimE, Path.Combine(dst, "DIM1"));
+                    CopyLevelDat(world, dst);
+                    try { Directory.Delete(dimE, true); } catch { }
+                }
+            }
+        }
+
+        private static void CopyLevelDat(string from, string toDir)
+        {
+            try { Directory.CreateDirectory(toDir); var ld = Path.Combine(from, "level.dat"); if (File.Exists(ld)) File.Copy(ld, Path.Combine(toDir, "level.dat"), true); } catch { }
+        }
+
+        private static void CopyDir(string src, string dst)
+        {
+            Directory.CreateDirectory(dst);
+            foreach (var f in Directory.GetFiles(src))
+            {
+                try { File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true); } catch { }
+            }
+            foreach (var d in Directory.GetDirectories(src))
+                CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
+        }
+
         private static Label Title(string text, float size, FontStyle st, Color fg, Rectangle b)
         {
             return new Label { Text = text, Font = Theme.F(size, st), ForeColor = fg, BackColor = Color.Transparent, AutoSize = false, Bounds = b };
@@ -709,6 +922,11 @@ namespace NareLauncher.UI
             _jarsPanel.Controls.Add(_jarsFlow);
             _jarsBtns = new[] { Mk("Искать", SearchCatalog), Mk("Папка", OpenJarsFolder), Mk("На сайте", OpenOnSite) };
             foreach (var b in _jarsBtns) _jarsPanel.Controls.Add(b);
+            // переключатель Моды/Плагины для гибрида
+            _hybridModsBtn = Mk("Моды", () => { _hybridPlugins = false; RefreshJars(); });
+            _hybridPlugsBtn = Mk("Плагины", () => { _hybridPlugins = true; RefreshJars(); });
+            _hybridModsBtn.Visible = false; _hybridPlugsBtn.Visible = false;
+            _jarsPanel.Controls.Add(_hybridModsBtn); _jarsPanel.Controls.Add(_hybridPlugsBtn);
 
             _propsPanel.Visible = false; Controls.Add(_propsPanel);
             _propsText.Multiline = true; _propsText.ScrollBars = ScrollBars.Both; _propsText.WordWrap = false;
@@ -777,6 +995,11 @@ namespace NareLauncher.UI
             _jarsTitle.Bounds = new Rectangle(12, 10, w - 24, 18);
             _jarsSearch.Bounds = new Rectangle(12, 32, w - 24, 28);
             if (_jarsBtns != null) foreach (var b in _jarsBtns) { b.Bounds = new Rectangle(x, 66, 118, 28); x += 126; }
+            if (_hybridModsBtn != null)
+            {
+                _hybridModsBtn.Bounds = new Rectangle(w - 24 - 170, 66, 82, 28);
+                _hybridPlugsBtn.Bounds = new Rectangle(w - 24 - 84, 66, 82, 28);
+            }
             _jarsFlow.Bounds = new Rectangle(12, 102, w - 24, Math.Max(40, _jarsPanel.Height - 114));
             SizeCards();
         }
@@ -808,9 +1031,12 @@ namespace NareLauncher.UI
             return new[] { "", "" };
         }
         private string CoreOf(Entry e) { return e == null ? "" : ReadMeta(e.Folder)[0]; }
+        private bool _hybridPlugins;   // для гибрида: показываем плагины (true) или моды (false)
+        private bool IsHybrid() { return CoreOf(_sel).StartsWith("hybrid"); }
         private string JarsSub()
         {
             string core = CoreOf(_sel);
+            if (core.StartsWith("hybrid")) return _hybridPlugins ? "plugins" : "mods";
             if (core == "paper") return "plugins";
             if (core == "forge" || core == "fabric") return "mods";
             if (_sel != null)
@@ -823,8 +1049,23 @@ namespace NareLauncher.UI
         private void UpdateJarsLabel()
         {
             bool plugins = JarsSub() == "plugins";
-            _tabJars.Text = plugins ? "Плагины" : "Моды";
-            _jarsTitle.Text = plugins ? "Плагины (папка plugins) — для Paper" : "Моды (папка mods) — для Forge/Fabric";
+            bool hyb = IsHybrid();
+            // переключатель Моды/Плагины — только для гибрида
+            if (_hybridModsBtn != null) { _hybridModsBtn.Visible = hyb; _hybridPlugsBtn.Visible = hyb; }
+            if (hyb)
+            {
+                _tabJars.Text = "Моды + плагины";
+                if (_hybridModsBtn != null)
+                {
+                    StyleBtn(_hybridModsBtn, "Моды", plugins ? CCard : CAccent, plugins ? CDim : Color.White, plugins ? CBorder : CAccent);
+                    StyleBtn(_hybridPlugsBtn, "Плагины", plugins ? CAccent : CCard, plugins ? Color.White : CDim, plugins ? CAccent : CBorder);
+                }
+            }
+            else
+            {
+                _tabJars.Text = plugins ? "Плагины" : "Моды";
+            }
+            _jarsTitle.Text = plugins ? "Плагины (папка plugins)" : "Моды (папка mods)";
         }
         private void RefreshActiveView()
         {
@@ -878,7 +1119,11 @@ namespace NareLauncher.UI
             bool plugins = JarsSub() == "plugins";
             string core = CoreOf(_sel);
             string type = plugins ? "plugin" : "mod";
-            string cat = plugins ? "paper" : (core == "fabric" ? "fabric" : (core == "forge" ? "forge" : ""));
+            string cat = plugins ? "paper"
+                : (core == "fabric" || core == "hybrid-fabric") ? "fabric"
+                : core == "forge" ? "forge"
+                : core == "hybrid-neoforge" ? "neoforge"
+                : "";
             string ver = ReadMeta(_sel.Folder)[1];
             string q = (_jarsSearch.Text ?? "").Trim();
             _jarsTitle.Text = (plugins ? "Плагины для Paper" : "Моды для " + (cat == "" ? "сервера" : cat))
@@ -906,10 +1151,19 @@ namespace NareLauncher.UI
 
         private Panel BuildPluginCard(ModProject pr)
         {
-            var card = new Panel { Height = 80, BackColor = CCard, Margin = new Padding(0, 0, 0, 8) };
+            var card = new Panel { Height = 80, BackColor = CCard, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(0) };
 
-            var pic = new PictureBox { Dock = DockStyle.Left, Width = 80, SizeMode = PictureBoxSizeMode.Zoom, BackColor = CTermBg };
-            card.Controls.Add(pic);
+            // ВАЖНО: порядок добавления задаёт z-order и порядок раскладки Dock.
+            // Панель Fill нужно добавить ПЕРВОЙ (ниже всех), иначе она займёт всю
+            // карточку и уедет под иконку слева — текст будет обрезан.
+            var mid = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+            var title = new Label { Text = pr.Title, Dock = DockStyle.Top, Height = 24, Padding = new Padding(2, 2, 6, 0), ForeColor = CText, BackColor = Color.Transparent, Font = Theme.F(11f, FontStyle.Bold), AutoEllipsis = true };
+            var meta = new Label { Text = VideosPage.Nfmt(pr.Downloads) + " загрузок", Dock = DockStyle.Top, Height = 16, Padding = new Padding(2, 0, 6, 0), ForeColor = CAccent, BackColor = Color.Transparent, Font = Theme.F(8.5f, FontStyle.Bold), AutoEllipsis = true };
+            var desc = new Label { Text = pr.Desc, Dock = DockStyle.Fill, Padding = new Padding(2, 2, 6, 2), ForeColor = CDim, BackColor = Color.Transparent, Font = Theme.F(8.5f), AutoEllipsis = true };
+            // при Dock порядок добавления = снизу вверх: Fill первым, затем Top-ы
+            mid.Controls.Add(desc); mid.Controls.Add(meta); mid.Controls.Add(title);
+            mid.Padding = new Padding(12, 10, 8, 8);
+            card.Controls.Add(mid);
 
             var install = new Button { Dock = DockStyle.Right, Width = 120 };
             StyleBtn(install, "Установить", Color.FromArgb(18, 58, 34), CGreen, Color.FromArgb(28, 92, 53));
@@ -918,12 +1172,8 @@ namespace NareLauncher.UI
             install.Click += (s, e) => InstallProject(proj);
             card.Controls.Add(install);
 
-            var mid = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-            var title = new Label { Text = pr.Title, Bounds = new Rectangle(12, 8, 400, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CText, BackColor = Color.Transparent, Font = Theme.F(11f, FontStyle.Bold) };
-            var meta = new Label { Text = VideosPage.Nfmt(pr.Downloads) + " загрузок", Bounds = new Rectangle(12, 32, 400, 16), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CAccent, BackColor = Color.Transparent, Font = Theme.F(8.5f, FontStyle.Bold) };
-            var desc = new Label { Text = pr.Desc, Bounds = new Rectangle(12, 50, 400, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = CDim, BackColor = Color.Transparent, Font = Theme.F(8.5f) };
-            mid.Controls.Add(desc); mid.Controls.Add(meta); mid.Controls.Add(title);
-            card.Controls.Add(mid);
+            var pic = new PictureBox { Dock = DockStyle.Left, Width = 80, SizeMode = PictureBoxSizeMode.Zoom, BackColor = CTermBg };
+            card.Controls.Add(pic);
 
             if (!string.IsNullOrEmpty(pr.IconUrl)) LoadIcon(pr.IconUrl, pic);
             return card;

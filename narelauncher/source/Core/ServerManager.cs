@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 
 namespace NareLauncher.Core
@@ -115,6 +116,7 @@ namespace NareLauncher.Core
             try { File.WriteAllText(Path.Combine(Folder, "nare_pid.txt"), _proc.Id.ToString()); } catch { }
             _proc.BeginOutputReadLine();
             _proc.BeginErrorReadLine();
+            StartAntiLag();
         }
 
         public void Send(string cmd)
@@ -124,8 +126,144 @@ namespace NareLauncher.Core
             catch { }
         }
 
+        // ---------------------------------------------------------- анти-лаг (TNT)
+        private System.Threading.Timer _antiTimer;
+        private bool _antiInit;
+
+        public class AntiLag { public bool On; public int Max = 100; }
+
+        public static AntiLag ReadAntiLag(string folder)
+        {
+            try
+            {
+                string f = Path.Combine(folder, "nare_antilag.json");
+                if (File.Exists(f)) { var j = Json.Parse(File.ReadAllText(f)); return new AntiLag { On = j["on"].AsBool(false), Max = j["max"].AsInt(100) }; }
+            }
+            catch { }
+            return new AntiLag();
+        }
+        public static void WriteAntiLag(string folder, AntiLag a)
+        {
+            try { File.WriteAllText(Path.Combine(folder, "nare_antilag.json"), "{\"on\":" + (a.On ? "true" : "false") + ",\"max\":" + a.Max + "}"); } catch { }
+        }
+
+        private void StartAntiLag()
+        {
+            _antiInit = false;
+            if (_antiTimer == null)
+                _antiTimer = new System.Threading.Timer(_ => AntiTick(), null, 8000, 8000);
+        }
+        private void AntiTick()
+        {
+            try
+            {
+                if (!Running) return;
+                var a = ReadAntiLag(Folder);
+                if (!a.On) return;
+                if (!_antiInit) { Send("scoreboard objectives add nareTnt dummy"); _antiInit = true; }
+                int max = a.Max < 10 ? 10 : a.Max;
+                Send("scoreboard players set #c nareTnt 0");
+                Send("execute as @e[type=minecraft:tnt] run scoreboard players add #c nareTnt 1");
+                Send("execute if score #c nareTnt matches " + max + ".. run kill @e[type=minecraft:tnt]");
+            }
+            catch { }
+        }
+
+        // ---------------------------------------------------------- вайтлист / опы
+        /// <summary>Имена из whitelist.json или ops.json (читаются с диска).</summary>
+        public string[] ReadNameList(string file)
+        {
+            var list = new List<string>();
+            try
+            {
+                string f = Path.Combine(Folder, file);
+                if (!File.Exists(f)) return list.ToArray();
+                string txt = File.ReadAllText(f);
+                int i = 0;
+                while (true)
+                {
+                    int k = txt.IndexOf("\"name\"", i, StringComparison.Ordinal);
+                    if (k < 0) break;
+                    int q1 = txt.IndexOf('"', k + 6); if (q1 < 0) break;
+                    int q2 = txt.IndexOf('"', q1 + 1); if (q2 < 0) break;
+                    q1 = txt.IndexOf('"', q2 + 1); if (q1 < 0) break;      // открывающая кавычка значения
+                    q2 = txt.IndexOf('"', q1 + 1); if (q2 < 0) break;      // закрывающая
+                    list.Add(txt.Substring(q1 + 1, q2 - q1 - 1));
+                    i = q2 + 1;
+                }
+            }
+            catch { }
+            return list.ToArray();
+        }
+
+        // ---------------------------------------------------------- бэкапы
+        /// <summary>Делает zip мира(ов) в backups/. Если сервер онлайн — безопасно
+        /// через save-off/save-all. Возвращает имя файла.</summary>
+        public string MakeBackup()
+        {
+            string dir = Path.Combine(Folder, "backups");
+            Directory.CreateDirectory(dir);
+            string stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+            string zip = Path.Combine(dir, "backup-" + stamp + ".zip");
+            bool online = Running;
+            try
+            {
+                if (online) { Send("save-off"); Send("save-all flush"); System.Threading.Thread.Sleep(2500); }
+                using (var z = System.IO.Compression.ZipFile.Open(zip, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    foreach (var world in new[] { "world", "world_nether", "world_the_end" })
+                    {
+                        string wp = Path.Combine(Folder, world);
+                        if (Directory.Exists(wp)) AddDir(z, wp, world);
+                    }
+                    foreach (var f in new[] { "server.properties", "whitelist.json", "ops.json", "banned-players.json" })
+                    {
+                        string fp = Path.Combine(Folder, f);
+                        if (File.Exists(fp)) z.CreateEntryFromFile(fp, f);
+                    }
+                }
+            }
+            finally { if (online) Send("save-on"); }
+            return Path.GetFileName(zip);
+        }
+        private static void AddDir(System.IO.Compression.ZipArchive z, string dir, string prefix)
+        {
+            foreach (var f in Directory.GetFiles(dir))
+            {
+                try { z.CreateEntryFromFile(f, prefix + "/" + Path.GetFileName(f)); } catch { }
+            }
+            foreach (var d in Directory.GetDirectories(dir))
+                AddDir(z, d, prefix + "/" + Path.GetFileName(d));
+        }
+        public string[] ListBackups()
+        {
+            try
+            {
+                string dir = Path.Combine(Folder, "backups");
+                if (!Directory.Exists(dir)) return new string[0];
+                var files = new List<string>(Directory.GetFiles(dir, "*.zip"));
+                files.Sort(); files.Reverse();
+                for (int i = 0; i < files.Count; i++) files[i] = Path.GetFileName(files[i]);
+                return files.ToArray();
+            }
+            catch { return new string[0]; }
+        }
+        /// <summary>Восстанавливает бэкап. Сервер должен быть остановлен (проверяет вызывающий).</summary>
+        public void RestoreBackup(string name)
+        {
+            string zip = Path.Combine(Folder, "backups", Path.GetFileName(name));
+            if (!File.Exists(zip)) throw new Exception("нет такого бэкапа");
+            foreach (var world in new[] { "world", "world_nether", "world_the_end" })
+            {
+                string wp = Path.Combine(Folder, world);
+                try { if (Directory.Exists(wp)) Directory.Delete(wp, true); } catch { }
+            }
+            System.IO.Compression.ZipFile.ExtractToDirectory(zip, Folder);
+        }
+
         public void Stop()
         {
+            try { if (_antiTimer != null) { _antiTimer.Dispose(); _antiTimer = null; } } catch { }
             try { File.Delete(Path.Combine(Folder, "nare_pid.txt")); } catch { }
             if (!Running) return;
             try

@@ -112,6 +112,7 @@
     <Compile Include="UI\Pages\HostPage.cs" />
     <Compile Include="UI\Pages\VideosPage.cs" />
     <Compile Include="UI\NareProfileForm.cs" />
+    <Compile Include="UI\NareClickerForm.cs" />
     <Compile Include="UI\WheelFilter.cs" />
     <Compile Include="UI\EventsAdminForm.cs" />
     <Compile Include="Core\Paths.cs" />

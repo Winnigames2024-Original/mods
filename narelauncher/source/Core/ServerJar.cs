@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -24,6 +25,12 @@ namespace NareLauncher.Core
             if (type == "forge")
             {
                 InstallForge(version, folder, log);
+            }
+            else if (type.StartsWith("hybrid"))
+            {
+                // гибрид «моды+плагины» — Arclight (NeoForge/Fabric + Bukkit)
+                string loader = type.Contains("fabric") ? "fabric" : "neoforge";
+                InstallArclight(version, loader, folder, log);
             }
             else
             {
@@ -181,6 +188,55 @@ namespace NareLauncher.Core
             string serverUrl = vj["downloads"]["server"]["url"].AsString("");
             if (log != null) log("Vanilla " + version);
             return string.IsNullOrEmpty(serverUrl) ? null : serverUrl;
+        }
+
+        // -------------------- Arclight (гибрид) --------------------
+
+        /// <summary>Скачивает Arclight нужного лоадера/версии с GitHub Releases.</summary>
+        private static void InstallArclight(string version, string loader, string folder, Action<string> log)
+        {
+            if (log != null) log("Ищу Arclight " + loader + " " + version + " на GitHub…");
+            string json = Get("https://api.github.com/repos/IzzelAliz/Arclight/releases?per_page=40");
+            var root = Json.Parse(json);
+
+            // Собираем все jar для нужного лоадера: имя вида arclight-<loader>-<mcver>-<arcver>...
+            string url = null, fname = null;
+            string key = loader.ToLowerInvariant() + "-";
+            var avail = new List<string>();          // доступные версии MC для этого лоадера
+            foreach (var rel in root.Items)
+            {
+                foreach (var a in rel["assets"].Items)
+                {
+                    string name = a["name"].AsString("");
+                    string low = name.ToLowerInvariant();
+                    if (!low.EndsWith(".jar")) continue;
+                    if (low.Contains("sources") || low.Contains("javadoc")) continue;
+                    int i = low.IndexOf(key);
+                    if (i < 0) continue;
+                    int vs = i + key.Length;
+                    int ve = low.IndexOf('-', vs);
+                    if (ve < 0) continue;
+                    string ver = low.Substring(vs, ve - vs);   // например "1.21.1" или "1.21.11"
+                    if (!avail.Contains(ver)) avail.Add(ver);
+                    if (ver == version && url == null)          // точное совпадение, берём самый свежий билд
+                    {
+                        url = a["browser_download_url"].AsString(""); fname = name;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(url))
+            {
+                string list = avail.Count > 0 ? string.Join(", ", avail.ToArray()) : "нет";
+                throw new Exception("Arclight " + loader + " для версии " + version + " не найден. " +
+                    "Доступные версии: " + list + ". " +
+                    "Выбери одну из них в «Ядро / версия» или скачай jar вручную с arclight.izzel.io.");
+            }
+
+            string dest = Path.Combine(folder, "server.jar");
+            if (log != null) log("Скачиваю: " + fname);
+            DownloadFile(url, dest);
+            if (log != null) log("Готово: server.jar (" + (new FileInfo(dest).Length / 1024 / 1024) + " МБ)");
         }
 
         // -------------------- helpers --------------------

@@ -30,8 +30,11 @@ namespace NareLauncher.UI.Pages
         private readonly NareButton _warn = new NareButton { Text = "Предупредить", Style = BtnStyle.Accent, Size = new Size(160, 38) };
 
         // объявление и команда
-        private readonly NareTextBox _broadcast = new NareTextBox { Placeholder = "Объявление всем (пусто — убрать)" };
-        private readonly NareButton _broadcastGo = new NareButton { Text = "Объявить", Style = BtnStyle.Accent, Size = new Size(150, 38) };
+        private readonly NareTextBox _broadcast = new NareTextBox { Placeholder = "Объявление всем вверху приложения (пусто — убрать)" };
+        private readonly NareTextBox _broadcastSec = new NareTextBox { Placeholder = "сек (0 — висит)" };
+        private readonly NareButton _broadcastGo = new NareButton { Text = "Показать всем", Style = BtnStyle.Accent, Size = new Size(170, 38) };
+        private readonly NareButton _restartLaunchersBtn = new NareButton { Text = "⟳ Перезапустить лаунчеры", Style = BtnStyle.Danger, Size = new Size(260, 38) };
+        private readonly NareButton _restartServersBtn = new NareButton { Text = "⟳ Перезапустить все серверы", Style = BtnStyle.Danger, Size = new Size(280, 38) };
         private readonly NareTextBox _command = new NareTextBox { Placeholder = "Команда серверу, например say привет" };
         private readonly NareButton _commandGo = new NareButton { Text = "Выполнить", Style = BtnStyle.Ghost, Size = new Size(150, 38) };
 
@@ -165,7 +168,7 @@ namespace NareLauncher.UI.Pages
                 _banMinutes.Invalidate();
             };
             Add(_warnNick); Add(_warnText); Add(_warn);
-            Add(_broadcast); Add(_broadcastGo); Add(_command); Add(_commandGo);
+            Add(_broadcast); Add(_broadcastSec); Add(_broadcastGo); Add(_restartLaunchersBtn); Add(_restartServersBtn); Add(_command); Add(_commandGo);
             Add(_togNick); Add(_togOff); Add(_togOn);
             Add(_modId); Add(_modVer); Add(_modBlock); Add(_modUnblock);
             Add(_srvId); Add(_srvOk); Add(_srvNo);
@@ -223,8 +226,15 @@ namespace NareLauncher.UI.Pages
             _warn.Click += async (s, e) => await Do(() => NareAuth.WarnAsync(Token, Pick(_warnNick), _warnText.Text.Trim(), Ct()),
                 "Предупреждение отправлено");
 
-            _broadcastGo.Click += async (s, e) => await Do(() => NareAuth.BroadcastAsync(Token, _broadcast.Text.Trim(), Ct()),
-                "Объявление обновлено");
+            _broadcastGo.Click += async (s, e) =>
+            {
+                int secs; int.TryParse((_broadcastSec.Text ?? "").Trim(), out secs); if (secs < 0) secs = 0;
+                await Do(() => NareAuth.BroadcastAsync(Token, _broadcast.Text.Trim(), secs, Ct()), "Объявление показано всем");
+            };
+            _restartLaunchersBtn.Click += async (s, e) => await Do(() => NareAuth.RestartAsync(Token, "launchers", Ct()),
+                "Перезапуск лаунчеров разослан");
+            _restartServersBtn.Click += async (s, e) => await Do(() => NareAuth.RestartAsync(Token, "servers", Ct()),
+                "Перезапуск серверов разослан");
             _commandGo.Click += async (s, e) => await Do(() => NareAuth.CommandAsync(Token, _command.Text.Trim(), Ct()),
                 "Команда поставлена в очередь серверу");
 
@@ -574,8 +584,14 @@ namespace NareLauncher.UI.Pages
             Field(_warnText, pad, w, ref y);
             _warn.Location = new Point(pad, y); y += 54;
 
+            // ВАЖНО: одна Row() на всю секцию — заголовки берутся из массива titles
+            // по счётчику, лишний Row() сдвинул бы все заголовки ниже.
             Row("ОБЪЯВЛЕНИЕ И КОМАНДА СЕРВЕРУ", ref y);
-            Field(_broadcast, pad, w, ref y); _broadcastGo.Location = new Point(pad + w + 10, _broadcast.Top);
+            Field(_broadcast, pad, w, ref y);
+            _broadcastSec.Bounds = new Rectangle(pad, y, 140, 38);
+            _broadcastGo.Location = new Point(pad + 150, y); y += 48;
+            _restartLaunchersBtn.Location = new Point(pad, y); y += 44;
+            _restartServersBtn.Location = new Point(pad, y); y += 54;
             Field(_command, pad, w, ref y); _commandGo.Location = new Point(pad + w + 10, _command.Top); y += 6;
 
             Row("ЗАПРЕТ «ВМЕСТЕ»", ref y);

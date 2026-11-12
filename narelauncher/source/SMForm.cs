@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using NareLauncher.Core;
 
 namespace NareServerManager
@@ -41,7 +42,16 @@ namespace NareServerManager
         private readonly TextBox _log = new TextBox();
         private readonly TextBox _cmd = new TextBox();
         private readonly Button _send = new Button();
+        private readonly Button _backup = new Button();
+        private readonly CheckBox _autostart = new CheckBox();
+        private readonly CheckBox _antilag = new CheckBox();
+        private readonly NumericUpDown _antiMax = new NumericUpDown();
         private readonly Timer _tick = new Timer { Interval = 1500 };
+        private readonly Timer _restartPoll = new Timer { Interval = 15000 };
+        private long _restartHandled = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        private bool _restartBusy;
+        private NotifyIcon _tray;
+        private bool _reallyExit;
 
         public SMForm(string folder)
         {
@@ -80,8 +90,18 @@ namespace NareServerManager
             StyleBtn(_restart, "↻ Рестарт", Color.FromArgb(54, 45, 17), CAmber); _restart.Bounds = new Rectangle(178, 114, 140, 38); _restart.Click += (s, e) => { StopServer(); var t = new Timer { Interval = 6000 }; t.Tick += (a, b) => { t.Stop(); t.Dispose(); StartServer(); }; t.Start(); }; Controls.Add(_restart);
             StyleBtn(_stop, "■ Остановить", Color.FromArgb(54, 20, 23), CRed); _stop.Bounds = new Rectangle(326, 114, 150, 38); _stop.Click += (s, e) => StopServer(); Controls.Add(_stop);
 
+            // панель инструментов: бэкап, автозапуск, анти-лаг
+            StyleBtn(_backup, "💾 Бэкап мира", Color.FromArgb(27, 44, 82), Color.FromArgb(157, 180, 255)); _backup.Bounds = new Rectangle(20, 160, 150, 32); _backup.Click += (s, e) => DoBackup(); Controls.Add(_backup);
+            _autostart.Text = "Автозапуск при старте ПК"; _autostart.Bounds = new Rectangle(186, 164, 230, 24); _autostart.ForeColor = CText; _autostart.BackColor = Color.Transparent; _autostart.FlatStyle = FlatStyle.Flat; _autostart.Checked = AutostartOn(); _autostart.CheckedChanged += (s, e) => SetAutostart(_autostart.Checked); Controls.Add(_autostart);
+            _antilag.Text = "Анти-лаг: убивать TNT, если больше"; _antilag.Bounds = new Rectangle(430, 164, 290, 24); _antilag.ForeColor = CText; _antilag.BackColor = Color.Transparent; _antilag.FlatStyle = FlatStyle.Flat; Controls.Add(_antilag);
+            _antiMax.Minimum = 10; _antiMax.Maximum = 2000; _antiMax.Increment = 10; _antiMax.Value = 100; _antiMax.Bounds = new Rectangle(724, 163, 70, 26); _antiMax.BackColor = CCard; _antiMax.ForeColor = CText; _antiMax.BorderStyle = BorderStyle.FixedSingle; Controls.Add(_antiMax);
+            var antiHint = new Label { Text = "шт.", Bounds = new Rectangle(800, 166, 40, 22), ForeColor = CDim, BackColor = Color.Transparent }; Controls.Add(antiHint);
+            LoadAntiLag();
+            _antilag.CheckedChanged += (s, e) => SaveAntiLag();
+            _antiMax.ValueChanged += (s, e) => SaveAntiLag();
+
             _log.Multiline = true; _log.ReadOnly = true; _log.ScrollBars = ScrollBars.Vertical; _log.BackColor = CTerm; _log.ForeColor = Color.FromArgb(194, 204, 221); _log.BorderStyle = BorderStyle.FixedSingle; _log.Font = new Font("Consolas", 9.5f);
-            _log.Bounds = new Rectangle(20, 166, 950, 420); _log.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom; Controls.Add(_log);
+            _log.Bounds = new Rectangle(20, 200, 950, 386); _log.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom; Controls.Add(_log);
 
             _cmd.BorderStyle = BorderStyle.FixedSingle; _cmd.BackColor = CCard; _cmd.ForeColor = CText; _cmd.Font = new Font("Consolas", 10f);
             _cmd.Bounds = new Rectangle(20, 598, 830, 30); _cmd.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -89,11 +109,152 @@ namespace NareServerManager
             Controls.Add(_cmd);
             StyleBtn(_send, "Ввод", Color.FromArgb(27, 44, 82), Color.FromArgb(157, 180, 255)); _send.Bounds = new Rectangle(860, 597, 110, 32); _send.Anchor = AnchorStyles.Bottom | AnchorStyles.Right; _send.Click += (s, e) => SendCmd(); Controls.Add(_send);
 
+            SetupTray();
+
             SetOnline(false);
             _tick.Tick += (s, e) => UpdateStats();
             _tick.Start();
+            _restartPoll.Tick += (s, e) => PollRestart();
+            _restartPoll.Start();
             Load += (s, e) => StartServer();
-            FormClosing += (s, e) => { try { StopServer(); } catch { } };
+            Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) HideToTray(); };
+            FormClosing += (s, e) =>
+            {
+                // крестик — не выход, а сворачивание в трей: сервер живёт в фоне
+                if (!_reallyExit && e.CloseReason == CloseReason.UserClosing)
+                {
+                    e.Cancel = true;
+                    HideToTray();
+                    return;
+                }
+                try { StopServer(); } catch { }
+                try { if (_tray != null) { _tray.Visible = false; _tray.Dispose(); } } catch { }
+            };
+        }
+
+        // ---------- системный трей: фоновая работа + уведомления Windows ----------
+        private void SetupTray()
+        {
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Открыть окно", null, (s, e) => ShowFromTray());
+            menu.Items.Add("Рестарт", null, (s, e) => { StopServer(); var t = new Timer { Interval = 6000 }; t.Tick += (a, b) => { t.Stop(); t.Dispose(); StartServer(); }; t.Start(); });
+            menu.Items.Add("Остановить сервер", null, (s, e) => StopServer());
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Выход (остановит сервер)", null, (s, e) => { _reallyExit = true; Close(); });
+
+            _tray = new NotifyIcon
+            {
+                Icon = SystemIcons.Application,
+                Visible = true,
+                Text = "ServerManager — " + _name,
+                ContextMenuStrip = menu
+            };
+            _tray.DoubleClick += (s, e) => ShowFromTray();
+        }
+
+        private void HideToTray()
+        {
+            Hide();
+            ShowInTaskbar = false;
+            Toast(_name, "Сервер работает в фоне. Двойной клик по значку — открыть.");
+        }
+
+        private void ShowFromTray()
+        {
+            Show();
+            ShowInTaskbar = true;
+            WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
+        /// <summary>Системное уведомление Windows (не внутри окна).</summary>
+        private void Toast(string title, string body)
+        {
+            try { if (_tray != null) _tray.ShowBalloonTip(5000, title, body ?? "", ToolTipIcon.Info); } catch { }
+        }
+
+        /// <summary>Опрашивает флаг «перезапустить все серверы» от админа.</summary>
+        private void PollRestart()
+        {
+            if (_restartBusy) return;
+            _restartBusy = true;
+            new System.Threading.Thread(() =>
+            {
+                long servers = 0;
+                try
+                {
+                    using (var wc = new System.Net.WebClient())
+                    {
+                        wc.Headers.Add("User-Agent", "ServerManager");
+                        string resp = wc.DownloadString("http://" + NareNet.Where + "/restartflag");
+                        var j = Json.Parse(resp);
+                        servers = j["servers"].AsLong(0);
+                    }
+                }
+                catch { }
+                Ui(() =>
+                {
+                    _restartBusy = false;
+                    if (servers > _restartHandled)
+                    {
+                        _restartHandled = servers;
+                        Append("Админ запросил перезапуск сервера.");
+                        Toast(_name, "Перезапуск по команде администратора");
+                        StopServer();
+                        var t = new Timer { Interval = 6000 };
+                        t.Tick += (a, b) => { t.Stop(); t.Dispose(); StartServer(); };
+                        t.Start();
+                    }
+                });
+            })
+            { IsBackground = true }.Start();
+        }
+
+        // ---------- бэкап ----------
+        private void DoBackup()
+        {
+            _backup.Enabled = false; Append("Делаю бэкап мира…");
+            new System.Threading.Thread(() =>
+            {
+                string msg; bool ok = true;
+                try { string f = Mgr().MakeBackup(); msg = "Бэкап готов: " + f; }
+                catch (Exception ex) { ok = false; msg = "Бэкап не удался: " + ex.Message; }
+                Ui(() => { Append(msg); _backup.Enabled = true; if (ok) Toast(_name, "Бэкап мира готов"); });
+            })
+            { IsBackground = true }.Start();
+        }
+
+        // ---------- автозапуск при старте ПК (HKCU Run) ----------
+        private string AutostartName() { return "NareServer_" + _name; }
+        private bool AutostartOn()
+        {
+            try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return k != null && k.GetValue(AutostartName()) != null; }
+            catch { return false; }
+        }
+        private void SetAutostart(bool on)
+        {
+            try
+            {
+                using (var k = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                {
+                    if (k == null) return;
+                    if (on) k.SetValue(AutostartName(), "\"" + Application.ExecutablePath + "\" \"" + _folder + "\"");
+                    else k.DeleteValue(AutostartName(), false);
+                }
+                Append(on ? "Автозапуск при старте ПК включён." : "Автозапуск выключен.");
+            }
+            catch (Exception ex) { Append("Автозапуск: " + ex.Message); }
+        }
+
+        // ---------- анти-лаг ----------
+        private void LoadAntiLag()
+        {
+            try { var a = ServerManager.ReadAntiLag(_folder); _antilag.Checked = a.On; _antiMax.Value = Math.Max(_antiMax.Minimum, Math.Min(_antiMax.Maximum, a.Max)); }
+            catch { }
+        }
+        private void SaveAntiLag()
+        {
+            try { ServerManager.WriteAntiLag(_folder, new ServerManager.AntiLag { On = _antilag.Checked, Max = (int)_antiMax.Value }); } catch { }
         }
 
         private void StartServer()
@@ -110,12 +271,13 @@ namespace NareServerManager
                 _host.Loader = meta[0]; _host.McVersion = meta[1];
 
                 _mgr = new ServerManager(_folder, _port);
-                _mgr.OnLine = s => { Ui(() => Append(s)); if (_host != null) _host.PushLog(s); };
-                _mgr.OnExit = () => Ui(() => { Append("Сервер остановлен."); SetOnline(false); });
+                _mgr.OnLine = s => { Ui(() => Append(s)); WatchPlayers(s); if (_host != null) _host.PushLog(s); };
+                _mgr.OnExit = () => Ui(() => { Append("Сервер остановлен."); SetOnline(false); Toast(_name, "Сервер остановлен."); });
                 _mgr.Start();
                 _host.Start();
                 Append("Запуск... веб-панель: http://narelauncher.winnigames2024.ru/server?name=" + _name);
                 SetOnline(true);
+                Toast(_name, "Сервер запущен · " + _name + ".narelauncher.winnigames2024.ru");
             }
             catch (Exception ex) { Append("Ошибка запуска: " + ex.Message); }
         }
@@ -243,9 +405,68 @@ namespace NareServerManager
                     string sub = Path.Combine(root, SubFolder()); Directory.CreateDirectory(sub);
                     string fn = dl[1].Length > 0 ? dl[1] : rel + ".jar"; ModrinthClient.Download(dl[0], Path.Combine(sub, fn)); return "{\"ok\":true,\"file\":\"" + JEsc(fn) + "\"}";
                 }
+                if (action == "backup")
+                {
+                    string f = Mgr().MakeBackup(); return "{\"ok\":true,\"file\":\"" + JEsc(f) + "\"}";
+                }
+                if (action == "backuplist")
+                {
+                    var arr = Mgr().ListBackups(); var sb = new StringBuilder("{\"ok\":true,\"items\":["); for (int i = 0; i < arr.Length; i++) { if (i > 0) sb.Append(','); sb.Append('"').Append(JEsc(arr[i])).Append('"'); } sb.Append("]}"); return sb.ToString();
+                }
+                if (action == "backuprestore")
+                {
+                    if (_mgr != null && _mgr.Running) return ErrJ("останови сервер перед восстановлением");
+                    Mgr().RestoreBackup(rel); return "{\"ok\":true}";
+                }
+                if (action == "wl_list" || action == "op_list")
+                {
+                    var arr = Mgr().ReadNameList(action == "wl_list" ? "whitelist.json" : "ops.json");
+                    var sb = new StringBuilder("{\"ok\":true,\"items\":["); for (int i = 0; i < arr.Length; i++) { if (i > 0) sb.Append(','); sb.Append('"').Append(JEsc(arr[i])).Append('"'); } sb.Append("]}"); return sb.ToString();
+                }
+                if (action == "wl_add" || action == "wl_remove" || action == "op_add" || action == "op_remove")
+                {
+                    if (_mgr == null || !_mgr.Running) return ErrJ("сервер должен быть запущен");
+                    string nm = (rel ?? "").Trim(); if (nm.Length == 0) return ErrJ("нет ника");
+                    if (action == "wl_add") { _mgr.Send("whitelist add " + nm); _mgr.Send("whitelist reload"); }
+                    else if (action == "wl_remove") { _mgr.Send("whitelist remove " + nm); _mgr.Send("whitelist reload"); }
+                    else if (action == "op_add") _mgr.Send("op " + nm);
+                    else _mgr.Send("deop " + nm);
+                    return "{\"ok\":true}";
+                }
+                if (action == "antilagget")
+                {
+                    var a = ServerManager.ReadAntiLag(_folder);
+                    return "{\"ok\":true,\"on\":" + (a.On ? "true" : "false") + ",\"max\":" + a.Max + "}";
+                }
+                if (action == "antilagset")
+                {
+                    var j = Json.Parse(content ?? "{}");
+                    ServerManager.WriteAntiLag(_folder, new ServerManager.AntiLag { On = j["on"].AsBool(false), Max = j["max"].AsInt(100) });
+                    return "{\"ok\":true}";
+                }
                 return ErrJ("неизвестное действие");
             }
             catch (Exception ex) { return ErrJ(ex.Message); }
+        }
+
+        /// <summary>Текущий менеджер сервера, либо временный для офлайн-операций (бэкапы).</summary>
+        private ServerManager Mgr() { return _mgr ?? new ServerManager(_folder, _port); }
+
+        /// <summary>Ловит в логе вход/выход игроков и шлёт системное уведомление.</summary>
+        private void WatchPlayers(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return;
+            int j = line.IndexOf(" joined the game", StringComparison.Ordinal);
+            int l = line.IndexOf(" left the game", StringComparison.Ordinal);
+            if (j < 0 && l < 0) return;
+            bool joined = j >= 0;
+            int cut = joined ? j : l;
+            // имя — последнее слово перед "joined/left the game"
+            string head = line.Substring(0, cut);
+            int sp = head.LastIndexOf(' ');
+            string who = sp >= 0 ? head.Substring(sp + 1) : head;
+            if (string.IsNullOrEmpty(who)) return;
+            Toast(_name, joined ? (who + " зашёл на сервер") : (who + " вышел"));
         }
 
         private void Ui(Action a) { try { if (IsHandleCreated) BeginInvoke(a); else a(); } catch { } }

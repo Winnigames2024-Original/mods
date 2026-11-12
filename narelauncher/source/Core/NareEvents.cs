@@ -210,5 +210,51 @@ namespace NareLauncher.Core
             }
             catch { return null; }
         }
+
+        // ---- кликер 67 ----
+        public static ClickerState ClickerGet(string token)
+        {
+            return ParseClk(Post("/clicker/get", "{\"token\":\"" + Esc(token) + "\"}"));
+        }
+        public static ClickerState ClickerClick(string token, int count)
+        {
+            return ParseClk(Post("/clicker/click", "{\"token\":\"" + Esc(token) + "\",\"count\":" + count + "}"));
+        }
+        public static ClickerState ClickerUpgrade(string token, string what)
+        {
+            return ParseClk(Post("/clicker/upgrade", "{\"token\":\"" + Esc(token) + "\",\"what\":\"" + Esc(what) + "\"}"));
+        }
+        private static ClickerState ParseClk(string resp)
+        {
+            var s = new ClickerState();
+            if (resp == null) return s;
+            var j = Json.Parse(resp);
+            s.Ok = j["ok"].AsBool(false);
+            s.Coins = j["coins"].AsLong(0);
+            s.Did = j["did"].AsInt(-1);
+            s.Click = j["click"].AsInt(0);
+            s.Auto = j["auto"].AsInt(0);
+            s.Energy = j["energy"].AsLong(-1);
+            s.EnergyMax = j["energyMax"].AsLong(0);
+            s.Regen = j["regen"].AsInt(0);
+            s.PriceClick = j["priceClick"].AsLong(0);
+            s.PriceAuto = j["priceAuto"].AsLong(0);
+            s.PriceEnergy = j["priceEnergy"].AsLong(0);
+            s.PriceRegen = j["priceRegen"].AsLong(0);
+            s.Error = j["error"].AsString("");
+            return s;
+        }
+    }
+
+    /// <summary>Состояние кликера 67, как его отдаёт сервер.</summary>
+    public class ClickerState
+    {
+        public bool Ok;
+        public long Coins;
+        public int Did = -1;            // сколько тапов зачтено (для /click)
+        public int Click, Auto, Regen;
+        public long Energy = -1, EnergyMax;
+        public long PriceClick, PriceAuto, PriceEnergy, PriceRegen;
+        public string Error = "";
     }
 }
