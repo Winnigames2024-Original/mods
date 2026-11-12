@@ -1,12 +1,12 @@
 {
-  "version": "1.84",
+  "version": "1.85",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "338dd7b7a18d37f38a732f467ac8c27428facb30",
-  "size": 865792,
+  "sha1": "93872deb6a3e42f9bb272f9ea4c4e6e5e77dc13f",
+  "size": 866304,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "Авто-установка NareVisuals на Forge 1.21.4, кнопка «IP и порты» (прямой IP + проверка известных портов), смена ядра/версии через «Ядро / версия»."
+  "notes": "«Мои серверы» теперь находит сервера из папки servers/, даже если их нет в сохранённой настройке (после переустановки/ручного создания)."
 }
