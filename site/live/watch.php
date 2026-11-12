@@ -43,8 +43,8 @@ function frame(){ node('/stream/frame',{id:ID}).then(function(j){
     var off=document.getElementById('off');
     if(j.found===false){ off.textContent='ошибка 1.456 СТРИМ НЕ НАЙДЕН'; off.style.display='grid';
       document.getElementById('st').textContent='не найден'; document.getElementById('st').className='badge'; return; }
-    document.getElementById('st').textContent=j.online?'в эфире':'не в сети'; document.getElementById('st').className='badge '+(j.online?'on':'');
-    off.textContent=j.online?'':'Стрим не запущен. Ожидайте, пока вернётся тот, кто его запустил.';
+    document.getElementById('st').textContent=j.online?'в эфире':(j.lost?'связь потеряна':'не в сети'); document.getElementById('st').className='badge '+(j.online?'on':'');
+    off.textContent=j.online?'':(j.lost?'Пропало соединение у стримера. Ждём, когда он вернётся…':'Стрим не запущен. Ожидайте, пока вернётся тот, кто его запустил.');
     off.style.display=j.online?'none':'grid';
     if(j.title)document.getElementById('title').textContent=j.title; if(j.user)document.getElementById('user').textContent=j.user;
     document.getElementById('vw').textContent=j.viewers||0;

@@ -18,12 +18,20 @@ require __DIR__ . '/../_inc/head.php';
     <?php endif; ?>
   </div>
   <?php if (!empty($info['desc'])): ?><p class="muted"><?= h($info['desc']) ?></p><?php endif; ?>
-  <?php if (!empty($info['isOwner'])): ?>
+  <?php if (!empty($info['canMod'])): ?>
   <div class="row-form" style="margin-bottom:8px">
     <input id="muser" placeholder="Ник для модерации" maxlength="16" style="flex:1">
     <button class="btn ghost" type="button" onclick="cmod('mute')">Мьют 5м</button>
     <button class="btn ghost" type="button" onclick="cmod('ban')">Бан (не зайдёт)</button>
     <button class="btn ghost" type="button" onclick="cmod('unban')">Разбан</button>
+  </div>
+  <?php endif; ?>
+  <?php if (!empty($info['isOwner'])): ?>
+  <div class="row-form" style="margin-bottom:8px">
+    <input id="moduser" placeholder="Ник модератора" maxlength="16" style="flex:1">
+    <button class="btn ghost" type="button" onclick="setmod(false)">Назначить мод.</button>
+    <button class="btn ghost" type="button" onclick="setmod(true)">Снять мод.</button>
+    <span class="muted" id="modlist"><?= !empty($info['mods']) ? 'модераторы: ' . h(implode(', ', $info['mods'])) : '' ?></span>
   </div>
   <?php endif; ?>
   <div id="chat" class="lchat" style="height:420px"></div>
@@ -36,6 +44,8 @@ require __DIR__ . '/../_inc/head.php';
 var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(me() ? token() : '') ?>, since=0;
 function cmod(action){ var u=document.getElementById('muser').value.trim(); if(!u)return;
   fetch('/channel/mod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,action:action,user:u})}).then(function(r){return r.json();}).then(function(j){ alert(j.ok?j.result:(j.error||'Ошибка')); if(j.ok)document.getElementById('muser').value=''; }); }
+function setmod(remove){ var u=document.getElementById('moduser').value.trim(); if(!u)return;
+  fetch('/channel/mods',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,user:u,remove:remove})}).then(function(r){return r.json();}).then(function(j){ if(j.ok){document.getElementById('modlist').textContent=(j.mods&&j.mods.length?'модераторы: '+j.mods.join(', '):'');document.getElementById('moduser').value='';}else alert(j.error||'Ошибка'); }); }
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 function poll(){ node('/channel/chat/get',{id:ID,since:since}).then(function(j){

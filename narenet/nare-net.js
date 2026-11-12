@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.65';
+const VERSION = '1.67';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -1991,6 +1991,18 @@ function status(req, res) {
     send(res, 200, statusFor(nick, tok));
 }
 
+// обращение в поддержку с сайта (видно админам в их панели)
+function supportSend(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token) || (clean(body && body.contact, 60) || 'гость');
+        const text = clean(body && body.text, 800);
+        if (!text) return send(res, 400, { error: 'пустое сообщение' });
+        policy.appeals.push({ nick: nick + ' (поддержка)', text, at: now() });
+        if (policy.appeals.length > 500) policy.appeals.shift();
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
 function appeal(req, res) {
     readJsonBody(req, body => {
         if (!body) return send(res, 400, { error: 'это не JSON' });
@@ -3519,6 +3531,20 @@ function recommend(req, res) {
     scored.sort((a, b) => b.score - a.score);
     send(res, 200, { ok: true, videos: scored.slice(0, 40).map(x => vidPublic(x.v, false)) });
 }
+// популярное: топ видео за всё время + топ каналов по подписчикам + живые эфиры
+function popular(req, res) {
+    const vids = policy.videos.filter(v => v.ready)
+        .map(v => ({ v, s: (v.views || 0) + (v.likes || []).length * 5 }))
+        .sort((a, b) => b.s - a.s).slice(0, 40).map(x => vidPublic(x.v, false));
+    const chans = Object.keys(accounts)
+        .map(n => { const a = acc(n); return { nick: n, user: a.username || n, subscribers: (a.followers || []).length, live: !!liveStreamOf(n) }; })
+        .filter(c => c.subscribers > 0 || c.live)
+        .sort((a, b) => b.subscribers - a.subscribers).slice(0, 30);
+    const live = [];
+    for (const [id, s] of streams) if (streamLive(s)) live.push({ id, user: s.user, title: s.title, viewers: s.viewers.size, link: s.link });
+    live.sort((a, b) => b.viewers - a.viewers);
+    send(res, 200, { ok: true, videos: vids, channels: chans, streams: live.slice(0, 20) });
+}
 
 // ------------------------------------------------------------ фото-галерея
 function phPath(id) { return path.join(PHOTOS_DIR, String(id).replace(/[^0-9a-f]/gi, '') + '.bin'); }
@@ -3641,7 +3667,7 @@ function streamPush(req, res) {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const s = streams.get(clean(body.id, 20)); if (!s || s.nick !== nick) return send(res, 404, { error: 'нет вашей трансляции' });
         const jpg = typeof body.jpg === 'string' ? body.jpg : '';
-        if (jpg) { if (jpg.length > 4_000_000) return send(res, 413, { error: 'кадр большой' }); s.jpg = jpg; s.seen = now(); }
+        if (jpg) { if (jpg.length > 4_000_000) return send(res, 413, { error: 'кадр большой' }); s.jpg = jpg; s.seen = now(); s.everLive = true; }
         send(res, 200, { ok: true });
     });
 }
@@ -3668,7 +3694,8 @@ function streamFrame(req, res) {
         if (!s) return send(res, 200, { ok: true, found: false, online: false });
         s.viewers.set(plainIp(req.socket), now());
         for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
-        send(res, 200, { ok: true, found: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
+        const live = streamLive(s);
+        send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
                          viewers: s.viewers.size, category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }
@@ -3767,8 +3794,10 @@ function channelChatGet(req, res) {
             return send(res, 403, { error: 'вы заблокированы в этом канале' });
         const arr = policy.channelChat[c.id] || [];
         const since = Math.max(0, Number(body.since) || 0);
+        const owner = !!(mine && (mine === c.owner || isAdmin(mine)));
+        const mod = owner || !!(mine && Array.isArray(c.mods) && c.mods.some(x => x.toLowerCase() === mine.toLowerCase()));
         send(res, 200, { ok: true, name: c.name, desc: c.desc || '', owner: c.owner,
-            isOwner: !!(mine && (mine === c.owner || isAdmin(mine))), msgs: arr.slice(since), total: arr.length });
+            isOwner: owner, canMod: mod, mods: owner ? (c.mods || []) : undefined, msgs: arr.slice(since), total: arr.length });
     });
 }
 function channelChatSend(req, res) {
@@ -3799,13 +3828,31 @@ function channelMod(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const c = chById(clean(body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
-        if (c.owner !== nick && !isAdmin(nick)) return send(res, 403, { error: 'не ваш канал' });
+        const isMod = c.owner === nick || isAdmin(nick) || (Array.isArray(c.mods) && c.mods.some(x => x.toLowerCase() === nick.toLowerCase()));
+        if (!isMod) return send(res, 403, { error: 'нет прав модератора в этом канале' });
         const user = clean(body.user, 16); if (!user) return send(res, 400, { error: 'нужен ник' });
         const action = clean(body.action, 10);
         if (!policy.channelBans[c.id]) policy.channelBans[c.id] = {};
         const r = applyMod(policy.channelBans[c.id], action, user, Number(body.seconds) || 0);
         savePolicy();
         send(res, 200, { ok: true, result: user + ' ' + r });
+    });
+}
+// владелец/админ: назначить или снять модератора канала
+function channelMods(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const c = chById(clean(body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
+        if (c.owner !== nick && !isAdmin(nick)) return send(res, 403, { error: 'только владелец' });
+        if (!Array.isArray(c.mods)) c.mods = [];
+        const user = clean(body.user, 16);
+        if (user) {
+            const low = user.toLowerCase();
+            if (body.remove === true) c.mods = c.mods.filter(x => x.toLowerCase() !== low);
+            else if (!c.mods.some(x => x.toLowerCase() === low)) c.mods.push(user);
+            savePolicy();
+        }
+        send(res, 200, { ok: true, mods: c.mods });
     });
 }
 // стример / админ: мьют/бан в чате эфира
@@ -4376,6 +4423,7 @@ function profileGet(req, res) {
         username: a.username || nick,
         subs: a.subs || [nick],
         subscribers: (a.followers || []).length,
+        live: !!liveStreamOf(nick),
         since: a.created || 0,
         shots: (a.shots || []).map(x => ({ id: x.id, at: x.at })),
         admin: isAdmin(nick), moderator: isModerator(nick),
@@ -4792,6 +4840,7 @@ const server = http.createServer((req, res) => {
     if (route === '/admin/logs' && req.method === 'POST') return adminLogs(req, res);
     if (route === '/status') return status(req, res);
     if (route === '/appeal' && req.method === 'POST') return appeal(req, res);
+    if (route === '/support/send' && req.method === 'POST') return supportSend(req, res);  // обращение в поддержку с сайта
 
     // чат по бану
     if (route === '/ban/chat' && req.method === 'POST') return banChatGet(req, res);
@@ -4852,6 +4901,7 @@ const server = http.createServer((req, res) => {
     if (route === '/subscribe' && req.method === 'POST') return subscribe(req, res);      // подписаться/отписаться
     if (route === '/subscribed' && req.method === 'POST') return subscribedList(req, res); // мои подписки + их видео/эфиры
     if (route === '/recommend') return recommend(req, res);                                // рекомендованные видео
+    if (route === '/popular') return popular(req, res);                                      // популярное: топ видео и каналов
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
     if (route === '/events' && req.method === 'POST') return eventsActive(req, res);
     if (route === '/events/join' && req.method === 'POST') return eventsJoin(req, res);
@@ -4961,7 +5011,8 @@ const server = http.createServer((req, res) => {
     if (route === '/channel/chat/get' && req.method === 'POST') return channelChatGet(req, res);
     if (route === '/channel/chat/send' && req.method === 'POST') return channelChatSend(req, res);
     if (route === '/channel/delete' && req.method === 'POST') return channelDelete(req, res);
-    if (route === '/channel/mod' && req.method === 'POST') return channelMod(req, res);   // владелец/админ: мьют/бан/разбан
+    if (route === '/channel/mod' && req.method === 'POST') return channelMod(req, res);   // мьют/бан/разбан
+    if (route === '/channel/mods' && req.method === 'POST') return channelMods(req, res); // владелец: назначить/снять модератора
     if (route === '/stream/mod' && req.method === 'POST') return streamMod(req, res);     // стример/админ: мьют/бан в чате эфира
     if (route === '/bot/mod' && req.method === 'POST') return botMod(req, res);           // бот модерирует чат своей цели
 

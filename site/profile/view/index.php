@@ -24,7 +24,7 @@ require __DIR__ . '/../../_inc/head.php';
         <h1 style="margin:0"><?= h($name) ?>
           <?php if (!empty($p['admin'])): ?><span class="badge">админ</span>
           <?php elseif (!empty($p['moderator'])): ?><span class="badge">модератор</span><?php endif; ?>
-          <?php if (!empty($p['online'])): ?><span class="badge on">онлайн</span><?php endif; ?>
+          <?php if (!empty($p['live'])): ?><span class="badge on">в эфире</span><?php elseif (!empty($p['online'])): ?><span class="badge on">онлайн</span><?php endif; ?>
         </h1>
         <div class="muted">@<?= h($p['nick'] ?? $user) ?> <?php if (!empty($p['tag'])): ?>· <span class="tag"><?= render_tag($p["tag"]) ?></span><?php endif; ?></div>
         <?php if (!empty($p['status'])): ?><div style="margin-top:6px"><?= h($p['status']) ?></div><?php endif; ?>
@@ -55,6 +55,19 @@ require __DIR__ . '/../../_inc/head.php';
       .then(function(r){return r.json();}).then(function(j){ if(j.ok){ paint(j.following); document.getElementById('subcnt').textContent=j.subscribers; } else alert(j.error||'Ошибка'); });
   });
   </script>
+  <?php endif; ?>
+  <?php
+  $uvids = api_get('/video/list?channel=' . urlencode($p['nick'] ?? $user))['videos'] ?? [];
+  if ($uvids): ?>
+  <h2 style="margin-top:20px">Видео</h2>
+  <div class="mgrid">
+    <?php foreach ($uvids as $v): ?>
+    <a class="mcard" href="/media/watch.php?v=<?= urlencode($v['id']) ?>">
+      <div class="mthumb vid"><?php if(!empty($v['thumb'])):?><img src="<?= h($v['thumb']) ?>" alt=""><?php else:?><span>▶</span><?php endif;?></div>
+      <div class="mmeta"><div class="mtitle"><?= h($v['title']) ?></div><div class="muted"><?= (int)$v['views'] ?> просм. · 👍 <?= (int)$v['likes'] ?></div></div>
+    </a>
+    <?php endforeach; ?>
+  </div>
   <?php endif; ?>
 <?php endif; ?>
 <?php require __DIR__ . '/../../_inc/foot.php'; ?>
