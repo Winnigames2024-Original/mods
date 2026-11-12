@@ -31,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($act === 'reject') {
         $r = api_post('/admin/server/reject', ['token' => $tok, 'id' => $_POST['id'] ?? '', 'reason' => $_POST['reason'] ?? '']);
         $msg = !empty($r['ok']) ? 'Сервер отклонён.' : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'streamban') {
+        $r = api_post('/admin/stream/ban', ['token' => $tok, 'nick' => $_POST['nick'] ?? '', 'on' => ($_POST['on'] ?? '') === '1']);
+        $msg = !empty($r['ok']) ? ($r['banned'] ? 'Трансляции запрещены игроку.' : 'Запрет на трансляции снят.') : ($r['error'] ?? 'Ошибка');
     }
     // перечитываем состояние после действия
     $state = api_post('/admin/state', ['token' => $tok]);
@@ -77,6 +80,17 @@ require __DIR__ . '/../_inc/head.php';
     <form method="post"><input type="hidden" name="act" value="restart"><input type="hidden" name="what" value="servers"><button class="btn ghost" type="submit">Перезапустить сервера</button></form>
     <form method="post" onsubmit="return confirm('Перезапустить всё — лаунчеры и сервера?')"><input type="hidden" name="act" value="restart"><input type="hidden" name="what" value="all"><button class="btn" type="submit">Перезапустить всё</button></form>
   </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <h2 style="margin-top:0">Запрет трансляций</h2>
+  <p class="muted">Запретить или разрешить игроку вести прямые эфиры.</p>
+  <form method="post" class="row-form">
+    <input type="hidden" name="act" value="streamban">
+    <input name="nick" placeholder="Ник игрока" maxlength="16" required style="flex:1">
+    <button class="btn" type="submit" name="on" value="1">Запретить</button>
+    <button class="btn ghost" type="submit" name="on" value="0">Разрешить</button>
+  </form>
 </div>
 
 <div class="panel" style="margin-top:18px">
