@@ -249,6 +249,12 @@ namespace NareLauncher.UI
                 y += 39;
             }
 
+            // Кнопка студии трансляции — открывает отдельное окно, не вкладку
+            var studioBtn = new NavButton { Text = "Эфир", Icon = Ico.Video, Bounds = new Rectangle(8, y, SidebarWidth - 16, 36) };
+            studioBtn.Click += (s, e) => OpenStudio();
+            _sidebar.Controls.Add(studioBtn);
+            y += 39;
+
             _accountChip = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted)
             {
                 Bounds = new Rectangle(18, 0, SidebarWidth - 36, 40),
@@ -275,6 +281,13 @@ namespace NareLauncher.UI
                 using (var pen = new Pen(Color.FromArgb(28, 255, 255, 255)))
                     e.Graphics.DrawLine(pen, _sidebar.Width - 1, 0, _sidebar.Width - 1, _sidebar.Height);
             };
+        }
+
+        /// <summary>Открыть студию трансляции (захват экрана/окна).</summary>
+        public void OpenStudio()
+        {
+            try { new StreamForm().Show(); }
+            catch (Exception ex) { ShowError("Не удалось открыть студию трансляции", ex); }
         }
 
         // ------------------------------------------------------------ навигация
@@ -437,6 +450,13 @@ namespace NareLauncher.UI
                 if (!EnsureAccount("вход на сервер " + link.Server)) return;
                 Navigate(0);
                 Home.LaunchOn(link.Server);
+                return;
+            }
+
+            // ссылка «студия трансляции» с сайта (narelauncher://stream)
+            if (link != null && link.OpenStudio)
+            {
+                if (EnsureAccount("трансляцию")) OpenStudio();
                 return;
             }
 

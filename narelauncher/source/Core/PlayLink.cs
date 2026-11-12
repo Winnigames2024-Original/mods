@@ -25,6 +25,7 @@ namespace NareLauncher.Core
             public string Version = "";     // ванильная версия: 1.21.4
             public string Loader = "vanilla";
             public string Server = "";      // host[:port], если надо сразу зайти
+            public bool OpenStudio = false; // открыть студию трансляции (narelauncher://stream)
 
             public bool HasVersion { get { return !string.IsNullOrEmpty(Version); } }
 
@@ -132,12 +133,14 @@ namespace NareLauncher.Core
             }
 
             string action = rest.TrimEnd('/');
-            if (action.Length > 0 && !string.Equals(action, "play", StringComparison.OrdinalIgnoreCase))
+            bool isStudio = string.Equals(action, "stream", StringComparison.OrdinalIgnoreCase);
+            if (action.Length > 0 && !isStudio && !string.Equals(action, "play", StringComparison.OrdinalIgnoreCase))
                 return null;
 
             var values = Split(query);
             var request = new Request();
 
+            request.OpenStudio = isStudio;
             request.Version = Clean(Value(values, "version"), 32);
             request.Loader = Loader(Value(values, "loader"));
             request.Server = Clean(Value(values, "server"), 128);

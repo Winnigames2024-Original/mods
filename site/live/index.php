@@ -13,11 +13,11 @@ $streams = api_get('/stream/list')['streams'] ?? [];
   <p class="muted">Сейчас нет прямых эфиров.</p>
 <?php else: ?>
 <div class="mgrid">
-  <?php foreach ($streams as $s): ?>
-  <a class="mcard" href="/live/watch.php?s=<?= urlencode($s['id']) ?>">
+  <?php foreach ($streams as $s): $href = !empty($s['link']) ? $s['link'] : ('/live/watch.php?s=' . urlencode($s['id'])); ?>
+  <a class="mcard" href="<?= h($href) ?>">
     <div class="mthumb vid"><span class="live-dot">● LIVE</span></div>
     <div class="mmeta"><div class="mtitle"><?= h($s['title']) ?></div>
-      <div class="muted"><?= h($s['user']) ?> · <?= (int)$s['viewers'] ?> смотрят</div></div>
+      <div class="muted"><?= h($s['user']) ?> · <?= (int)$s['viewers'] ?> смотрят<?php if (!empty($s['category'])): ?> · <?= h($s['category']) ?><?php endif; ?></div></div>
   </a>
   <?php endforeach; ?>
 </div>

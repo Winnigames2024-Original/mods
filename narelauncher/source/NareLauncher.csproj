@@ -166,6 +166,7 @@
     <Compile Include="UI\ChatView.cs" />
     <Compile Include="UI\InputPrompt.cs" />
     <Compile Include="UI\Toast.cs" />
+    <Compile Include="UI\StreamForm.cs" />
     <Compile Include="UI\BanOverlay.cs">
       <SubType>Form</SubType>
     </Compile>

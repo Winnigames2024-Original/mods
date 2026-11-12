@@ -1,12 +1,12 @@
 {
-  "version": "1.88",
+  "version": "1.89",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "becfc478d0e1e2b420679d7af23c62431bb362b0",
-  "size": 873984,
+  "sha1": "b985309a0cf6b2a6a4959500bcd77abaee309ca4",
+  "size": 881664,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "Удалённое управление: кнопка «Задать пароль» теперь сразу включает удалёнку. Входы в аккаунт больше не слетают при обновлении сервера."
+  "notes": "Студия трансляции (кнопка «Эфир»): показ всего экрана или отдельного окна/приложения. Трансляции с экрана теперь и в вебе, и красивые ссылки на эфиры."
 }

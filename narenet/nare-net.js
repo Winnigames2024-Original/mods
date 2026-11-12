@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.52';
+const VERSION = '1.53';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3370,9 +3370,15 @@ function streamStart(req, res) {
         // одна активная трансляция на ник
         for (const [id, s] of streams) if (s.nick === nick) streams.delete(id);
         const id = crypto.randomBytes(6).toString('hex');
-        streams.set(id, { nick, user: (acc(nick) || {}).username || nick, title: clean(body.title, 120) || ('Эфир ' + nick),
+        const user = (acc(nick) || {}).username || nick;
+        const title = clean(body.title, 120) || ('Эфир ' + nick);
+        const category = (clean(body.category, 32) || 'stream').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || 'stream';
+        const channel = (clean(body.channel, 32) || nick).toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || nick;
+        const nameSlug = (title.toLowerCase().replace(/[^a-z0-9а-я]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'live';
+        const link = '/live/' + encodeURIComponent(category) + '/' + encodeURIComponent(channel) + '/' + id + '-' + encodeURIComponent(nameSlug);
+        streams.set(id, { nick, user, title, category, channel, nameSlug, link,
                           jpg: '', seen: now(), at: now(), viewers: new Map(), chat: [] });
-        send(res, 200, { ok: true, id });
+        send(res, 200, { ok: true, id, link });
     });
 }
 function streamPush(req, res) {
@@ -3396,7 +3402,8 @@ function streamList(req, res) {
     for (const [id, s] of streams) {
         if (!streamLive(s)) { continue; }
         for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
-        out.push({ id, user: s.user, title: s.title, viewers: s.viewers.size, at: s.at });
+        out.push({ id, user: s.user, title: s.title, viewers: s.viewers.size, at: s.at,
+                   category: s.category, channel: s.channel, link: s.link });
     }
     send(res, 200, { streams: out });
 }
@@ -3406,7 +3413,8 @@ function streamFrame(req, res) {
         if (!s) return send(res, 200, { ok: true, online: false });
         s.viewers.set(plainIp(req.socket), now());
         for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
-        send(res, 200, { ok: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user, viewers: s.viewers.size });
+        send(res, 200, { ok: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user,
+                         viewers: s.viewers.size, category: s.category, channel: s.channel, link: s.link });
     });
 }
 function streamChatGet(req, res) {
@@ -4387,6 +4395,17 @@ const server = http.createServer((req, res) => {
     const route = at >= 0 ? req.url.slice(0, at) : req.url;
 
     res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // красивая ссылка на стрим: /live/<категория>/<канал>/<id>-<имя> -> страница просмотра
+    if (route.startsWith('/live/')) {
+        const parts = route.split('/').filter(Boolean);   // ['live', cat, chan, idname]
+        if (parts.length >= 4) {
+            const idname = decodeURIComponent(parts[3]);
+            const id = (idname.match(/^[0-9a-f]+/) || [idname])[0];
+            res.writeHead(302, { Location: '/live/watch.php?s=' + encodeURIComponent(id) });
+            return res.end();
+        }
+    }
 
     // --- аккаунты
     if (route === '/account/register' && req.method === 'POST') return accountRegister(req, res);
