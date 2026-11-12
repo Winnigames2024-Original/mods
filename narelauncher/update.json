@@ -1,12 +1,12 @@
 {
-  "version": "1.91",
+  "version": "1.92",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "71f2486ba853350fa27e80c884fdf0e7beddeede",
-  "size": 882176,
+  "sha1": "6bb9a3f04657fafd0277bed0d4ff2d6c0c49d207",
+  "size": 885248,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "e41c0070501891a3320ccc2a16392d85b12242f2",
   "smSize": 90112,
-  "notes": "Кнопка «Простой/Обычный дизайн» на сайте; больше функций для эфиров (реакции, подписка, поделиться) и каналов (описание, удаление); кнопки «Медиа»/«Каналы» в лаунчере."
+  "notes": "Студия: прозрачный оверлей чата поверх игры (кнопка «Чат-оверлей»). Постоянная ссылка на стрим по имени и модерация чатов."
 }

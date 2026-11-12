@@ -24,9 +24,11 @@ namespace NareLauncher.UI
         private readonly TextBox _sub = new TextBox();
         private readonly Button _refresh = new Button { Text = "⟳ Окна" };
         private readonly Button _go = new Button { Text = "Выйти в эфир" };
+        private readonly Button _overlayBtn = new Button { Text = "Чат-оверлей" };
         private readonly PictureBox _preview = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
         private readonly Label _status = new Label { Text = "Готово", AutoSize = false };
         private readonly LinkLabel _link = new LinkLabel { Text = "", AutoSize = false };
+        private ChatOverlay _overlay;
 
         private readonly System.Windows.Forms.Timer _tick = new System.Windows.Forms.Timer { Interval = 800 };
         private readonly List<IntPtr> _windows = new List<IntPtr>();
@@ -67,7 +69,11 @@ namespace NareLauncher.UI
             _link.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             _link.LinkClicked += (s, e) => { try { if (!string.IsNullOrEmpty(_streamLink)) System.Diagnostics.Process.Start(_streamLink); } catch { } };
 
-            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, _preview, _go, _status, _link });
+            _overlayBtn.SetBounds(556, 488, 188, 40); Btn(_overlayBtn, false);
+            _overlayBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            _overlayBtn.Click += (s, e) => ToggleOverlay();
+
+            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, _preview, _go, _overlayBtn, _status, _link });
 
             _refresh.Click += (s, e) => LoadSources();
             _go.Click += (s, e) => { if (_live) Stop(); else Start(); };
@@ -215,7 +221,21 @@ namespace NareLauncher.UI
                 case "Музыка": return "music"; case "Творчество": return "creative"; default: return "stream"; }
         }
 
-        protected override void OnFormClosing(FormClosingEventArgs e) { if (_live) Stop(); base.OnFormClosing(e); }
+        private void ToggleOverlay()
+        {
+            if (_overlay != null && !_overlay.IsDisposed) { try { _overlay.Close(); } catch { } _overlay = null; _overlayBtn.Text = "Чат-оверлей"; return; }
+            if (string.IsNullOrEmpty(_streamId)) { _status.Text = "Сначала выйдите в эфир."; return; }
+            _overlay = new ChatOverlay(_streamId, true);   // справа
+            _overlay.Show();
+            _overlayBtn.Text = "Убрать оверлей";
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_overlay != null && !_overlay.IsDisposed) { try { _overlay.Close(); } catch { } }
+            if (_live) Stop();
+            base.OnFormClosing(e);
+        }
 
         private static string Post(string route, string body)
         {
