@@ -146,9 +146,20 @@ namespace NareLauncher.UI.Pages
             {
                 string p = (_remotePass.Text ?? "").Trim();
                 if (p.Length < 4) { _status.Text = "Пароль удалёнки: минимум 4 символа."; return; }
-                bool ok = RemoteControl.Config(p, _remote.Checked);
-                _remotePass.Text = "";
-                _status.Text = ok ? "Пароль удалённого управления сохранён." : "Не удалось сохранить пароль (нет связи или вход не выполнен).";
+                // задаём пароль и сразу включаем удалённое управление, чтобы оно заработало без лишних шагов
+                bool ok = RemoteControl.Config(p, true);
+                if (ok)
+                {
+                    _remotePass.Text = "";
+                    _remote.Checked = true;
+                    Settings.Current.RemoteEnabled = true;
+                    Settings.Save();
+                    _status.Text = "Пароль сохранён, удалённое управление включено. Откройте на сайте «Удалёнка».";
+                }
+                else
+                {
+                    _status.Text = "Не удалось сохранить: нет связи с сервером или вы не вошли в аккаунт. Войдите и попробуйте снова.";
+                }
             };
 
             _scroll.Controls.Add(_save);

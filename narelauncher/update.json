@@ -1,12 +1,12 @@
 {
-  "version": "1.87",
+  "version": "1.88",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "92ebd3872adcfe373c9fd10921e227d54cc88d7a",
+  "sha1": "becfc478d0e1e2b420679d7af23c62431bb362b0",
   "size": 873984,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "Удалённое управление лаунчером с сайта по паролю (мышь, клики, клавиатура): Настройки → Удалённое управление. Кнопка «Играть» на сайте заходит прямо на сервер."
+  "notes": "Удалённое управление: кнопка «Задать пароль» теперь сразу включает удалёнку. Входы в аккаунт больше не слетают при обновлении сервера."
 }

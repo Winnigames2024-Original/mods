@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.51';
+const VERSION = '1.52';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -621,10 +621,42 @@ function goodPassword(password) {
     return typeof password === 'string' && password.length >= 4 && password.length <= 100;
 }
 
-// ---- сессии: токен живёт в памяти, переживать перезапуск ему незачем
+// ---- сессии: храним на диске, чтобы перезапуск сервера (например при обновлении)
+//      не выкидывал всех из аккаунтов и из удалённого управления.
 
 const sessions = new Map();                     // token -> { nick, exp }
 const SESSION_LIFE = 12 * 60 * 60 * 1000;
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+
+(function loadSessions() {
+    try {
+        const raw = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        const t = now();
+        for (const tok of Object.keys(raw)) {
+            const s = raw[tok];
+            if (s && s.exp > t) sessions.set(tok, s);
+        }
+        log('сессий восстановлено:', sessions.size);
+    } catch (e) {}
+})();
+
+let sessionsDirty = false;
+let sessionsLastSize = -1;
+function saveSessions() { sessionsDirty = true; }       // пишем не чаще раза в несколько секунд
+function flushSessions() {
+    if (sessions.size !== sessionsLastSize) sessionsDirty = true;   // появились/исчезли сессии
+    if (!sessionsDirty) return;
+    sessionsDirty = false;
+    sessionsLastSize = sessions.size;
+    try {
+        const o = {};
+        for (const [tok, s] of sessions) if (s.exp > now()) o[tok] = s;
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(o));
+    } catch (e) {}
+}
+setInterval(flushSessions, 5000);
+process.on('SIGTERM', flushSessions);
+process.on('SIGINT', () => { flushSessions(); process.exit(0); });
 
 // --- удалённое управление лаунчером из веба ---
 // policy.remote[nick] = { salt, hash, enabled } — пароль (хэш), который задаёт сам пользователь.
@@ -649,6 +681,7 @@ const botEvents = [];              // [{seq, target, from, text, at}] кольц
 function openSession(nick, device) {
     const tok = token();
     sessions.set(tok, { nick, exp: now() + SESSION_LIFE, device: device && device.id ? String(device.id) : null });
+    saveSessions();
     // привязываем токен к устройству аккаунта, чтобы его можно было отвязать
     if (device && device.id) {
         const a = accounts[nick];
