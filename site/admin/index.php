@@ -40,6 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($act === 'emupdate') {
         $r = api_post('/admin/update', ['token' => $tok, 'version' => $_POST['version'] ?? '', 'changelog' => $_POST['changelog'] ?? '', 'critical' => ($_POST['critical'] ?? '') === '1']);
         $msg = !empty($r['ok']) ? 'Обновление объявлено всем.' : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'twofaoff') {
+        $r = api_post('/admin/twofa/off', ['token' => $tok, 'nick' => $_POST['nick'] ?? '']);
+        $msg = !empty($r['ok']) ? ('2FA снята: ' . h($r['cleared'])) : ($r['error'] ?? 'Ошибка');
     }
     // перечитываем состояние после действия
     $state = api_post('/admin/state', ['token' => $tok]);
@@ -90,6 +93,16 @@ require __DIR__ . '/../_inc/head.php';
 </div>
 
 <div class="panel" style="margin-top:18px">
+  <h2 style="margin-top:0">Снять 2FA с игрока</h2>
+  <p class="muted">Если игрок (или ты сам) застрял на подтверждении входа — убери у него защиту входа. Можно <code>all</code>, чтобы снять у всех.</p>
+  <form method="post" class="row-form">
+    <input type="hidden" name="act" value="twofaoff">
+    <input name="nick" placeholder="Ник игрока (или all)" maxlength="16" required style="flex:1">
+    <button class="btn" type="submit">Снять 2FA</button>
+  </form>
+</div>
+
+<div class="panel" style="margin-top:18px">
   <h2 style="margin-top:0">Запрет трансляций</h2>
   <p class="muted">Запретить или разрешить игроку вести прямые эфиры.</p>
   <form method="post" class="row-form">
@@ -128,6 +141,7 @@ require __DIR__ . '/../_inc/head.php';
     <li>Перезапустить только серверы: <code><?= h($base) ?>/admin/api/restart?code=<?= $c ?>&what=servers</code></li>
     <li>Экстренное обновление: <code><?= h($base) ?>/admin/api/update?code=<?= $c ?>&version=1.90&critical=1</code></li>
     <li>Объявление: <code><?= h($base) ?>/admin/api/broadcast?code=<?= $c ?>&text=Привет&seconds=30</code></li>
+    <li>Снять 2FA (аварийно): <code><?= h($base) ?>/admin/api/twofa?code=<?= $c ?>&nick=all</code></li>
   </ul>
 </div>
 

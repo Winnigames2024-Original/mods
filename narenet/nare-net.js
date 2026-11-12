@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.56';
+const VERSION = '1.57';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3335,6 +3335,26 @@ function twofaGet(req, res) {
         send(res, 200, { ok: true, on: !!policy.twofa[nick] });
     });
 }
+// админ снимает 2FA с любого аккаунта (на случай, если игрок застрял)
+function adminTwofaOff(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const nick = clean(body.nick, 16);
+        if (nick === 'all') policy.twofa = {}; else delete policy.twofa[nick];
+        savePolicy();
+        send(res, 200, { ok: true, cleared: nick });
+    });
+}
+// аварийный сброс 2FA по URL-коду (если и сам админ застрял): /admin/api/twofa?code=..&nick=..
+function apiTwofaOff(req, res) {
+    if (!codeOk(req, null)) return send(res, 403, { error: 'неверный код' });
+    const nick = clean(query(req).nick, 16);
+    if (!nick) return send(res, 400, { error: 'нужен nick (или nick=all)' });
+    if (nick === 'all') policy.twofa = {}; else delete policy.twofa[nick];
+    savePolicy();
+    log('2FA снята по URL-коду:', nick);
+    send(res, 200, { ok: true, cleared: nick });
+}
 
 // ------------------------------------------------------------ фото-галерея
 function phPath(id) { return path.join(PHOTOS_DIR, String(id).replace(/[^0-9a-f]/gi, '') + '.bin'); }
@@ -4628,6 +4648,8 @@ const server = http.createServer((req, res) => {
     if (route === '/verify/status' && req.method === 'POST') return verifyStatus(req, res);   // опрос: подтверждено ли
     if (route === '/twofa/set' && req.method === 'POST') return twofaSet(req, res);           // вкл/выкл 2FA у аккаунта
     if (route === '/twofa/get' && req.method === 'POST') return twofaGet(req, res);
+    if (route === '/admin/twofa/off' && req.method === 'POST') return adminTwofaOff(req, res);   // админ снимает 2FA с игрока
+    if (route === '/admin/api/twofa') return apiTwofaOff(req, res);                               // /admin/api/twofa?code=..&nick=.. (или nick=all)
 
     // --- фото-галерея ---
     if (route === '/photo/create' && req.method === 'POST') return photoCreate(req, res);
