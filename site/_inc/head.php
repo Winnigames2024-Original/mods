@@ -10,6 +10,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 ?><!doctype html>
 <html lang="ru">
 <head>
+<script>try{if(localStorage.getItem('nareDesign')==='simple')document.documentElement.classList.add('simple');}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($t) ?></title>
@@ -67,6 +68,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
       <a href="/login/">Вход</a>
       <a class="cta" href="/register/">Регистрация</a>
     <?php endif; ?>
+    <button type="button" class="design-toggle" id="designToggle" title="Переключить дизайн">◑ Дизайн</button>
   </nav>
 </header>
 <main class="wrap">

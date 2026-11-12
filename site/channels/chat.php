@@ -1,13 +1,23 @@
 <?php
 require_once __DIR__ . '/../_inc/config.php';
 $id = $_GET['c'] ?? '';
-$info = api_post('/channel/chat/get', ['id' => $id, 'since' => 0]);
+if (($_POST['act'] ?? '') === 'del' && me()) {
+    api_post('/channel/delete', ['token' => token(), 'id' => $id]);
+    header('Location: /channels/'); exit;
+}
+$info = api_post('/channel/chat/get', ['id' => $id, 'since' => 0, 'token' => me() ? token() : '']);
 if (empty($info['ok'])) { require __DIR__ . '/../_inc/head.php'; echo '<div class="panel"><h1>Канал не найден</h1></div>'; require __DIR__ . '/../_inc/foot.php'; exit; }
 $PAGE_TITLE = ($info['name'] ?? 'Канал') . ' — NareLauncher';
 require __DIR__ . '/../_inc/head.php';
 ?>
 <div class="watch">
-  <h1># <?= h($info['name'] ?? '') ?></h1>
+  <div class="media-head">
+    <h1># <?= h($info['name'] ?? '') ?></h1>
+    <?php if (!empty($info['isOwner'])): ?>
+    <form method="post" onsubmit="return confirm('Удалить канал и весь чат?')"><input type="hidden" name="act" value="del"><button class="btn ghost" type="submit">Удалить канал</button></form>
+    <?php endif; ?>
+  </div>
+  <?php if (!empty($info['desc'])): ?><p class="muted"><?= h($info['desc']) ?></p><?php endif; ?>
   <div id="chat" class="lchat" style="height:420px"></div>
   <?php if (me()): ?>
   <div class="row-form" style="margin-top:8px"><input id="ct" placeholder="Сообщение в канал" maxlength="600" style="flex:1"><button class="btn" id="cs">Отправить</button></div>

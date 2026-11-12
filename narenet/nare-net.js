@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.62';
+const VERSION = '1.63';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3664,7 +3664,7 @@ function streamFrame(req, res) {
         if (!s) return send(res, 200, { ok: true, online: false });
         s.viewers.set(plainIp(req.socket), now());
         for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
-        send(res, 200, { ok: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user,
+        send(res, 200, { ok: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
                          viewers: s.viewers.size, category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }
@@ -3722,13 +3722,13 @@ function channelCreate(req, res) {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const name = clean(body.name, 60); if (!name) return send(res, 400, { error: 'нужно имя канала' });
         const id = crypto.randomBytes(5).toString('hex');
-        policy.channels.push({ id, name, owner: nick, at: now() });
+        policy.channels.push({ id, name, desc: clean(body.desc, 300), owner: nick, at: now() });
         policy.channelChat[id] = [];
         savePolicy(); send(res, 200, { ok: true, id });
     });
 }
 function channelList(req, res) {
-    send(res, 200, { channels: policy.channels.map(c => ({ id: c.id, name: c.name, owner: c.owner, at: c.at,
+    send(res, 200, { channels: policy.channels.map(c => ({ id: c.id, name: c.name, desc: c.desc || '', owner: c.owner, at: c.at,
         msgs: (policy.channelChat[c.id] || []).length })) });
 }
 function channelChatGet(req, res) {
@@ -3736,7 +3736,9 @@ function channelChatGet(req, res) {
         const c = chById(clean(body && body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
         const arr = policy.channelChat[c.id] || [];
         const since = Math.max(0, Number(body.since) || 0);
-        send(res, 200, { ok: true, name: c.name, msgs: arr.slice(since), total: arr.length });
+        const mine = sessionNick(body && body.token);
+        send(res, 200, { ok: true, name: c.name, desc: c.desc || '', owner: c.owner,
+            isOwner: !!(mine && (mine === c.owner || isAdmin(mine))), msgs: arr.slice(since), total: arr.length });
     });
 }
 function channelChatSend(req, res) {

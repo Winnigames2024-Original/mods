@@ -1,12 +1,12 @@
 {
-  "version": "1.90",
+  "version": "1.91",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "fde9f979c5d0eaf4374b40d17350be540c1a924e",
-  "size": 881664,
+  "sha1": "71f2486ba853350fa27e80c884fdf0e7beddeede",
+  "size": 882176,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "e41c0070501891a3320ccc2a16392d85b12242f2",
   "smSize": 90112,
-  "notes": "ServerManager теперь сам обновляется и перезапускается при выходе новой версии."
+  "notes": "Кнопка «Простой/Обычный дизайн» на сайте; больше функций для эфиров (реакции, подписка, поделиться) и каналов (описание, удаление); кнопки «Медиа»/«Каналы» в лаунчере."
 }

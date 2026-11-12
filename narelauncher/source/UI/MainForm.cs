@@ -255,6 +255,16 @@ namespace NareLauncher.UI
             _sidebar.Controls.Add(studioBtn);
             y += 39;
 
+            // Быстрые ссылки на разделы сайта (открываются в браузере)
+            foreach (var lk in new[] { new[] { "Медиа", "/media/" }, new[] { "Каналы", "/channels/" } })
+            {
+                string url = "https://narelauncher.winnigames2024.ru" + lk[1];
+                var lb = new NavButton { Text = lk[0], Icon = Ico.Chat, Bounds = new Rectangle(8, y, SidebarWidth - 16, 36) };
+                lb.Click += (s, e) => { try { System.Diagnostics.Process.Start(url); } catch { } };
+                _sidebar.Controls.Add(lb);
+                y += 39;
+            }
+
             _accountChip = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted)
             {
                 Bounds = new Rectangle(18, 0, SidebarWidth - 36, 40),

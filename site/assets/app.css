@@ -111,3 +111,25 @@ select.fi{width:100%}
 .ck{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:14px;cursor:pointer}
 #cv{display:block;width:100%;height:auto;background:#000}
 .rc-screen-wrap canvas{display:block;width:100%;height:auto}
+
+/* --- переключатель дизайна --- */
+.design-toggle{background:none;border:1px solid var(--border);color:var(--dim);border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:13px}
+.design-toggle:hover{color:var(--text)}
+
+/* --- ПРОСТОЙ ДИЗАЙН: плоско, крупно, без градиентов --- */
+html.simple{--bg:#ffffff;--card:#f3f4f6;--border:#d4d7de;--text:#15181f;--dim:#5b6472;--accent:#2563eb}
+html.simple body{background:#fff;color:#15181f;font-size:17px;line-height:1.6}
+html.simple .nav{background:#fff;border-bottom:1px solid #e2e5ea}
+html.simple .brand,html.simple .tabs a{color:#15181f}
+html.simple .logo{background:#2563eb;border-radius:6px}
+html.simple .panel,html.simple .card,html.simple .srv,html.simple .lchat{background:#f3f4f6;border:1px solid #d4d7de;border-radius:8px;box-shadow:none}
+html.simple .btn{background:#2563eb;border-radius:8px;box-shadow:none}
+html.simple .btn.ghost,html.simple .design-toggle{background:#fff;border:1px solid #d4d7de;color:#15181f}
+html.simple .mthumb,html.simple .srv-ico,html.simple .ava,html.simple .srv-ico{border-radius:8px;background:#e5e7eb;color:#15181f}
+html.simple .ava,html.simple .srv-ico{background:#2563eb;color:#fff}
+html.simple .badge{background:#fff;border:1px solid #d4d7de;color:#5b6472}
+html.simple .badge.on{color:#15803d;border-color:#86efac}
+html.simple code,html.simple .fi,html.simple #code,html.simple .row-form input,html.simple input,html.simple textarea,html.simple select{background:#fff;border:1px solid #d4d7de;color:#15181f}
+html.simple .mgrid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+html.simple h1{font-size:28px}
+html.simple .muted{color:#5b6472}
