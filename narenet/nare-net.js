@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.59';
+const VERSION = '1.60';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3350,6 +3350,36 @@ function twofaGet(req, res) {
         send(res, 200, { ok: true, on: !!policy.twofa[nick] });
     });
 }
+// живые сетевые миры «Вместе» (не выделенные серверы)
+function adminWorlds(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const out = [];
+        for (const room of rooms.values()) {
+            if (room.dedic) continue;
+            if (now() - (room.seen || 0) > ROOM_LIFE) continue;
+            out.push({ host: room.nick, user: room.user || room.nick, version: room.version || '',
+                       mode: room.mode || 'direct', queued: (policy.worldCommands[room.nick] || []).length });
+        }
+        send(res, 200, { ok: true, worlds: out });
+    });
+}
+
+// хост шлёт команду в СВОЙ мир «Вместе» (его мод её исполнит с правами оператора)
+function worldCommandSend(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const text = clean(body.text, 300);
+        if (!text) return send(res, 400, { error: 'пустая команда' });
+        if (!policy.worldCommands[nick]) policy.worldCommands[nick] = [];
+        policy.worldCommands[nick].push(text);
+        if (policy.worldCommands[nick].length > 100) policy.worldCommands[nick].shift();
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+
 // все серверы всех игроков — для админской веб-панели управления
 function adminServersAll(req, res) {
     readJsonBody(req, body => {
@@ -4719,6 +4749,8 @@ const server = http.createServer((req, res) => {
     if (route === '/twofa/get' && req.method === 'POST') return twofaGet(req, res);
     if (route === '/admin/twofa/off' && req.method === 'POST') return adminTwofaOff(req, res);   // админ снимает 2FA с игрока
     if (route === '/admin/servers/all' && req.method === 'POST') return adminServersAll(req, res); // все серверы всех игроков
+    if (route === '/admin/worlds' && req.method === 'POST') return adminWorlds(req, res);            // живые сетевые миры «Вместе»
+    if (route === '/world/command/send' && req.method === 'POST') return worldCommandSend(req, res); // хост шлёт команду в свой мир
     if (route === '/admin/sm/close' && req.method === 'POST') return adminSmClose(req, res);         // закрыть ServerManager у игрока/всех
     if (route === '/admin/api/sm') return apiSmClose(req, res);                                      // /admin/api/sm?code=..&nick=all
     if (route === '/admin/api/twofa') return apiTwofaOff(req, res);                               // /admin/api/twofa?code=..&nick=.. (или nick=all)
