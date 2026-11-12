@@ -87,6 +87,7 @@
     <Compile Include="Core\Cosmetic.cs" />
     <Compile Include="Core\ModIcons.cs" />
     <Compile Include="Core\PlayLink.cs" />
+    <Compile Include="Core\RemoteControl.cs" />
     <Compile Include="Core\WebIcons.cs" />
     <Compile Include="Core\VpnControl.cs" />
     <Compile Include="Core\ModManager.cs" />

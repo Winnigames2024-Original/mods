@@ -255,6 +255,13 @@ namespace NareLauncher.UI
         public string Placeholder = "";
         public Ico? Icon;
 
+        /// <summary>Скрывать вводимый текст точками (для паролей).</summary>
+        public bool Password
+        {
+            get { return Inner.UseSystemPasswordChar; }
+            set { Inner.UseSystemPasswordChar = value; }
+        }
+
         public NareTextBox()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |

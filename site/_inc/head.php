@@ -51,10 +51,13 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
   <a class="brand" href="/home/"><span class="logo">N</span> NareLauncher</a>
   <nav class="tabs">
     <a href="/home/">Главная</a>
+    <a href="/servers/">Сервера</a>
     <a href="/versions/">Версии</a>
     <a href="/download/">Скачать</a>
-    <a href="/launch/">Запуск</a>
     <?php if (me()): ?>
+      <a href="/servers/mine/">Мои серверы</a>
+      <a href="/remote/">Удалёнка</a>
+      <?php if (!empty($_SESSION['admin'])): ?><a href="/admin/">Админ</a><?php endif; ?>
       <a href="/profile/my/">Профиль</a>
     <?php else: ?>
       <a href="/login/">Вход</a>

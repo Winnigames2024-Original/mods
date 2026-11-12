@@ -55,6 +55,11 @@ namespace NareLauncher.UI.Pages
         { Placeholder = "Сборные пункты «Вместе», через ; — 151.245.217.104:2445" };
         private readonly NareButton _browseLocal = new NareButton { Text = "Обзор", Style = BtnStyle.Ghost, Size = new Size(110, 38) };
 
+        private readonly NareToggle _remote = new NareToggle();
+        private readonly NareTextBox _remotePass = new NareTextBox { Placeholder = "Пароль для удалённого управления (минимум 4 символа)", Password = true };
+        private readonly NareButton _remoteSave = new NareButton { Text = "Задать пароль", Style = BtnStyle.Ghost, Size = new Size(200, 40) };
+        private readonly NareLabel _remoteHint = new NareLabel("Управляйте лаунчером с сайта: narelauncher.winnigames2024.ru → Удалёнка", 8.8f, FontStyle.Regular, Theme.Dim);
+
         private readonly NareButton _save = new NareButton { Text = "Сохранить", Style = BtnStyle.Accent, Icon = Ico.Check, Size = new Size(180, 42) };
         private readonly NareButton _openLauncher = new NareButton { Text = "Папка лаунчера", Style = BtnStyle.Ghost, Icon = Ico.Folder, Size = new Size(190, 42) };
         private readonly NareLabel _status = new NareLabel("", 9f, FontStyle.Regular, Theme.Muted);
@@ -124,6 +129,27 @@ namespace NareLauncher.UI.Pages
             _scroll.Controls.Add(_onJoin);
             _scroll.Controls.Add(_netHost);
             _scroll.Controls.Add(_browseLocal);
+
+            AddCaption("Удалённое управление", "Управляйте лаунчером с сайта по паролю — мышь и кнопки");
+            _scroll.Controls.Add(_remote);
+            _scroll.Controls.Add(_remotePass);
+            _scroll.Controls.Add(_remoteSave);
+            _scroll.Controls.Add(_remoteHint);
+
+            _remote.CheckedChanged += (s, e) =>
+            {
+                Settings.Current.RemoteEnabled = _remote.Checked;
+                Settings.Save();
+                RemoteControl.Config("", _remote.Checked);   // синхронизируем флаг на сервере
+            };
+            _remoteSave.Click += (s, e) =>
+            {
+                string p = (_remotePass.Text ?? "").Trim();
+                if (p.Length < 4) { _status.Text = "Пароль удалёнки: минимум 4 символа."; return; }
+                bool ok = RemoteControl.Config(p, _remote.Checked);
+                _remotePass.Text = "";
+                _status.Text = ok ? "Пароль удалённого управления сохранён." : "Не удалось сохранить пароль (нет связи или вход не выполнен).";
+            };
 
             _scroll.Controls.Add(_save);
             _scroll.Controls.Add(_openLauncher);
@@ -230,6 +256,7 @@ namespace NareLauncher.UI.Pages
             _localFolder.Text = s.LocalModsFolder;
             _onJoin.Text = s.JoinCommands;
             _netHost.Text = s.NareNetHosts;
+            _remote.Checked = s.RemoteEnabled;
             ReloadJava();
         }
 
@@ -446,6 +473,16 @@ namespace NareLauncher.UI.Pages
             _netHost.SetBounds(pad, y, w, 38);
             y += 58;
 
+            // Удалённое управление
+            caption(0);
+            _remote.Location = new Point(pad, y);
+            y += 40;
+            _remotePass.SetBounds(pad, y, Math.Max(200, w - 212), 38);
+            _remoteSave.Location = new Point(pad + Math.Max(200, w - 212) + 12, y);
+            y += 44;
+            _remoteHint.SetBounds(pad, y, Math.Max(100, w), 18);
+            y += 40;
+
             _save.Location = new Point(pad, y);
             _openLauncher.Location = new Point(pad + 196, y);
             _status.SetBounds(pad, y + 52, Math.Max(100, w), 20);
@@ -480,6 +517,7 @@ namespace NareLauncher.UI.Pages
                 DrawToggleLabel(g, _demo, "Демо-режим");
                 DrawToggleLabel(g, _autoVisuals, "Автообновление мода NareVisuals при запуске");
                 DrawToggleLabel(g, _gitVisuals, "Брать свежий мод с GitHub, а не только встроенный");
+                DrawToggleLabel(g, _remote, "Разрешить удалённое управление лаунчером через сайт");
 
                 string pin = (Settings.Current.VisualsVersion ?? "").Trim();
                 Theme.Text1(g, pin.Length == 0 ? "сейчас: всегда последняя" : "сейчас закреплена " + pin,

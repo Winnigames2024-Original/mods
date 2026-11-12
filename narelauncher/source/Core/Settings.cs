@@ -76,6 +76,9 @@ namespace NareLauncher.Core
         /// <summary>Выделенные серверы игрока (хостинг): строки «id|папка|порт», разделитель — перевод строки.</summary>
         public string HostServers = "";
 
+        /// <summary>Разрешить удалённое управление лаунчером через сайт (по паролю).</summary>
+        public bool RemoteEnabled = false;
+
         public static Settings Current = new Settings();
 
         public static void Load()
@@ -111,6 +114,7 @@ namespace NareLauncher.Core
                 s.ModFileFromGitHub = j["modFileFromGitHub"].AsString(s.ModFileFromGitHub);
                 s.VisualsVersion = j["visualsVersion"].AsString(s.VisualsVersion);
                 s.WornCosmetics = j["wornCosmetics"].AsString(s.WornCosmetics);
+                s.RemoteEnabled = j["remoteEnabled"].AsBool(s.RemoteEnabled);
             }
 
             // прежние сборки клали игру рядом с exe — переводим на стандартный %APPDATA%\.minecraft
@@ -162,6 +166,7 @@ namespace NareLauncher.Core
                 j.Set("modFileFromGitHub", s.ModFileFromGitHub);
                 j.Set("visualsVersion", s.VisualsVersion);
                 j.Set("wornCosmetics", s.WornCosmetics);
+                j.Set("remoteEnabled", s.RemoteEnabled);
                 j.SaveTo(Paths.ConfigFile);
             }
             catch (Exception ex) { Log.Error("Не удалось сохранить настройки", ex); }

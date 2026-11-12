@@ -430,6 +430,16 @@ namespace NareLauncher.UI
                 return;
             }
 
+            // ссылка «зайти на сервер» с сайта: версии нет, но есть адрес —
+            // запускаем выбранную версию и сразу коннектимся на сервер
+            if (link != null && !string.IsNullOrEmpty(link.Server))
+            {
+                if (!EnsureAccount("вход на сервер " + link.Server)) return;
+                Navigate(0);
+                Home.LaunchOn(link.Server);
+                return;
+            }
+
             // Первый запуск: без аккаунта играть нельзя — сразу открываем окно
             if (AccountStore.Accounts.Count == 0)
                 ManageAccounts();
@@ -448,6 +458,10 @@ namespace NareLauncher.UI
             var minuteTimer = new System.Windows.Forms.Timer { Interval = 60000 };
             minuteTimer.Tick += delegate { ClaimMinuteReward(); };
             minuteTimer.Start();
+
+            // удалённое управление лаунчером с сайта (работает только пока включено в настройках)
+            Core.RemoteControl.Start(this);
+
             CheckPolicy();
         }
 

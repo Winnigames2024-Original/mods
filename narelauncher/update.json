@@ -1,12 +1,12 @@
 {
-  "version": "1.86",
+  "version": "1.87",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "eac4ccd935a514723f91e862be738f5034d8b415",
-  "size": 866304,
+  "sha1": "92ebd3872adcfe373c9fd10921e227d54cc88d7a",
+  "size": 873984,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "Исправлен выбор версии для гибрида (Arclight): раньше 1.21.1 ошибочно скачивал 1.21.11 (совпадение по подстроке). Теперь версия подбирается точно, а если нужной нет — показывается список доступных."
+  "notes": "Удалённое управление лаунчером с сайта по паролю (мышь, клики, клавиатура): Настройки → Удалённое управление. Кнопка «Играть» на сайте заходит прямо на сервер."
 }
