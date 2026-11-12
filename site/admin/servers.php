@@ -15,6 +15,7 @@ require __DIR__ . '/../_inc/head.php';
 ?>
 <div class="media-head"><h1>Серверы игроков</h1><a class="btn ghost" href="/admin/">← В админку</a></div>
 <p class="lead">Управление серверами всех игроков: консоль, команды, запуск/остановка. Команды уходят в ServerManager владельца.</p>
+<p style="margin:8px 0"><button class="btn ghost" type="button" onclick="smClose('all')">⨯ Закрыть ServerManager у ВСЕХ (остановит их серверы)</button></p>
 
 <?php if (!$servers): ?><p class="muted">Серверов пока нет (ни у кого не сохранено серверов).</p><?php else: ?>
 <div class="srv-list">
@@ -25,7 +26,10 @@ require __DIR__ . '/../_inc/head.php';
       <div class="muted">владелец @<?= h($s['owner']) ?> · порт <?= (int)$s['port'] ?>
         <?php if (!empty($s['stats'])): ?> · игроков <?= (int)$s['stats']['players'] ?> · RAM <?= (int)$s['stats']['ram'] ?>МБ<?php endif; ?></div>
     </div></div>
-    <div class="srv-act"><button class="btn" type="button" onclick="openCon('<?= h(addslashes($s['name'])) ?>','<?= h(addslashes($s['id'])) ?>')">Консоль</button></div>
+    <div class="srv-act">
+      <button class="btn" type="button" onclick="openCon('<?= h(addslashes($s['name'])) ?>','<?= h(addslashes($s['id'])) ?>')">Консоль</button>
+      <button class="btn ghost" type="button" onclick="smClose('<?= h(addslashes($s['owner'])) ?>')">Закрыть ServerManager</button>
+    </div>
   </div>
   <?php endforeach; ?>
 </div>
@@ -54,6 +58,8 @@ function pollLog(){ if(!CUR)return; node('/server/weblog',{token:TOK,name:CUR}).
     box.scrollTop=box.scrollHeight; } }).catch(function(){}); }
 function ctl(action){ if(!CUR)return; node('/server/control',{token:TOK,name:CUR,action:action}).then(function(j){
   if(!j.ok)alert(j.error||'Ошибка'); }); }
+function smClose(nick){ if(!confirm(nick==='all'?'Закрыть ServerManager у всех игроков? Их серверы остановятся.':'Закрыть ServerManager у '+nick+'? Его сервер остановится.'))return;
+  node('/admin/sm/close',{token:TOK,nick:nick}).then(function(j){ alert(j.ok?('Команда отправлена: '+j.closed):(j.error||'Ошибка')); }); }
 document.addEventListener('click',function(e){ if(e.target&&e.target.id==='send'){ var t=document.getElementById('cmd').value.trim(); if(!t||!CUR)return;
   node('/server/webcmd',{token:TOK,name:CUR,text:t}).then(function(j){ if(j.ok)document.getElementById('cmd').value=''; else alert(j.error||'Ошибка'); }); }});
 </script>

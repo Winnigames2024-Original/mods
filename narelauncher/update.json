@@ -6,7 +6,7 @@
   "size": 881664,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
-  "smSize": 84992,
-  "notes": "Подкатегории трансляций (например Minecraft). В студии добавлено поле подкатегории."
+  "smSha1": "65313de39e07c69b6289f7781dc06d972d82c350",
+  "smSize": 86528,
+  "notes": "Админ может закрыть ServerManager у игрока или у всех (сервер останавливается). Управление чужими серверами из админки."
 }

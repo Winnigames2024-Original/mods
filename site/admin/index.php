@@ -143,6 +143,7 @@ require __DIR__ . '/../_inc/head.php';
     <li>Экстренное обновление: <code><?= h($base) ?>/admin/api/update?code=<?= $c ?>&version=1.90&critical=1</code></li>
     <li>Объявление: <code><?= h($base) ?>/admin/api/broadcast?code=<?= $c ?>&text=Привет&seconds=30</code></li>
     <li>Снять 2FA (аварийно): <code><?= h($base) ?>/admin/api/twofa?code=<?= $c ?>&nick=all</code></li>
+    <li>Закрыть ServerManager у всех: <code><?= h($base) ?>/admin/api/sm?code=<?= $c ?>&nick=all</code></li>
   </ul>
 </div>
 

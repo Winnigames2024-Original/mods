@@ -49,6 +49,7 @@ namespace NareServerManager
         private readonly Timer _tick = new Timer { Interval = 1500 };
         private readonly Timer _restartPoll = new Timer { Interval = 15000 };
         private long _restartHandled = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        private long _killHandled = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private bool _restartBusy;
         private NotifyIcon _tray;
         private bool _reallyExit;
@@ -180,21 +181,34 @@ namespace NareServerManager
             _restartBusy = true;
             new System.Threading.Thread(() =>
             {
-                long servers = 0;
+                long servers = 0, killSm = 0;
                 try
                 {
                     using (var wc = new System.Net.WebClient())
                     {
                         wc.Headers.Add("User-Agent", "ServerManager");
-                        string resp = wc.DownloadString("http://" + NareNet.Where + "/restartflag");
+                        string resp = wc.DownloadString("http://" + NareNet.Where + "/restartflag?name=" + Uri.EscapeDataString(_name));
                         var j = Json.Parse(resp);
                         servers = j["servers"].AsLong(0);
+                        killSm = j["killSm"].AsLong(0);
                     }
                 }
                 catch { }
                 Ui(() =>
                 {
                     _restartBusy = false;
+                    if (killSm > _killHandled)
+                    {
+                        _killHandled = killSm;
+                        Append("Админ закрыл ServerManager. Останавливаю сервер и выхожу.");
+                        Toast(_name, "ServerManager закрыт администратором");
+                        try { StopServer(); } catch { }
+                        _reallyExit = true;
+                        var t = new Timer { Interval = 2500 };   // дать серверу корректно остановиться
+                        t.Tick += (a, b) => { t.Stop(); t.Dispose(); try { Close(); } catch { } Application.Exit(); };
+                        t.Start();
+                        return;
+                    }
                     if (servers > _restartHandled)
                     {
                         _restartHandled = servers;
