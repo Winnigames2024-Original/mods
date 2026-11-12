@@ -16,6 +16,9 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <meta name="description" content="<?= h($d) ?>">
 <meta name="keywords" content="minecraft launcher, майнкрафт скачать, лаунчер майнкрафт, скачать майнкрафт лаунчер, бесплатный лаунчер minecraft, nare launcher, narelauncher, сервер майнкрафт с модами и плагинами, майнкрафт с модами">
 <meta name="robots" content="index, follow">
+<?php $gsc = @trim(@file_get_contents(__DIR__ . '/gsc.txt')); if ($gsc): ?>
+<meta name="google-site-verification" content="<?= h($gsc) ?>">
+<?php endif; ?>
 <link rel="canonical" href="<?= h($canon) ?>">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="NareLauncher">
