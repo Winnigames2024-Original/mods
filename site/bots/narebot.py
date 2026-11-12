@@ -36,6 +36,18 @@ class Message:
         """Ответить в тот же чат, откуда пришло сообщение."""
         return self._bot.send(self.target, text)
 
+    def mute(self, user, seconds=300):
+        """Временно заблокировать пользователю чат (по умолчанию 5 минут)."""
+        return self._bot.mod(self.target, "mute", user, seconds)
+
+    def ban(self, user):
+        """Забанить пользователя в этом чате навсегда (не сможет писать/заходить)."""
+        return self._bot.mod(self.target, "ban", user)
+
+    def unban(self, user):
+        """Снять блокировку/бан."""
+        return self._bot.mod(self.target, "unban", user)
+
 
 class Bot:
     def __init__(self, token, server=SERVER):
@@ -61,6 +73,10 @@ class Bot:
     def send(self, target, text):
         """Отправить сообщение в канал/трансляцию ('channel:ID' или 'stream:ID')."""
         return self._post("/bot/send", {"botToken": self.token, "target": target, "text": text})
+
+    def mod(self, target, action, user, seconds=0):
+        """Модерация: action = 'mute' (seconds), 'ban' (навсегда), 'unban'."""
+        return self._post("/bot/mod", {"botToken": self.token, "target": target, "action": action, "user": user, "seconds": seconds})
 
     def me(self):
         return self._post("/bot/me", {"botToken": self.token})

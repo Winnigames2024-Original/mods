@@ -17,6 +17,9 @@ require __DIR__ . '/../_inc/head.php';
       <input id="sub" class="fi" style="flex:1" maxlength="40" placeholder="Подкатегория (Minecraft)" list="subs">
       <datalist id="subs"><option value="Minecraft"><option value="CS2"><option value="GTA V"><option value="Dota 2"></datalist>
     </div>
+    <label class="fl" style="margin-top:10px">Постоянное имя трансляции (англ., для ссылки)</label>
+    <input id="name" class="fi" maxlength="40" placeholder="my-stream — ссылка будет всегда одна">
+    <p class="muted" style="font-size:13px;margin-top:4px">Ссылка: narelauncher.winnigames2024.ru/live/&lt;категория&gt;/&lt;подкатегория&gt;/&lt;это-имя&gt;</p>
     <label class="fl" style="margin-top:10px">Качество</label>
     <select id="q" class="fi">
       <option value="720">720p · обычное</option>
@@ -82,7 +85,7 @@ document.getElementById('start').onclick=function(){
   if(wantS) chain=chain.then(function(){return navigator.mediaDevices.getDisplayMedia({video:{frameRate:15}}).then(function(ms){screenStream=ms;document.getElementById('screenV').srcObject=ms;ms.getVideoTracks()[0].addEventListener('ended',stop);});});
   if(wantC) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({video:true}).then(function(ms){camStream=ms;camOn=true;document.getElementById('camV').srcObject=ms;});});
   if(wantM) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({audio:true}).then(function(ms){micStream=ms;micOn=true;});});
-  chain.then(function(){ return node('/stream/start',{token:TOK,title:(document.getElementById('title').value.trim()||'Эфир'),category:document.getElementById('cat').value,subcategory:document.getElementById('sub').value.trim()}); })
+  chain.then(function(){ return node('/stream/start',{token:TOK,title:(document.getElementById('title').value.trim()||'Эфир'),category:document.getElementById('cat').value,subcategory:document.getElementById('sub').value.trim(),name:document.getElementById('name').value.trim()}); })
   .then(function(j){ if(!j.ok){msg(j.error||'Ошибка');return;} SID=j.id; LINK=location.origin+(j.link||('/live/watch.php?s='+j.id));
     document.getElementById('setup').style.display='none'; document.getElementById('live').style.display='block';
     document.getElementById('watch').href=j.link||('/live/watch.php?s='+j.id);

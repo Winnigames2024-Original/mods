@@ -18,6 +18,14 @@ require __DIR__ . '/../_inc/head.php';
     <?php endif; ?>
   </div>
   <?php if (!empty($info['desc'])): ?><p class="muted"><?= h($info['desc']) ?></p><?php endif; ?>
+  <?php if (!empty($info['isOwner'])): ?>
+  <div class="row-form" style="margin-bottom:8px">
+    <input id="muser" placeholder="Ник для модерации" maxlength="16" style="flex:1">
+    <button class="btn ghost" type="button" onclick="cmod('mute')">Мьют 5м</button>
+    <button class="btn ghost" type="button" onclick="cmod('ban')">Бан (не зайдёт)</button>
+    <button class="btn ghost" type="button" onclick="cmod('unban')">Разбан</button>
+  </div>
+  <?php endif; ?>
   <div id="chat" class="lchat" style="height:420px"></div>
   <?php if (me()): ?>
   <div class="row-form" style="margin-top:8px"><input id="ct" placeholder="Сообщение в канал" maxlength="600" style="flex:1"><button class="btn" id="cs">Отправить</button></div>
@@ -26,6 +34,8 @@ require __DIR__ . '/../_inc/head.php';
 </div>
 <script>
 var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(me() ? token() : '') ?>, since=0;
+function cmod(action){ var u=document.getElementById('muser').value.trim(); if(!u)return;
+  fetch('/channel/mod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,action:action,user:u})}).then(function(r){return r.json();}).then(function(j){ alert(j.ok?j.result:(j.error||'Ошибка')); if(j.ok)document.getElementById('muser').value=''; }); }
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 function poll(){ node('/channel/chat/get',{id:ID,since:since}).then(function(j){

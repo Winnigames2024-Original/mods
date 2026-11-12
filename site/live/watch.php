@@ -19,13 +19,23 @@ require __DIR__ . '/../_inc/head.php';
   <div class="muted"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="cat"></span> · <span id="st" class="badge">подключение…</span></div>
 
   <h2 style="margin-top:18px">Чат</h2>
+  <?php if (me()): ?>
+  <div class="row-form" id="modrow" style="display:none;margin-bottom:8px">
+    <input id="muser" placeholder="Ник для модерации" maxlength="16" style="flex:1">
+    <button class="btn ghost" type="button" onclick="smod('mute')">Мьют 5м</button>
+    <button class="btn ghost" type="button" onclick="smod('ban')">Бан</button>
+    <button class="btn ghost" type="button" onclick="smod('unban')">Разбан</button>
+  </div>
+  <?php endif; ?>
   <div id="chat" class="lchat"></div>
   <?php if (me()): ?>
   <div class="row-form" style="margin-top:8px"><input id="ct" placeholder="Сообщение" maxlength="400" style="flex:1"><button class="btn" id="cs">→</button></div>
   <?php else: ?><p class="muted"><a href="/login/">Войдите</a>, чтобы писать в чат.</p><?php endif; ?>
 </div>
 <script>
-var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(me() ? token() : '') ?>;
+var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(me() ? token() : '') ?>, ME=<?= json_encode(me() ?: '') ?>;
+function smod(action){ var u=document.getElementById('muser').value.trim(); if(!u)return;
+  fetch('/stream/mod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,action:action,user:u})}).then(function(r){return r.json();}).then(function(j){ alert(j.ok?j.result:(j.error||'Ошибка')); if(j.ok)document.getElementById('muser').value=''; }); }
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 function frame(){ node('/stream/frame',{id:ID}).then(function(j){
@@ -35,6 +45,7 @@ function frame(){ node('/stream/frame',{id:ID}).then(function(j){
     document.getElementById('vw').textContent=j.viewers||0;
     document.getElementById('cat').textContent=(j.subcategory||j.category||'');
     if(j.nick)offerFollow(j.nick);
+    if(j.nick&&ME&&j.nick.toLowerCase()===ME.toLowerCase()){ var mr=document.getElementById('modrow'); if(mr)mr.style.display='flex'; }
     if(j.jpg)document.getElementById('scr').src='data:image/jpeg;base64,'+j.jpg; }
 }).catch(function(){}).finally(function(){setTimeout(frame,600);}); }
 frame();

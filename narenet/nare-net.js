@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.63';
+const VERSION = '1.64';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -525,6 +525,7 @@ if (!policy.twofa) policy.twofa = {};            // nick -> true: вход на 
 if (!policy.photos) policy.photos = [];          // фото-галерея
 if (!policy.channels) policy.channels = [];      // каналы с общим чатом
 if (!policy.channelChat) policy.channelChat = {}; // id канала -> [сообщения]
+if (!policy.channelBans) policy.channelBans = {}; // id канала -> { nick(lower): untilTs|0 } (0 = навсегда)
 if (!policy.bots) policy.bots = [];              // боты для чатов (Python через API)
 if (!policy.noStream) policy.noStream = {};      // nick -> true: запрет трансляций (из админки)
 if (!policy.apiCode) policy.apiCode = '';        // секретный код для управления по URL (перезапуск/обновление)
@@ -3622,13 +3623,16 @@ function streamStart(req, res) {
         const id = crypto.randomBytes(6).toString('hex');
         const user = (acc(nick) || {}).username || nick;
         const title = clean(body.title, 120) || ('Эфир ' + nick);
+        const slug = (v, max) => (String(v || '').toLowerCase().replace(/[^a-z0-9а-я]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, max));
         const category = (clean(body.category, 32) || 'stream').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || 'stream';
         const subcategory = clean(body.subcategory, 40);   // например Minecraft (свободный текст)
         const channel = (clean(body.channel, 32) || nick).toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || nick;
-        const nameSlug = (title.toLowerCase().replace(/[^a-z0-9а-я]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'live';
-        const link = '/live/' + encodeURIComponent(category) + '/' + encodeURIComponent(channel) + '/' + id + '-' + encodeURIComponent(nameSlug);
-        streams.set(id, { nick, user, title, category, subcategory, channel, nameSlug, link,
-                          jpg: '', seen: now(), at: now(), viewers: new Map(), chat: [] });
+        const subSlug = slug(subcategory, 40) || 'live';
+        // постоянное имя трансляции: его задаёт стример (англ. слаг), иначе берём из названия — ссылка всегда одна
+        const nameSlug = slug(body.name, 40) || slug(title, 40) || 'live';
+        const link = '/live/' + encodeURIComponent(category) + '/' + encodeURIComponent(subSlug) + '/' + encodeURIComponent(nameSlug);
+        streams.set(id, { nick, user, title, category, subcategory, channel, subSlug, nameSlug, link,
+                          jpg: '', seen: now(), at: now(), viewers: new Map(), chat: [], bans: {} });
         send(res, 200, { ok: true, id, link });
     });
 }
@@ -3698,6 +3702,7 @@ function streamChatSend(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const s = streams.get(clean(body.id, 20)); if (!s) return send(res, 404, { error: 'нет эфира' });
+        if (banned(s.bans, nick) && nick !== s.nick) return send(res, 403, { error: 'вы заблокированы в этом чате (' + banLeft(s.bans, nick) + ')' });
         const text = clean(body.text, 400); if (!text) return send(res, 400, { error: 'пусто' });
         const from = (acc(nick) || {}).username || nick;
         s.chat.push({ from, text, at: now() }); if (s.chat.length > 500) s.chat.shift();
@@ -3717,6 +3722,29 @@ function adminStreamBan(req, res) {
 
 // ------------------------------------------------------------ каналы с общим чатом
 function chById(id) { return policy.channels.find(c => c.id === id) || null; }
+
+// --- баны/мьюты в чатах каналов и эфиров ---
+function banned(bans, nick) {
+    if (!bans || !nick) return false;
+    const until = bans[nick.toLowerCase()];
+    if (until === undefined) return false;
+    if (until === 0) return true;            // навсегда
+    if (now() > until) { delete bans[nick.toLowerCase()]; return false; }
+    return true;
+}
+function banLeft(bans, nick) {
+    const until = bans[nick.toLowerCase()];
+    if (until === 0) return 'навсегда';
+    const s = Math.max(0, Math.round((until - now()) / 1000));
+    return s > 60 ? Math.round(s / 60) + ' мин' : s + ' с';
+}
+// применить действие модерации к объекту банов
+function applyMod(bans, action, user, seconds) {
+    const u = user.toLowerCase();
+    if (action === 'unban') { delete bans[u]; return 'разбанен'; }
+    if (action === 'mute') { bans[u] = now() + Math.max(1, Math.min(86400, seconds || 300)) * 1000; return 'замьючен'; }
+    bans[u] = 0; return 'забанен';           // ban = навсегда
+}
 function channelCreate(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
@@ -3734,9 +3762,11 @@ function channelList(req, res) {
 function channelChatGet(req, res) {
     readJsonBody(req, body => {
         const c = chById(clean(body && body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
+        const mine = sessionNick(body && body.token);
+        if (mine && banned(policy.channelBans[c.id], mine) && !isAdmin(mine))
+            return send(res, 403, { error: 'вы заблокированы в этом канале' });
         const arr = policy.channelChat[c.id] || [];
         const since = Math.max(0, Number(body.since) || 0);
-        const mine = sessionNick(body && body.token);
         send(res, 200, { ok: true, name: c.name, desc: c.desc || '', owner: c.owner,
             isOwner: !!(mine && (mine === c.owner || isAdmin(mine))), msgs: arr.slice(since), total: arr.length });
     });
@@ -3745,6 +3775,7 @@ function channelChatSend(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const c = chById(clean(body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
+        if (banned(policy.channelBans[c.id], nick)) return send(res, 403, { error: 'вы заблокированы в этом канале (' + banLeft(policy.channelBans[c.id], nick) + ')' });
         const text = clean(body.text, 600); if (!text) return send(res, 400, { error: 'пусто' });
         const from = (acc(nick) || {}).username || nick;
         const arr = policy.channelChat[c.id] || (policy.channelChat[c.id] = []);
@@ -3763,6 +3794,49 @@ function channelDelete(req, res) {
     });
 }
 
+// владелец канала / админ: мьют(mute, сек), бан(ban, навсегда), разбан(unban)
+function channelMod(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const c = chById(clean(body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
+        if (c.owner !== nick && !isAdmin(nick)) return send(res, 403, { error: 'не ваш канал' });
+        const user = clean(body.user, 16); if (!user) return send(res, 400, { error: 'нужен ник' });
+        const action = clean(body.action, 10);
+        if (!policy.channelBans[c.id]) policy.channelBans[c.id] = {};
+        const r = applyMod(policy.channelBans[c.id], action, user, Number(body.seconds) || 0);
+        savePolicy();
+        send(res, 200, { ok: true, result: user + ' ' + r });
+    });
+}
+// стример / админ: мьют/бан в чате эфира
+function streamMod(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const s = streams.get(clean(body.id, 20)); if (!s) return send(res, 404, { error: 'нет эфира' });
+        if (s.nick !== nick && !isAdmin(nick)) return send(res, 403, { error: 'не ваш эфир' });
+        const user = clean(body.user, 16); if (!user) return send(res, 400, { error: 'нужен ник' });
+        if (!s.bans) s.bans = {};
+        const r = applyMod(s.bans, clean(body.action, 10), user, Number(body.seconds) || 0);
+        send(res, 200, { ok: true, result: user + ' ' + r });
+    });
+}
+// бот модерирует чат своей цели (channel:ID или stream:ID)
+function botMod(req, res) {
+    readJsonBody(req, body => {
+        const b = botByToken(clean(body && body.botToken, 40)); if (!b) return send(res, 403, { error: 'неверный токен бота' });
+        const target = clean(body.target, 40);
+        if (!(b.targets || []).includes(target)) return send(res, 403, { error: 'бот не состоит в этой цели' });
+        const user = clean(body.user, 16); if (!user) return send(res, 400, { error: 'нужен ник' });
+        const action = clean(body.action, 10), seconds = Number(body.seconds) || 0;
+        const m = target.split(':'), kind = m[0], id = m[1];
+        let r;
+        if (kind === 'channel') { if (!policy.channelBans[id]) policy.channelBans[id] = {}; r = applyMod(policy.channelBans[id], action, user, seconds); savePolicy(); }
+        else if (kind === 'stream') { const s = streams.get(id); if (!s) return send(res, 404, { error: 'нет эфира' }); if (!s.bans) s.bans = {}; r = applyMod(s.bans, action, user, seconds); }
+        else return send(res, 400, { error: 'неизвестная цель' });
+        send(res, 200, { ok: true, result: user + ' ' + r });
+    });
+}
+
 // ------------------------------------------------------------ боты для чатов (Python через API)
 const BOT_TEMPLATE = '# Бот NareLauncher. Запуск: python bot.py\n' +
     'from narebot import Bot\n\n' +
@@ -3771,7 +3845,10 @@ const BOT_TEMPLATE = '# Бот NareLauncher. Запуск: python bot.py\n' +
     'def reply(msg):\n' +
     '    # msg.text, msg.from_, msg.target\n' +
     '    if msg.text.lower() == "привет":\n' +
-    '        msg.reply("Привет, " + msg.from_ + "!")\n\n' +
+    '        msg.reply("Привет, " + msg.from_ + "!")\n' +
+    '    # модерация: msg.mute(ник, секунды), msg.ban(ник), msg.unban(ник)\n' +
+    '    if msg.text.startswith("!mute "):\n' +
+    '        msg.mute(msg.text.split(" ",1)[1], 300)\n\n' +
     'bot.run()\n';
 
 function botById(id) { return policy.bots.find(b => b.id === id) || null; }
@@ -4676,12 +4753,24 @@ const server = http.createServer((req, res) => {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    // красивая ссылка на стрим: /live/<категория>/<канал>/<id>-<имя> -> страница просмотра
+    // красивая/постоянная ссылка на стрим: /live/<категория>/<подкатегория>/<имя> -> страница просмотра
     if (route.startsWith('/live/')) {
-        const parts = route.split('/').filter(Boolean);   // ['live', cat, chan, idname]
+        const parts = route.split('/').filter(Boolean);   // ['live', cat, sub, name]
         if (parts.length >= 4) {
-            const idname = decodeURIComponent(parts[3]);
-            const id = (idname.match(/^[0-9a-f]+/) || [idname])[0];
+            const cat = decodeURIComponent(parts[1]).toLowerCase();
+            const last = decodeURIComponent(parts[3]).toLowerCase();
+            // 1) живой стрим с таким именем (ссылка всегда одна и та же у стримера)
+            let foundId = null, catMatchId = null;
+            for (const [sid, s] of streams) {
+                if (!streamLive(s)) continue;
+                if ((s.nameSlug || '').toLowerCase() === last) {
+                    foundId = foundId || sid;
+                    if ((s.category || '').toLowerCase() === cat) catMatchId = catMatchId || sid;
+                }
+            }
+            let id = catMatchId || foundId;
+            // 2) запасной вариант — старые ссылки вида <id>-<имя>
+            if (!id) id = (last.match(/^[0-9a-f]+/) || [last])[0];
             res.writeHead(302, { Location: '/live/watch.php?s=' + encodeURIComponent(id) });
             return res.end();
         }
@@ -4872,6 +4961,9 @@ const server = http.createServer((req, res) => {
     if (route === '/channel/chat/get' && req.method === 'POST') return channelChatGet(req, res);
     if (route === '/channel/chat/send' && req.method === 'POST') return channelChatSend(req, res);
     if (route === '/channel/delete' && req.method === 'POST') return channelDelete(req, res);
+    if (route === '/channel/mod' && req.method === 'POST') return channelMod(req, res);   // владелец/админ: мьют/бан/разбан
+    if (route === '/stream/mod' && req.method === 'POST') return streamMod(req, res);     // стример/админ: мьют/бан в чате эфира
+    if (route === '/bot/mod' && req.method === 'POST') return botMod(req, res);           // бот модерирует чат своей цели
 
     // --- боты (управление владельцем по токену аккаунта) ---
     if (route === '/bot/create' && req.method === 'POST') return botCreate(req, res);
