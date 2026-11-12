@@ -18,9 +18,13 @@
   <button id="fab" title="Помощь">＋</button>
 </div>
 <div id="ai-panel" class="chat-panel">
-  <div class="cp-head">🤖 ИИ-помощник <button class="cp-x" data-close="ai-panel">✕</button></div>
+  <div class="cp-head">🤖 Наря · ИИ <button class="cp-x" data-close="ai-panel">✕</button></div>
   <div class="cp-body" id="ai-body"></div>
-  <div class="cp-foot"><input id="ai-in" placeholder="Спросите о лаунчере, стримах, серверах…"><button class="btn" id="ai-send">→</button></div>
+  <div id="ai-thumb" class="ai-thumb" style="display:none"></div>
+  <div class="cp-foot">
+    <label class="ai-clip" title="Прикрепить картинку">📎<input type="file" id="ai-img" accept="image/*" hidden></label>
+    <input id="ai-in" placeholder="Спросите что угодно…"><button class="btn" id="ai-send">→</button>
+  </div>
 </div>
 <div id="sup-panel" class="chat-panel">
   <div class="cp-head">🆘 Поддержка <button class="cp-x" data-close="sup-panel">✕</button></div>
@@ -40,11 +44,46 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
   document.getElementById('fab-support').onclick=function(){ openPanel('sup-panel'); };
   Array.prototype.forEach.call(document.querySelectorAll('.cp-x'),function(x){ x.onclick=function(){ document.getElementById(this.getAttribute('data-close')).classList.remove('open'); }; });
 
-  // ---- ИИ-помощник: отвечает по базе знаний о NareLauncher ----
-  var aiStarted=false;
+  // ---- Наря: настоящий ИИ через /ai/chat, с памятью/картинками/инструментами ----
+  var aiStarted=false, aiHist=[], aiBusy=false, aiImg=null;
   function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-  function add(cls,html){ var b=document.getElementById('ai-body'); var d=document.createElement('div'); d.className='cp-msg '+cls; d.innerHTML=html; b.appendChild(d); b.scrollTop=b.scrollHeight; }
-  function aiGreet(){ aiStarted=true; add('bot','Привет! Я помощник NareLauncher. Спросите про <b>скачивание</b>, <b>серверы</b>, <b>эфиры/стримы</b>, <b>ботов</b>, <b>каналы</b>, <b>подписки</b>, <b>монеты</b>, <b>2FA</b> или <b>удалённое управление</b>.'); }
+  // мини-markdown: **жирный**, `код`, тройные бэктики -> <pre>, переносы строк, ссылки
+  function fmt(s){ s=esc(s);
+    s=s.replace(/```([\s\S]*?)```/g,function(m,c){return '<pre>'+c.replace(/^\n/,'')+'</pre>';});
+    s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    s=s.replace(/(https?:\/\/[^\s<]+|\/[a-z][\w\/.\-]*)/g,'<a href="$1" target="_blank">$1</a>');
+    s=s.replace(/\n/g,'<br>'); return s; }
+  function add(cls,html){ var b=document.getElementById('ai-body'); var d=document.createElement('div'); d.className='cp-msg '+cls; d.innerHTML=html; b.appendChild(d); b.scrollTop=b.scrollHeight; return d; }
+  function aiGreet(){ aiStarted=true; add('bot','Привет! Я <b>Наря</b> — ИИ-помощник NareLauncher. Спрашивай что угодно про лаунчер, эфиры, серверы, ботов. Я могу искать по базе, создавать каналы и ботов, смотреть присланные картинки 🖼️'); }
+
+  // прикрепление картинки
+  document.getElementById('ai-img').addEventListener('change',function(e){
+    var f=e.target.files[0]; if(!f){aiImg=null;return;}
+    if(f.size>5*1024*1024){ add('bot','Картинка великовата (до 5 МБ).'); this.value=''; return; }
+    var rd=new FileReader(); rd.onload=function(){ aiImg=rd.result;
+      var t=document.getElementById('ai-thumb'); t.style.display='block';
+      t.innerHTML='<img src="'+aiImg+'"><span class="ai-thumb-x" id="ai-thumb-x">убрать ✕</span>';
+      document.getElementById('ai-thumb-x').onclick=function(){ aiImg=null; t.style.display='none'; t.innerHTML=''; document.getElementById('ai-img').value=''; };
+    }; rd.readAsDataURL(f);
+  });
+
+  function aiAsk(){ if(aiBusy)return; var inp=document.getElementById('ai-in'); var q=inp.value.trim();
+    if(!q && !aiImg)return;
+    add('me',(q?fmt(q):'')+(aiImg?'<br><img class="ai-sent" src="'+aiImg+'">':'')); inp.value='';
+    var sentImg=aiImg; aiImg=null; var t=document.getElementById('ai-thumb'); t.style.display='none'; t.innerHTML='';
+    aiBusy=true; var wait=add('bot','<span class="ai-typing">Наря печатает…</span>');
+    fetch('/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:SUPTOK,text:q,image:sentImg,history:aiHist})})
+      .then(function(r){return r.json();})
+      .then(function(j){ aiBusy=false;
+        if(j && j.configured===false){ wait.innerHTML=fmt(j.reply||'')+'<br><span class="muted" style="font-size:12px">(пока отвечаю по разделам — '+fmt(answer(q))+')</span>'; return; }
+        var rep=(j&&j.reply)||'Пустой ответ.'; wait.innerHTML=fmt(rep);
+        aiHist.push({role:'user',text:q}); aiHist.push({role:'ai',text:rep}); if(aiHist.length>12)aiHist=aiHist.slice(-12);
+      })
+      .catch(function(){ aiBusy=false; wait.innerHTML=fmt(answer(q))+'<br><span class="muted" style="font-size:12px">(сеть недоступна — ответ по разделам)</span>'; });
+  }
+
   var KB=[
     [['скач','установ','download'],'Скачать лаунчер: раздел <a href="/download/">Скачать</a>. Запустите установщик — он поставит лаунчер сам.'],
     [['сервер','server','ядро','плагин','мод '],'Свой сервер: в лаунчере вкладка «Мои серверы» → создать → выбрать версию и ядро (ванила/Paper/Forge/Fabric/гибрid). Моды и плагины — там же. Сервера видны на сайте в разделе <a href="/servers/">Сервера</a>.'],
@@ -62,9 +101,7 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
   ];
   function answer(q){ q=q.toLowerCase();
     for(var i=0;i<KB.length;i++){ for(var k=0;k<KB[i][0].length;k++){ if(q.indexOf(KB[i][0][k])>=0) return KB[i][1]; } }
-    return 'Не уверен, что понял. Попробуйте по-другому или напишите в <b>Поддержку</b> (кнопка 🆘) — ответит администратор.'; }
-  function aiAsk(){ var inp=document.getElementById('ai-in'); var q=inp.value.trim(); if(!q)return; add('me',esc(q)); inp.value='';
-    setTimeout(function(){ add('bot',answer(q)); },250); }
+    return 'Напишите в <b>Поддержку</b> (кнопка 🆘) — ответит администратор.'; }
   document.getElementById('ai-send').onclick=aiAsk;
   document.getElementById('ai-in').addEventListener('keydown',function(e){ if(e.key==='Enter')aiAsk(); });
 

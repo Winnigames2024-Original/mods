@@ -153,3 +153,35 @@ html.simple .muted{color:#5b6472}
 html.simple #fab{background:#2563eb}
 html.simple .chat-panel,html.simple .fab-item{background:#fff}
 html.simple .cp-msg.bot,html.simple .cp-foot input{background:#f3f4f6}
+
+/* --- Наря: ИИ-панель (картинки, печатает, код) --- */
+.ai-clip{cursor:pointer;font-size:20px;line-height:1;padding:0 6px;user-select:none;opacity:.8}
+.ai-clip:hover{opacity:1}
+.ai-thumb{padding:6px 10px;border-top:1px solid rgba(128,128,128,.25)}
+.ai-thumb img{max-height:70px;border-radius:8px;vertical-align:middle}
+.ai-thumb-x{margin-left:8px;font-size:12px;color:#e55;cursor:pointer}
+.cp-msg img.ai-sent{max-width:160px;border-radius:8px;margin-top:4px;display:block}
+.ai-typing{opacity:.6;font-style:italic}
+.cp-msg pre{background:rgba(128,128,128,.15);padding:8px 10px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;font-size:13px;margin:4px 0}
+.cp-msg code{background:rgba(128,128,128,.18);padding:1px 5px;border-radius:5px;font-size:13px}
+.cp-msg pre code{background:none;padding:0}
+
+/* --- Вкладки в стиле Modrinth + страница ошибки в стиле GitHub 404 --- */
+.tabs{display:flex;gap:4px;border-bottom:2px solid rgba(128,128,128,.2);margin:0 0 16px;overflow-x:auto}
+.tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:10px 16px;
+  font:inherit;font-weight:600;color:var(--muted,#8b949e);cursor:pointer;white-space:nowrap;border-radius:8px 8px 0 0}
+.tab:hover{color:var(--fg,#e6edf3);background:rgba(128,128,128,.08)}
+.tab.active{color:var(--accent,#5b8cff);border-bottom-color:var(--accent,#5b8cff)}
+.tab-pane{display:none}
+.tab-pane.active{display:block;animation:tabin .18s ease}
+@keyframes tabin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.about-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.about-grid>div{background:rgba(128,128,128,.08);border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:12px 14px}
+.about-grid .muted{font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+.about-grid>div>div{font-size:17px;font-weight:600;margin-top:4px}
+
+.gh404{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 16px;gap:10px}
+.gh404-code{font-size:15px;font-weight:700;letter-spacing:.15em;color:var(--accent,#5b8cff);opacity:.85}
+.gh404-big{font-size:clamp(28px,6vw,54px);font-weight:800;letter-spacing:.02em;line-height:1.05}
+.gh404-sub{max-width:520px;color:var(--muted,#8b949e);margin:4px 0 14px}
+html.simple .gh404-code{color:#2563eb}

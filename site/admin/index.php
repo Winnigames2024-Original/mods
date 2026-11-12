@@ -43,11 +43,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($act === 'twofaoff') {
         $r = api_post('/admin/twofa/off', ['token' => $tok, 'nick' => $_POST['nick'] ?? '']);
         $msg = !empty($r['ok']) ? ('2FA снята: ' . h($r['cleared'])) : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'aiconfig') {
+        $r = api_post('/admin/ai/config', ['token' => $tok, 'set' => true,
+            'provider' => $_POST['provider'] ?? '', 'model' => $_POST['model'] ?? '',
+            'base' => $_POST['base'] ?? '', 'key' => $_POST['key'] ?? '',
+            'enabled' => ($_POST['enabled'] ?? '') === '1']);
+        $msg = !empty($r['ok']) ? 'Настройки ИИ сохранены.' : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'aiforget') {
+        $r = api_post('/admin/ai/config', ['token' => $tok, 'clearMemory' => true]);
+        $msg = !empty($r['ok']) ? 'Память ИИ очищена.' : ($r['error'] ?? 'Ошибка');
     }
     // перечитываем состояние после действия
     $state = api_post('/admin/state', ['token' => $tok]);
 }
 $apiCode = api_post('/admin/apicode', ['token' => $tok])['code'] ?? '';
+$aiCfg = api_post('/admin/ai/config', ['token' => $tok])['ai'] ?? [];
 $srvResp = api_post('/admin/servers', ['token' => $tok]);
 $allServers = $srvResp['servers'] ?? [];
 $pending = array_values(array_filter($allServers, fn($x) => ($x['status'] ?? '') === 'pending'));
@@ -91,6 +101,41 @@ require __DIR__ . '/../_inc/head.php';
     <form method="post"><input type="hidden" name="act" value="restart"><input type="hidden" name="what" value="servers"><button class="btn ghost" type="submit">Перезапустить сервера</button></form>
     <form method="post" onsubmit="return confirm('Перезапустить всё — лаунчеры и сервера?')"><input type="hidden" name="act" value="restart"><input type="hidden" name="what" value="all"><button class="btn" type="submit">Перезапустить всё</button></form>
   </div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <h2 style="margin-top:0">🤖 Настоящий ИИ (Наря)</h2>
+  <p class="muted">Подключи любой <b>бесплатный</b> провайдер ИИ — и помощник на сайте оживёт: будет отвечать как живой, искать по базе, создавать каналы/ботов, смотреть присланные картинки и учиться в файл на сервере.</p>
+  <ul class="muted" style="margin:6px 0 12px;font-size:14px;line-height:1.6">
+    <li><b>Groq</b> (быстрый, бесплатный): провайдер <code>openai</code>, адрес <code>https://api.groq.com/openai/v1</code>, модель напр. <code>llama-3.3-70b-versatile</code>. Ключ — на console.groq.com.</li>
+    <li><b>OpenRouter</b> (много бесплатных моделей): провайдер <code>openai</code>, адрес <code>https://openrouter.ai/api/v1</code>, модель напр. <code>meta-llama/llama-3.1-8b-instruct:free</code>. Ключ — на openrouter.ai.</li>
+    <li><b>Google Gemini</b> (бесплатный ключ): провайдер <code>gemini</code>, модель напр. <code>gemini-1.5-flash</code>, адрес не нужен. Ключ — на aistudio.google.com.</li>
+  </ul>
+  <p class="muted" style="font-size:13px">Сейчас:
+    <b><?= $aiCfg ? h(($aiCfg['provider'] ?: '—')) : '—' ?></b>,
+    модель <b><?= h(($aiCfg['model'] ?? '') ?: '—') ?></b>,
+    ключ <b><?= !empty($aiCfg['hasKey']) ? h($aiCfg['keyHint']) : 'не задан' ?></b>,
+    <b><?= !empty($aiCfg['enabled']) ? 'включён' : 'выключен' ?></b>,
+    память <b><?= (int)($aiCfg['memoryBytes'] ?? 0) ?></b> б.
+  </p>
+  <form method="post" style="display:grid;gap:8px;max-width:560px">
+    <input type="hidden" name="act" value="aiconfig">
+    <label>Провайдер
+      <select name="provider" style="width:100%">
+        <option value="openai"<?= (($aiCfg['provider'] ?? '')==='openai')?' selected':'' ?>>openai-совместимый (Groq / OpenRouter / …)</option>
+        <option value="gemini"<?= (($aiCfg['provider'] ?? '')==='gemini')?' selected':'' ?>>gemini (Google)</option>
+      </select>
+    </label>
+    <label>Модель <input name="model" value="<?= h($aiCfg['model'] ?? '') ?>" placeholder="llama-3.3-70b-versatile / gemini-1.5-flash" style="width:100%"></label>
+    <label>Адрес API (для openai-совместимых) <input name="base" value="<?= h($aiCfg['base'] ?? '') ?>" placeholder="https://api.groq.com/openai/v1" style="width:100%"></label>
+    <label>Ключ API <input name="key" type="password" placeholder="<?= !empty($aiCfg['hasKey']) ? 'оставь пустым, чтобы не менять' : 'вставь ключ' ?>" style="width:100%"></label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="enabled" value="1"<?= !empty($aiCfg['enabled'])?' checked':'' ?>> Включить ИИ</label>
+    <div style="display:flex;gap:8px"><button class="btn" type="submit">Сохранить</button></div>
+  </form>
+  <form method="post" style="margin-top:8px" onsubmit="return confirm('Очистить всё, что ИИ выучил?')">
+    <input type="hidden" name="act" value="aiforget">
+    <button class="btn ghost" type="submit">Очистить память ИИ</button>
+  </form>
 </div>
 
 <div class="panel" style="margin-top:18px">
