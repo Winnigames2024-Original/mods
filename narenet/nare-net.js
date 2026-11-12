@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.60';
+const VERSION = '1.61';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -930,6 +930,8 @@ function acc(nick) {
     if (typeof a.tag !== 'string') a.tag = '';
     if (typeof a.chatName !== 'string') a.chatName = '';
     if (typeof a.lastSeen !== 'number') a.lastSeen = 0;
+    if (!Array.isArray(a.followers)) a.followers = [];   // кто подписан на этот канал
+    if (!Array.isArray(a.following)) a.following = [];   // на кого подписан этот аккаунт
     return a;
 }
 
@@ -3455,6 +3457,68 @@ function apiTwofaOff(req, res) {
     send(res, 200, { ok: true, cleared: nick });
 }
 
+// ------------------------------------------------------------ подписки и рекомендации
+function subscribe(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const target = clean(body.nick, 16);
+        if (!target || !accounts[target]) return send(res, 404, { error: 'нет такого канала' });
+        if (target.toLowerCase() === me.toLowerCase()) return send(res, 400, { error: 'нельзя подписаться на себя' });
+        const a = acc(me), t = acc(target);
+        const low = target.toLowerCase();
+        let following;
+        if (a.following.some(x => x.toLowerCase() === low)) {
+            a.following = a.following.filter(x => x.toLowerCase() !== low);
+            t.followers = t.followers.filter(x => x.toLowerCase() !== me.toLowerCase());
+            following = false;
+        } else {
+            a.following.push(target);
+            if (!t.followers.some(x => x.toLowerCase() === me.toLowerCase())) t.followers.push(me);
+            following = true;
+        }
+        saveAccounts();
+        send(res, 200, { ok: true, following, subscribers: t.followers.length });
+    });
+}
+function subscribedList(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(me);
+        const chans = a.following.map(nk => {
+            const t = acc(nk);
+            return { nick: nk, user: t ? t.username || nk : nk, subscribers: t ? t.followers.length : 0,
+                     online: isOnline(nk), live: !!liveStreamOf(nk) };
+        });
+        // свежие видео каналов, на которые подписан
+        const set = new Set(a.following.map(x => x.toLowerCase()));
+        const vids = policy.videos.filter(v => v.ready && set.has(v.nick.toLowerCase()))
+            .sort((x, y) => y.at - x.at).slice(0, 40).map(v => vidPublic(v, false));
+        send(res, 200, { ok: true, channels: chans, videos: vids });
+    });
+}
+function liveStreamOf(nick) {
+    for (const [id, s] of streams) if (s.nick.toLowerCase() === nick.toLowerCase() && streamLive(s)) return id;
+    return null;
+}
+function recommend(req, res) {
+    const q = query(req);
+    const nick = sessionNick(q.token) || '';
+    let follow = new Set();
+    if (nick && accounts[nick]) follow = new Set(acc(nick).following.map(x => x.toLowerCase()));
+    const t = now();
+    const scored = policy.videos.filter(v => v.ready).map(v => {
+        const ageH = Math.max(1, (t - v.at) / 3600000);
+        let score = (v.views || 0) + (v.likes || []).length * 5;
+        score = score / Math.pow(ageH, 0.4);                 // свежее — выше
+        if (follow.has(v.nick.toLowerCase())) score *= 3;    // от тех, на кого подписан — выше
+        return { v, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    send(res, 200, { ok: true, videos: scored.slice(0, 40).map(x => vidPublic(x.v, false)) });
+}
+
 // ------------------------------------------------------------ фото-галерея
 function phPath(id) { return path.join(PHOTOS_DIR, String(id).replace(/[^0-9a-f]/gi, '') + '.bin'); }
 function phById(id) { return policy.photos.find(p => p.id === id) || null; }
@@ -4213,6 +4277,7 @@ function profileGet(req, res) {
         coins: a.coins || 0,
         username: a.username || nick,
         subs: a.subs || [nick],
+        subscribers: (a.followers || []).length,
         since: a.created || 0,
         shots: (a.shots || []).map(x => ({ id: x.id, at: x.at })),
         admin: isAdmin(nick), moderator: isModerator(nick),
@@ -4674,6 +4739,9 @@ const server = http.createServer((req, res) => {
     if (route === '/clicker/upgrade' && req.method === 'POST') return clickerUpgrade(req, res);
     if (route === '/top') return coinsTop(req, res);
     if (route === '/profile/get') return profileGet(req, res);
+    if (route === '/subscribe' && req.method === 'POST') return subscribe(req, res);      // подписаться/отписаться
+    if (route === '/subscribed' && req.method === 'POST') return subscribedList(req, res); // мои подписки + их видео/эфиры
+    if (route === '/recommend') return recommend(req, res);                                // рекомендованные видео
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
     if (route === '/events' && req.method === 'POST') return eventsActive(req, res);
     if (route === '/events/join' && req.method === 'POST') return eventsJoin(req, res);

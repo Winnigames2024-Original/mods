@@ -3,13 +3,29 @@ require_once __DIR__ . '/../_inc/config.php';
 $PAGE_TITLE = 'Медиа — видео и фото · NareLauncher';
 $PAGE_DESC  = 'Видео и фото сообщества NareLauncher: смотрите, лайкайте, комментируйте.';
 require __DIR__ . '/../_inc/head.php';
+$recs = api_get('/recommend' . (me() ? '?token=' . urlencode(token()) : ''))['videos'] ?? [];
 $vids = api_get('/video/list')['videos'] ?? [];
 $phs  = api_get('/photos')['photos'] ?? [];
 ?>
 <div class="media-head">
   <h1>Медиа</h1>
-  <?php if (me()): ?><a class="btn" href="/media/upload.php">Загрузить</a><?php endif; ?>
+  <div class="btn-row">
+    <?php if (me()): ?><a class="btn ghost" href="/subscriptions/">Подписки</a><a class="btn" href="/media/upload.php">Загрузить</a><?php endif; ?>
+  </div>
 </div>
+
+<?php if ($recs): ?>
+<h2>Рекомендации</h2>
+<div class="mgrid">
+  <?php foreach ($recs as $v): ?>
+  <a class="mcard" href="/media/watch.php?v=<?= urlencode($v['id']) ?>">
+    <div class="mthumb vid"><?php if (!empty($v['thumb'])): ?><img src="<?= h($v['thumb']) ?>" alt=""><?php else: ?><span>▶</span><?php endif; ?></div>
+    <div class="mmeta"><div class="mtitle"><?= h($v['title']) ?></div>
+      <div class="muted"><?= h($v['user']) ?> · <?= (int)$v['views'] ?> просм. · 👍 <?= (int)$v['likes'] ?></div></div>
+  </a>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <h2>Видео</h2>
 <?php if (!$vids): ?><p class="muted">Пока нет видео.</p><?php else: ?>
