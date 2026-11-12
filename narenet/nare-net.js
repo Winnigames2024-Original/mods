@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.61';
+const VERSION = '1.62';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3668,6 +3668,25 @@ function streamFrame(req, res) {
                          viewers: s.viewers.size, category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }
+// микрофон эфира: ведущий шлёт короткие самостоятельные аудио-клипы, зрители их проигрывают
+function streamAudioPush(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const s = streams.get(clean(body.id, 20)); if (!s || s.nick !== nick) return send(res, 404, { error: 'нет вашей трансляции' });
+        const clip = typeof body.clip === 'string' ? body.clip : '';
+        if (clip) { if (clip.length > 2_000_000) return send(res, 413, { error: 'клип большой' }); s.audio = clip; s.audioSeq = (s.audioSeq || 0) + 1; s.seen = now(); }
+        send(res, 200, { ok: true, seq: s.audioSeq || 0 });
+    });
+}
+function streamAudioGet(req, res) {
+    readJsonBody(req, body => {
+        const s = streams.get(clean(body && body.id, 20)); if (!s) return send(res, 404, { error: 'нет эфира' });
+        const since = Math.max(0, Number(body.since) || 0);
+        const seq = s.audioSeq || 0;
+        if (seq > since && s.audio) send(res, 200, { ok: true, seq, clip: s.audio });
+        else send(res, 200, { ok: true, seq });
+    });
+}
 function streamChatGet(req, res) {
     readJsonBody(req, body => {
         const s = streams.get(clean(body && body.id, 20)); if (!s) return send(res, 404, { error: 'нет эфира' });
@@ -4839,6 +4858,8 @@ const server = http.createServer((req, res) => {
     if (route === '/stream/stop' && req.method === 'POST') return streamStop(req, res);
     if (route === '/stream/list') return streamList(req, res);
     if (route === '/stream/frame' && req.method === 'POST') return streamFrame(req, res);
+    if (route === '/stream/audio/push' && req.method === 'POST') return streamAudioPush(req, res);
+    if (route === '/stream/audio/get' && req.method === 'POST') return streamAudioGet(req, res);
     if (route === '/stream/chat/get' && req.method === 'POST') return streamChatGet(req, res);
     if (route === '/stream/chat/send' && req.method === 'POST') return streamChatSend(req, res);
     if (route === '/admin/stream/ban' && req.method === 'POST') return adminStreamBan(req, res);
