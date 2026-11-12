@@ -37,6 +37,7 @@ require __DIR__ . '/../_inc/head.php';
     <h1>Подтвердите вход</h1>
     <p class="muted">У вас включена защита входа. Отсканируйте QR телефоном или откройте код на <b>/qrverify</b> и нажмите «Подтвердить».</p>
     <div class="qr-box"><canvas id="qr"></canvas></div>
+    <p><a class="btn ghost" id="dl" download="qr.png">Скачать QR (PNG)</a></p>
     <p>Код: <code><?= h($vt) ?></code></p>
     <p class="muted" id="st">Ожидаю подтверждения…</p>
   </div>
@@ -44,6 +45,7 @@ require __DIR__ . '/../_inc/head.php';
   <script>
     var link = <?= json_encode(SITE . '/qrverify/?t=' . $vt) ?>;
     NareQR.draw(document.getElementById('qr'), link, {scale:6});
+    try { document.getElementById('dl').href = document.getElementById('qr').toDataURL('image/png'); } catch(e){}
     var token = <?= json_encode($vt) ?>, done = false;
     function poll(){
       if (done) return;

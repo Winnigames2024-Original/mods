@@ -7,7 +7,7 @@ require __DIR__ . '/../_inc/head.php';
 <div class="watch">
   <div class="rc-screen-wrap"><img id="scr" alt="эфир"><div id="off" class="rc-off">Эфир не в сети.</div></div>
   <h1 style="margin:12px 0 2px" id="title">Эфир</h1>
-  <div class="muted"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="st" class="badge">подключение…</span></div>
+  <div class="muted"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="cat"></span> · <span id="st" class="badge">подключение…</span></div>
 
   <h2 style="margin-top:18px">Чат</h2>
   <div id="chat" class="lchat"></div>
@@ -24,6 +24,7 @@ function frame(){ node('/stream/frame',{id:ID}).then(function(j){
     document.getElementById('off').style.display=j.online?'none':'grid';
     if(j.title)document.getElementById('title').textContent=j.title; if(j.user)document.getElementById('user').textContent=j.user;
     document.getElementById('vw').textContent=j.viewers||0;
+    document.getElementById('cat').textContent=(j.subcategory||j.category||'');
     if(j.jpg)document.getElementById('scr').src='data:image/jpeg;base64,'+j.jpg; }
 }).catch(function(){}).finally(function(){setTimeout(frame,600);}); }
 frame();

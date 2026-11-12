@@ -21,6 +21,7 @@ namespace NareLauncher.UI
         private readonly ComboBox _source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly ComboBox _category = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly TextBox _title = new TextBox();
+        private readonly TextBox _sub = new TextBox();
         private readonly Button _refresh = new Button { Text = "⟳ Окна" };
         private readonly Button _go = new Button { Text = "Выйти в эфир" };
         private readonly PictureBox _preview = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
@@ -51,7 +52,9 @@ namespace NareLauncher.UI
             _category.SelectedIndex = 0;
 
             var lblTitle = Lbl("Название эфира", 16, 72);
-            _title.SetBounds(16, 94, 728, 26); Style(_title);
+            _title.SetBounds(16, 94, 470, 26); Style(_title);
+            var lblSub = Lbl("Подкатегория (напр. Minecraft)", 500, 72);
+            _sub.SetBounds(500, 94, 244, 26); Style(_sub);
 
             _preview.SetBounds(16, 132, 728, 344);
             _preview.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
@@ -64,7 +67,7 @@ namespace NareLauncher.UI
             _link.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             _link.LinkClicked += (s, e) => { try { if (!string.IsNullOrEmpty(_streamLink)) System.Diagnostics.Process.Start(_streamLink); } catch { } };
 
-            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, _preview, _go, _status, _link });
+            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, _preview, _go, _status, _link });
 
             _refresh.Click += (s, e) => LoadSources();
             _go.Click += (s, e) => { if (_live) Stop(); else Start(); };
@@ -119,7 +122,8 @@ namespace NareLauncher.UI
             if (acc == null || string.IsNullOrEmpty(acc.Token)) { _status.Text = "Сначала войдите в аккаунт."; return; }
             string title = (_title.Text ?? "").Trim(); if (title.Length == 0) title = "Эфир";
             string cat = CatSlug(_category.SelectedItem as string);
-            string resp = Post("/stream/start", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) + "\"}");
+            string sub = (_sub.Text ?? "").Trim();
+            string resp = Post("/stream/start", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) + "\",\"subcategory\":\"" + Esc(sub) + "\"}");
             var j = resp != null ? Json.Parse(resp) : null;
             if (j == null || !j["ok"].AsBool(false)) { _status.Text = "Не удалось начать: " + (j != null ? j["error"].AsString("нет связи") : "нет связи"); return; }
             _streamId = j["id"].AsString("");

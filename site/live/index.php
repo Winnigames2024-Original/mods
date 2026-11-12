@@ -17,7 +17,7 @@ $streams = api_get('/stream/list')['streams'] ?? [];
   <a class="mcard" href="<?= h($href) ?>">
     <div class="mthumb vid"><span class="live-dot">● LIVE</span></div>
     <div class="mmeta"><div class="mtitle"><?= h($s['title']) ?></div>
-      <div class="muted"><?= h($s['user']) ?> · <?= (int)$s['viewers'] ?> смотрят<?php if (!empty($s['category'])): ?> · <?= h($s['category']) ?><?php endif; ?></div></div>
+      <div class="muted"><?= h($s['user']) ?> · <?= (int)$s['viewers'] ?> смотрят<?php if (!empty($s['subcategory'])): ?> · <?= h($s['subcategory']) ?><?php elseif (!empty($s['category'])): ?> · <?= h($s['category']) ?><?php endif; ?></div></div>
   </a>
   <?php endforeach; ?>
 </div>

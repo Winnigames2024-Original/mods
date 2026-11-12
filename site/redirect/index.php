@@ -33,6 +33,7 @@ require __DIR__ . '/../_inc/head.php';
     <h1>Подтвердите, что вы человек</h1>
     <p class="muted">Отсканируйте QR телефоном или откройте код на <b>/qrverify</b> и нажмите «Подтвердить». После этого откроется переход.</p>
     <div class="qr-box"><canvas id="qr"></canvas></div>
+    <p><a class="btn ghost" id="dl" download="qr.png">Скачать QR (PNG)</a></p>
     <p>Код подтверждения: <code id="code"><?= h($token) ?></code></p>
     <p class="muted" id="st">Ожидаю подтверждения…</p>
     <a id="go" class="btn" style="display:none" href="<?= h($dest) ?>">Перейти →</a>
@@ -42,6 +43,7 @@ require __DIR__ . '/../_inc/head.php';
   <script>
     var link = <?= json_encode(SITE . '/qrverify/?t=' . $token) ?>;
     NareQR.draw(document.getElementById('qr'), link, {scale:6});
+    try { document.getElementById('dl').href = document.getElementById('qr').toDataURL('image/png'); } catch(e){}
     var dest = <?= json_encode($dest) ?>;
     var token = <?= json_encode($token) ?>;
     var done = false;

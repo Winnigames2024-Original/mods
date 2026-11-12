@@ -14,6 +14,9 @@ require __DIR__ . '/../_inc/head.php';
       <option value="games">Игры</option><option value="just-chatting">Разговоры</option>
       <option value="music">Музыка</option><option value="creative">Творчество</option><option value="stream">Другое</option>
     </select>
+    <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Подкатегория (например Minecraft)</label>
+    <input id="sub" maxlength="40" placeholder="Minecraft" list="subs" style="width:100%;background:#0a0d14;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:11px 12px">
+    <datalist id="subs"><option value="Minecraft"><option value="CS2"><option value="GTA V"><option value="Dota 2"><option value="Fortnite"><option value="Roblox"></datalist>
     <div class="btn-row" style="margin-top:16px">
       <button class="btn" id="screen">🖥 Экран / окно / приложение</button>
       <button class="btn ghost" id="camera">🎥 Камера</button>
@@ -43,10 +46,11 @@ function msg(t){var e=document.getElementById('st');e.style.display='block';e.te
 function begin(getMedia){
   var title=document.getElementById('title').value.trim()||'Эфир';
   var cat=document.getElementById('cat').value;
+  var sub=document.getElementById('sub').value.trim();
   getMedia().then(function(ms){
     stream=ms; document.getElementById('cam').srcObject=ms;
     ms.getVideoTracks()[0].addEventListener('ended', stop);   // пользователь нажал «прекратить доступ»
-    return node('/stream/start',{token:TOK,title:title,category:cat});
+    return node('/stream/start',{token:TOK,title:title,category:cat,subcategory:sub});
   }).then(function(j){
     if(!j.ok){msg(j.error||'Не удалось начать');return;}
     SID=j.id; LINK=location.origin+(j.link||('/live/watch.php?s='+j.id));

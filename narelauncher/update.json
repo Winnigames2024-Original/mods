@@ -1,12 +1,12 @@
 {
-  "version": "1.89",
+  "version": "1.90",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "b985309a0cf6b2a6a4959500bcd77abaee309ca4",
+  "sha1": "fde9f979c5d0eaf4374b40d17350be540c1a924e",
   "size": 881664,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "309770ca61a994e47bb89626ae290a2ff221d4ff",
   "smSize": 84992,
-  "notes": "Студия трансляции (кнопка «Эфир»): показ всего экрана или отдельного окна/приложения. Трансляции с экрана теперь и в вебе, и красивые ссылки на эфиры."
+  "notes": "Подкатегории трансляций (например Minecraft). В студии добавлено поле подкатегории."
 }
