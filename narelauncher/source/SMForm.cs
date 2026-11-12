@@ -51,6 +51,9 @@ namespace NareServerManager
         private long _restartHandled = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private long _killHandled = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private bool _restartBusy;
+        private readonly Timer _updatePoll = new Timer { Interval = 10 * 60 * 1000 };
+        private bool _updating;
+        private const string ManifestUrl = "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/update.json";
         private NotifyIcon _tray;
         private bool _reallyExit;
 
@@ -117,6 +120,11 @@ namespace NareServerManager
             _tick.Start();
             _restartPoll.Tick += (s, e) => PollRestart();
             _restartPoll.Start();
+            _updatePoll.Tick += (s, e) => CheckSelfUpdate();
+            _updatePoll.Start();
+            var upKick = new Timer { Interval = 20000 };     // первая проверка через 20с после старта
+            upKick.Tick += (a, b) => { upKick.Stop(); upKick.Dispose(); CheckSelfUpdate(); };
+            upKick.Start();
             Load += (s, e) => StartServer();
             Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) HideToTray(); };
             FormClosing += (s, e) =>
@@ -222,6 +230,95 @@ namespace NareServerManager
                 });
             })
             { IsBackground = true }.Start();
+        }
+
+        // ---------- самообновление ServerManager ----------
+        private void CheckSelfUpdate()
+        {
+            if (_updating) return;
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    string manifest;
+                    using (var wc = new System.Net.WebClient())
+                    {
+                        wc.Headers.Add("User-Agent", "ServerManager");
+                        manifest = wc.DownloadString(ManifestUrl + "?t=" + DateTime.UtcNow.Ticks);
+                    }
+                    var j = Json.Parse(manifest);
+                    string wantSha = j["smSha1"].AsString("");
+                    string url = j["smUrl"].AsString("");
+                    if (string.IsNullOrEmpty(wantSha) || string.IsNullOrEmpty(url)) return;
+
+                    string exe = Application.ExecutablePath;
+                    string curSha = Sha1OfFile(exe) ?? "";
+                    if (string.Equals(curSha, wantSha, StringComparison.OrdinalIgnoreCase)) return;   // уже свежий
+
+                    string tmp = exe + ".new";
+                    using (var wc = new System.Net.WebClient())
+                    {
+                        wc.Headers.Add("User-Agent", "ServerManager");
+                        wc.DownloadFile(url, tmp);
+                    }
+                    if (!string.Equals(Sha1OfFile(tmp) ?? "", wantSha, StringComparison.OrdinalIgnoreCase))
+                    { try { File.Delete(tmp); } catch { } return; }
+
+                    _updating = true;
+                    Ui(() =>
+                    {
+                        Append("Доступно обновление ServerManager. Останавливаю сервер и обновляюсь…");
+                        Toast(_name, "Обновление ServerManager");
+                        try { StopServer(); } catch { }
+                        SwapAndRestart(exe, tmp);
+                        _reallyExit = true;
+                        var t = new Timer { Interval = 1800 };
+                        t.Tick += (a, b) => { t.Stop(); t.Dispose(); try { Close(); } catch { } Application.Exit(); };
+                        t.Start();
+                    });
+                }
+                catch { }
+            })
+            { IsBackground = true }.Start();
+        }
+
+        private static string Sha1OfFile(string path)
+        {
+            try
+            {
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16))
+                {
+                    var hash = sha.ComputeHash(fs);
+                    var sb = new StringBuilder(hash.Length * 2);
+                    foreach (var b in hash) sb.Append(b.ToString("x2"));
+                    return sb.ToString();
+                }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Маленький .bat ждёт выхода процесса, подменяет exe и запускает заново с той же папкой.</summary>
+        private void SwapAndRestart(string exe, string newExe)
+        {
+            try
+            {
+                int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                string bat = Path.Combine(Path.GetTempPath(), "sm_update_" + Guid.NewGuid().ToString("N") + ".bat");
+                var sb = new StringBuilder();
+                sb.AppendLine("@echo off");
+                sb.AppendLine("timeout /t 2 /nobreak >nul");
+                sb.AppendLine(":w");
+                sb.AppendLine("tasklist /fi \"PID eq " + pid + "\" | find \"" + pid + "\" >nul && (timeout /t 1 /nobreak >nul & goto w)");
+                sb.AppendLine("move /y \"" + newExe + "\" \"" + exe + "\" >nul");
+                sb.AppendLine("start \"\" \"" + exe + "\" \"" + _folder + "\"");
+                sb.AppendLine("del \"%~f0\"");
+                File.WriteAllText(bat, sb.ToString());
+                var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"")
+                { CreateNoWindow = true, UseShellExecute = false, WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch { }
         }
 
         // ---------- бэкап ----------

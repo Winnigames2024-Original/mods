@@ -6,7 +6,7 @@
   "size": 881664,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "65313de39e07c69b6289f7781dc06d972d82c350",
-  "smSize": 86528,
-  "notes": "Админ может закрыть ServerManager у игрока или у всех (сервер останавливается). Управление чужими серверами из админки."
+  "smSha1": "e41c0070501891a3320ccc2a16392d85b12242f2",
+  "smSize": 90112,
+  "notes": "ServerManager теперь сам обновляется и перезапускается при выходе новой версии."
 }
