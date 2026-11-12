@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.54';
+const VERSION = '1.55';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3723,6 +3723,7 @@ function vidPublic(v, full) {
     const o = {
         id: v.id, nick: v.nick, user: v.user || v.nick, title: v.title, desc: full ? (v.desc || '') : undefined,
         thumb: v.thumb || '', mime: v.mime || 'video/mp4', at: v.at, dur: v.dur || 0,
+        category: v.category || '', subcategory: v.subcategory || '',
         views: v.views || 0, likes: (v.likes || []).length, ready: !!v.ready
     };
     if (full) o.comments = (v.comments || []).map(c => ({ user: c.user, nick: c.nick, text: c.text, at: c.at }));
@@ -3749,6 +3750,8 @@ function videoCreate(req, res) {
         const v = {
             id: crypto.randomBytes(8).toString('hex'), nick, user: a.username || nick,
             title, desc, mime, thumb, at: now(), dur: Number(body.dur) || 0,
+            category: (clean(body.category, 32) || '').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, ''),
+            subcategory: clean(body.subcategory, 40),
             views: 0, likes: [], comments: [], ready: false
         };
         policy.videos.push(v);
@@ -3812,8 +3815,12 @@ function videoList(req, res) {
     const q = query(req);
     const ch = clean(q.channel, 16).toLowerCase();
     const term = clean(q.q, 60).toLowerCase();
+    const cat = clean(q.category, 32).toLowerCase();
+    const sub = clean(q.subcategory, 40).toLowerCase();
     let list = policy.videos.filter(v => v.ready);
     if (ch) list = list.filter(v => v.nick === ch);
+    if (cat) list = list.filter(v => (v.category || '').toLowerCase() === cat);
+    if (sub) list = list.filter(v => (v.subcategory || '').toLowerCase() === sub);
     if (term) list = list.filter(v => (v.title || '').toLowerCase().indexOf(term) >= 0 || (v.user || '').toLowerCase().indexOf(term) >= 0);
     list = list.slice().sort((a, b) => b.at - a.at).slice(0, 200).map(v => vidPublic(v, false));
     send(res, 200, { ok: true, videos: list });

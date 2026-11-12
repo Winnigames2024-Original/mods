@@ -55,6 +55,10 @@ server {
     root $WEBROOT;
     index index.php index.html;
 
+    # narecat: красивые ссылки на категории -> страница категории (URL остаётся красивым)
+    rewrite ^/category/([^/]+)/([^/]+)/?\$ /category/index.php?cat=\$1&sub=\$2 last;
+    rewrite ^/category/([^/]+)/?\$ /category/index.php?cat=\$1 last;
+
     # Есть файл/папка сайта — отдаём её (PHP). Иначе — в NareNet (Node).
     location / {
         try_files \$uri \$uri/ @node;
