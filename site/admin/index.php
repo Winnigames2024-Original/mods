@@ -59,6 +59,7 @@ require __DIR__ . '/../_inc/head.php';
 ?>
 <h1>Админ-панель</h1>
 <?php if ($msg): ?><div class="msg ok"><?= h($msg) ?></div><?php endif; ?>
+<p style="margin:10px 0"><a class="btn" href="/admin/servers.php">⚙ Серверы игроков (консоль и управление)</a></p>
 
 <div class="grid" style="margin-top:12px">
   <div class="card"><h3>Аккаунты</h3><p style="font-size:22px"><?= (int)($st['accounts'] ?? 0) ?></p></div>

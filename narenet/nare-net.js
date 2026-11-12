@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.57';
+const VERSION = '1.58';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -2555,7 +2555,18 @@ function srvOwner(token, name) {
     const nick = sessionNick(token);
     if (!nick) return false;
     const n = String(name || '').toLowerCase();
-    return n === nick.toLowerCase() || n.startsWith(nick.toLowerCase() + '-') || nick === ADMIN;
+    return n === nick.toLowerCase() || n.startsWith(nick.toLowerCase() + '-') || isAdmin(nick);
+}
+
+/** Настоящий ник-владелец сервера по его имени (nick-id или nick). */
+function srvOwnerNick(name) {
+    const low = String(name || '').toLowerCase();
+    for (const nk of Object.keys(policy.hostServers || {})) {
+        const l = nk.toLowerCase();
+        if (low === l || low.startsWith(l + '-')) return nk;
+    }
+    const i = low.indexOf('-');
+    return i > 0 ? low.slice(0, i) : low;
 }
 
 /** Веб: кнопка питания (start/stop/restart) — в очередь владельцу. */
@@ -2565,7 +2576,9 @@ function serverControl(req, res) {
         const action = clean(body.action, 12);
         if (!srvOwner(body.token, name)) return send(res, 403, { error: 'не ваш сервер' });
         if (['start', 'stop', 'restart'].indexOf(action) < 0) return send(res, 400, { error: 'действие?' });
-        const owner = sessionNick(body.token);
+        // команду кладём в очередь ВЛАДЕЛЬЦА сервера (его ServerManager её заберёт),
+        // а не вызвавшего — чтобы админ мог управлять чужими серверами
+        const owner = srvOwnerNick(name) || sessionNick(body.token);
         if (!policy.srvCtl[owner]) policy.srvCtl[owner] = [];
         policy.srvCtl[owner].push({ name, action });
         if (policy.srvCtl[owner].length > 50) policy.srvCtl[owner].shift();
@@ -3333,6 +3346,21 @@ function twofaGet(req, res) {
         const nick = sessionNick(body && body.token);
         if (!nick) return send(res, 403, { error: 'нужен вход' });
         send(res, 200, { ok: true, on: !!policy.twofa[nick] });
+    });
+}
+// все серверы всех игроков — для админской веб-панели управления
+function adminServersAll(req, res) {
+    readJsonBody(req, body => {
+        if (!needAdmin(body, res)) return;
+        const out = [];
+        for (const nk of Object.keys(policy.hostServers || {})) {
+            for (const s of (policy.hostServers[nk] || [])) {
+                const name = (nk + '-' + s.id).toLowerCase();
+                out.push({ owner: nk, id: s.id, name, port: s.port, folder: s.folder || '',
+                           online: !!rooms2byNick(name), stats: policy.srvStat[name] || null });
+            }
+        }
+        send(res, 200, { ok: true, servers: out });
     });
 }
 // админ снимает 2FA с любого аккаунта (на случай, если игрок застрял)
@@ -4649,6 +4677,7 @@ const server = http.createServer((req, res) => {
     if (route === '/twofa/set' && req.method === 'POST') return twofaSet(req, res);           // вкл/выкл 2FA у аккаунта
     if (route === '/twofa/get' && req.method === 'POST') return twofaGet(req, res);
     if (route === '/admin/twofa/off' && req.method === 'POST') return adminTwofaOff(req, res);   // админ снимает 2FA с игрока
+    if (route === '/admin/servers/all' && req.method === 'POST') return adminServersAll(req, res); // все серверы всех игроков
     if (route === '/admin/api/twofa') return apiTwofaOff(req, res);                               // /admin/api/twofa?code=..&nick=.. (или nick=all)
 
     // --- фото-галерея ---
