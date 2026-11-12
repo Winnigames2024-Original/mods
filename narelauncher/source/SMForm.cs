@@ -53,6 +53,9 @@ namespace NareServerManager
         private bool _restartBusy;
         private readonly Timer _updatePoll = new Timer { Interval = 10 * 60 * 1000 };
         private bool _updating;
+        private readonly Timer _lockTimer = new Timer { Interval = 3000 };   // следим, не перехватил ли сервер другой экземпляр
+        private int _myPid;
+        private string _lockFile;
         private const string ManifestUrl = "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/update.json";
         private NotifyIcon _tray;
         private bool _reallyExit;
@@ -125,6 +128,15 @@ namespace NareServerManager
             var upKick = new Timer { Interval = 20000 };     // первая проверка через 20с после старта
             upKick.Tick += (a, b) => { upKick.Stop(); upKick.Dispose(); CheckSelfUpdate(); };
             upKick.Start();
+
+            // один сервер — одно окно: при повторном запуске новый экземпляр забирает «замок»,
+            // а старое окно это замечает, останавливает сервер и закрывается.
+            _myPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            _lockFile = Path.Combine(_folder, "nare_sm.lock");
+            WriteLock();
+            _lockTimer.Tick += (s, e) => CheckLock();
+            _lockTimer.Start();
+
             Load += (s, e) => StartServer();
             Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) HideToTray(); };
             FormClosing += (s, e) =>
@@ -230,6 +242,39 @@ namespace NareServerManager
                 });
             })
             { IsBackground = true }.Start();
+        }
+
+        // ---------- один сервер — одно окно ----------
+        private void WriteLock()
+        {
+            try { File.WriteAllText(_lockFile, _myPid + "|" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()); } catch { }
+        }
+        private void CheckLock()
+        {
+            try
+            {
+                int owner = _myPid;
+                if (File.Exists(_lockFile))
+                {
+                    var parts = File.ReadAllText(_lockFile).Split('|');
+                    int pid;
+                    if (parts.Length > 0 && int.TryParse(parts[0].Trim(), out pid)) owner = pid;
+                }
+                if (owner != _myPid)
+                {
+                    // сервер перезапустили в другом окне — закрываем это, остановив сервер
+                    _lockTimer.Stop();
+                    Append("Сервер запущен заново в другом окне — закрываю это.");
+                    Toast(_name, "Запущено заново — старое окно закрыто");
+                    try { StopServer(); } catch { }
+                    _reallyExit = true;
+                    var t = new Timer { Interval = 1500 };
+                    t.Tick += (a, b) => { t.Stop(); t.Dispose(); try { Close(); } catch { } Application.Exit(); };
+                    t.Start();
+                }
+                else WriteLock();   // продлеваем владение
+            }
+            catch { }
         }
 
         // ---------- самообновление ServerManager ----------

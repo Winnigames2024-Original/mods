@@ -53,7 +53,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.64';
+const VERSION = '1.65';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3665,10 +3665,10 @@ function streamList(req, res) {
 function streamFrame(req, res) {
     readJsonBody(req, body => {
         const s = streams.get(clean(body && body.id, 20));
-        if (!s) return send(res, 200, { ok: true, online: false });
+        if (!s) return send(res, 200, { ok: true, found: false, online: false });
         s.viewers.set(plainIp(req.socket), now());
         for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
-        send(res, 200, { ok: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
+        send(res, 200, { ok: true, found: true, online: streamLive(s), jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
                          viewers: s.viewers.size, category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }

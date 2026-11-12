@@ -6,7 +6,7 @@
   "size": 885248,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
-  "smSha1": "e41c0070501891a3320ccc2a16392d85b12242f2",
-  "smSize": 90112,
-  "notes": "Студия: прозрачный оверлей чата поверх игры (кнопка «Чат-оверлей»). Постоянная ссылка на стрим по имени и модерация чатов."
+  "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
+  "smSize": 91136,
+  "notes": "Эфир: понятные надписи (не запущен / СТРИМ НЕ НАЙДЕН). Повторный запуск сервера закрывает старое окно (один сервер — одно окно)."
 }
