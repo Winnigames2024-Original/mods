@@ -34,10 +34,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($act === 'streamban') {
         $r = api_post('/admin/stream/ban', ['token' => $tok, 'nick' => $_POST['nick'] ?? '', 'on' => ($_POST['on'] ?? '') === '1']);
         $msg = !empty($r['ok']) ? ($r['banned'] ? 'Трансляции запрещены игроку.' : 'Запрет на трансляции снят.') : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'apicode') {
+        $r = api_post('/admin/apicode', ['token' => $tok, 'regen' => true]);
+        $msg = !empty($r['ok']) ? 'Новый API-код сгенерирован.' : ($r['error'] ?? 'Ошибка');
+    } elseif ($act === 'emupdate') {
+        $r = api_post('/admin/update', ['token' => $tok, 'version' => $_POST['version'] ?? '', 'changelog' => $_POST['changelog'] ?? '', 'critical' => ($_POST['critical'] ?? '') === '1']);
+        $msg = !empty($r['ok']) ? 'Обновление объявлено всем.' : ($r['error'] ?? 'Ошибка');
     }
     // перечитываем состояние после действия
     $state = api_post('/admin/state', ['token' => $tok]);
 }
+$apiCode = api_post('/admin/apicode', ['token' => $tok])['code'] ?? '';
 $srvResp = api_post('/admin/servers', ['token' => $tok]);
 $allServers = $srvResp['servers'] ?? [];
 $pending = array_values(array_filter($allServers, fn($x) => ($x['status'] ?? '') === 'pending'));
@@ -91,6 +98,37 @@ require __DIR__ . '/../_inc/head.php';
     <button class="btn" type="submit" name="on" value="1">Запретить</button>
     <button class="btn ghost" type="submit" name="on" value="0">Разрешить</button>
   </form>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <h2 style="margin-top:0">Экстренное обновление всем</h2>
+  <p class="muted">Все лаунчеры получат уведомление об обновлении. «Критическое» — обязательное, без него не пустит в игру.</p>
+  <form method="post" class="row-form">
+    <input type="hidden" name="act" value="emupdate">
+    <input name="version" placeholder="Версия (например 1.90)" maxlength="32" required style="width:180px">
+    <input name="changelog" placeholder="Что нового" maxlength="400" style="flex:1">
+    <label class="muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="critical" value="1"> критическое</label>
+    <button class="btn" type="submit">Объявить</button>
+  </form>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <h2 style="margin-top:0">Управление по URL (API-код)</h2>
+  <p class="muted">Секретный код, которым можно перезапустить/обновить всех прямо по ссылке — из закладки или скрипта, без входа. Держите его в тайне.</p>
+  <p>Код: <code id="apicode"><?= h($apiCode ?: '—') ?></code>
+     <button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('apicode').textContent)">Скопировать</button></p>
+  <form method="post" onsubmit="return confirm('Сменить код? Старые ссылки перестанут работать.')" style="margin-bottom:12px">
+    <input type="hidden" name="act" value="apicode"><button class="btn ghost" type="submit">Сгенерировать новый код</button>
+  </form>
+  <?php $base = SITE; $c = urlencode($apiCode); ?>
+  <p class="muted">Готовые ссылки (открой в браузере):</p>
+  <ul style="line-height:1.9;word-break:break-all">
+    <li>Перезапустить всё: <code><?= h($base) ?>/admin/api/restart?code=<?= $c ?>&what=all</code></li>
+    <li>Перезапустить только лаунчеры: <code><?= h($base) ?>/admin/api/restart?code=<?= $c ?>&what=launchers</code></li>
+    <li>Перезапустить только серверы: <code><?= h($base) ?>/admin/api/restart?code=<?= $c ?>&what=servers</code></li>
+    <li>Экстренное обновление: <code><?= h($base) ?>/admin/api/update?code=<?= $c ?>&version=1.90&critical=1</code></li>
+    <li>Объявление: <code><?= h($base) ?>/admin/api/broadcast?code=<?= $c ?>&text=Привет&seconds=30</code></li>
+  </ul>
 </div>
 
 <div class="panel" style="margin-top:18px">
