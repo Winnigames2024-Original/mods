@@ -2341,7 +2341,24 @@ function aiGenerate(messages, image, systemText, cb) {
             }
         });
         const body = { model, messages: msgs, temperature: 0.7, max_tokens: 1024 };
-        return httpsPostJson(base + '/chat/completions', { 'Authorization': 'Bearer ' + key }, body, (err, code, json, txt) => {
+        const headers = { 'Authorization': 'Bearer ' + key };
+        // OpenRouter: бесплатные модели часто пропадают/лимитируются — передаём список дублёров,
+        // OpenRouter сам переключится на рабочую (его механизм models-fallback).
+        if (/openrouter\.ai/i.test(base)) {
+            headers['HTTP-Referer'] = 'https://narelauncher.winnigames2024.ru';
+            headers['X-Title'] = 'NareLauncher';
+            const fallbacks = [
+                'meta-llama/llama-3.3-70b-instruct:free',
+                'google/gemini-2.0-flash-exp:free',
+                'openai/gpt-oss-120b:free',
+                'qwen/qwen3-235b-a22b:free',
+                'deepseek/deepseek-chat-v3-0324:free',
+                'meta-llama/llama-3.1-405b-instruct:free'
+            ];
+            const list = [model]; for (const f of fallbacks) if (list.indexOf(f) < 0) list.push(f);
+            body.models = list;   // OpenRouter перебирает по очереди, если модель недоступна/лимит
+        }
+        return httpsPostJson(base + '/chat/completions', headers, body, (err, code, json, txt) => {
             if (err) return cb(err);
             if (code !== 200) return cb(new Error('ИИ вернул ' + code + ': ' + String(txt).slice(0, 200)));
             const reply = json && json.choices && json.choices[0] && json.choices[0].message &&

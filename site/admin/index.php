@@ -108,7 +108,7 @@ require __DIR__ . '/../_inc/head.php';
   <p class="muted">Подключи любой <b>бесплатный</b> провайдер ИИ — и помощник на сайте оживёт: будет отвечать как живой, искать по базе, создавать каналы/ботов, смотреть присланные картинки и учиться в файл на сервере.</p>
   <ul class="muted" style="margin:6px 0 12px;font-size:14px;line-height:1.6">
     <li><b>Groq</b> (быстрый, бесплатный): провайдер <code>openai</code>, адрес <code>https://api.groq.com/openai/v1</code>, модель напр. <code>llama-3.3-70b-versatile</code>. Ключ — на console.groq.com.</li>
-    <li><b>OpenRouter</b> (много бесплатных моделей): провайдер <code>openai</code>, адрес <code>https://openrouter.ai/api/v1</code>, модель напр. <code>meta-llama/llama-3.1-8b-instruct:free</code>. Ключ — на openrouter.ai.</li>
+    <li><b>OpenRouter</b> (много бесплатных моделей): провайдер <code>openai</code>, адрес <code>https://openrouter.ai/api/v1</code>, модель напр. <code>meta-llama/llama-3.3-70b-instruct:free</code>. Ключ — на openrouter.ai. <i>Бесплатные модели иногда пропадают — сервер сам переберёт запасные бесплатные, если выбранная недоступна.</i></li>
     <li><b>Google Gemini</b> (бесплатный ключ): провайдер <code>gemini</code>, модель напр. <code>gemini-1.5-flash</code>, адрес не нужен. Ключ — на aistudio.google.com.</li>
   </ul>
   <p class="muted" style="font-size:13px">Сейчас:
