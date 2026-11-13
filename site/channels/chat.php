@@ -120,12 +120,26 @@ function fill(){
   document.getElementById('ch-shorts').innerHTML=shorts.length?shorts.map(vcard).join(''):'<p class="muted">Нет shorts.</p>';
   document.getElementById('ch-photos').innerHTML=PHOTOS.length?PHOTOS.map(pcard).join(''):'<p class="muted">Нет фото.</p>';
   function sect(title,arr,render){ return arr.length?('<h3>'+title+'</h3><div class="mgrid">'+arr.slice(0,8).map(render).join('')+'</div>'):''; }
-  var home=sect('Видео',vids,vcard)+sect('Записи эфиров',recs,vcard)+sect('Shorts',shorts,vcard)+sect('Фото',PHOTOS,pcard);
+  var liveBlock='';
+  if(LIVE){
+    var cov=LIVE.cover?('data:image/jpeg;base64,'+LIVE.cover):'';
+    liveBlock='<h3>🔴 В эфире сейчас</h3><a class="mcard livecard" href="'+esc(LIVE.link||('/live/watch.php?s='+LIVE.id))+'">'+
+      '<div class="mthumb vid" style="'+(cov?('background-image:url(\''+cov+'\');background-size:cover;background-position:center'):'')+'">'+
+      '<span class="livebadge">● В ЭФИРЕ</span><span class="dur">👁 '+(LIVE.viewers||0)+'</span></div>'+
+      '<div class="mmeta"><div class="mtitle">'+esc(LIVE.title||'Прямой эфир')+'</div><div class="muted">смотреть трансляцию</div></div></a>';
+  }
+  var home=liveBlock+sect('Видео',vids,vcard)+sect('Записи эфиров',recs,vcard)+sect('Shorts',shorts,vcard)+sect('Фото',PHOTOS,pcard);
   document.getElementById('ch-home').innerHTML=home||'<p class="muted">На канале пока пусто.</p>';
 }
+var LIVE=null;
 if(OWNER){
   fetch('/video/list?channel='+encodeURIComponent(OWNER)).then(function(r){return r.json();}).then(function(j){ VIDS=(j.videos||[]); fill(); }).catch(function(){});
   fetch('/photo/list?nick='+encodeURIComponent(OWNER)).then(function(r){return r.json();}).then(function(j){ PHOTOS=(j.photos||[]); fill(); }).catch(function(){});
+  fetch('/stream/list').then(function(r){return r.json();}).then(function(j){
+    var ow=OWNER.toLowerCase();
+    LIVE=(j.streams||[]).filter(function(s){ return (s.channel||'').toLowerCase()===ow || (s.user||'').toLowerCase()===ow; })[0]||null;
+    fill();
+  }).catch(function(){});
 }
 
 function poll(){ node('/channel/chat/get',{id:ID,since:since}).then(function(j){

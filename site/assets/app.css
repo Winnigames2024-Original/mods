@@ -414,3 +414,7 @@ a.card:hover,.mcard:hover .mthumb{box-shadow:0 6px 20px rgba(0,0,0,.18)}
 @media(max-width:820px){
   .nav-search{flex:1 1 120px;min-width:0}
 }
+
+/* эфир первым на главной канала */
+.livecard .mthumb{position:relative}
+.livebadge{position:absolute;left:8px;top:8px;background:#ff2f45;color:#fff;font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;letter-spacing:.03em;box-shadow:0 2px 8px rgba(0,0,0,.3)}

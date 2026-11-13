@@ -23,6 +23,9 @@ namespace NareLauncher.UI
         private readonly ComboBox _fps = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly TextBox _title = new TextBox();
         private readonly TextBox _sub = new TextBox();
+        private readonly TextBox _sid = new TextBox();    // постоянная ссылка (свой ID)
+        private readonly TextBox _desc = new TextBox();   // описание эфира
+        private readonly Button _saveMeta = new Button { Text = "💾" };
         private readonly Button _refresh = new Button { Text = "⟳ Окна" };
         private readonly Button _go = new Button { Text = "Выйти в эфир" };
         private readonly Button _overlayBtn = new Button { Text = "Чат-оверлей" };
@@ -44,12 +47,12 @@ namespace NareLauncher.UI
         public StreamForm()
         {
             Text = "NareLauncher — Студия трансляции";
-            ClientSize = new Size(760, 560);
+            ClientSize = new Size(760, 620);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.FromArgb(14, 17, 23);
             ForeColor = Color.White;
             Font = new Font("Segoe UI", 9f);
-            MinimumSize = new Size(620, 460);
+            MinimumSize = new Size(620, 520);
 
             var lblSrc = Lbl("Источник", 16, 14);
             _source.SetBounds(16, 36, 420, 26); Style(_source);
@@ -67,7 +70,15 @@ namespace NareLauncher.UI
             _fps.Items.AddRange(new object[] { "60", "120", "240", "360" });
             _fps.SelectedIndex = 0;
 
-            _preview.SetBounds(16, 132, 728, 344);
+            // постоянная ссылка (свой ID) + описание
+            var lblSid = Lbl("Постоянная ссылка (ID)", 16, 126);
+            _sid.SetBounds(16, 148, 360, 26); Style(_sid);
+            var lblDesc = Lbl("Описание эфира", 390, 126);
+            _desc.SetBounds(390, 148, 284, 26); Style(_desc);
+            _saveMeta.SetBounds(680, 147, 64, 28); Btn(_saveMeta, false);
+            _saveMeta.Click += (s, e) => SaveMeta();
+
+            _preview.SetBounds(16, 190, 728, 286);
             _preview.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
 
             _go.SetBounds(16, 488, 200, 40); Btn(_go, true);
@@ -82,7 +93,9 @@ namespace NareLauncher.UI
             _overlayBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             _overlayBtn.Click += (s, e) => ToggleOverlay();
 
-            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, lblFps, _fps, _preview, _go, _overlayBtn, _status, _link });
+            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, lblFps, _fps,
+                                              lblSid, _sid, lblDesc, _desc, _saveMeta, _preview, _go, _overlayBtn, _status, _link });
+            LoadMeta();
 
             _refresh.Click += (s, e) => LoadSources();
             _go.Click += (s, e) => { if (_live) Stop(); else Start(); };
@@ -145,10 +158,14 @@ namespace NareLauncher.UI
             string title = (_title.Text ?? "").Trim(); if (title.Length == 0) title = "Эфир";
             string cat = CatSlug(_category.SelectedItem as string);
             string sub = (_sub.Text ?? "").Trim();
-            // берём личный ключ RTMP и сразу задаём название/категорию будущего эфира
-            string resp = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) + "\",\"subcategory\":\"" + Esc(sub) + "\"}");
+            string desc = (_desc.Text ?? "").Trim();
+            string customKey = (_sid.Text ?? "").Trim();
+            // берём личный ключ RTMP и сразу задаём название/описание/категорию/свой ID будущего эфира
+            string resp = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) +
+                "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\"}");
             var j = resp != null ? Json.Parse(resp) : null;
             if (j == null || !j["ok"].AsBool(false)) { _status.Text = "Не удалось начать: " + (j != null ? j["error"].AsString("нет связи") : "нет связи"); return; }
+            string ke = j["keyError"].AsString(""); if (ke.Length > 0) { _status.Text = "ID: " + ke; return; }
             string key = j["key"].AsString("");
             string server = j["server"].AsString("rtmp://151.245.217.104/live");
             string rtmpUrl = server + "/" + key;
@@ -285,6 +302,58 @@ namespace NareLauncher.UI
             if (_live) Stop();
             base.OnFormClosing(e);
         }
+
+        // загрузить текущий постоянный ключ/ID и сохранённые название/описание
+        private void LoadMeta()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null || string.IsNullOrEmpty(acc.Token)) return;
+            new System.Threading.Thread(() =>
+            {
+                string r = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\"}");
+                if (r == null) return;
+                var j = Json.Parse(r);
+                string key = j["key"].AsString("");
+                string watch = j["watch"].AsString("/live/watch.php?s=" + key);
+                UiInvoke(() =>
+                {
+                    if (_sid.Text.Trim().Length == 0) _sid.Text = key;
+                    _streamLink = "https://narelauncher.winnigames2024.ru" + watch;
+                    _link.Text = "Постоянная ссылка: " + _streamLink;
+                });
+            }) { IsBackground = true }.Start();
+        }
+
+        // сохранить свой ID (постоянную ссылку) + название/описание без выхода в эфир
+        private void SaveMeta()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null || string.IsNullOrEmpty(acc.Token)) { _status.Text = "Сначала войдите."; return; }
+            string title = (_title.Text ?? "").Trim();
+            string desc = (_desc.Text ?? "").Trim();
+            string customKey = (_sid.Text ?? "").Trim();
+            string cat = CatSlug(_category.SelectedItem as string);
+            string sub = (_sub.Text ?? "").Trim();
+            new System.Threading.Thread(() =>
+            {
+                string r = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) +
+                    "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\"}");
+                var j = r != null ? Json.Parse(r) : null;
+                UiInvoke(() =>
+                {
+                    if (j == null) { _status.Text = "Нет связи."; return; }
+                    string ke = j["keyError"].AsString("");
+                    if (ke.Length > 0) { _status.Text = "ID: " + ke; return; }
+                    string key = j["key"].AsString("");
+                    _sid.Text = key;
+                    _streamLink = "https://narelauncher.winnigames2024.ru" + j["watch"].AsString("/live/watch.php?s=" + key);
+                    _link.Text = "Постоянная ссылка: " + _streamLink;
+                    _status.Text = "Сохранено ✓";
+                });
+            }) { IsBackground = true }.Start();
+        }
+
+        private void UiInvoke(Action a) { if (IsDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
 
         private static string Post(string route, string body)
         {

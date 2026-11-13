@@ -1,12 +1,12 @@
 {
-  "version": "1.98",
+  "version": "1.99",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "9dd6189df293bdb6c6b9efcfe838b5b336942dce",
-  "size": 908288,
+  "sha1": "171474a9a9bc7d995396c7d044be8e90799c797d",
+  "size": 910848,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Уведомления в приложении: раздел «Уведомления» в меню слева — лента событий (подписки, лайки, зрители эфиров, рассылки), покупка подписки на рассылку за 10000 монет, отправка уведомлений всем/кому-то. Новые события всплывают тостом прямо в лаунчере."
+  "notes": "Студия эфира: поле «Постоянная ссылка (ID)» — можно задать свой адрес эфира, он не меняется; поле «Описание эфира»; кнопка сохранить без выхода в эфир. На главной канала теперь первым показывается текущий эфир."
 }

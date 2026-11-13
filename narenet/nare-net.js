@@ -4243,7 +4243,7 @@ function streamKeyFor(nick) {
     return policy.streamKeys[low];
 }
 function nickByKey(key) {
-    key = String(key || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+    key = String(key || '').toLowerCase().replace(/[^0-9a-z_-]/g, '');
     if (!key) return null;
     for (const [low, k] of Object.entries(policy.streamKeys)) if (k === key) return low;
     return null;
@@ -4252,18 +4252,28 @@ function nickByKey(key) {
 function streamKey(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
-        if (body && body.regen) { policy.streamKeys[nick.toLowerCase()] = crypto.randomBytes(10).toString('hex'); savePolicy(); }
+        const low = nick.toLowerCase();
+        if (body && body.regen) { policy.streamKeys[low] = crypto.randomBytes(10).toString('hex'); savePolicy(); }
+        // своя постоянная ссылка: стример может задать свой ID ключа (a-z, 0-9, _-, 4..40)
+        let keyErr = '';
+        if (body && typeof body.customKey === 'string' && body.customKey.trim()) {
+            const ck = body.customKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            if (ck.length < 4 || ck.length > 40) keyErr = 'ID: 4–40 символов (буквы, цифры, _ и -)';
+            else { const owner = nickByKey(ck); if (owner && owner !== low) keyErr = 'этот ID уже занят'; else { policy.streamKeys[low] = ck; savePolicy(); } }
+        }
         const key = streamKeyFor(nick);
-        // лаунчер/клиент может заранее задать название/категорию будущего RTMP-эфира
-        if (body && (body.title || body.category || body.subcategory)) {
+        // лаунчер/клиент может заранее задать название/описание/категорию будущего RTMP-эфира
+        if (body && (body.title || body.category || body.subcategory || typeof body.desc === 'string')) {
             if (!policy.streamMeta) policy.streamMeta = {};
-            policy.streamMeta[nick.toLowerCase()] = {
-                title: clean(body.title, 120), category: clean(body.category, 32),
-                subcategory: clean(body.subcategory, 40)
+            const prev = policy.streamMeta[low] || {};
+            policy.streamMeta[low] = {
+                title: clean(body.title, 120) || prev.title || '', category: clean(body.category, 32) || prev.category || '',
+                subcategory: clean(body.subcategory, 40) || prev.subcategory || '',
+                desc: (typeof body.desc === 'string' ? clean(body.desc, 500) : (prev.desc || ''))
             };
             savePolicy();
         }
-        send(res, 200, { ok: true, key, server: 'rtmp://' + RTMP_HOST + '/live',
+        send(res, 200, { ok: true, key, keyError: keyErr, server: 'rtmp://' + RTMP_HOST + '/live',
                          hls: '/live-hls/' + key + '/index.m3u8', watch: '/live/watch.php?s=' + key });
     });
 }
@@ -4271,7 +4281,7 @@ function streamKey(req, res) {
 function rtmpEvent(req, res) {
     readJsonBody(req, body => {
         if (!body || body.secret !== RTMP_SECRET) return send(res, 403, { error: 'нет' });
-        const key = String(body.key || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+        const key = String(body.key || '').toLowerCase().replace(/[^0-9a-z_-]/g, '');
         const nick = nickByKey(key);
         if (!nick) return send(res, 404, { ok: false, error: 'ключ не найден' });   // отклонит публикацию
         if (policy.noStream[nick]) return send(res, 403, { ok: false, error: 'трансляции запрещены' });
@@ -4283,6 +4293,7 @@ function rtmpEvent(req, res) {
             const meta = (policy.streamMeta && policy.streamMeta[nick]) || {};
             streams.set(key, Object.assign({
                 nick, user, title: meta.title || ex.title || ('Эфир ' + nick),
+                desc: meta.desc || ex.desc || '',
                 category: (meta.category || 'games').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || 'games',
                 subcategory: meta.subcategory || '',
                 channel: nick, nameSlug: key, link: '/live/watch.php?s=' + key,
@@ -4383,7 +4394,7 @@ function streamFrame(req, res) {
         if (!s) return send(res, 200, { ok: true, found: false, online: false });
         touchViewer(s, nick);
         const live = streamLive(s);
-        send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
+        send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, desc: s.desc || '', user: s.user, nick: s.nick,
                          viewers: s.viewers.size, viewerList: viewerList(s), hasVideo: !!(s.media && s.media.init),
                          hls: s.type === 'hls' ? ('/live-hls/' + s.hlsKey + '/index.m3u8') : '',
                          category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
