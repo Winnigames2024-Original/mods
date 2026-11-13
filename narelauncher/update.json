@@ -1,12 +1,12 @@
 {
-  "version": "1.99",
+  "version": "2.00",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "171474a9a9bc7d995396c7d044be8e90799c797d",
-  "size": 910848,
+  "sha1": "45d19795c71c4a3d4a07d1ca868c6d5ad9cdb9b2",
+  "size": 911872,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Студия эфира: поле «Постоянная ссылка (ID)» — можно задать свой адрес эфира, он не меняется; поле «Описание эфира»; кнопка сохранить без выхода в эфир. На главной канала теперь первым показывается текущий эфир."
+  "notes": "Эфир сам переподключается, если связь оборвалась не по кнопке (сеть/ffmpeg) — тот же ID, та же ссылка, зрители не теряются. Плюс постоянная ссылка (свой ID), описание эфира, и эфир первым на главной канала."
 }

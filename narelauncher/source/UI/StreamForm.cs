@@ -43,6 +43,13 @@ namespace NareLauncher.UI
         private int _viewerTick;
         private StreamEncoder _enc;      // настоящее видео через ffmpeg
         private bool _videoMode;         // true = идёт видео, false = запасной режим кадров
+        // параметры для авто-переподключения, если эфир оборвался не по кнопке
+        private string _rtmpUrl, _rcWinTitle;
+        private bool _rcFullScreen;
+        private int _rcBitrate = 3000, _rcFps = 60;
+        private bool _reconnecting;
+        private int _reconnectTicks, _reconnectTries;
+        private const int ReconnectMaxTries = 20;   // ~1 минута попыток
 
         public StreamForm()
         {
@@ -190,6 +197,10 @@ namespace NareLauncher.UI
                 return;
             }
 
+            // запоминаем параметры для авто-переподключения
+            _rtmpUrl = rtmpUrl; _rcFullScreen = fullScreen; _rcWinTitle = winTitle; _rcBitrate = 3000; _rcFps = fps;
+            _reconnecting = false; _reconnectTicks = 0; _reconnectTries = 0;
+
             _live = true; _videoMode = true; _go.Text = "Завершить эфир"; _go.BackColor = Color.FromArgb(210, 70, 72);
             _status.Text = "● В ЭФИРЕ · RTMP (как OBS)";
             _link.Text = "Ссылка на эфир: " + _streamLink;
@@ -202,9 +213,41 @@ namespace NareLauncher.UI
             try { if (IsHandleCreated) BeginInvoke((Action)(() => { _status.Text = s; })); } catch { }
         }
 
+        // эфир оборвался не по кнопке — ждём немного и переподключаемся (тот же ключ = та же ссылка)
+        private void HandleDrop()
+        {
+            if (!_reconnecting)
+            {
+                _reconnecting = true; _reconnectTicks = 0; _reconnectTries = 0;
+                try { if (_enc != null) _enc.Dispose(); } catch { }
+                _enc = null;
+                _status.Text = "⚠ Связь прервалась — переподключаюсь…";
+            }
+            _reconnectTicks++;
+            if (_reconnectTicks < 3) return;   // пауза ~3 сек между попытками (тик = 1 сек)
+            _reconnectTicks = 0; _reconnectTries++;
+            if (_reconnectTries > ReconnectMaxTries)
+            {
+                _status.Text = "Не удалось переподключиться. Нажми «Завершить» и попробуй снова.";
+                _reconnecting = false; _tick.Stop(); _live = false;
+                _go.Text = "Выйти в эфир"; _go.BackColor = Color.FromArgb(91, 140, 255);
+                return;
+            }
+            _status.Text = "Переподключение… попытка " + _reconnectTries + "/" + ReconnectMaxTries;
+            var enc = new StreamEncoder(SafeStatus);
+            bool ok = false;
+            try { ok = enc.StartRtmp(_rtmpUrl, _rcFullScreen, _rcWinTitle, _rcBitrate, _rcFps); } catch { ok = false; }
+            if (ok)
+            {
+                _enc = enc; _reconnecting = false; _reconnectTries = 0;
+                _status.Text = "● Снова в эфире · RTMP";
+            }
+            // если не вышло — на следующих тиках попробуем ещё раз
+        }
+
         private void Stop()
         {
-            _tick.Stop(); _live = false;
+            _tick.Stop(); _live = false; _reconnecting = false;
             try { if (_enc != null) _enc.Dispose(); } catch { }
             _enc = null; _videoMode = false;
             var acc = AccountStore.Selected;
@@ -230,10 +273,10 @@ namespace NareLauncher.UI
                     }
                 }
 
-                // если ffmpeg (RTMP) неожиданно завершился — сообщаем
-                if (_live && _enc != null && !_enc.Running) { SafeStatus("Трансляция прервалась (ffmpeg завершился). Нажми «Завершить» и попробуй снова."); }
+                // если ffmpeg (RTMP) оборвался не по кнопке — пытаемся переподключиться сами
+                if (_live && _enc != null && !_enc.Running) { HandleDrop(); return; }
 
-                if (++_viewerTick % 5 == 0 && _streamId != null)
+                if (!_reconnecting && ++_viewerTick % 5 == 0 && _streamId != null)
                 {
                     string r = Post("/stream/viewers", "{\"id\":\"" + Esc(_streamId) + "\"}");
                     if (r != null) { int v = Json.Parse(r)["count"].AsInt(0); _status.Text = "● В ЭФИРЕ · RTMP · " + v + " смотрят"; }
