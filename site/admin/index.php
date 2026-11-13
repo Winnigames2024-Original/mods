@@ -115,23 +115,44 @@ require __DIR__ . '/../_inc/head.php';
     <b><?= $aiCfg ? h(($aiCfg['provider'] ?: '—')) : '—' ?></b>,
     модель <b><?= h(($aiCfg['model'] ?? '') ?: '—') ?></b>,
     ключ <b><?= !empty($aiCfg['hasKey']) ? h($aiCfg['keyHint']) : 'не задан' ?></b>,
-    <b><?= !empty($aiCfg['enabled']) ? 'включён' : 'выключен' ?></b>,
-    память <b><?= (int)($aiCfg['memoryBytes'] ?? 0) ?></b> б.
+    <b><?= !empty($aiCfg['enabled']) ? 'включён' : 'выключен' ?></b>.
+    <?php if (!empty($aiCfg['brain'])): $br=$aiCfg['brain']; ?>
+    <br>Локальный мозг: фраз <b><?= (int)$br['phrases'] ?></b>, пар вопрос→ответ <b><?= (int)$br['qa'] ?></b>, обработано сообщений <b><?= (int)$br['seen'] ?></b>.
+    <?php endif; ?>
   </p>
-  <form method="post" style="display:grid;gap:8px;max-width:560px">
+  <div style="margin:4px 0 10px;display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="btn ghost" onclick="aiPreset('local')">🧠 Локальный (бесплатно)</button>
+    <button type="button" class="btn ghost" onclick="aiPreset('openrouter')">⚡ OpenRouter</button>
+    <button type="button" class="btn ghost" onclick="aiPreset('groq')">🚀 Groq</button>
+    <button type="button" class="btn ghost" onclick="aiPreset('gemini')">✨ Gemini</button>
+  </div>
+  <form method="post" style="display:grid;gap:8px;max-width:560px" id="aiForm">
     <input type="hidden" name="act" value="aiconfig">
     <label>Провайдер
-      <select name="provider" style="width:100%">
+      <select name="provider" id="aiProvider" style="width:100%">
+        <option value="local"<?= (($aiCfg['provider'] ?? '')==='local')?' selected':'' ?>>local — локальный самообучающийся (без ключа)</option>
         <option value="openai"<?= (($aiCfg['provider'] ?? '')==='openai')?' selected':'' ?>>openai-совместимый (Groq / OpenRouter / …)</option>
         <option value="gemini"<?= (($aiCfg['provider'] ?? '')==='gemini')?' selected':'' ?>>gemini (Google)</option>
       </select>
     </label>
-    <label>Модель <input name="model" value="<?= h($aiCfg['model'] ?? '') ?>" placeholder="llama-3.3-70b-versatile / gemini-1.5-flash" style="width:100%"></label>
-    <label>Адрес API (для openai-совместимых) <input name="base" value="<?= h($aiCfg['base'] ?? '') ?>" placeholder="https://api.groq.com/openai/v1" style="width:100%"></label>
-    <label>Ключ API <input name="key" type="password" placeholder="<?= !empty($aiCfg['hasKey']) ? 'оставь пустым, чтобы не менять' : 'вставь ключ' ?>" style="width:100%"></label>
+    <label>Модель <input name="model" id="aiModel" value="<?= h($aiCfg['model'] ?? '') ?>" placeholder="meta-llama/llama-3.3-70b-instruct:free" style="width:100%"></label>
+    <label>Адрес API (для openai-совместимых) <input name="base" id="aiBase" value="<?= h($aiCfg['base'] ?? '') ?>" placeholder="https://openrouter.ai/api/v1" style="width:100%"></label>
+    <label>Ключ API <input name="key" type="password" id="aiKey" placeholder="<?= !empty($aiCfg['hasKey']) ? 'оставь пустым, чтобы не менять' : 'вставь ключ (sk-or-v1-… для OpenRouter)' ?>" style="width:100%"></label>
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="enabled" value="1"<?= !empty($aiCfg['enabled'])?' checked':'' ?>> Включить ИИ</label>
     <div style="display:flex;gap:8px"><button class="btn" type="submit">Сохранить</button></div>
   </form>
+  <script>
+  function aiPreset(p){
+    var prov=document.getElementById('aiProvider'), model=document.getElementById('aiModel'),
+        base=document.getElementById('aiBase'), en=document.querySelector('#aiForm input[name=enabled]');
+    if(p==='local'){ prov.value='local'; model.value=''; base.value=''; }
+    else if(p==='openrouter'){ prov.value='openai'; base.value='https://openrouter.ai/api/v1'; if(!model.value||model.value.indexOf(':free')<0&&model.value.indexOf('/')<0) model.value='meta-llama/llama-3.3-70b-instruct:free'; }
+    else if(p==='groq'){ prov.value='openai'; base.value='https://api.groq.com/openai/v1'; model.value='llama-3.3-70b-versatile'; }
+    else if(p==='gemini'){ prov.value='gemini'; base.value=''; model.value='gemini-1.5-flash'; }
+    if(en) en.checked=true;
+    document.getElementById('aiKey').focus();
+  }
+  </script>
   <form method="post" style="margin-top:8px" onsubmit="return confirm('Очистить всё, что ИИ выучил?')">
     <input type="hidden" name="act" value="aiforget">
     <button class="btn ghost" type="submit">Очистить память ИИ</button>

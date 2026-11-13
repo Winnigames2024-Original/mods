@@ -2387,8 +2387,9 @@ function aiChat(req, res) {
         const step = () => {
             steps++;
             aiGenerate(messages, steps === 1 ? image : null, systemText, (err, reply, flag) => {
-                if (flag === 'nokey') return send(res, 200, { ok: true, configured: false, reply: 'ИИ не настроен (нет ключа).' });
-                if (err) { log('ai error', err.message); return send(res, 200, { ok: true, configured: true, reply: 'ИИ временно недоступен: ' + err.message }); }
+                if (flag === 'nokey') { const la = localReply(text || ''); brainLearnText(text); brainLearnText(la); return send(res, 200, { ok: true, configured: true, local: true, reply: la }); }
+                if (err) { log('ai error', err.message); const la = localReply(text || ''); brainLearnText(text);
+                    return send(res, 200, { ok: true, configured: true, local: true, reply: la, note: 'внешний ИИ недоступен, ответил локально' }); }
                 const tool = aiParseTool(reply);
                 if (tool && steps <= 3) {
                     const visible = reply.replace(tool.raw, '').trim();
