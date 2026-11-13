@@ -55,7 +55,8 @@ nms.on('postPublish', (id, StreamPath, args) => {
     '-c:v', 'copy',
     '-c:a', 'aac', '-ar', '44100', '-b:a', '96k',
     '-f', 'hls',
-    '-hls_time', '2', '-hls_list_size', '4', '-hls_flags', 'delete_segments+omit_endlist',
+    // окно перемотки (DVR) ~5 минут: 150 сегментов по 2 сек, старые удаляются
+    '-hls_time', '2', '-hls_list_size', '150', '-hls_flags', 'delete_segments+omit_endlist',
     out
   ]);
   ffmpegs[key] = ff;

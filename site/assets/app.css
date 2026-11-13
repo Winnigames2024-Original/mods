@@ -418,3 +418,26 @@ a.card:hover,.mcard:hover .mthumb{box-shadow:0 6px 20px rgba(0,0,0,.18)}
 /* эфир первым на главной канала */
 .livecard .mthumb{position:relative}
 .livebadge{position:absolute;left:8px;top:8px;background:#ff2f45;color:#fff;font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;letter-spacing:.03em;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* ===== Оформления (темы) страницы эфира ===== */
+#watchbox{border-radius:16px;transition:background .3s}
+.stheme-pink{background:linear-gradient(135deg,#ffd1e8,#ffe9f3 40%,#fff5fa);padding:18px;border:1px solid #ffc0db}
+.stheme-pink #wrap{border:5px solid #ff6fb5;box-shadow:0 0 0 3px #ffd1e8,0 8px 30px rgba(255,111,181,.3)}
+.stheme-pink h1,.stheme-pink .muted{color:#9b2c66}
+.stheme-flowers{background:linear-gradient(135deg,#fff0f5,#f3fff0);padding:22px 18px;border:1px solid #ffd6e6}
+.stheme-flowers #wrap{border:6px solid #ff9ecb;box-shadow:0 0 0 4px #fff,0 0 0 8px #ffd6e6}
+.stheme-flowers h1{color:#b5367f}
+.stheme-garland{font-size:22px;line-height:1;letter-spacing:2px;text-align:center;margin:0 0 8px;user-select:none;overflow:hidden;white-space:nowrap}
+.stheme-mint{background:linear-gradient(135deg,#d6fff0,#eafff8);padding:18px;border:1px solid #a8f0d8}
+.stheme-mint #wrap{border:5px solid #2fd3a5;box-shadow:0 8px 30px rgba(47,211,165,.25)}
+.stheme-mint h1{color:#0e7a5c}
+.stheme-gold{background:linear-gradient(135deg,#2a2410,#3a3214);padding:18px;border:1px solid #c9a227}
+.stheme-gold #wrap{border:5px solid #ffcf3f;box-shadow:0 0 24px rgba(255,207,63,.4)}
+.stheme-gold h1{color:#ffcf3f}
+.stheme-night{background:radial-gradient(1200px 400px at 50% -10%,#3b2d6b,#120f22 70%);padding:18px;border:1px solid #3b2d6b}
+.stheme-night #wrap{border:5px solid #7c6cff;box-shadow:0 0 30px rgba(124,108,255,.45)}
+.stheme-night h1{color:#c7bcff}
+.stheme-hearts{background:linear-gradient(135deg,#ffe0e0,#fff2f2);padding:20px 18px;border:1px solid #ffb3b3}
+.stheme-hearts #wrap{border:6px solid #ff5b7a;box-shadow:0 0 0 4px #fff,0 0 0 8px #ffd0d8}
+.stheme-hearts h1{color:#c81d3c}
+.stheme-pick{background:rgba(128,128,128,.1);border:1px solid rgba(128,128,128,.25);color:inherit;border-radius:9px;padding:7px 10px;font:inherit}

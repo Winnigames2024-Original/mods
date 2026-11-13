@@ -10,7 +10,7 @@ require __DIR__ . '/../_inc/head.php';
   <!-- слева: видео + инфо -->
   <div class="live-main">
     <div class="rc-screen-wrap" id="wrap">
-      <video id="vid" autoplay muted playsinline style="display:none"></video>
+      <video id="vid" autoplay muted playsinline controls style="display:none"></video>
       <img id="scr" alt="эфир" style="display:none">
       <div id="off" class="rc-off">Подключение…</div>
     </div>
@@ -18,6 +18,7 @@ require __DIR__ . '/../_inc/head.php';
     <div class="muted" style="margin-bottom:10px"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="cat"></span> · <span id="st" class="badge">подключение…</span></div>
     <div class="btn-row">
       <button class="btn" id="sound">🔊 Включить звук</button>
+      <button class="btn ghost" id="golive" onclick="goLive()">🔴 В прямой эфир</button>
       <button class="btn ghost" id="full">⛶ На весь экран</button>
       <button class="btn ghost" id="share">🔗 Поделиться</button>
       <button class="btn ghost" id="follow" style="display:none">+ Подписаться</button>
@@ -52,6 +53,18 @@ require __DIR__ . '/../_inc/head.php';
       <button class="btn ghost" type="button" onclick="smod('mute')">Мьют</button>
       <button class="btn ghost" type="button" onclick="smod('ban')">Бан</button>
       <button class="btn ghost" type="button" onclick="smod('unban')">Разбан</button>
+    </div>
+    <div class="row-form" id="themerow" style="display:none;margin:0 8px 8px">
+      <span class="muted">🎨 Оформление:</span>
+      <select id="themeSel" class="stheme-pick" onchange="setTheme(this.value)">
+        <option value="">Обычное</option>
+        <option value="pink">🌸 Розовое</option>
+        <option value="flowers">💐 Цветочки</option>
+        <option value="hearts">❤️ Сердечки</option>
+        <option value="mint">🌿 Мятное</option>
+        <option value="gold">✨ Золотое</option>
+        <option value="night">🌌 Ночное</option>
+      </select>
     </div>
     <div id="chat" class="lchat"></div>
     <div class="row-form lc-foot"><input id="ct" placeholder="Сообщение" maxlength="400" style="flex:1"><button class="btn" id="cs">→</button></div>
@@ -92,9 +105,24 @@ var vid=document.getElementById('vid'), scr=document.getElementById('scr'), stre
 var hls=null, hlsUrl='';
 function setupHls(url){ if(hlsUrl===url)return; hlsUrl=url;
   if(vid.canPlayType('application/vnd.apple.mpegurl')){ vid.src=url; vid.play().catch(function(){}); }
-  else if(window.Hls&&Hls.isSupported()){ if(hls)hls.destroy(); hls=new Hls({liveSyncDurationCount:3,lowLatencyMode:true}); hls.loadSource(url); hls.attachMedia(vid); hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){});}); }
+  else if(window.Hls&&Hls.isSupported()){ if(hls)hls.destroy();
+    hls=new Hls({liveSyncDurationCount:3, backBufferLength:300}); // окно перемотки назад ~5 мин
+    hls.loadSource(url); hls.attachMedia(vid); hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){});}); }
 }
+// кнопка «в прямой эфир» — прыжок к живому краю
+function goLive(){ try{ if(hls&&hls.liveSyncPosition){ vid.currentTime=hls.liveSyncPosition; } else if(vid.seekable&&vid.seekable.length){ vid.currentTime=vid.seekable.end(vid.seekable.length-1); } vid.play().catch(function(){}); }catch(e){} }
 function show404(){ document.getElementById('watchbox').style.display='none'; document.getElementById('notfound').style.display='flex'; }
+var THEMES=['pink','flowers','hearts','mint','gold','night'];
+function applyTheme(t){ var box=document.getElementById('watchbox');
+  THEMES.forEach(function(x){ box.classList.remove('stheme-'+x); });
+  var old=document.getElementById('sgarland'); if(old)old.remove();
+  if(t&&THEMES.indexOf(t)>=0){ box.classList.add('stheme-'+t);
+    if(t==='flowers'||t==='hearts'){ var g=document.createElement('div'); g.id='sgarland'; g.className='stheme-garland';
+      var ch=t==='flowers'?'🌸🌼🌷💐🌺':'❤️💕💗💓💖'; var line=''; for(var i=0;i<40;i++)line+=ch[i%ch.length];
+      g.textContent=line; var w=document.getElementById('wrap'); w.parentNode.insertBefore(g,w); } }
+}
+function setTheme(t){ window._themeTouched=true; applyTheme(t);
+  node('/stream/theme',{token:TOK,id:ID,theme:t}); }
 function meta(){ node('/stream/frame',{token:TOK,id:ID}).then(function(j){
   if(j.needLogin){ location.href='/login/'; return; }
   if(j.found===false){ show404(); return; }
@@ -111,7 +139,10 @@ function meta(){ node('/stream/frame',{token:TOK,id:ID}).then(function(j){
   document.getElementById('aSt').textContent=stTxt;
   document.getElementById('vcount').textContent=j.viewers||0;
   if(j.nick)offerFollow(j.nick);
-  if(j.nick&&ME&&j.nick.toLowerCase()===ME.toLowerCase()){ document.getElementById('modrow').style.display='flex'; }
+  applyTheme(j.theme||'');
+  if(j.nick&&ME&&j.nick.toLowerCase()===ME.toLowerCase()){ document.getElementById('modrow').style.display='flex';
+    var tr=document.getElementById('themerow'); tr.style.display='flex';
+    if(!window._themeTouched){ document.getElementById('themeSel').value=j.theme||''; } }
   renderViewers(j.viewerList||[]);
   // режим: настоящее видео или запасной кадр
   if(j.hls){ setupHls(j.hls); vid.style.display='block'; scr.style.display='none'; }

@@ -4104,6 +4104,20 @@ function notifyStatus(req, res) {
                          events: (policy.notifyInbox[k] || []).slice(-40).reverse() });
     });
 }
+// владелец меняет оформление (тему) своего эфира — сразу и на будущее
+function streamTheme(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const theme = clean(body && body.theme, 24).toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const s = streams.get(clean(body && body.id, 40));
+        if (s && s.nick.toLowerCase() === nick.toLowerCase()) s.theme = theme;
+        if (!policy.streamMeta) policy.streamMeta = {};
+        const low = nick.toLowerCase();
+        policy.streamMeta[low] = Object.assign(policy.streamMeta[low] || {}, { theme });
+        savePolicy();
+        send(res, 200, { ok: true, theme });
+    });
+}
 function liveStreamOf(nick) {
     for (const [id, s] of streams) if (s.nick.toLowerCase() === nick.toLowerCase() && streamLive(s)) return id;
     return null;
@@ -4269,7 +4283,8 @@ function streamKey(req, res) {
             policy.streamMeta[low] = {
                 title: clean(body.title, 120) || prev.title || '', category: clean(body.category, 32) || prev.category || '',
                 subcategory: clean(body.subcategory, 40) || prev.subcategory || '',
-                desc: (typeof body.desc === 'string' ? clean(body.desc, 500) : (prev.desc || ''))
+                desc: (typeof body.desc === 'string' ? clean(body.desc, 500) : (prev.desc || '')),
+                theme: (typeof body.theme === 'string' ? clean(body.theme, 24).toLowerCase().replace(/[^a-z0-9-]/g, '') : (prev.theme || ''))
             };
             savePolicy();
         }
@@ -4293,7 +4308,7 @@ function rtmpEvent(req, res) {
             const meta = (policy.streamMeta && policy.streamMeta[nick]) || {};
             streams.set(key, Object.assign({
                 nick, user, title: meta.title || ex.title || ('Эфир ' + nick),
-                desc: meta.desc || ex.desc || '',
+                desc: meta.desc || ex.desc || '', theme: meta.theme || ex.theme || '',
                 category: (meta.category || 'games').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || 'games',
                 subcategory: meta.subcategory || '',
                 channel: nick, nameSlug: key, link: '/live/watch.php?s=' + key,
@@ -4394,7 +4409,7 @@ function streamFrame(req, res) {
         if (!s) return send(res, 200, { ok: true, found: false, online: false });
         touchViewer(s, nick);
         const live = streamLive(s);
-        send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, desc: s.desc || '', user: s.user, nick: s.nick,
+        send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, desc: s.desc || '', theme: s.theme || '', user: s.user, nick: s.nick,
                          viewers: s.viewers.size, viewerList: viewerList(s), hasVideo: !!(s.media && s.media.init),
                          hls: s.type === 'hls' ? ('/live-hls/' + s.hlsKey + '/index.m3u8') : '',
                          category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
@@ -5913,6 +5928,7 @@ const server = http.createServer((req, res) => {
     if (route === '/notify/buy' && req.method === 'POST') return notifyBuy(req, res);      // купить подписку на рассылку
     if (route === '/notify/send' && req.method === 'POST') return notifySend(req, res);    // отправить уведомление всем/кому-то
     if (route === '/notify/status' && req.method === 'POST') return notifyStatus(req, res);// статус подписки + лента событий
+    if (route === '/stream/theme' && req.method === 'POST') return streamTheme(req, res);  // оформление эфира (тема)
     if (route === '/recommend') return recommend(req, res);                                // рекомендованные видео
     if (route === '/popular') return popular(req, res);                                      // популярное: топ видео и каналов
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
