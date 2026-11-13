@@ -7,8 +7,9 @@ $streams = api_get('/stream/list')['streams'] ?? [];
 ?>
 <div class="media-head">
   <h1>Трансляции</h1>
-  <?php if (me()): ?><a class="btn" href="/live/go.php">Начать трансляцию</a><?php endif; ?>
+  <?php if (me()): ?><a class="btn" href="/live/go.php">🔴 Начать эфир с браузера</a><?php else: ?><a class="btn ghost" href="/login/">Войдите, чтобы вести эфир</a><?php endif; ?>
 </div>
+<?php if (me()): ?><p class="muted" style="margin-top:-6px">Можно вести эфир прямо из браузера — <b>приложение не нужно</b>. Браузер спросит разрешение на демонстрацию экрана/окна. Либо стримьте из лаунчера (студия как в OBS).</p><?php endif; ?>
 <?php if (!$streams): ?>
   <p class="muted">Сейчас нет прямых эфиров.</p>
 <?php else: ?>

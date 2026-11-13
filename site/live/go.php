@@ -7,6 +7,7 @@ require __DIR__ . '/../_inc/head.php';
 <div class="watch">
   <h1>Прямой эфир</h1>
   <div id="setup" class="panel" style="max-width:560px">
+    <p class="muted" style="margin-top:0">Эфир идёт <b>прямо из браузера</b> — приложение не нужно. При старте браузер попросит выбрать, что показывать (экран, окно или вкладку). Если установлен лаунчер — можно вести эфир и из его студии.</p>
     <label class="fl">Название</label>
     <input id="title" maxlength="120" placeholder="Мой стрим" class="fi">
     <label class="fl" style="margin-top:10px">ID стрима (для ссылки ?s=…; пусто — сгенерируется сам)</label>
