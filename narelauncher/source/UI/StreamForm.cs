@@ -140,29 +140,38 @@ namespace NareLauncher.UI
             string title = (_title.Text ?? "").Trim(); if (title.Length == 0) title = "Эфир";
             string cat = CatSlug(_category.SelectedItem as string);
             string sub = (_sub.Text ?? "").Trim();
-            string resp = Post("/stream/start", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) + "\",\"subcategory\":\"" + Esc(sub) + "\"}");
+            // берём личный ключ RTMP и сразу задаём название/категорию будущего эфира
+            string resp = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) + "\",\"subcategory\":\"" + Esc(sub) + "\"}");
             var j = resp != null ? Json.Parse(resp) : null;
             if (j == null || !j["ok"].AsBool(false)) { _status.Text = "Не удалось начать: " + (j != null ? j["error"].AsString("нет связи") : "нет связи"); return; }
-            _streamId = j["id"].AsString("");
-            _streamLink = "https://" + "narelauncher.winnigames2024.ru" + j["link"].AsString("/live/");
-            _live = true; _go.Text = "Завершить эфир"; _go.BackColor = Color.FromArgb(210, 70, 72);
-            _link.Text = "Ссылка на эфир: " + _streamLink;
+            string key = j["key"].AsString("");
+            string server = j["server"].AsString("rtmp://151.245.217.104/live");
+            string rtmpUrl = server + "/" + key;
+            _streamId = key;
+            _streamLink = "https://narelauncher.winnigames2024.ru" + j["watch"].AsString("/live/watch.php?s=" + key);
 
-            // пробуем настоящее видео через ffmpeg; если его нет — падаем на кадры
             int si = _source.SelectedIndex;
             bool fullScreen = !(si > 0 && si < _titles.Count);
             string winTitle = fullScreen ? "" : _titles[si];
-            try
-            {
-                int fps; if (!int.TryParse(_fps.SelectedItem as string, out fps)) fps = 60;
-                _enc = new StreamEncoder(acc.Token, _streamId, SafeStatus);
-                _videoMode = _enc.Start(fullScreen, winTitle, 3000, fps);
-            }
-            catch { _videoMode = false; }
-            if (_videoMode) _status.Text = "● В ЭФИРЕ · настоящее видео";
-            else { _status.Text = "● В ЭФИРЕ · кадры (готовлю видео…)"; StreamEncoder.EnsureFfmpegAsync(SafeStatus); _enc = null; }
+            int fps; if (!int.TryParse(_fps.SelectedItem as string, out fps)) fps = 60;
+            if (fps > 60) fps = 60;   // по RTMP держим до 60
 
-            _tick.Interval = _videoMode ? 1000 : 800;   // в видео-режиме таймер только для превью/зрителей
+            _enc = new StreamEncoder(SafeStatus);
+            bool ok = false;
+            try { ok = _enc.StartRtmp(rtmpUrl, fullScreen, winTitle, 3000, fps); } catch { ok = false; }
+            if (!ok)
+            {
+                // ffmpeg ещё не скачан — качаем и просим повторить
+                _enc = null;
+                _status.Text = "Готовлю кодек видео… запусти эфир ещё раз через минуту.";
+                StreamEncoder.EnsureFfmpegAsync(SafeStatus);
+                return;
+            }
+
+            _live = true; _videoMode = true; _go.Text = "Завершить эфир"; _go.BackColor = Color.FromArgb(210, 70, 72);
+            _status.Text = "● В ЭФИРЕ · RTMP (как OBS)";
+            _link.Text = "Ссылка на эфир: " + _streamLink;
+            _tick.Interval = 1000;   // таймер только для превью и счётчика зрителей
             _tick.Start();
         }
 
@@ -195,25 +204,17 @@ namespace NareLauncher.UI
                 {
                     using (bmp)
                     {
-                        _preview.Image = (Image)bmp.Clone();
-                        // настоящее видео шлёт ffmpeg; кадры шлём только в запасном режиме
-                        if (!_videoMode)
-                        {
-                            string jpg = Encode(bmp, 1280, 50);
-                            var acc = AccountStore.Selected;
-                            if (acc != null && _streamId != null)
-                                Post("/stream/push", "{\"token\":\"" + Esc(acc.Token) + "\",\"id\":\"" + Esc(_streamId) + "\",\"jpg\":\"" + jpg + "\"}");
-                        }
+                        _preview.Image = (Image)bmp.Clone();   // локальное превью; само видео уходит по RTMP через ffmpeg
                     }
                 }
 
-                // если видео-кодер неожиданно умер — переходим на кадры
-                if (_videoMode && _enc != null && !_enc.Running) { _videoMode = false; SafeStatus("● В ЭФИРЕ · кадры (видео прервалось)"); }
+                // если ffmpeg (RTMP) неожиданно завершился — сообщаем
+                if (_live && _enc != null && !_enc.Running) { SafeStatus("Трансляция прервалась (ffmpeg завершился). Нажми «Завершить» и попробуй снова."); }
 
                 if (++_viewerTick % 5 == 0 && _streamId != null)
                 {
                     string r = Post("/stream/viewers", "{\"id\":\"" + Esc(_streamId) + "\"}");
-                    if (r != null) { int v = Json.Parse(r)["count"].AsInt(0); _status.Text = "● В ЭФИРЕ · " + (_videoMode ? "видео · " : "") + v + " смотрят"; }
+                    if (r != null) { int v = Json.Parse(r)["count"].AsInt(0); _status.Text = "● В ЭФИРЕ · RTMP · " + v + " смотрят"; }
                 }
             }
             catch { }

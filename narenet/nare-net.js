@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.73';
+const VERSION = '1.74';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3975,7 +3975,17 @@ function streamKey(req, res) {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         if (body && body.regen) { policy.streamKeys[nick.toLowerCase()] = crypto.randomBytes(10).toString('hex'); savePolicy(); }
         const key = streamKeyFor(nick);
-        send(res, 200, { ok: true, key, server: 'rtmp://' + RTMP_HOST + '/live', hls: '/live-hls/' + key + '/index.m3u8' });
+        // лаунчер/клиент может заранее задать название/категорию будущего RTMP-эфира
+        if (body && (body.title || body.category || body.subcategory)) {
+            if (!policy.streamMeta) policy.streamMeta = {};
+            policy.streamMeta[nick.toLowerCase()] = {
+                title: clean(body.title, 120), category: clean(body.category, 32),
+                subcategory: clean(body.subcategory, 40)
+            };
+            savePolicy();
+        }
+        send(res, 200, { ok: true, key, server: 'rtmp://' + RTMP_HOST + '/live',
+                         hls: '/live-hls/' + key + '/index.m3u8', watch: '/live/watch.php?s=' + key });
     });
 }
 // node-media-server сообщает о начале/конце публикации по RTMP
@@ -3991,8 +4001,11 @@ function rtmpEvent(req, res) {
             for (const [id, s] of streams) if (s.nick === nick && s.id !== key) { finalizeVod(s); streams.delete(id); }
             const user = (acc(nick) || {}).username || nick;
             const ex = streams.get(key) || {};
+            const meta = (policy.streamMeta && policy.streamMeta[nick]) || {};
             streams.set(key, Object.assign({
-                nick, user, title: ex.title || ('Эфир ' + nick), category: 'games', subcategory: '',
+                nick, user, title: meta.title || ex.title || ('Эфир ' + nick),
+                category: (meta.category || 'games').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, '') || 'games',
+                subcategory: meta.subcategory || '',
                 channel: nick, nameSlug: key, link: '/live/watch.php?s=' + key,
                 jpg: '', at: now(), viewers: new Map(), chat: [], bans: {}, media: { init: '', seq: 0, buf: [] }
             }, ex, { type: 'hls', hlsKey: key, hlsLive: true, seen: now(), everLive: true }));

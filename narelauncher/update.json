@@ -1,12 +1,12 @@
 {
-  "version": "1.94",
+  "version": "1.95",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "48450c71480aaf3c51592dd4bf2a8806e7578a3d",
-  "size": 890368,
+  "sha1": "058b20c4d5c8c253d8a5e4892d3ef7f2bfff979d",
+  "size": 889856,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Студия эфира: настоящее видео через ffmpeg + выбор частоты кадров (60/120/240/360 fps). При первом эфире один раз качается кодек видео (пока идут кадры). Реальный fps зависит от ПК — высокие значения требуют мощного железа."
+  "notes": "Студия эфира теперь транслирует как OBS — по RTMP прямо из лаунчера (ffmpeg -> rtmp -> сервер -> HLS зрителям). Отдельный OBS не нужен. При первом эфире один раз качается кодек ffmpeg."
 }
