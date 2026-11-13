@@ -4289,7 +4289,8 @@ function streamKey(req, res) {
             savePolicy();
         }
         send(res, 200, { ok: true, key, keyError: keyErr, server: 'rtmp://' + RTMP_HOST + '/live',
-                         hls: '/live-hls/' + key + '/index.m3u8', watch: '/live/watch.php?s=' + key });
+                         hls: '/live-hls/' + key + '/index.m3u8', watch: '/live/watch.php?s=' + key,
+                         meta: (policy.streamMeta && policy.streamMeta[low]) || {} });
     });
 }
 // node-media-server сообщает о начале/конце публикации по RTMP

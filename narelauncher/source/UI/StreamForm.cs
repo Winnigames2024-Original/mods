@@ -25,6 +25,8 @@ namespace NareLauncher.UI
         private readonly TextBox _sub = new TextBox();
         private readonly TextBox _sid = new TextBox();    // постоянная ссылка (свой ID)
         private readonly TextBox _desc = new TextBox();   // описание эфира
+        private readonly ComboBox _theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };   // оформление страницы
+        private static readonly string[] ThemeSlugs = { "", "pink", "flowers", "hearts", "mint", "gold", "night" };
         private readonly Button _saveMeta = new Button { Text = "💾" };
         private readonly Button _refresh = new Button { Text = "⟳ Окна" };
         private readonly Button _go = new Button { Text = "Выйти в эфир" };
@@ -77,12 +79,17 @@ namespace NareLauncher.UI
             _fps.Items.AddRange(new object[] { "60", "120", "240", "360" });
             _fps.SelectedIndex = 0;
 
-            // постоянная ссылка (свой ID) + описание
+            // постоянная ссылка (свой ID) + описание + оформление
             var lblSid = Lbl("Постоянная ссылка (ID)", 16, 126);
-            _sid.SetBounds(16, 148, 360, 26); Style(_sid);
-            var lblDesc = Lbl("Описание эфира", 390, 126);
-            _desc.SetBounds(390, 148, 284, 26); Style(_desc);
-            _saveMeta.SetBounds(680, 147, 64, 28); Btn(_saveMeta, false);
+            _sid.SetBounds(16, 148, 210, 26); Style(_sid);
+            var lblDesc = Lbl("Описание эфира", 234, 126);
+            _desc.SetBounds(234, 148, 196, 26); Style(_desc);
+            var lblTheme = Lbl("Оформление", 438, 126);
+            _theme.SetBounds(438, 148, 150, 26); Style(_theme);
+            _theme.Items.AddRange(new object[] { "Обычное", "🌸 Розовое", "💐 Цветочки", "❤️ Сердечки", "🌿 Мятное", "✨ Золотое", "🌌 Ночное" });
+            _theme.SelectedIndex = 0;
+            _saveMeta.SetBounds(600, 147, 144, 28); Btn(_saveMeta, false);
+            _saveMeta.Text = "💾 Сохранить";
             _saveMeta.Click += (s, e) => SaveMeta();
 
             _preview.SetBounds(16, 190, 728, 286);
@@ -101,7 +108,7 @@ namespace NareLauncher.UI
             _overlayBtn.Click += (s, e) => ToggleOverlay();
 
             Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, lblFps, _fps,
-                                              lblSid, _sid, lblDesc, _desc, _saveMeta, _preview, _go, _overlayBtn, _status, _link });
+                                              lblSid, _sid, lblDesc, _desc, lblTheme, _theme, _saveMeta, _preview, _go, _overlayBtn, _status, _link });
             LoadMeta();
 
             _refresh.Click += (s, e) => LoadSources();
@@ -167,9 +174,10 @@ namespace NareLauncher.UI
             string sub = (_sub.Text ?? "").Trim();
             string desc = (_desc.Text ?? "").Trim();
             string customKey = (_sid.Text ?? "").Trim();
-            // берём личный ключ RTMP и сразу задаём название/описание/категорию/свой ID будущего эфира
+            string theme = ThemeSlug();
+            // берём личный ключ RTMP и сразу задаём название/описание/категорию/свой ID/оформление будущего эфира
             string resp = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) +
-                "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\"}");
+                "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\",\"theme\":\"" + Esc(theme) + "\"}");
             var j = resp != null ? Json.Parse(resp) : null;
             if (j == null || !j["ok"].AsBool(false)) { _status.Text = "Не удалось начать: " + (j != null ? j["error"].AsString("нет связи") : "нет связи"); return; }
             string ke = j["keyError"].AsString(""); if (ke.Length > 0) { _status.Text = "ID: " + ke; return; }
@@ -358,9 +366,14 @@ namespace NareLauncher.UI
                 var j = Json.Parse(r);
                 string key = j["key"].AsString("");
                 string watch = j["watch"].AsString("/live/watch.php?s=" + key);
+                var meta = j["meta"];
+                string mDesc = meta["desc"].AsString(""), mTheme = meta["theme"].AsString(""), mTitle = meta["title"].AsString("");
                 UiInvoke(() =>
                 {
                     if (_sid.Text.Trim().Length == 0) _sid.Text = key;
+                    if (_desc.Text.Trim().Length == 0 && mDesc.Length > 0) _desc.Text = mDesc;
+                    if (_title.Text.Trim().Length == 0 && mTitle.Length > 0) _title.Text = mTitle;
+                    if (mTheme.Length > 0) SetThemeBySlug(mTheme);
                     _streamLink = "https://narelauncher.winnigames2024.ru" + watch;
                     _link.Text = "Постоянная ссылка: " + _streamLink;
                 });
@@ -377,10 +390,11 @@ namespace NareLauncher.UI
             string customKey = (_sid.Text ?? "").Trim();
             string cat = CatSlug(_category.SelectedItem as string);
             string sub = (_sub.Text ?? "").Trim();
+            string theme = ThemeSlug();
             new System.Threading.Thread(() =>
             {
                 string r = Post("/stream/key", "{\"token\":\"" + Esc(acc.Token) + "\",\"title\":\"" + Esc(title) + "\",\"category\":\"" + Esc(cat) +
-                    "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\"}");
+                    "\",\"subcategory\":\"" + Esc(sub) + "\",\"desc\":\"" + Esc(desc) + "\",\"customKey\":\"" + Esc(customKey) + "\",\"theme\":\"" + Esc(theme) + "\"}");
                 var j = r != null ? Json.Parse(r) : null;
                 UiInvoke(() =>
                 {
@@ -395,6 +409,9 @@ namespace NareLauncher.UI
                 });
             }) { IsBackground = true }.Start();
         }
+
+        private string ThemeSlug() { int i = _theme.SelectedIndex; return (i >= 0 && i < ThemeSlugs.Length) ? ThemeSlugs[i] : ""; }
+        private void SetThemeBySlug(string slug) { int idx = Array.IndexOf(ThemeSlugs, slug ?? ""); if (idx < 0) idx = 0; _theme.SelectedIndex = idx; }
 
         private void UiInvoke(Action a) { if (IsDisposed) return; try { if (InvokeRequired) BeginInvoke(a); else a(); } catch { } }
 

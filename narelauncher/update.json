@@ -1,12 +1,12 @@
 {
-  "version": "2.00",
+  "version": "2.01",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "45d19795c71c4a3d4a07d1ca868c6d5ad9cdb9b2",
-  "size": 911872,
+  "sha1": "be9fbb12fe5e61f3c72d10fbf2ea405bf4cba047",
+  "size": 912896,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Эфир сам переподключается, если связь оборвалась не по кнопке (сеть/ffmpeg) — тот же ID, та же ссылка, зрители не теряются. Плюс постоянная ссылка (свой ID), описание эфира, и эфир первым на главной канала."
+  "notes": "Студия эфира: выбор оформления страницы эфира (розовое, цветочки, сердечки, мятное, золотое, ночное). Поля ID, описание и тема теперь подгружаются из сохранённых. На сайте у эфиров появилась перемотка назад и эфир больше не пропадает через минуту."
 }
