@@ -24,18 +24,26 @@ $channels = api_get('/channel/list')['channels'] ?? [];
 </form>
 <?php if ($msg): ?><div class="msg"><?= h($msg) ?></div><?php endif; ?>
 <?php endif; ?>
+<div class="nv-search" style="margin-top:4px"><input id="chq" type="search" placeholder="Поиск по каналам…" autocomplete="off"></div>
 <?php if (!$channels): ?><p class="muted">Пока нет каналов.</p><?php else: ?>
-<div class="srv-list">
-  <?php foreach ($channels as $c): ?>
-  <a class="srv" href="/channels/chat.php?c=<?= urlencode($c['id']) ?>" style="text-decoration:none;color:inherit">
-    <div class="srv-main"><div class="srv-ico">#</div><div class="srv-body">
-      <div class="srv-name"><?= h($c['name']) ?></div>
-      <?php if (!empty($c['desc'])): ?><div class="muted"><?= h($c['desc']) ?></div><?php endif; ?>
-      <div class="muted">владелец @<?= h($c['owner']) ?> · <?= (int)$c['msgs'] ?> сообщений</div>
-    </div></div>
-    <div class="srv-act"><span class="btn ghost">Открыть чат</span></div>
+<div class="mgrid chans" id="chgrid">
+  <?php foreach ($channels as $c):
+    $ava = !empty($c['avatar']) ? ' style="background-image:url(\''.h($c['avatar']).'\');background-size:cover;background-position:center"' : '';
+    $s = strtolower(($c['name'] ?? '').' '.($c['username'] ?? '').' '.($c['desc'] ?? '')); ?>
+  <a class="mcard chan" href="/channels/chat.php?c=<?= urlencode($c['id']) ?>" data-s="<?= h($s) ?>">
+    <div class="cc-ava"<?= $ava ?>><?= empty($c['avatar']) ? h(initial($c['name'] ?? '?')) : '' ?></div>
+    <div class="mmeta"><div class="mtitle"># <?= h($c['name']) ?></div>
+      <div class="muted"><?= !empty($c['username']) ? '@'.h($c['username']).' · ' : '' ?><?= (int)$c['msgs'] ?> сообщений</div></div>
   </a>
   <?php endforeach; ?>
 </div>
+<p class="muted" id="chempty" style="display:none">Ничего не найдено.</p>
+<script>
+(function(){ var q=document.getElementById('chq'); if(!q)return;
+  q.addEventListener('input',function(){ var v=this.value.trim().toLowerCase(),n=0;
+    Array.prototype.forEach.call(document.querySelectorAll('#chgrid .chan'),function(c){
+      var show=!v||c.getAttribute('data-s').indexOf(v)>=0; c.style.display=show?'':'none'; if(show)n++; });
+    document.getElementById('chempty').style.display=n?'none':'block'; }); })();
+</script>
 <?php endif; ?>
 <?php require __DIR__ . '/../_inc/foot.php'; ?>

@@ -259,3 +259,14 @@ html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
 .nv-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
 .nv-brand{font-size:24px;font-weight:800;display:flex;align-items:center;gap:8px}
 .nv-logo{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#ff4d4f,#ff7a45);color:#fff;font-size:16px}
+
+/* --- NareVideos поиск и карточки каналов --- */
+.nv-search{margin:10px 0 14px}
+.nv-search input{width:100%;background:rgba(128,128,128,.08);border:1px solid rgba(128,128,128,.25);
+  color:inherit;border-radius:999px;padding:11px 18px;font:inherit;outline:none}
+.nv-search input:focus{border-color:var(--accent,#5b8cff)}
+.mcard.chan{align-items:center}
+.cc-ava{width:100%;aspect-ratio:1/1;border-radius:14px;display:grid;place-items:center;font-size:34px;font-weight:800;color:#fff;
+  background:linear-gradient(135deg,#8b5bff,#5b8cff);background-size:cover;background-position:center}
+.mgrid.chans{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+#nv-results h3{margin:18px 0 8px}
