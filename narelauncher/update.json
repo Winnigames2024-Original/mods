@@ -1,12 +1,12 @@
 {
-  "version": "1.96",
+  "version": "1.97",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "a20dd8cd19cd13605f3fb62ac4f43306db97c8a5",
-  "size": 889856,
+  "sha1": "ebb3479b9c8885d60999a1d13f1b02713c912976",
+  "size": 898048,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Студия эфира: список запущенных приложений/окон обновляется сам. Трансляция по RTMP как OBS прямо из лаунчера."
+  "notes": "Теперь эфир можно смотреть прямо в приложении: кнопка «Эфир по ID» в разделе Видео — вводишь ID, смотришь встроенный плеер с живым чатом и счётчиком зрителей. Для RTMP-эфиров — кнопка открыть видео в браузере."
 }

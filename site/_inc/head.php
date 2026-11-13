@@ -18,7 +18,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <meta name="keywords" content="minecraft launcher, майнкрафт скачать, лаунчер майнкрафт, скачать майнкрафт лаунчер, бесплатный лаунчер minecraft, nare launcher, narelauncher, сервер майнкрафт с модами и плагинами, майнкрафт с модами">
 <meta name="robots" content="index, follow">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0b0f17">
+<meta name="theme-color" content="#2787f5">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
 <link rel="apple-touch-icon" href="/assets/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -58,6 +58,10 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <body>
 <header class="nav" id="siteHeader">
   <a class="brand" href="/home/"><span class="logo">N</span> NareLauncher</a>
+  <form class="nav-search" action="/search/" method="get" role="search">
+    <span class="nav-search-ic">🔍</span>
+    <input type="search" name="q" placeholder="Поиск видео, каналов, эфиров…" value="<?= h($_GET['q'] ?? '') ?>" autocomplete="off">
+  </form>
   <button type="button" class="nav-burger" id="navBurger" aria-label="Меню" onclick="document.getElementById('siteHeader').classList.toggle('open')">☰</button>
   <nav class="tabs">
     <a href="/home/">Главная</a>

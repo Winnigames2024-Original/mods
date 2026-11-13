@@ -26,6 +26,7 @@ namespace NareLauncher.UI
         private readonly Button _upload = new Button();
         private readonly Button _mine = new Button();
         private readonly Button _refresh = new Button();
+        private readonly Button _watchId = new Button();
         private readonly Label _status = new Label();
         private readonly FlowLayoutPanel _feed = new FlowLayoutPanel();
 
@@ -67,6 +68,11 @@ namespace NareLauncher.UI
             _refresh.Click += (s, e) => Load(null, null);
             Controls.Add(_refresh);
 
+            _watchId.Text = "👁 Эфир по ID"; VideosPage.StyleBtn(_watchId, CCard, CText);
+            _watchId.Bounds = new Rectangle(452, 16, 128, 30);
+            _watchId.Click += (s, e) => { using (var f = new StreamWatchForm("")) f.ShowDialog(FindForm()); };
+            Controls.Add(_watchId);
+
             _status.AutoSize = false; _status.BackColor = Color.Transparent; _status.ForeColor = CDim;
             _status.Font = Theme.F(9.5f); _status.Bounds = new Rectangle(24, 52, 860, 20);
             Controls.Add(_status);
@@ -87,7 +93,8 @@ namespace NareLauncher.UI
         {
             int w = Math.Max(640, Width);
             _refresh.Left = w - 68; _mine.Left = _refresh.Left - 128; _upload.Left = _mine.Left - 138;
-            _search.Width = Math.Max(180, _upload.Left - 250 - 12);
+            _watchId.Left = _upload.Left - 136;
+            _search.Width = Math.Max(160, _watchId.Left - 250 - 12);
             _status.Width = w - 48;
             _feed.Bounds = new Rectangle(8, 76, w - 16, Math.Max(200, Height - 84));
         }
