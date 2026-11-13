@@ -102,6 +102,11 @@ function clean(text, limit) {
     if (typeof text !== 'string') return '';
     return text.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, limit || 64);
 }
+// как clean, но сохраняет переносы строк и табы (для сообщений бота с кодом)
+function cleanMultiline(text, limit) {
+    if (typeof text !== 'string') return '';
+    return text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/[ \t\n]+$/, '').slice(0, limit || 64);
+}
 
 function isSha1(text) { return typeof text === 'string' && /^[0-9a-f]{40}$/i.test(text); }
 
@@ -2116,6 +2121,7 @@ function aiSystemPrompt(nick, admin) {
     const mem = aiMemoryRead();
     return [
         'Ты — Наря (NareAI), встроенный ИИ-помощник платформы NareLauncher (игровая/медиа-платформа вокруг Minecraft, с видео, фото, прямыми эфирами, каналами с чатами и ботами).',
+        'Владелец и создатель платформы NareLauncher — Winnigames2024. Если спрашивают, кто владелец/создатель/разработчик платформы — отвечай: Winnigames2024. Не упоминай, на какой языковой модели ты работаешь, и не называй сторонние компании как создателей платформы.',
         'Отвечай по-русски, дружелюбно и по делу. Ты помогаешь пользователям и можешь сам действовать на платформе через инструменты.',
         '',
         'Текущий пользователь: ' + (nick || 'гость') + (admin ? ' (АДМИНИСТРАТОР)' : '') + '.',
@@ -2273,14 +2279,15 @@ const LOCAL_KB = [
     [['скач', 'установ', 'download', 'лаунчер'], 'Скачать лаунчер можно в разделе «Скачать» (/download/). Установщик всё поставит сам, аккаунт — бесплатный.'],
     [['сервер', 'ядро', 'плагин', 'paper', 'forge', 'fabric'], 'Свой сервер — в лаунчере вкладка «Мои серверы»: выбираешь версию и ядро (ванила/Paper/Forge/Fabric/гибрид), ставишь моды и плагины. Список серверов — на /servers/.'],
     [['стрим', 'эфир', 'трансл', 'obs'], 'Эфир запускается из лаунчера (кнопка «Эфир», студия с захватом экрана/окна по RTMP как OBS) или на сайте — /live/go.php. Смотреть эфиры: /live/. Можно смотреть и прямо в приложении по ID.'],
-    [['бот', 'bot'], 'Боты живут в разделе «Боты» (/bots/). Можно писать код бота прямо на сайте — он отвечает в чатах каналов и эфиров.'],
+    [['бот', 'bot', 'python', 'narebot'], 'Боты — раздел /bots/. Два способа: 1) правила прямо на сайте (on/cmd/regex — бот отвечает сам на сервере); 2) Python через narebot: from narebot import Bot; currentbot = Bot.Bot(Bot.TOKEN("токен")); @Bot.Messages.Listener def on_message(message, userid): if Bot.MessageContains(message,"привет"): Bot.Messages.Write("привет!", userid). Код в чат — Bot.Code.python("...") (покажется в рамке с кнопкой «копировать»).'],
     [['канал', 'channel'], 'Каналы с общим чатом — /channels/. Владелец задаёт описание, аватар, обложку, назначает модераторов.'],
     [['подпис', 'уведомл', 'notif'], 'Подписки — /subscriptions/. Если включить уведомления (колокольчик в шапке), приходит сообщение, когда тот, на кого ты подписан, выложил видео, запись или запустил эфир.'],
     [['видео', 'narevideos', 'ролик'], 'Видео и весь медиа-хаб — NareVideos (/narevideos/): лента, поиск, каналы, эфиры, записи, фото. Загрузка — из лаунчера или на сайте.'],
     [['монет', 'coin'], 'Монеты начисляются за активность и награды, баланс — в профиле (/profile/my/).'],
     [['дизайн', 'тема', 'светл', 'тёмн'], 'Дизайн переключается кнопкой «◑» в шапке: тёмный и светлый (в стиле VK).'],
     [['привет', 'здаров', 'хай', 'ку'], 'Привет! Я Наря — локальный ИИ NareLauncher. Спрашивай про лаунчер, эфиры, видео, серверы, ботов — помогу.'],
-    [['кто ты', 'что ты', 'умеешь'], 'Я Наря — встроенный ИИ NareLauncher. Работаю локально на сервере, без внешних ключей, и постоянно учусь на общении. Помогаю по платформе и просто болтаю.']
+    [['кто ты', 'что ты', 'умеешь'], 'Я Наря — встроенный ИИ NareLauncher. Помогаю по платформе и просто болтаю, постоянно учусь на общении.'],
+    [['владел', 'создал', 'разработ', 'чей', 'компани', 'кому принадлеж'], 'Владелец и создатель платформы NareLauncher — Winnigames2024.']
 ];
 function localKbAnswer(q) {
     const low = String(q || '').toLowerCase().replace(/ё/g, 'е');
@@ -2302,6 +2309,29 @@ function localReply(userText) {
     const tips = 'Я ещё учусь на общении 🙂 Могу точно подсказать про: лаунчер, эфиры, видео, каналы, ботов, серверы, подписки и уведомления.';
     return gen ? (gen + '\n\n' + tips) : tips;
 }
+
+// обучаем локальный ИИ нашему API ботов и Python (один раз на версию)
+function brainSeedBots() {
+    const VER = 3;
+    if (brain.seededBots === VER) return;
+    const qa = [
+        ['кто владелец платформы', 'Владелец и создатель платформы NareLauncher — Winnigames2024.'],
+        ['кто создал narelauncher', 'NareLauncher создал Winnigames2024 — он же владелец платформы.'],
+        ['чья это платформа', 'Платформа NareLauncher принадлежит Winnigames2024.'],
+        ['как написать бота', 'from narebot import Bot; currentbot = Bot.Bot(Bot.TOKEN("токен")); затем @Bot.Messages.Listener над функцией (message, userid) и Bot.Messages.Write(text, userid). Токен — в редакторе бота на /bots/.'],
+        ['бот на python', 'from narebot import Bot; currentbot = Bot.Bot(Bot.TOKEN("токен")); @Bot.Messages.Listener\\ndef on_message(message, userid):\\n    if Bot.MessageContains(message, "привет"): Bot.Messages.Write("привет!", userid)'],
+        ['как бот отвечает', 'В обработчике @Bot.Messages.Listener проверяй Bot.MessageContains(message, "текст") и пиши ответ через Bot.Messages.Write("ответ", userid).'],
+        ['как отправить код ботом', 'Bot.Code.python("код") (или .js .php .java .csharp .html .css) — вернёт сообщение, которое в чате покажется в рамке с кнопкой «копировать». Отправь его через Bot.Messages.Write(код, userid).'],
+        ['bot api', 'Bot.Bot(token), Bot.TOKEN(t), @Bot.Messages.Listener, Bot.Messages.Write(text, userid), Bot.MessageContains(message, needle), Bot.Code.<язык>(code), Bot.ListenMessages(bot, func).'],
+        ['как запустить бота', 'Сохрани bot.py и narebot.py рядом, запусти: python bot.py. Либо пиши правила прямо на сайте в редакторе бота — тогда запускать ничего не нужно.'],
+        ['где токен бота', 'Токен бота — в разделе Боты (/bots/), в редакторе нужного бота, строка «Токен бота».'],
+        ['как модерировать ботом', 'msg.mute(ник, секунды), msg.ban(ник), msg.unban(ник); или в правилах ответ начинается с /mute ник сек, /ban ник, /unban ник.']
+    ];
+    for (const [q, a] of qa) brainLearnQA(q, a.replace(/\\n/g, '\n'));
+    brainLearnText('бот narebot python Bot.Bot Bot.TOKEN Bot.Messages.Listener Bot.Messages.Write Bot.MessageContains Bot.Code python csharp js php java html css токен редактор ботов чат канал эфир');
+    brain.seededBots = VER; brainSave();
+}
+try { brainSeedBots(); } catch (e) {}
 
 function aiGenerate(messages, image, systemText, cb) {
     const ai = policy.ai || {};
@@ -4787,18 +4817,17 @@ function botMod(req, res) {
 }
 
 // ------------------------------------------------------------ боты для чатов (Python через API)
-const BOT_TEMPLATE = '# Бот NareLauncher. Запуск: python bot.py\n' +
+const BOT_TEMPLATE = '# Бот NareLauncher. Запуск: python bot.py  (narebot.py положи рядом)\n' +
     'from narebot import Bot\n\n' +
-    'bot = Bot("ВСТАВЬ_ТОКЕН_БОТА")\n\n' +
-    '@bot.on_message\n' +
-    'def reply(msg):\n' +
-    '    # msg.text, msg.from_, msg.target\n' +
-    '    if msg.text.lower() == "привет":\n' +
-    '        msg.reply("Привет, " + msg.from_ + "!")\n' +
-    '    # модерация: msg.mute(ник, секунды), msg.ban(ник), msg.unban(ник)\n' +
-    '    if msg.text.startswith("!mute "):\n' +
-    '        msg.mute(msg.text.split(" ",1)[1], 300)\n\n' +
-    'bot.run()\n';
+    'currentbot = Bot.Bot(Bot.TOKEN("ВСТАВЬ_ТОКЕН_БОТА"))\n\n' +
+    '@Bot.Messages.Listener\n' +
+    'def on_message(message, userid):\n' +
+    '    if Bot.MessageContains(message, "пр") or Bot.MessageContains(message, "привет"):\n' +
+    '        Bot.Messages.Write("привет!", userid)\n' +
+    '    # прислать код в рамке с кнопкой «копировать»:\n' +
+    '    if Bot.MessageContains(message, "код"):\n' +
+    '        Bot.Messages.Write(Bot.Code.python("print(\'hi from NareBot\')"), userid)\n\n' +
+    'currentbot.run()   # можно не писать — запустится само\n';
 
 // Шаблон правил серверного бота (выполняется у нас, код пишется на сайте)
 const BOT_SCRIPT_TEMPLATE =
@@ -4992,7 +5021,7 @@ function botApiSend(req, res) {
     readJsonBody(req, body => {
         const b = botByToken(clean(body && body.botToken, 40)); if (!b) return send(res, 403, { error: 'неверный токен бота' });
         const target = clean(body.target, 40);
-        const text = clean(body.text, 600); if (!text) return send(res, 400, { error: 'пусто' });
+        const text = cleanMultiline(body.text, 4000); if (!text) return send(res, 400, { error: 'пусто' });   // код с переносами строк разрешён
         if (!(b.targets || []).includes(target)) return send(res, 403, { error: 'бот не состоит в этой цели' });
         const from = b.name + ' 🤖';
         const m = target.split(':'), kind = m[0], id = m[1];

@@ -58,8 +58,10 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
   function fmt(s){ s=esc(s);
     s=s.replace(/```([\s\S]*?)```/g,function(m,c){return '<pre>'+c.replace(/^\n/,'')+'</pre>';});
     s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    // ссылки: сначала полные URL, затем абсолютные пути сайта (только не внутри тегов) — ДО **жирного**
+    s=s.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank">$1</a>');
+    s=s.replace(/(^|[\s(])(\/[a-z][\w\/.\-]*)/g,'$1<a href="$2" target="_blank">$2</a>');
     s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
-    s=s.replace(/(https?:\/\/[^\s<]+|\/[a-z][\w\/.\-]*)/g,'<a href="$1" target="_blank">$1</a>');
     s=s.replace(/\n/g,'<br>'); return s; }
   function add(cls,html){ var b=document.getElementById('ai-body'); var d=document.createElement('div'); d.className='cp-msg '+cls; d.innerHTML=html; b.appendChild(d); b.scrollTop=b.scrollHeight; return d; }
   function aiGreet(){ aiStarted=true; add('bot','Привет! Я <b>Наря</b> — ИИ-помощник NareLauncher. Спрашивай что угодно про лаунчер, эфиры, серверы, ботов. Я могу искать по базе, создавать каналы и ботов, смотреть присланные картинки 🖼️'); }

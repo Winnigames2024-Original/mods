@@ -112,6 +112,15 @@ function setupHls(url){ if(hlsUrl===url)return; hlsUrl=url;
 // кнопка «в прямой эфир» — прыжок к живому краю
 function goLive(){ try{ if(hls&&hls.liveSyncPosition){ vid.currentTime=hls.liveSyncPosition; } else if(vid.seekable&&vid.seekable.length){ vid.currentTime=vid.seekable.end(vid.seekable.length-1); } vid.play().catch(function(){}); }catch(e){} }
 function show404(){ document.getElementById('watchbox').style.display='none'; document.getElementById('notfound').style.display='flex'; }
+// код в чате: ```язык\n...\n``` -> карточка с кнопкой «копировать»
+function fmtMsg(t){ t=String(t==null?'':t); var out='',last=0,re=/```([a-zA-Z0-9+#]*)\n?([\s\S]*?)```/g,m;
+  while((m=re.exec(t))){ out+=esc(t.slice(last,m.index));
+    var lang=(m[1]||'код'), code=m[2].replace(/\n$/,'');
+    out+='<div class="codecard"><div class="cc-head"><span>'+esc(lang)+'</span><button class="cc-copy" type="button" onclick="copyCode(this)">копировать</button></div><pre class="cc-body">'+esc(code)+'</pre></div>';
+    last=re.lastIndex; }
+  out+=esc(t.slice(last)); return out; }
+function copyCode(btn){ try{ var card=btn.closest('.codecard'); var code=card.querySelector('.cc-body').textContent;
+  navigator.clipboard.writeText(code).then(function(){ btn.textContent='скопировано ✓'; setTimeout(function(){btn.textContent='копировать';},1500); }); }catch(e){} }
 var THEMES=['pink','flowers','hearts','mint','gold','night'];
 function applyTheme(t){ var box=document.getElementById('watchbox');
   THEMES.forEach(function(x){ box.classList.remove('stheme-'+x); });
@@ -194,7 +203,7 @@ document.getElementById('sound').addEventListener('click',function(){ vid.muted=
 var since2=0;
 function chat(){ node('/stream/chat/get',{id:ID,since:since2}).then(function(j){
   if(j.ok&&j.msgs&&j.msgs.length){ var box=document.getElementById('chat');
-    j.msgs.forEach(function(m){ var d=document.createElement('div'); d.className='lmsg'+(m.bot?' bot':''); d.innerHTML='<b>'+esc(m.from)+':</b> '+esc(m.text); box.appendChild(d); });
+    j.msgs.forEach(function(m){ var d=document.createElement('div'); d.className='lmsg'+(m.bot?' bot':''); d.innerHTML='<b>'+esc(m.from)+':</b> '+fmtMsg(m.text); box.appendChild(d); });
     since2=j.total; box.scrollTop=box.scrollHeight; }
 }).catch(function(){}).finally(function(){setTimeout(chat,1500);}); }
 chat();

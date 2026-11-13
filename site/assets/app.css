@@ -447,3 +447,12 @@ a.card:hover,.mcard:hover .mthumb{box-shadow:0 6px 20px rgba(0,0,0,.18)}
   font-size:12px;line-height:1;padding:6px 12px 6px 10px;border-top-right-radius:10px;
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.08);border-left:0;border-bottom:0;pointer-events:none;letter-spacing:.02em}
 .ver-strip b{color:#fff;font-weight:700}
+
+/* код в чате: рамка + кнопка «копировать» */
+.codecard{margin:6px 0;border:1px solid rgba(128,128,128,.3);border-radius:10px;overflow:hidden;background:#0a0d14;max-width:100%}
+.cc-head{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:rgba(128,128,128,.14);font-size:12px;color:var(--dim)}
+.cc-copy{background:var(--vk,#2787f5);color:#fff;border:0;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;font-weight:600}
+.cc-copy:hover{filter:brightness(1.1)}
+.cc-body{margin:0;padding:10px 12px;font:12px/1.5 ui-monospace,Consolas,monospace;color:#d7e0f0;white-space:pre;overflow-x:auto}
+html.simple .codecard{background:#f6f8fa}
+html.simple .cc-body{color:#1b2330}

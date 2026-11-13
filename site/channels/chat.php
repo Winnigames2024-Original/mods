@@ -89,6 +89,12 @@ function cmod(action){ var u=document.getElementById('muser').value.trim(); if(!
 function setmod(remove){ var u=document.getElementById('moduser').value.trim(); if(!u)return;
   fetch('/channel/mods',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,user:u,remove:remove})}).then(function(r){return r.json();}).then(function(j){ if(j.ok){document.getElementById('modlist').textContent=(j.mods&&j.mods.length?'модераторы: '+j.mods.join(', '):'');document.getElementById('moduser').value='';}else alert(j.error||'Ошибка'); }); }
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtMsg(t){ t=String(t==null?'':t); var out='',last=0,re=/```([a-zA-Z0-9+#]*)\n?([\s\S]*?)```/g,m;
+  while((m=re.exec(t))){ out+=esc(t.slice(last,m.index)); var lang=(m[1]||'код'), code=m[2].replace(/\n$/,'');
+    out+='<div class="codecard"><div class="cc-head"><span>'+esc(lang)+'</span><button class="cc-copy" type="button" onclick="copyCode(this)">копировать</button></div><pre class="cc-body">'+esc(code)+'</pre></div>';
+    last=re.lastIndex; } out+=esc(t.slice(last)); return out; }
+function copyCode(btn){ try{ var card=btn.closest('.codecard'); var code=card.querySelector('.cc-body').textContent;
+  navigator.clipboard.writeText(code).then(function(){ btn.textContent='скопировано ✓'; setTimeout(function(){btn.textContent='копировать';},1500); }); }catch(e){} }
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 // оформление канала (владелец)
 (function(){ var save=document.getElementById('e-save'); if(!save)return;
@@ -144,7 +150,7 @@ if(OWNER){
 
 function poll(){ node('/channel/chat/get',{id:ID,since:since}).then(function(j){
   if(j.ok&&j.msgs&&j.msgs.length){ var box=document.getElementById('chat');
-    j.msgs.forEach(function(m){var d=document.createElement('div');d.className='lmsg'+(m.bot?' bot':'');d.innerHTML='<b>'+esc(m.from)+':</b> '+esc(m.text);box.appendChild(d);});
+    j.msgs.forEach(function(m){var d=document.createElement('div');d.className='lmsg'+(m.bot?' bot':'');d.innerHTML='<b>'+esc(m.from)+':</b> '+fmtMsg(m.text);box.appendChild(d);});
     since=j.total; box.scrollTop=box.scrollHeight; }
 }).catch(function(){}).finally(function(){setTimeout(poll,1500);}); }
 poll();
