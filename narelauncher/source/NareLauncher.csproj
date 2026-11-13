@@ -169,6 +169,7 @@
     <Compile Include="UI\Toast.cs" />
     <Compile Include="UI\StreamForm.cs" />
     <Compile Include="UI\StreamWatchForm.cs" />
+    <Compile Include="UI\NotificationsForm.cs" />
     <Compile Include="UI\ChatOverlay.cs" />
     <Compile Include="UI\BanOverlay.cs">
       <SubType>Form</SubType>

@@ -290,6 +290,15 @@ namespace NareLauncher.Core
             return j == null ? 0 : j["awarded"].AsInt(0);
         }
 
+        /// <summary>Новые уведомления (события/рассылки) с момента since. Возвращает сырой Json (items, now).</summary>
+        public static async Task<Json> NotifyCheckAsync(string token, long since, CancellationToken ct)
+        {
+            var body = Json.NewObject();
+            body.Set("token", token);
+            body.Set("since", since);
+            return await PostAsync("/notify/check", body, ct).ConfigureAwait(false);
+        }
+
         public static async Task CommandAsync(string token, string text, CancellationToken ct)
         {
             var body = Admin(token);

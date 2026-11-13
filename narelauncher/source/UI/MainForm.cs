@@ -255,6 +255,12 @@ namespace NareLauncher.UI
             _sidebar.Controls.Add(studioBtn);
             y += 39;
 
+            // Уведомления — отдельное окно (события и рассылки)
+            var notifBtn = new NavButton { Text = "Уведомления", Icon = Ico.Chat, Bounds = new Rectangle(8, y, SidebarWidth - 16, 36) };
+            notifBtn.Click += (s, e) => { if (EnsureAuth()) { using (var f = new NotificationsForm()) f.ShowDialog(this); } };
+            _sidebar.Controls.Add(notifBtn);
+            y += 39;
+
             // Быстрые ссылки на разделы сайта (открываются в браузере)
             foreach (var lk in new[] { new[] { "Медиа", "/media/" }, new[] { "Каналы", "/channels/" } })
             {
@@ -480,10 +486,10 @@ namespace NareLauncher.UI
 
             _guard.Tick += delegate { CheckPolicy(); };
             _guard.Start();
-            _eventTimer.Tick += delegate { CheckEvents(); };
+            _eventTimer.Tick += delegate { CheckEvents(); CheckNotifications(); };
             _eventTimer.Start();
             var evKick = new System.Windows.Forms.Timer { Interval = 2500 };
-            evKick.Tick += delegate { evKick.Stop(); evKick.Dispose(); CheckEvents(); };
+            evKick.Tick += delegate { evKick.Stop(); evKick.Dispose(); CheckEvents(); CheckNotifications(); };
             evKick.Start();
             var minuteTimer = new System.Windows.Forms.Timer { Interval = 60000 };
             minuteTimer.Tick += delegate { ClaimMinuteReward(); };
@@ -782,6 +788,59 @@ namespace NareLauncher.UI
         }
 
         private static long NowMs() { return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); }
+
+        private long _notifySince = -1;   // базовая отметка для уведомлений
+
+        /// <summary>Новые уведомления (подписки, лайки, зрители эфира, рассылки) — всплывают тостом.</summary>
+        private async void CheckNotifications()
+        {
+            var acc = AccountStore.Selected;
+            if (acc == null || string.IsNullOrEmpty(acc.Token) || _toasts == null) return;
+            try
+            {
+                long since = _notifySince < 0 ? NowMs() : _notifySince;
+                var j = await NareAuth.NotifyCheckAsync(acc.Token, since, System.Threading.CancellationToken.None);
+                if (j == null) return;
+                long srvNow = j["now"].AsLong(NowMs());
+                bool first = _notifySince < 0;
+                _notifySince = srvNow;
+                if (first) return;   // первая проверка — только базовая отметка, без шквала тостов
+                var items = new System.Collections.Generic.List<Json>();
+                foreach (var it in j["items"].Items) items.Add(it);
+                // показываем от старых к новым, но не больше 5 за раз
+                items.Reverse();
+                int shown = 0;
+                foreach (var it in items)
+                {
+                    if (shown++ >= 5) break;
+                    string type = it["type"].AsString("");
+                    string title = it["title"].AsString("");
+                    string url = it["url"].AsString("");
+                    string head = NotifyHead(type);
+                    string full = "https://narelauncher.winnigames2024.ru" + (string.IsNullOrEmpty(url) ? "/notifications/" : url);
+                    _toasts.Push(head, title, () => { try { System.Diagnostics.Process.Start(full); } catch { } });
+                }
+            }
+            catch { }
+        }
+
+        private static string NotifyHead(string type)
+        {
+            switch (type)
+            {
+                case "подписка": return "➕ Новый подписчик";
+                case "отписка": return "➖ Отписка";
+                case "лайк": return "❤️ Лайк";
+                case "анлайк": return "💔 Лайк убрали";
+                case "зритель": return "👁 Зритель на эфире";
+                case "ушёл": return "🚪 Зритель вышел";
+                case "рассылка": return "📣 Уведомление";
+                case "эфир": return "📡 Начался эфир";
+                case "видео": return "▶ Новое видео";
+                case "запись": return "🎬 Новая запись";
+                default: return "🔔 Уведомление";
+            }
+        }
 
         /// <summary>Ежеминутная награда за онлайн — тихо начисляется, при начислении лёгкий тост.</summary>
         private async void ClaimMinuteReward()
