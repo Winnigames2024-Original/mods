@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../_inc/config.php';
+header('Location: /narevideos/', true, 301); exit;   // NareVideos — новый дом видео/фото
 $PAGE_TITLE = 'Медиа — видео и фото · NareLauncher';
 $PAGE_DESC  = 'Видео и фото сообщества NareLauncher: смотрите, лайкайте, комментируйте.';
 require __DIR__ . '/../_inc/head.php';

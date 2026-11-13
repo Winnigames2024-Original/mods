@@ -52,7 +52,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
   <a class="brand" href="/home/"><span class="logo">N</span> NareLauncher</a>
   <nav class="tabs">
     <a href="/home/">Главная</a>
-    <a href="/media/">Медиа</a>
+    <a href="/narevideos/">NareVideos</a>
     <a href="/live/">Эфиры</a>
     <a href="/popular/">Популярное</a>
     <a href="/servers/">Сервера</a>

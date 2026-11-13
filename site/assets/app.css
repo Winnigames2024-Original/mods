@@ -254,3 +254,8 @@ html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
 .mgrid.shorts{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 .mgrid.shorts .mthumb{aspect-ratio:9/16;background-size:cover;background-position:center}
 #ch-home h3{margin:18px 0 8px}
+
+/* --- NareVideos хаб --- */
+.nv-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.nv-brand{font-size:24px;font-weight:800;display:flex;align-items:center;gap:8px}
+.nv-logo{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#ff4d4f,#ff7a45);color:#fff;font-size:16px}
