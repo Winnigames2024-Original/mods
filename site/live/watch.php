@@ -25,7 +25,7 @@ require __DIR__ . '/../_inc/head.php';
     </div>
     <div class="btn-row" style="margin-top:8px">
       <button class="btn" id="sound">🔊 Включить звук</button>
-      <button class="btn ghost" id="size">⤢ Размер: обычный</button>
+      <button class="btn ghost" id="full">⛶ На весь экран</button>
     </div>
     <div class="btn-row" style="margin-top:6px" id="reacts">
       <?php foreach (['❤️','🔥','😂','👏','😮','🎉'] as $e): ?><button class="btn ghost react" type="button" data-e="<?= $e ?>" style="font-size:18px;padding:6px 12px"><?= $e ?></button><?php endforeach; ?>
@@ -170,11 +170,10 @@ cs.addEventListener('click',function(){var t=document.getElementById('ct').value
   node('/stream/chat/send',{token:TOK,id:ID,text:t}).then(function(j){if(j.ok)document.getElementById('ct').value='';});});
 document.getElementById('ct').addEventListener('keydown',function(e){if(e.key==='Enter')cs.click();});
 
-// ---------- размер ----------
-var big=false;
-document.getElementById('size').addEventListener('click',function(){ big=!big; var w=document.getElementById('wrap');
-  w.style.maxWidth=big?'100%':''; this.textContent=big?'⤢ Размер: большой':'⤢ Размер: обычный';
-  document.querySelector('.watch').style.maxWidth=big?'1200px':''; });
+// ---------- на весь экран (размер сам подстраивается под окно через CSS) ----------
+document.getElementById('full').addEventListener('click',function(){ var w=document.getElementById('wrap');
+  if(document.fullscreenElement){ document.exitFullscreen(); }
+  else if(w.requestFullscreen){ w.requestFullscreen(); } else if(w.webkitRequestFullscreen){ w.webkitRequestFullscreen(); } });
 
 // ---------- поделиться ----------
 document.getElementById('share').addEventListener('click',function(){ var u=location.href;

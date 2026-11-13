@@ -238,3 +238,11 @@ html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
   background:linear-gradient(135deg,#8b5bff,#5b8cff);border:3px solid var(--bg,#0b0f17);background-position:center}
 .ch-meta{flex:1;padding-bottom:2px}
 .ch-actions{display:flex;gap:6px;align-items:center;padding-bottom:4px;flex-wrap:wrap}
+
+/* --- Эфир: авто-размер по окну (без ручной настройки) --- */
+.rc-screen-wrap{display:flex;align-items:center;justify-content:center}
+.rc-screen-wrap #scr, .rc-screen-wrap #vid{width:100%;height:auto;max-height:78vh;object-fit:contain;margin:0 auto}
+.rc-screen-wrap:fullscreen{background:#000;width:100vw;height:100vh}
+.rc-screen-wrap:fullscreen #scr, .rc-screen-wrap:fullscreen #vid{max-height:100vh;height:100vh;width:100%}
+/* превью студии тоже по окну */
+.rc-screen-wrap canvas{max-height:70vh}
