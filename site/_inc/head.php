@@ -17,6 +17,14 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <meta name="description" content="<?= h($d) ?>">
 <meta name="keywords" content="minecraft launcher, майнкрафт скачать, лаунчер майнкрафт, скачать майнкрафт лаунчер, бесплатный лаунчер minecraft, nare launcher, narelauncher, сервер майнкрафт с модами и плагинами, майнкрафт с модами">
 <meta name="robots" content="index, follow">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0f17">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NareLauncher">
 <?php $gsc = @trim(@file_get_contents(__DIR__ . '/gsc.txt')); if ($gsc): ?>
 <meta name="google-site-verification" content="<?= h($gsc) ?>">
 <?php endif; ?>

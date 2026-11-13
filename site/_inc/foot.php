@@ -127,5 +127,14 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
   });
 })();
 </script>
+<button id="pwaInstall" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;background:#5b8cff;color:#fff;border:none;border-radius:999px;padding:11px 18px;font:600 14px/1 inherit;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)">📲 Установить приложение</button>
+<script>
+if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}
+(function(){ var dp=null, b=document.getElementById('pwaInstall');
+  window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); dp=e; if(b)b.style.display='inline-block'; });
+  if(b)b.onclick=function(){ if(!dp)return; dp.prompt(); dp.userChoice.finally(function(){ dp=null; b.style.display='none'; }); };
+  window.addEventListener('appinstalled',function(){ if(b)b.style.display='none'; });
+})();
+</script>
 </body>
 </html>
