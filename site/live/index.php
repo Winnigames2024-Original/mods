@@ -10,6 +10,25 @@ $streams = api_get('/stream/list')['streams'] ?? [];
   <?php if (me()): ?><a class="btn" href="/live/go.php">🔴 Начать эфир с браузера</a><?php else: ?><a class="btn ghost" href="/login/">Войдите, чтобы вести эфир</a><?php endif; ?>
 </div>
 <?php if (me()): ?><p class="muted" style="margin-top:-6px">Можно вести эфир прямо из браузера — <b>приложение не нужно</b>. Браузер спросит разрешение на демонстрацию экрана/окна. Либо стримьте из лаунчера (студия как в OBS).</p><?php endif; ?>
+
+<!-- смотреть эфир по ID прямо здесь (встраивание, без перехода) -->
+<div class="embed-box">
+  <input id="emid" placeholder="ID эфира" autocomplete="off">
+  <button class="btn" id="embtn">▶ Смотреть здесь</button>
+  <button class="btn ghost" id="emclose" style="display:none">✕ Закрыть</button>
+</div>
+<div id="emwrap" class="embed-wrap" style="display:none">
+  <iframe id="emframe" allow="autoplay; fullscreen" allowfullscreen></iframe>
+</div>
+<script>
+(function(){
+  var inp=document.getElementById('emid'), wrap=document.getElementById('emwrap'), fr=document.getElementById('emframe'), cl=document.getElementById('emclose');
+  function show(){ var v=inp.value.trim(); if(!v)return; fr.src='/live/embed.php?s='+encodeURIComponent(v); wrap.style.display='block'; cl.style.display='inline-block'; }
+  document.getElementById('embtn').onclick=show;
+  inp.addEventListener('keydown',function(e){ if(e.key==='Enter')show(); });
+  cl.onclick=function(){ fr.src='about:blank'; wrap.style.display='none'; cl.style.display='none'; };
+})();
+</script>
 <?php if (!$streams): ?>
   <p class="muted">Сейчас нет прямых эфиров.</p>
 <?php else: ?>
