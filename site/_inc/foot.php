@@ -127,7 +127,68 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
   });
 })();
 </script>
-<button id="pwaInstall" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;background:#5b8cff;color:#fff;border:none;border-radius:999px;padding:11px 18px;font:600 14px/1 inherit;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)">📲 Установить приложение</button>
+<script>
+/* ===== Выезжающее слева меню ===== */
+(function(){
+  var mb=document.getElementById('menuBtn'), dx=document.getElementById('drawerX'), ov=document.getElementById('navOverlay');
+  function open(){document.body.classList.add('drawer-open');}
+  function close(){document.body.classList.remove('drawer-open');}
+  function toggle(){document.body.classList.toggle('drawer-open');}
+  if(mb)mb.addEventListener('click',toggle);
+  if(dx)dx.addEventListener('click',close);
+  if(ov)ov.addEventListener('click',close);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+})();
+
+/* ===== Веб-уведомления: новые видео/эфиры/записи от подписок ===== */
+(function(){
+  var TOK=<?= json_encode(me() ? token() : '') ?>;
+  if(!TOK) return;
+  var bell=document.getElementById('navBell'), dot=document.getElementById('bellDot');
+  var KEY='nareNotifySince';
+  function since(){ var v=parseInt(localStorage.getItem(KEY)||'0',10); if(!v){ v=Date.now(); localStorage.setItem(KEY,v); } return v; }
+  function setSince(v){ try{localStorage.setItem(KEY,v);}catch(e){} }
+  function showDot(){ if(dot)dot.style.display='block'; }
+  function clearDot(){ if(dot)dot.style.display='none'; }
+
+  function notify(it){
+    var body=(it.from?it.from+': ':'')+(it.title||'');
+    var tag='nare-'+it.type;
+    var title=it.type==='эфир'?'📡 Прямой эфир!':(it.type==='запись'?'🎬 Новая запись':'▶ Новое видео');
+    if(window.Notification && Notification.permission==='granted'){
+      try{ var n=new Notification(title,{body:body,icon:'/assets/icon-192.png',tag:tag});
+        n.onclick=function(){ window.focus(); location.href=it.url; n.close(); }; }catch(e){}
+    }
+  }
+  function poll(){
+    fetch('/notify/check',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:TOK,since:since()})})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j||!j.items||!j.items.length) return;
+        showDot();
+        for(var i=0;i<j.items.length;i++) notify(j.items[i]);
+        if(j.now) setSince(j.now);
+      }).catch(function(){});
+  }
+
+  if(bell){
+    bell.addEventListener('click',function(){
+      if(window.Notification && Notification.permission==='default'){
+        Notification.requestPermission().then(function(){ poll(); });
+      }
+      clearDot();
+      location.href='/subscriptions/';
+    });
+  }
+  // мягкий запрос разрешения (если ещё не решено) + старт опроса
+  setTimeout(function(){
+    if(window.Notification && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
+    poll(); setInterval(poll, 45000);
+  }, 2500);
+})();
+</script>
+<button id="pwaInstall" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;background:#2787f5;color:#fff;border:none;border-radius:999px;padding:11px 18px;font:600 14px/1 inherit;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)">📲 Установить приложение</button>
 <script>
 if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}
 (function(){ var dp=null, b=document.getElementById('pwaInstall');

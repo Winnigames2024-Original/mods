@@ -56,35 +56,72 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
+<?php
+// Пункты меню (иконка, подпись, ссылка) — для выезжающего слева списка
+$NAV_MAIN = [
+  ['🏠','Главная','/home/'],
+  ['▶','NareVideos','/narevideos/'],
+  ['📡','Эфиры','/live/'],
+  ['🔥','Популярное','/popular/'],
+  ['🎮','Сервера','/servers/'],
+  ['👥','Каналы','/channels/'],
+  ['🔍','Поиск','/search/'],
+  ['⬇','Скачать','/download/'],
+];
+$NAV_ME = me() ? [
+  ['🔔','Подписки','/subscriptions/'],
+  ['✉','Сообщения','/messages/'],
+  ['🖥','Мои серверы','/servers/mine/'],
+  ['🤖','Боты','/bots/'],
+  ['🕹','Удалёнка','/remote/'],
+  ['👤','Профиль','/profile/my/'],
+] : [];
+?>
 <header class="nav" id="siteHeader">
-  <a class="brand" href="/home/"><span class="logo">N</span> NareLauncher</a>
+  <button type="button" class="menu-btn" id="menuBtn" aria-label="Меню">
+    <span></span><span></span><span></span>
+  </button>
+  <a class="brand" href="/home/"><span class="logo">N</span> <span class="brand-tx">NareLauncher</span></a>
   <form class="nav-search" action="/search/" method="get" role="search">
     <span class="nav-search-ic">🔍</span>
     <input type="search" name="q" placeholder="Поиск видео, каналов, эфиров…" value="<?= h($_GET['q'] ?? '') ?>" autocomplete="off">
   </form>
-  <button type="button" class="nav-burger" id="navBurger" aria-label="Меню" onclick="document.getElementById('siteHeader').classList.toggle('open')">☰</button>
-  <nav class="tabs">
-    <a href="/home/">Главная</a>
-    <a href="/narevideos/">NareVideos</a>
-    <a href="/live/">Эфиры</a>
-    <a href="/popular/">Популярное</a>
-    <a href="/servers/">Сервера</a>
-    <a href="/channels/">Каналы</a>
-    <a href="/search/">Поиск</a>
-    <a href="/download/">Скачать</a>
+  <div class="nav-right">
     <?php if (me()): ?>
-      <a href="/subscriptions/">Подписки</a>
-      <a href="/messages/">Сообщения</a>
-      <a href="/servers/mine/">Мои серверы</a>
-      <a href="/bots/">Боты</a>
-      <a href="/remote/">Удалёнка</a>
-      <?php if (!empty($_SESSION['admin'])): ?><a href="/admin/">Админ</a><?php endif; ?>
-      <a href="/profile/my/">Профиль</a>
+      <button type="button" class="nav-bell" id="navBell" title="Уведомления">🔔<span class="bell-dot" id="bellDot" style="display:none"></span></button>
     <?php else: ?>
-      <a href="/login/">Вход</a>
-      <a class="cta" href="/register/">Регистрация</a>
+      <a class="nav-login" href="/login/">Вход</a>
+      <a class="tabs-cta" href="/register/">Регистрация</a>
     <?php endif; ?>
-    <button type="button" class="design-toggle" id="designToggle" title="Переключить дизайн">◑ Дизайн</button>
-  </nav>
+    <button type="button" class="design-toggle" id="designToggle" title="Переключить дизайн">◑</button>
+  </div>
 </header>
+
+<!-- Выезжающее слева меню (как в VK) -->
+<div class="drawer-ov" id="navOverlay"></div>
+<aside class="drawer" id="navDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="logo">N</span> <b>NareLauncher</b>
+    <button type="button" class="drawer-x" id="drawerX" aria-label="Закрыть">✕</button>
+  </div>
+  <nav class="drawer-nav">
+    <?php foreach ($NAV_MAIN as $it): ?>
+      <a class="drawer-item" href="<?= $it[2] ?>"><span class="di-ic"><?= $it[0] ?></span><?= h($it[1]) ?></a>
+    <?php endforeach; ?>
+    <?php if ($NAV_ME): ?>
+      <div class="drawer-sep"></div>
+      <?php foreach ($NAV_ME as $it): ?>
+        <a class="drawer-item" href="<?= $it[2] ?>"><span class="di-ic"><?= $it[0] ?></span><?= h($it[1]) ?></a>
+      <?php endforeach; ?>
+      <?php if (!empty($_SESSION['admin'])): ?>
+        <a class="drawer-item" href="/admin/"><span class="di-ic">⚙</span>Админ</a>
+      <?php endif; ?>
+      <a class="drawer-item logout" href="/profile/my/?logout=1" onclick="return confirm('Выйти из аккаунта?')"><span class="di-ic">🚪</span>Выйти</a>
+    <?php else: ?>
+      <div class="drawer-sep"></div>
+      <a class="drawer-item" href="/login/"><span class="di-ic">🔑</span>Вход</a>
+      <a class="drawer-item accent" href="/register/"><span class="di-ic">✨</span>Регистрация</a>
+    <?php endif; ?>
+  </nav>
+</aside>
 <main class="wrap">

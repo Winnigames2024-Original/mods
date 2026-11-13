@@ -18,6 +18,29 @@ require __DIR__ . '/../_inc/head.php';
   <div class="muted" style="margin-top:8px">Цели: <span id="targets"><?= $b['targets'] ? h(implode(', ', $b['targets'])) : '—' ?></span></div>
 </div>
 
+<div class="panel" style="margin-bottom:14px">
+  <div class="media-head" style="margin-bottom:6px">
+    <h2 style="margin:0">⚡ Бот на сервере (код пишется тут)</h2>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="srun"> Запускать на сервере</label>
+  </div>
+  <p class="muted" style="margin:0 0 10px">Пиши правила — бот отвечает в привязанных чатах <b>сам, без запуска Python</b>. По строке на правило:</p>
+  <textarea id="script" spellcheck="false" style="width:100%;min-height:220px;background:#0a0d14;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical"></textarea>
+  <div class="btn-row" style="margin-top:10px">
+    <button class="btn" id="saveScript" type="button">Сохранить правила</button>
+    <button class="btn ghost" id="cheat" type="button">Подсказка по синтаксису</button>
+    <span class="muted" id="st2"></span>
+  </div>
+  <div id="cheatBox" class="muted" style="display:none;margin-top:10px;font-size:13px;line-height:1.7">
+    <code>on &lt;текст&gt; -&gt; ответ</code> — если сообщение содержит текст<br>
+    <code>cmd &lt;!слово&gt; -&gt; ответ</code> — если начинается с команды<br>
+    <code>regex &lt;шаблон&gt; -&gt; ответ</code> — по регулярке<br>
+    <code>else -&gt; ответ</code> — если ничего не совпало (пусто = молчать)<br>
+    В ответе: <code>{user}</code> <code>{msg}</code> <code>{time}</code> <code>{rand}</code> <code>{rand:1-6}</code><br>
+    Модерация: ответ с <code>/mute ник сек</code>, <code>/ban ник</code>, <code>/unban ник</code>
+  </div>
+</div>
+
+<h2 style="margin:18px 0 8px">🐍 Python-бот (запускаешь сам, через API)</h2>
 <div class="beditor">
   <div class="bfiles" id="tabs"></div>
   <textarea id="code" spellcheck="false"></textarea>
@@ -32,6 +55,18 @@ require __DIR__ . '/../_inc/head.php';
 <script>
 var TOK=<?= json_encode(token()) ?>, ID=<?= json_encode($id) ?>;
 var files=<?= json_encode($b['files'] ?: (object)[], JSON_UNESCAPED_UNICODE) ?>;
+// --- серверный бот на правилах ---
+(function(){
+  var sc=document.getElementById('script'), sr=document.getElementById('srun');
+  sc.value=<?= json_encode($b['script'] ?? '', JSON_UNESCAPED_UNICODE) ?>;
+  sr.checked=<?= !empty($b['serverRun']) ? 'true' : 'false' ?>;
+  function post(d){return fetch('/bot/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
+  document.getElementById('saveScript').onclick=function(){
+    post({token:TOK,id:ID,script:sc.value,serverRun:sr.checked}).then(function(j){
+      document.getElementById('st2').textContent=j.ok?'Сохранено ✓ бот работает в привязанных чатах':(j.error||'Ошибка'); }); };
+  sr.onchange=function(){ post({token:TOK,id:ID,serverRun:sr.checked}); };
+  document.getElementById('cheat').onclick=function(){ var c=document.getElementById('cheatBox'); c.style.display=c.style.display==='none'?'block':'none'; };
+})();
 var cur=Object.keys(files)[0]||'bot.py';
 if(!files[cur])files[cur]='';
 var code=document.getElementById('code'), tabs=document.getElementById('tabs');
