@@ -32,9 +32,12 @@ namespace NareLauncher.UI
 
         private readonly System.Windows.Forms.Timer _tick = new System.Windows.Forms.Timer { Interval = 800 };
         private readonly List<IntPtr> _windows = new List<IntPtr>();
+        private readonly List<string> _titles = new List<string>();   // полные заголовки окон (для ffmpeg)
         private bool _live;
         private string _streamId, _streamLink;
         private int _viewerTick;
+        private StreamEncoder _enc;      // настоящее видео через ffmpeg
+        private bool _videoMode;         // true = идёт видео, false = запасной режим кадров
 
         public StreamForm()
         {
@@ -99,9 +102,11 @@ namespace NareLauncher.UI
         {
             string prev = _source.SelectedItem as string;
             _windows.Clear();
+            _titles.Clear();
             _source.Items.Clear();
             _source.Items.Add("🖥 Весь экран");
             _windows.Add(IntPtr.Zero);                     // 0 = весь экран
+            _titles.Add("");
             EnumWindows((h, l) =>
             {
                 if (!IsWindowVisible(h) || IsIconic(h)) return true;
@@ -114,6 +119,7 @@ namespace NareLauncher.UI
                 RECT r; if (!GetWindowRect(h, out r)) return true;
                 if (r.Right - r.Left < 80 || r.Bottom - r.Top < 60) return true;
                 _windows.Add(h);
+                _titles.Add(t);
                 _source.Items.Add("🪟 " + (t.Length > 60 ? t.Substring(0, 60) : t));
                 return true;
             }, IntPtr.Zero);
@@ -135,14 +141,35 @@ namespace NareLauncher.UI
             _streamId = j["id"].AsString("");
             _streamLink = "https://" + "narelauncher.winnigames2024.ru" + j["link"].AsString("/live/");
             _live = true; _go.Text = "Завершить эфир"; _go.BackColor = Color.FromArgb(210, 70, 72);
-            _status.Text = "● В ЭФИРЕ";
             _link.Text = "Ссылка на эфир: " + _streamLink;
+
+            // пробуем настоящее видео через ffmpeg; если его нет — падаем на кадры
+            int si = _source.SelectedIndex;
+            bool fullScreen = !(si > 0 && si < _titles.Count);
+            string winTitle = fullScreen ? "" : _titles[si];
+            try
+            {
+                _enc = new StreamEncoder(acc.Token, _streamId, SafeStatus);
+                _videoMode = _enc.Start(fullScreen, winTitle, 3000);
+            }
+            catch { _videoMode = false; }
+            if (_videoMode) _status.Text = "● В ЭФИРЕ · настоящее видео";
+            else { _status.Text = "● В ЭФИРЕ · кадры (готовлю видео…)"; StreamEncoder.EnsureFfmpegAsync(SafeStatus); _enc = null; }
+
+            _tick.Interval = _videoMode ? 1000 : 800;   // в видео-режиме таймер только для превью/зрителей
             _tick.Start();
+        }
+
+        private void SafeStatus(string s)
+        {
+            try { if (IsHandleCreated) BeginInvoke((Action)(() => { _status.Text = s; })); } catch { }
         }
 
         private void Stop()
         {
             _tick.Stop(); _live = false;
+            try { if (_enc != null) _enc.Dispose(); } catch { }
+            _enc = null; _videoMode = false;
             var acc = AccountStore.Selected;
             if (acc != null && _streamId != null) Post("/stream/stop", "{\"token\":\"" + Esc(acc.Token) + "\",\"id\":\"" + Esc(_streamId) + "\"}");
             _go.Text = "Выйти в эфир"; _go.BackColor = Color.FromArgb(91, 140, 255);
@@ -155,23 +182,32 @@ namespace NareLauncher.UI
             {
                 int i = _source.SelectedIndex;
                 IntPtr hwnd = (i >= 0 && i < _windows.Count) ? _windows[i] : IntPtr.Zero;
+
+                // локальное превью (и в режиме видео, и в режиме кадров)
                 Bitmap bmp = hwnd == IntPtr.Zero ? GrabScreen() : GrabWindow(hwnd);
-                if (bmp == null) return;
-                using (bmp)
+                if (bmp != null)
                 {
-                    _preview.Image = (Image)bmp.Clone();
-                    string jpg = Encode(bmp, 1280, 50);
-                    var acc = AccountStore.Selected;
-                    if (acc != null && _streamId != null)
+                    using (bmp)
                     {
-                        string resp = Post("/stream/push", "{\"token\":\"" + Esc(acc.Token) + "\",\"id\":\"" + Esc(_streamId) + "\",\"jpg\":\"" + jpg + "\"}");
-                        if (resp != null && !Json.Parse(resp)["ok"].AsBool(true)) _status.Text = "Сервер отклонил кадр";
+                        _preview.Image = (Image)bmp.Clone();
+                        // настоящее видео шлёт ffmpeg; кадры шлём только в запасном режиме
+                        if (!_videoMode)
+                        {
+                            string jpg = Encode(bmp, 1280, 50);
+                            var acc = AccountStore.Selected;
+                            if (acc != null && _streamId != null)
+                                Post("/stream/push", "{\"token\":\"" + Esc(acc.Token) + "\",\"id\":\"" + Esc(_streamId) + "\",\"jpg\":\"" + jpg + "\"}");
+                        }
                     }
                 }
+
+                // если видео-кодер неожиданно умер — переходим на кадры
+                if (_videoMode && _enc != null && !_enc.Running) { _videoMode = false; SafeStatus("● В ЭФИРЕ · кадры (видео прервалось)"); }
+
                 if (++_viewerTick % 5 == 0 && _streamId != null)
                 {
-                    string r = Post("/stream/frame", "{\"id\":\"" + Esc(_streamId) + "\"}");
-                    if (r != null) { int v = Json.Parse(r)["viewers"].AsInt(0); _status.Text = "● В ЭФИРЕ · " + v + " смотрят"; }
+                    string r = Post("/stream/viewers", "{\"id\":\"" + Esc(_streamId) + "\"}");
+                    if (r != null) { int v = Json.Parse(r)["count"].AsInt(0); _status.Text = "● В ЭФИРЕ · " + (_videoMode ? "видео · " : "") + v + " смотрят"; }
                 }
             }
             catch { }

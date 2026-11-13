@@ -1,12 +1,12 @@
 {
-  "version": "1.92",
+  "version": "1.93",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "6bb9a3f04657fafd0277bed0d4ff2d6c0c49d207",
-  "size": 885248,
+  "sha1": "8ff29612a39ba9c71e0b194e6ff2aa1f135c20d7",
+  "size": 890368,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Эфир: понятные надписи (не запущен / СТРИМ НЕ НАЙДЕН). Повторный запуск сервера закрывает старое окно (один сервер — одно окно)."
+  "notes": "Студия эфира: НАСТОЯЩЕЕ видео через ffmpeg (а не кадры). При первом эфире лаунчер один раз докачает кодек видео; пока качается — идут кадры, потом сам переключается на видео. Если ffmpeg недоступен — работает по кадрам, как раньше."
 }

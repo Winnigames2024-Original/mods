@@ -73,6 +73,7 @@
   <!-- SubType = Code: интерфейс собран в коде, конструктор форм открывать не нужно -->
   <ItemGroup>
     <Compile Include="Core\Accounts.cs" />
+    <Compile Include="Core\StreamEncoder.cs" />
     <Compile Include="Core\DeviceId.cs" />
     <Compile Include="Core\EmergencyMark.cs" />
     <Compile Include="Core\GameLauncher.cs" />
