@@ -178,7 +178,7 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
         Notification.requestPermission().then(function(){ poll(); });
       }
       clearDot();
-      location.href='/subscriptions/';
+      location.href='/notifications/';
     });
   }
   // мягкий запрос разрешения (если ещё не решено) + старт опроса

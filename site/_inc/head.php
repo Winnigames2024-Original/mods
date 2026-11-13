@@ -69,7 +69,8 @@ $NAV_MAIN = [
   ['⬇','Скачать','/download/'],
 ];
 $NAV_ME = me() ? [
-  ['🔔','Подписки','/subscriptions/'],
+  ['🔔','Уведомления','/notifications/'],
+  ['➕','Подписки','/subscriptions/'],
   ['✉','Сообщения','/messages/'],
   ['🖥','Мои серверы','/servers/mine/'],
   ['🤖','Боты','/bots/'],

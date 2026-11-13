@@ -522,6 +522,22 @@ if (!policy.srvStat) policy.srvStat = {};
 if (!policy.srvFsReq) policy.srvFsReq = {};
 if (!policy.srvFsRes) policy.srvFsRes = {};
 if (!policy.videos) policy.videos = [];
+// --- уведомления ---
+if (!policy.notifyInbox) policy.notifyInbox = {};   // nickLower -> [ {type,from,text,url,at} ] личные события
+if (!policy.broadcasts) policy.broadcasts = [];     // [ {from,text,target('all'|nick),at} ] платные/админские рассылки
+if (!policy.notifyPro) policy.notifyPro = {};       // nickLower -> until (подписка на рассылку)
+if (!policy.notifyLast) policy.notifyLast = {};     // nickLower -> ts последней рассылки (кулдаун)
+const NOTIFY_PRICE = 10000;                 // цена подписки на рассылку
+const NOTIFY_PRO_DAYS = 30;                 // срок подписки
+const NOTIFY_COOLDOWN = 10 * 60 * 1000;     // обычным — раз в 10 минут
+const NOTIFY_ADMIN_COOLDOWN = 1000;         // админам — раз в секунду
+function notifyPush(nick, ev) {
+    if (!nick) return;
+    const k = String(nick).toLowerCase();
+    const arr = policy.notifyInbox[k] || (policy.notifyInbox[k] = []);
+    arr.push(Object.assign({ at: now() }, ev));
+    if (arr.length > 60) policy.notifyInbox[k] = arr.slice(-60);
+}
 if (!policy.hostServers) policy.hostServers = {};
 if (!policy.remote) policy.remote = {};          // nick -> { salt, hash, enabled }
 if (!policy.twofa) policy.twofa = {};            // nick -> true: вход на сайт требует подтверждения по QR
@@ -3960,14 +3976,17 @@ function subscribe(req, res) {
         const a = acc(me), t = acc(target);
         const low = target.toLowerCase();
         let following;
+        const meName = (a.username || me);
         if (a.following.some(x => x.toLowerCase() === low)) {
             a.following = a.following.filter(x => x.toLowerCase() !== low);
             t.followers = t.followers.filter(x => x.toLowerCase() !== me.toLowerCase());
             following = false;
+            notifyPush(target, { type: 'отписка', from: meName, text: meName + ' отписался от вас', url: '/channels/' });
         } else {
             a.following.push(target);
             if (!t.followers.some(x => x.toLowerCase() === me.toLowerCase())) t.followers.push(me);
             following = true;
+            notifyPush(target, { type: 'подписка', from: meName, text: meName + ' подписался на вас', url: '/channels/' });
         }
         saveAccounts();
         send(res, 200, { ok: true, following, subscribers: t.followers.length });
@@ -4016,8 +4035,73 @@ function notifyCheck(req, res) {
             items.push({ type: 'эфир', from: s.user || s.nick, nick: s.nick,
                          title: s.title || 'Прямой эфир', url: (s.link || ('/live/watch.php?s=' + id)), at: s.at || 0 });
         }
+        // личные события (подписки, лайки, зрители эфира)
+        const inbox = policy.notifyInbox[me.toLowerCase()] || [];
+        for (const ev of inbox) if ((ev.at || 0) > since)
+            items.push({ type: ev.type, from: ev.from, title: ev.text, url: ev.url || '/notifications/', at: ev.at || 0 });
+        // рассылки (платные/админские): всем или лично мне
+        for (const b of policy.broadcasts) {
+            if ((b.at || 0) <= since) continue;
+            if (b.target !== 'all' && b.target.toLowerCase() !== me.toLowerCase()) continue;
+            items.push({ type: 'рассылка', from: b.from, title: b.text, url: '/notifications/', at: b.at || 0 });
+        }
         items.sort((x, y) => y.at - x.at);
-        send(res, 200, { ok: true, items: items.slice(0, 30), now: now() });
+        send(res, 200, { ok: true, items: items.slice(0, 40), now: now() });
+    });
+}
+// купить подписку на рассылку уведомлений (10000 монет, 30 дней)
+function notifyBuy(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const a = acc(me);
+        if (isAdmin(me)) return send(res, 200, { ok: true, pro: true, until: 0, coins: a.coins || 0, note: 'админам не нужно' });
+        if ((a.coins || 0) < NOTIFY_PRICE) return send(res, 402, { error: 'нужно ' + NOTIFY_PRICE + ' монет, у вас ' + (a.coins || 0) });
+        a.coins -= NOTIFY_PRICE;
+        const until = now() + NOTIFY_PRO_DAYS * 24 * 60 * 60 * 1000;
+        policy.notifyPro[me.toLowerCase()] = until;
+        saveAccounts(); savePolicy();
+        send(res, 200, { ok: true, pro: true, until, coins: a.coins });
+    });
+}
+// отправить уведомление всем или кому-то (подписка/админ)
+function notifySend(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 403, { error: 'нужен вход' });
+        const admin = isAdmin(me);
+        const k = me.toLowerCase();
+        const proUntil = policy.notifyPro[k] || 0;
+        const isPro = admin || proUntil > now();
+        if (!isPro) return send(res, 402, { error: 'нужна подписка на уведомления (' + NOTIFY_PRICE + ' монет)' });
+        const text = clean(body.text, 300);
+        if (!text) return send(res, 400, { error: 'пустое сообщение' });
+        const cooldown = admin ? NOTIFY_ADMIN_COOLDOWN : NOTIFY_COOLDOWN;
+        const last = policy.notifyLast[k] || 0;
+        const wait = cooldown - (now() - last);
+        if (wait > 0) return send(res, 429, { error: 'подождите ' + Math.ceil(wait / 1000) + ' сек до следующей отправки' });
+        // цель: 'all' или ник
+        let target = clean(body.target, 16) || 'all';
+        if (target !== 'all') { if (!accounts[target.toLowerCase()] && !accounts[target]) return send(res, 404, { error: 'нет такого пользователя' }); }
+        const from = (acc(me).username || me) + (admin ? ' (админ)' : '');
+        policy.broadcasts.push({ from, text, target, at: now() });
+        if (policy.broadcasts.length > 200) policy.broadcasts.shift();
+        policy.notifyLast[k] = now();
+        savePolicy();
+        send(res, 200, { ok: true, target });
+    });
+}
+// статус подписки (для страницы уведомлений)
+function notifyStatus(req, res) {
+    readJsonBody(req, body => {
+        const me = sessionNick(body && body.token);
+        if (!me) return send(res, 200, { ok: true, needLogin: true });
+        const a = acc(me), k = me.toLowerCase();
+        const proUntil = policy.notifyPro[k] || 0;
+        send(res, 200, { ok: true, admin: isAdmin(me), pro: isAdmin(me) || proUntil > now(), until: proUntil,
+                         coins: a.coins || 0, price: NOTIFY_PRICE,
+                         cooldown: isAdmin(me) ? NOTIFY_ADMIN_COOLDOWN : NOTIFY_COOLDOWN,
+                         events: (policy.notifyInbox[k] || []).slice(-40).reverse() });
     });
 }
 function liveStreamOf(nick) {
@@ -4266,8 +4350,25 @@ function streamList(req, res) {
 }
 // отметить зрителя по нику (смотреть можно только из аккаунта) и подчистить ушедших
 function touchViewer(s, nick) {
-    if (nick) s.viewers.set(nick, { at: now(), user: (acc(nick) || {}).username || nick });
-    for (const [k, v] of s.viewers) if (now() - ((v && v.at) || 0) > 15000) s.viewers.delete(k);
+    if (nick) {
+        const isNew = !s.viewers.has(nick);
+        s.viewers.set(nick, { at: now(), user: (acc(nick) || {}).username || nick });
+        // зашёл на эфир — уведомляем ведущего (не себе)
+        if (isNew && s.nick && nick.toLowerCase() !== s.nick.toLowerCase()) {
+            const who = (acc(nick) || {}).username || nick;
+            notifyPush(s.nick, { type: 'зритель', from: who, text: who + ' зашёл на ваш эфир «' + (s.title || '') + '»',
+                                 url: s.link || '/live/' });
+        }
+    }
+    for (const [k, v] of s.viewers) if (now() - ((v && v.at) || 0) > 15000) {
+        s.viewers.delete(k);
+        // вышел с эфира — уведомляем ведущего
+        if (s.nick && k.toLowerCase() !== s.nick.toLowerCase()) {
+            const who = (v && v.user) || k;
+            notifyPush(s.nick, { type: 'ушёл', from: who, text: who + ' вышел с вашего эфира',
+                                 url: s.link || '/live/' });
+        }
+    }
 }
 function viewerList(s) {
     const out = [];
@@ -5109,6 +5210,13 @@ function videoLike(req, res) {
         const i = v.likes.indexOf(nick);
         if (i >= 0) v.likes.splice(i, 1); else v.likes.push(nick);
         savePolicy();
+        // уведомление владельцу видео (не себе)
+        if ((v.nick || '').toLowerCase() !== nick.toLowerCase()) {
+            const liker = (acc(nick) || {}).username || nick;
+            notifyPush(v.nick, i < 0
+                ? { type: 'лайк', from: liker, text: liker + ' лайкнул ваше видео «' + (v.title || '') + '»', url: '/watch/' + v.id + '/' }
+                : { type: 'анлайк', from: liker, text: liker + ' убрал лайк с «' + (v.title || '') + '»', url: '/watch/' + v.id + '/' });
+        }
         send(res, 200, { ok: true, likes: v.likes.length, liked: i < 0 });
     });
 }
@@ -5789,6 +5897,9 @@ const server = http.createServer((req, res) => {
     if (route === '/subscribe' && req.method === 'POST') return subscribe(req, res);      // подписаться/отписаться
     if (route === '/subscribed' && req.method === 'POST') return subscribedList(req, res); // мои подписки + их видео/эфиры
     if (route === '/notify/check' && req.method === 'POST') return notifyCheck(req, res);  // новые видео/эфиры подписок (для уведомлений)
+    if (route === '/notify/buy' && req.method === 'POST') return notifyBuy(req, res);      // купить подписку на рассылку
+    if (route === '/notify/send' && req.method === 'POST') return notifySend(req, res);    // отправить уведомление всем/кому-то
+    if (route === '/notify/status' && req.method === 'POST') return notifyStatus(req, res);// статус подписки + лента событий
     if (route === '/recommend') return recommend(req, res);                                // рекомендованные видео
     if (route === '/popular') return popular(req, res);                                      // популярное: топ видео и каналов
     if (route === '/host/save' && req.method === 'POST') return hostSave(req, res);
