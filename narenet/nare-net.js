@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.69';
+const VERSION = '1.70';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3947,8 +3947,8 @@ function streamStart(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         if (policy.noStream[nick]) return send(res, 403, { error: 'трансляции вам запрещены администратором' });
-        // одна активная трансляция на ник
-        for (const [id, s] of streams) if (s.nick === nick) streams.delete(id);
+        // одна активная трансляция на ник (прошлую закрываем и сохраняем как видео)
+        for (const [id, s] of streams) if (s.nick === nick) { finalizeVod(s); streams.delete(id); }
         // id задаёт стример; если пусто — генерируем. Чистим и следим за уникальностью.
         let id = clean(body.id, 40).toLowerCase().replace(/[^a-z0-9_-]/g, '');
         if (!id || streams.has(id)) id = crypto.randomBytes(6).toString('hex');
@@ -3980,7 +3980,7 @@ function streamPush(req, res) {
 function streamStop(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
-        const s = streams.get(clean(body.id, 20)); if (s && (s.nick === nick || isAdmin(nick))) streams.delete(body.id);
+        const s = streams.get(clean(body.id, 40)); if (s && (s.nick === nick || isAdmin(nick))) { finalizeVod(s); streams.delete(body.id); }
         send(res, 200, { ok: true });
     });
 }
@@ -4037,8 +4037,59 @@ function streamAudioGet(req, res) {
         else send(res, 200, { ok: true, seq });
     });
 }
+// --- запись эфира в файл, чтобы после завершения он стал видео (с тегом «стрим») ---
+const VOD_MAX = 1024 * 1024 * 1024;   // не пишем запись эфира больше 1 ГБ
+function vodInit(s, initB64) {
+    try {
+        // новый эфир = новая запись (если предыдущая была — закроем её как видео)
+        if (s.vodId && !s.vodDone) finalizeVod(s);
+        s.vodId = crypto.randomBytes(8).toString('hex');
+        s.vodBytes = 0; s.vodDone = false; s.vodStart = now();
+        const buf = Buffer.from(initB64, 'base64');
+        fs.writeFileSync(vidPath(s.vodId), buf);
+        s.vodBytes = buf.length;
+    } catch (e) { log('vodInit fail', e.message); s.vodId = null; }
+}
+function vodAppend(s, chunkB64) {
+    if (!s.vodId || s.vodDone) return;
+    if (s.vodBytes > VOD_MAX) return;             // предохранитель
+    try {
+        const buf = Buffer.from(chunkB64, 'base64');
+        fs.appendFileSync(vidPath(s.vodId), buf);
+        s.vodBytes += buf.length;
+    } catch (e) {}
+}
+// завершить запись эфира -> создать видео с тегом «стрим»
+function finalizeVod(s) {
+    if (!s || !s.vodId || s.vodDone) return;
+    s.vodDone = true;
+    try {
+        if (!s.vodBytes || s.vodBytes < 50 * 1024) { try { fs.unlinkSync(vidPath(s.vodId)); } catch (e) {} return; }
+        const tags = ['стрим'];
+        if (s.subcategory) { const t = String(s.subcategory).toLowerCase().replace(/[^a-z0-9а-яё_-]/gi, '').slice(0, 24); if (t && !tags.includes(t)) tags.push(t); }
+        policy.videos.push({
+            id: s.vodId, nick: s.nick, user: s.user || s.nick,
+            title: 'Запись эфира: ' + (s.title || 'Эфир'),
+            desc: 'Сохранённая запись прямого эфира.',
+            mime: 'video/webm', thumb: s.jpg ? ('data:image/jpeg;base64,' + s.jpg) : '',
+            at: now(), dur: Math.round((now() - (s.vodStart || now())) / 1000),
+            category: s.category || 'stream', subcategory: s.subcategory || '',
+            tags, size: s.vodBytes, views: 0, likes: [], comments: [], ready: true, fromStream: true
+        });
+        if (policy.videos.length > 5000) policy.videos = policy.videos.slice(-5000);
+        savePolicy();
+        log('эфир сохранён как видео', s.vodId, s.vodBytes + ' б');
+    } catch (e) { log('finalizeVod fail', e.message); }
+}
+
 // --- НАСТОЯЩЕЕ ВИДЕО (MSE): стример шлёт webm-чанки, зрители собирают в поток ---
 const STREAM_MEDIA_KEEP = 40;   // сколько последних чанков держим для догоняющих зрителей
+// брошенные эфиры (стример закрыл окно без «завершить») — через 90 c сохраняем и убираем
+setInterval(() => {
+    for (const [id, s] of streams) {
+        if (now() - s.seen > 90 * 1000) { finalizeVod(s); streams.delete(id); }
+    }
+}, 30 * 1000);
 function streamMediaPush(req, res) {
     readJsonBodyLimit(req, 3 * 1024 * 1024, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
@@ -4049,9 +4100,11 @@ function streamMediaPush(req, res) {
         if (chunk.length > 2_600_000) return send(res, 413, { error: 'чанк большой' });
         if (body.init === true) {                 // первый чанк с заголовком webm (init-сегмент)
             s.media.init = chunk; s.media.seq = 0; s.media.buf = []; s.media.epoch = (s.media.epoch || 0) + 1;
+            vodInit(s, chunk);                    // начинаем новую запись эфира в файл
         } else {
             s.media.seq++; s.media.buf.push({ seq: s.media.seq, chunk, at: now() });
             if (s.media.buf.length > STREAM_MEDIA_KEEP) s.media.buf.shift();
+            vodAppend(s, chunk);                  // дописываем эфир в файл (для сохранения как видео)
         }
         s.seen = now(); s.everLive = true;
         send(res, 200, { ok: true, seq: s.media.seq });
@@ -4547,6 +4600,7 @@ function vidPublic(v, full) {
         id: v.id, nick: v.nick, user: v.user || v.nick, title: v.title, desc: full ? (v.desc || '') : undefined,
         thumb: v.thumb || '', mime: v.mime || 'video/mp4', at: v.at, dur: v.dur || 0,
         category: v.category || '', subcategory: v.subcategory || '',
+        tags: Array.isArray(v.tags) ? v.tags : [],
         views: v.views || 0, likes: (v.likes || []).length, ready: !!v.ready
     };
     if (full) o.comments = (v.comments || []).map(c => ({ user: c.user, nick: c.nick, text: c.text, at: c.at }));
