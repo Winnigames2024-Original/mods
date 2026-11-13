@@ -96,21 +96,22 @@ namespace NareLauncher.Core
         }
 
         // --- запуск захвата. fullScreen=true → весь экран, иначе окно по заголовку ---
-        public bool Start(bool fullScreen, string windowTitle, int bitrateKbps)
+        public bool Start(bool fullScreen, string windowTitle, int bitrateKbps, int fps)
         {
             string ffmpeg = FindFfmpeg();
             if (ffmpeg == null) { EnsureFfmpegAsync(_status); return false; }
 
+            if (fps < 15) fps = 15; if (fps > 360) fps = 360;
             string input = fullScreen
-                ? "-f gdigrab -framerate 30 -i desktop"
-                : "-f gdigrab -framerate 30 -i title=\"" + (windowTitle ?? "").Replace("\"", "") + "\"";
+                ? "-f gdigrab -framerate " + fps + " -i desktop"
+                : "-f gdigrab -framerate " + fps + " -i title=\"" + (windowTitle ?? "").Replace("\"", "") + "\"";
             // тихая аудио-дорожка opus, чтобы webm всегда был vp8+opus (совпадает с веб-студией и плеером)
             string silent = "-f lavfi -i anullsrc=r=48000:cl=stereo";
             string args = input + " " + silent +
                 " -c:v libvpx -deadline realtime -cpu-used 5 -b:v " + bitrateKbps + "k" +
-                " -g 60 -keyint_min 60 -auto-alt-ref 0 -pix_fmt yuv420p" +
+                " -g " + fps + " -keyint_min " + fps + " -auto-alt-ref 0 -pix_fmt yuv420p" +
                 " -c:a libopus -b:a 32k" +
-                " -f webm -live 1 -cluster_time_limit 1000 pipe:1";
+                " -f webm -live 1 -cluster_time_limit 500 pipe:1";
 
             var psi = new ProcessStartInfo(ffmpeg, args)
             {

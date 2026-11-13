@@ -20,6 +20,7 @@ namespace NareLauncher.UI
     {
         private readonly ComboBox _source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly ComboBox _category = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        private readonly ComboBox _fps = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly TextBox _title = new TextBox();
         private readonly TextBox _sub = new TextBox();
         private readonly Button _refresh = new Button { Text = "⟳ Окна" };
@@ -58,8 +59,12 @@ namespace NareLauncher.UI
 
             var lblTitle = Lbl("Название эфира", 16, 72);
             _title.SetBounds(16, 94, 470, 26); Style(_title);
-            var lblSub = Lbl("Подкатегория (напр. Minecraft)", 500, 72);
-            _sub.SetBounds(500, 94, 244, 26); Style(_sub);
+            var lblSub = Lbl("Подкатегория", 500, 72);
+            _sub.SetBounds(500, 94, 150, 26); Style(_sub);
+            var lblFps = Lbl("Кадры/с", 660, 72);
+            _fps.SetBounds(660, 94, 84, 26); Style(_fps);
+            _fps.Items.AddRange(new object[] { "60", "120", "240", "360" });
+            _fps.SelectedIndex = 0;
 
             _preview.SetBounds(16, 132, 728, 344);
             _preview.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
@@ -76,7 +81,7 @@ namespace NareLauncher.UI
             _overlayBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             _overlayBtn.Click += (s, e) => ToggleOverlay();
 
-            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, _preview, _go, _overlayBtn, _status, _link });
+            Controls.AddRange(new Control[] { lblSrc, _source, _refresh, _category, lblTitle, _title, lblSub, _sub, lblFps, _fps, _preview, _go, _overlayBtn, _status, _link });
 
             _refresh.Click += (s, e) => LoadSources();
             _go.Click += (s, e) => { if (_live) Stop(); else Start(); };
@@ -149,8 +154,9 @@ namespace NareLauncher.UI
             string winTitle = fullScreen ? "" : _titles[si];
             try
             {
+                int fps; if (!int.TryParse(_fps.SelectedItem as string, out fps)) fps = 60;
                 _enc = new StreamEncoder(acc.Token, _streamId, SafeStatus);
-                _videoMode = _enc.Start(fullScreen, winTitle, 3000);
+                _videoMode = _enc.Start(fullScreen, winTitle, 3000, fps);
             }
             catch { _videoMode = false; }
             if (_videoMode) _status.Text = "● В ЭФИРЕ · настоящее видео";

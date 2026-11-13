@@ -1,12 +1,12 @@
 {
-  "version": "1.93",
+  "version": "1.94",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "8ff29612a39ba9c71e0b194e6ff2aa1f135c20d7",
+  "sha1": "48450c71480aaf3c51592dd4bf2a8806e7578a3d",
   "size": 890368,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Студия эфира: НАСТОЯЩЕЕ видео через ffmpeg (а не кадры). При первом эфире лаунчер один раз докачает кодек видео; пока качается — идут кадры, потом сам переключается на видео. Если ffmpeg недоступен — работает по кадрам, как раньше."
+  "notes": "Студия эфира: настоящее видео через ffmpeg + выбор частоты кадров (60/120/240/360 fps). При первом эфире один раз качается кодек видео (пока идут кадры). Реальный fps зависит от ПК — высокие значения требуют мощного железа."
 }

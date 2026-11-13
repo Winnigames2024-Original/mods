@@ -84,7 +84,7 @@ document.getElementById('start').onclick=function(){
   if(!wantS&&!wantC){ msg('Выберите экран и/или камеру'); return; }
   maxW=qToW(document.getElementById('q').value);
   var chain=Promise.resolve();
-  if(wantS) chain=chain.then(function(){return navigator.mediaDevices.getDisplayMedia({video:{frameRate:15}}).then(function(ms){screenStream=ms;document.getElementById('screenV').srcObject=ms;ms.getVideoTracks()[0].addEventListener('ended',stop);});});
+  if(wantS) chain=chain.then(function(){return navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:60,max:120}}}).then(function(ms){screenStream=ms;document.getElementById('screenV').srcObject=ms;ms.getVideoTracks()[0].addEventListener('ended',stop);});});
   if(wantC) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({video:true}).then(function(ms){camStream=ms;camOn=true;document.getElementById('camV').srcObject=ms;});});
   if(wantM) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({audio:true}).then(function(ms){micStream=ms;micOn=true;});});
   chain.then(function(){ return node('/stream/start',{token:TOK,id:document.getElementById('sid').value.trim(),title:(document.getElementById('title').value.trim()||'Эфир'),category:document.getElementById('cat').value,subcategory:document.getElementById('sub').value.trim(),name:document.getElementById('name').value.trim()}); })
@@ -131,7 +131,7 @@ function startRecorder(){
   var cv=document.getElementById('cv');
   // дождёмся, пока у canvas появится размер
   if(!cv.width){ setTimeout(startRecorder,200); return; }
-  var canvasStream=cv.captureStream(30);
+  var canvasStream=cv.captureStream(60);
   var tracks=canvasStream.getVideoTracks();
   if(micOn&&micStream){ micStream.getAudioTracks().forEach(function(t){ tracks.push(t); }); }
   combined=new MediaStream(tracks);
