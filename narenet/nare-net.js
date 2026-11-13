@@ -28,6 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const https = require('https');
+const { execFile } = require('child_process');
 
 const PORT = Number(process.env.NARENET_PORT || 2445);
 const HOST = process.env.NARENET_BIND || '0.0.0.0';
@@ -2400,12 +2401,19 @@ function aiGenerate(messages, image, systemText, cb) {
             // если выбрана бесплатная (:free) или пустая модель — первой ставим openrouter/free
             // (сам выбирает живую бесплатную), чтобы «мёртвый» сохранённый слаг не мешал.
             const flaky = !model || /:free$/i.test(model) || model === 'openrouter/free';
-            const base3 = flaky
-                ? ['openrouter/free', 'google/gemma-4-26b-a4b-it:free', 'nvidia/nemotron-3.5-lightning:free']
-                : [model, 'openrouter/free', 'google/gemma-4-26b-a4b-it:free'];
+            let base3;
+            if (image) {
+                // для картинок нужна модель со зрением (vision)
+                base3 = ['nvidia/nemotron-3.5-super-vl:free', 'google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'];
+            } else if (flaky) {
+                base3 = ['openrouter/free', 'google/gemma-4-26b-a4b-it:free', 'nvidia/nemotron-3.5-lightning:free'];
+            } else {
+                base3 = [model, 'openrouter/free', 'google/gemma-4-26b-a4b-it:free'];
+            }
             const list = []; for (const m of base3) { if (list.length >= 3) break; if (m && list.indexOf(m) < 0) list.push(m); }
             body.models = list;
             body.model = list[0];
+            if (image) body.max_tokens = 1500;   // vision-reasoning моделям нужен запас токенов
         }
         const reqModel = body.model;
         return httpsPostJson(base + '/chat/completions', headers, body, (err, code, json, txt) => {
@@ -2413,8 +2421,10 @@ function aiGenerate(messages, image, systemText, cb) {
             if (code !== 200) { const em = (json && json.error && json.error.message) || String(txt).slice(0, 200);
                 aiCallRecord({ provider: 'openai', base, model: reqModel, ok: false, code, error: em });
                 return cb(new Error('ИИ вернул ' + code + ': ' + em)); }
-            const reply = json && json.choices && json.choices[0] && json.choices[0].message &&
-                (typeof json.choices[0].message.content === 'string' ? json.choices[0].message.content : '');
+            const msg = json && json.choices && json.choices[0] && json.choices[0].message;
+            let reply = msg && typeof msg.content === 'string' ? msg.content : '';
+            // reasoning-модели (напр. vision) иногда кладут ответ в reasoning
+            if ((!reply || !reply.trim()) && msg && typeof msg.reasoning === 'string') reply = msg.reasoning;
             aiCallRecord({ provider: 'openai', base, model: reqModel, ok: true, used: (json && json.model) || '' });
             cb(null, reply || '(пустой ответ)');
         });
@@ -4495,7 +4505,7 @@ function finalizeVod(s) {
         if (!s.vodBytes || s.vodBytes < 50 * 1024) { try { fs.unlinkSync(vidPath(s.vodId)); } catch (e) {} return; }
         const tags = ['стрим'];
         if (s.subcategory) { const t = String(s.subcategory).toLowerCase().replace(/[^a-z0-9а-яё_-]/gi, '').slice(0, 24); if (t && !tags.includes(t)) tags.push(t); }
-        policy.videos.push({
+        const vodVideo = {
             id: s.vodId, nick: s.nick, user: s.user || s.nick,
             title: 'Запись эфира: ' + (s.title || 'Эфир'),
             desc: 'Сохранённая запись прямого эфира.',
@@ -4503,9 +4513,11 @@ function finalizeVod(s) {
             at: now(), dur: Math.round((now() - (s.vodStart || now())) / 1000),
             category: s.category || 'stream', subcategory: s.subcategory || '',
             tags, size: s.vodBytes, views: 0, likes: [], comments: [], ready: true, fromStream: true
-        });
+        };
+        policy.videos.push(vodVideo);
         if (policy.videos.length > 5000) policy.videos = policy.videos.slice(-5000);
         savePolicy();
+        ensureVideoThumb(vodVideo);   // если кадра не было — сделаем превью из записи
         log('эфир сохранён как видео', s.vodId, s.vodBytes + ' б');
     } catch (e) { log('finalizeVod fail', e.message); }
 }
@@ -5121,6 +5133,41 @@ function shotPath(id) { return path.join(SHOTS_DIR, id + '.png'); }
 /** Профиль игрока: статус, статистика, список скриншотов. */
 // ======================= ВИДЕО (как YouTube) =======================
 function vidPath(id) { return path.join(VIDEOS_DIR, String(id).replace(/[^0-9a-f]/gi, '') + '.bin'); }
+
+// генерация превью из файла видео через ffmpeg (кадр ~1 сек, уменьшенный JPEG -> data:URI)
+const FFMPEG_BIN = process.env.NARE_FFMPEG || 'ffmpeg';
+let _thumbBusy = 0;
+function makeThumb(filePath, cb) {
+    try {
+        if (!fs.existsSync(filePath)) return cb(null);
+        const tmp = path.join(require('os').tmpdir(), 'narethumb_' + crypto.randomBytes(6).toString('hex') + '.jpg');
+        execFile(FFMPEG_BIN, ['-y', '-ss', '1', '-i', filePath, '-frames:v', '1', '-vf', 'scale=480:-2', '-q:v', '6', tmp],
+            { timeout: 25000 }, (err) => {
+                let out = null;
+                try { if (fs.existsSync(tmp)) { const b = fs.readFileSync(tmp); if (b && b.length > 200 && b.length < 400000) out = 'data:image/jpeg;base64,' + b.toString('base64'); fs.unlinkSync(tmp); } } catch (e) {}
+                cb(out);
+            });
+    } catch (e) { cb(null); }
+}
+// поставить превью видео, если его нет
+function ensureVideoThumb(video) {
+    if (!video || (video.thumb && video.thumb.length > 0)) return;
+    if (_thumbBusy > 2) { setTimeout(() => ensureVideoThumb(video), 4000); return; }   // не больше 3 ffmpeg разом
+    _thumbBusy++;
+    makeThumb(vidPath(video.id), (uri) => {
+        _thumbBusy--;
+        if (uri) { video.thumb = uri; savePolicy(); log('превью видео готово', video.id); }
+    });
+}
+// фоновая дозагрузка превью для старых видео без обложки (один раз при старте)
+setTimeout(() => {
+    try {
+        const pend = (policy.videos || []).filter(v => v.ready && (!v.thumb || v.thumb.length === 0) && fs.existsSync(vidPath(v.id)));
+        let i = 0;
+        const step = () => { if (i >= pend.length) return; ensureVideoThumb(pend[i++]); setTimeout(step, 6000); };
+        step();
+    } catch (e) {}
+}, 8000);
 function vidById(id) { return policy.videos.find(v => v.id === id) || null; }
 function vidPublic(v, full) {
     const o = {
@@ -5198,6 +5245,7 @@ function videoRaw(req, res, id) {
         out.end(() => {
             try { fs.renameSync(temp, full); } catch (e) { return send(res, 500, { error: 'не записалось' }); }
             v.size = size; v.ready = true; savePolicy();
+            ensureVideoThumb(v);   // сгенерировать превью из загруженного файла, если нет
             send(res, 200, { ok: true, id, size });
         });
     });
