@@ -2347,16 +2347,12 @@ function aiGenerate(messages, image, systemText, cb) {
         if (/openrouter\.ai/i.test(base)) {
             headers['HTTP-Referer'] = 'https://narelauncher.winnigames2024.ru';
             headers['X-Title'] = 'NareLauncher';
-            const fallbacks = [
-                'meta-llama/llama-3.3-70b-instruct:free',
-                'google/gemini-2.0-flash-exp:free',
-                'openai/gpt-oss-120b:free',
-                'qwen/qwen3-235b-a22b:free',
-                'deepseek/deepseek-chat-v3-0324:free',
-                'meta-llama/llama-3.1-405b-instruct:free'
-            ];
-            const list = [model]; for (const f of fallbacks) if (list.indexOf(f) < 0) list.push(f);
-            body.models = list;   // OpenRouter перебирает по очереди, если модель недоступна/лимит
+            // актуальные бесплатные слаги часто лимитируются/пропадают — даём перебор.
+            // 'openrouter/free' сам выбирает любую свободную бесплатную модель.
+            // ВАЖНО: OpenRouter разрешает в массиве models не более 3 штук.
+            const fallbacks = ['openrouter/free', 'google/gemma-4-26b-a4b-it:free', 'nvidia/nemotron-3.5-lightning:free'];
+            const list = [model]; for (const f of fallbacks) { if (list.length >= 3) break; if (list.indexOf(f) < 0) list.push(f); }
+            body.models = list.slice(0, 3);   // OpenRouter переберёт по очереди, если модель недоступна/лимит
         }
         return httpsPostJson(base + '/chat/completions', headers, body, (err, code, json, txt) => {
             if (err) return cb(err);
@@ -2406,7 +2402,8 @@ function aiChat(req, res) {
             aiGenerate(messages, steps === 1 ? image : null, systemText, (err, reply, flag) => {
                 if (flag === 'nokey') { const la = localReply(text || ''); brainLearnText(text); brainLearnText(la); return send(res, 200, { ok: true, configured: true, local: true, reply: la }); }
                 if (err) { log('ai error', err.message); const la = localReply(text || ''); brainLearnText(text);
-                    return send(res, 200, { ok: true, configured: true, local: true, reply: la, note: 'внешний ИИ недоступен, ответил локально' }); }
+                    return send(res, 200, { ok: true, configured: true, local: true, reply: la, note: 'внешний ИИ недоступен, ответил локально',
+                        extError: admin ? String(err.message).slice(0, 400) : undefined }); }
                 const tool = aiParseTool(reply);
                 if (tool && steps <= 3) {
                     const visible = reply.replace(tool.raw, '').trim();

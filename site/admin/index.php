@@ -108,7 +108,7 @@ require __DIR__ . '/../_inc/head.php';
   <p class="muted">Подключи любой <b>бесплатный</b> провайдер ИИ — и помощник на сайте оживёт: будет отвечать как живой, искать по базе, создавать каналы/ботов, смотреть присланные картинки и учиться в файл на сервере.</p>
   <ul class="muted" style="margin:6px 0 12px;font-size:14px;line-height:1.6">
     <li><b>Groq</b> (быстрый, бесплатный): провайдер <code>openai</code>, адрес <code>https://api.groq.com/openai/v1</code>, модель напр. <code>llama-3.3-70b-versatile</code>. Ключ — на console.groq.com.</li>
-    <li><b>OpenRouter</b> (много бесплатных моделей): провайдер <code>openai</code>, адрес <code>https://openrouter.ai/api/v1</code>, модель напр. <code>meta-llama/llama-3.3-70b-instruct:free</code>. Ключ — на openrouter.ai. <i>Бесплатные модели иногда пропадают — сервер сам переберёт запасные бесплатные, если выбранная недоступна.</i></li>
+    <li><b>OpenRouter</b> (много бесплатных моделей): провайдер <code>openai</code>, адрес <code>https://openrouter.ai/api/v1</code>, модель <code>openrouter/free</code> (сама выбирает любую свободную бесплатную). Ключ — на openrouter.ai. <i>Бесплатные модели часто лимитируются — сервер перебирает запасные автоматически.</i></li>
     <li><b>Google Gemini</b> (бесплатный ключ): провайдер <code>gemini</code>, модель напр. <code>gemini-1.5-flash</code>, адрес не нужен. Ключ — на aistudio.google.com.</li>
   </ul>
   <p class="muted" style="font-size:13px">Сейчас:
@@ -146,7 +146,7 @@ require __DIR__ . '/../_inc/head.php';
     var prov=document.getElementById('aiProvider'), model=document.getElementById('aiModel'),
         base=document.getElementById('aiBase'), en=document.querySelector('#aiForm input[name=enabled]');
     if(p==='local'){ prov.value='local'; model.value=''; base.value=''; }
-    else if(p==='openrouter'){ prov.value='openai'; base.value='https://openrouter.ai/api/v1'; if(!model.value||model.value.indexOf(':free')<0&&model.value.indexOf('/')<0) model.value='meta-llama/llama-3.3-70b-instruct:free'; }
+    else if(p==='openrouter'){ prov.value='openai'; base.value='https://openrouter.ai/api/v1'; model.value='openrouter/free'; }
     else if(p==='groq'){ prov.value='openai'; base.value='https://api.groq.com/openai/v1'; model.value='llama-3.3-70b-versatile'; }
     else if(p==='gemini'){ prov.value='gemini'; base.value=''; model.value='gemini-1.5-flash'; }
     if(en) en.checked=true;
@@ -175,7 +175,9 @@ require __DIR__ . '/../_inc/head.php';
           else { badge='⚠ ИИ не настроен'; color='#ff6b74'; }
           st.innerHTML='<b style="color:'+color+'">'+badge+'</b>';
           out.style.display='block';
-          out.innerHTML='<div class="muted" style="font-size:12px;margin-bottom:4px">Ответ Наря:</div>'+((j&&j.reply)?String(j.reply).replace(/[<>]/g,''):'(пусто)');
+          var extra='';
+          if(j && j.extError){ extra='<div style="margin-top:8px;padding:8px;border-radius:8px;background:rgba(255,107,116,.12);color:#ff6b74;font-size:13px"><b>Ошибка внешнего ИИ:</b> '+String(j.extError).replace(/[<>]/g,'')+'</div>'; }
+          out.innerHTML='<div class="muted" style="font-size:12px;margin-bottom:4px">Ответ Наря:</div>'+((j&&j.reply)?String(j.reply).replace(/[<>]/g,''):'(пусто)')+extra;
         })
         .catch(function(){ btn.disabled=false; st.innerHTML='<b style="color:#ff6b74">Ошибка сети — сервер ИИ не ответил</b>'; });
     };
