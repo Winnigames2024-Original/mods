@@ -1,12 +1,12 @@
 {
-  "version": "1.95",
+  "version": "1.96",
   "file": "NareLauncher.exe",
   "url": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/NareLauncher.exe",
-  "sha1": "058b20c4d5c8c253d8a5e4892d3ef7f2bfff979d",
+  "sha1": "a20dd8cd19cd13605f3fb62ac4f43306db97c8a5",
   "size": 889856,
   "smFile": "ServerManager.exe",
   "smUrl": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/narelauncher/ServerManager.exe",
   "smSha1": "24999b95e96ceecc33f29b3672f3af81c730540e",
   "smSize": 91136,
-  "notes": "Студия эфира теперь транслирует как OBS — по RTMP прямо из лаунчера (ffmpeg -> rtmp -> сервер -> HLS зрителям). Отдельный OBS не нужен. При первом эфире один раз качается кодек ffmpeg."
+  "notes": "Студия эфира: список запущенных приложений/окон обновляется сам. Трансляция по RTMP как OBS прямо из лаунчера."
 }

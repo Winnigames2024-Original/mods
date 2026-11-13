@@ -318,3 +318,29 @@ html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
   .vk-item{flex:0 0 auto;white-space:nowrap;padding:8px 12px}
   .vk-sep{display:none}
 }
+
+/* --- Эфир: видео слева, чат справа (как VK/Twitch) --- */
+.live-layout{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+.live-main{min-width:0}
+.live-chat{display:flex;flex-direction:column;height:min(78vh,720px);background:rgba(128,128,128,.06);
+  border:1px solid rgba(128,128,128,.18);border-radius:14px;overflow:hidden;position:sticky;top:12px}
+.lc-head{padding:12px 14px;font-weight:700;border-bottom:1px solid rgba(128,128,128,.18)}
+.live-chat .lchat{flex:1;overflow-y:auto;margin:0;padding:10px 12px;border:none;background:none}
+.lc-foot{padding:10px;border-top:1px solid rgba(128,128,128,.18)}
+@media(max-width:900px){
+  .live-layout{grid-template-columns:1fr}
+  .live-chat{height:420px;position:static}
+}
+
+#watchbox{max-width:1180px}
+
+/* --- Кнопка-меню «☰» в шапке (как в лаунчере) --- */
+.nav-burger{display:none;background:rgba(128,128,128,.12);border:1px solid rgba(128,128,128,.25);color:inherit;
+  font-size:20px;line-height:1;padding:6px 12px;border-radius:10px;cursor:pointer}
+.nav-burger:hover{background:rgba(91,140,255,.18);border-color:var(--accent,#5b8cff)}
+@media(max-width:860px){
+  .nav-burger{display:inline-block}
+  header.nav .tabs{display:none;width:100%;flex-direction:column;align-items:stretch;gap:2px;margin-top:8px}
+  header.nav.open .tabs{display:flex}
+  header.nav{flex-wrap:wrap}
+}

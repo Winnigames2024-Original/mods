@@ -2,7 +2,20 @@
 // Общая конфигурация и помощники сайта NareLauncher.
 // Сайт разговаривает с NareNet (Node) по локальному адресу на том же VPS.
 
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Заголовки безопасности (до любого вывода)
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(self), camera=(self), display-capture=(self)');
+    header('Strict-Transport-Security: max-age=15552000; includeSubDomains');
+}
+// Безопасные cookie сессии (по HTTPS, недоступны из JS)
+if (session_status() === PHP_SESSION_NONE) {
+    $sp = session_get_cookie_params();
+    @session_set_cookie_params(['lifetime' => $sp['lifetime'], 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+    session_start();
+}
 
 const NARENET = 'http://127.0.0.1:2445';                 // NareNet на этом же сервере
 const SITE    = 'https://narelauncher.winnigames2024.ru';

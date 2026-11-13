@@ -32,6 +32,7 @@ namespace NareLauncher.UI
         private ChatOverlay _overlay;
 
         private readonly System.Windows.Forms.Timer _tick = new System.Windows.Forms.Timer { Interval = 800 };
+        private readonly System.Windows.Forms.Timer _srcTick = new System.Windows.Forms.Timer { Interval = 3000 };
         private readonly List<IntPtr> _windows = new List<IntPtr>();
         private readonly List<string> _titles = new List<string>();   // полные заголовки окон (для ffmpeg)
         private bool _live;
@@ -86,6 +87,10 @@ namespace NareLauncher.UI
             _refresh.Click += (s, e) => LoadSources();
             _go.Click += (s, e) => { if (_live) Stop(); else Start(); };
             _tick.Tick += (s, e) => Capture();
+
+            // авто-обновление списка запущенных приложений/окон (когда не в эфире и список не раскрыт)
+            _srcTick.Tick += (s, e) => { if (!_live && !_source.DroppedDown) LoadSources(); };
+            _srcTick.Start();
 
             LoadSources();
             var acc = AccountStore.Selected;
@@ -276,6 +281,7 @@ namespace NareLauncher.UI
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (_overlay != null && !_overlay.IsDisposed) { try { _overlay.Close(); } catch { } }
+            _srcTick.Stop();
             if (_live) Stop();
             base.OnFormClosing(e);
         }

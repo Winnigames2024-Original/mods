@@ -56,8 +56,9 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
-<header class="nav">
+<header class="nav" id="siteHeader">
   <a class="brand" href="/home/"><span class="logo">N</span> NareLauncher</a>
+  <button type="button" class="nav-burger" id="navBurger" aria-label="Меню" onclick="document.getElementById('siteHeader').classList.toggle('open')">☰</button>
   <nav class="tabs">
     <a href="/home/">Главная</a>
     <a href="/narevideos/">NareVideos</a>

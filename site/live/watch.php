@@ -6,63 +6,57 @@ $PAGE_TITLE = 'Эфир — NareLauncher';
 require __DIR__ . '/../_inc/head.php';
 ?>
 <div class="watch" id="watchbox">
-  <h1 style="margin:0 0 2px" id="title">Эфир</h1>
-  <div class="muted" style="margin-bottom:12px"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="cat"></span> · <span id="st" class="badge">подключение…</span></div>
-
-  <div class="tabs" id="tabs">
-    <button class="tab active" type="button" data-t="live">📺 Эфир</button>
-    <button class="tab" type="button" data-t="chat">💬 Чат</button>
-    <button class="tab" type="button" data-t="viewers">👥 Зрители <span id="vcount" class="vbadge">0</span></button>
-    <button class="tab" type="button" data-t="about">ℹ️ Об эфире</button>
-  </div>
-
-  <!-- вкладка: эфир -->
-  <div class="tab-pane active" data-pane="live">
+ <div class="live-layout">
+  <!-- слева: видео + инфо -->
+  <div class="live-main">
     <div class="rc-screen-wrap" id="wrap">
       <video id="vid" autoplay muted playsinline style="display:none"></video>
       <img id="scr" alt="эфир" style="display:none">
       <div id="off" class="rc-off">Подключение…</div>
     </div>
-    <div class="btn-row" style="margin-top:8px">
+    <h1 style="margin:12px 0 2px" id="title">Эфир</h1>
+    <div class="muted" style="margin-bottom:10px"><span id="user"></span> · <span id="vw">0</span> смотрят · <span id="cat"></span> · <span id="st" class="badge">подключение…</span></div>
+    <div class="btn-row">
       <button class="btn" id="sound">🔊 Включить звук</button>
       <button class="btn ghost" id="full">⛶ На весь экран</button>
+      <button class="btn ghost" id="share">🔗 Поделиться</button>
+      <button class="btn ghost" id="follow" style="display:none">+ Подписаться</button>
     </div>
     <div class="btn-row" style="margin-top:6px" id="reacts">
       <?php foreach (['❤️','🔥','😂','👏','😮','🎉'] as $e): ?><button class="btn ghost react" type="button" data-e="<?= $e ?>" style="font-size:18px;padding:6px 12px"><?= $e ?></button><?php endforeach; ?>
     </div>
+
+    <div class="tabs" id="tabs" style="margin-top:14px">
+      <button class="tab active" type="button" data-t="viewers">👥 Зрители <span id="vcount" class="vbadge">0</span></button>
+      <button class="tab" type="button" data-t="about">ℹ️ Об эфире</button>
+    </div>
+    <div class="tab-pane active" data-pane="viewers">
+      <p class="muted" style="margin-top:0">Кто сейчас смотрит эфир. Нажми «написать», чтобы отправить личное сообщение.</p>
+      <div id="viewers" class="vlist"></div>
+    </div>
+    <div class="tab-pane" data-pane="about">
+      <div class="about-grid">
+        <div><span class="muted">Стример</span><div id="aUser">—</div></div>
+        <div><span class="muted">Категория</span><div id="aCat">—</div></div>
+        <div><span class="muted">Зрителей</span><div id="aVw">0</div></div>
+        <div><span class="muted">Статус</span><div id="aSt">—</div></div>
+      </div>
+    </div>
   </div>
 
-  <!-- вкладка: чат -->
-  <div class="tab-pane" data-pane="chat">
-    <div class="row-form" id="modrow" style="display:none;margin-bottom:8px">
-      <input id="muser" placeholder="Ник для модерации" maxlength="16" style="flex:1">
-      <button class="btn ghost" type="button" onclick="smod('mute')">Мьют 5м</button>
+  <!-- справа: чат (всегда виден, как на VK/Twitch) -->
+  <aside class="live-chat">
+    <div class="lc-head">💬 Чат эфира</div>
+    <div class="row-form" id="modrow" style="display:none;margin:8px">
+      <input id="muser" placeholder="Ник" maxlength="16" style="flex:1">
+      <button class="btn ghost" type="button" onclick="smod('mute')">Мьют</button>
       <button class="btn ghost" type="button" onclick="smod('ban')">Бан</button>
       <button class="btn ghost" type="button" onclick="smod('unban')">Разбан</button>
     </div>
     <div id="chat" class="lchat"></div>
-    <div class="row-form" style="margin-top:8px"><input id="ct" placeholder="Сообщение" maxlength="400" style="flex:1"><button class="btn" id="cs">→</button></div>
-  </div>
-
-  <!-- вкладка: зрители -->
-  <div class="tab-pane" data-pane="viewers">
-    <p class="muted" style="margin-top:0">Кто сейчас смотрит эфир. Нажми «написать», чтобы отправить личное сообщение.</p>
-    <div id="viewers" class="vlist"></div>
-  </div>
-
-  <!-- вкладка: об эфире -->
-  <div class="tab-pane" data-pane="about">
-    <div class="about-grid">
-      <div><span class="muted">Стример</span><div id="aUser">—</div></div>
-      <div><span class="muted">Категория</span><div id="aCat">—</div></div>
-      <div><span class="muted">Зрителей</span><div id="aVw">0</div></div>
-      <div><span class="muted">Статус</span><div id="aSt">—</div></div>
-    </div>
-    <div class="btn-row" style="margin-top:12px">
-      <button class="btn ghost" id="share">🔗 Поделиться</button>
-      <button class="btn ghost" id="follow" style="display:none">+ Подписаться</button>
-    </div>
-  </div>
+    <div class="row-form lc-foot"><input id="ct" placeholder="Сообщение" maxlength="400" style="flex:1"><button class="btn" id="cs">→</button></div>
+  </aside>
+ </div>
 </div>
 
 <!-- страница ошибки в стиле github 404 -->
