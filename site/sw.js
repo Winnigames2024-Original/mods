@@ -1,5 +1,5 @@
 // Service worker NareLauncher (PWA). Кэшируем только статику — страницы всегда свежие.
-const CACHE = 'nare-v1';
+const CACHE = 'nare-v2';
 
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {

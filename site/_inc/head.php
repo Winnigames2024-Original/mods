@@ -53,7 +53,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
   "description": "Бесплатный лаунчер Minecraft: любые версии, свои сервера с модами и плагинами, голосовой чат, скины и профили."
 }
 </script>
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/app.css?v=<?= @filemtime(__DIR__ . '/../assets/app.css') ?: date('Ymd') ?>">
 </head>
 <body>
 <?php
