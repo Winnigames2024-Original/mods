@@ -24,6 +24,7 @@ require __DIR__ . '/../_inc/head.php';
   <datalist id="subs"><option value="Minecraft"><option value="CS2"><option value="GTA V"><option value="Dota 2"><option value="Fortnite"><option value="Roblox"></datalist>
   <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Теги (через пробел или запятую, с # или без)</label>
   <input id="tags" maxlength="200" placeholder="#minecraft обзор #топ" style="width:100%;background:#0a0d14;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:11px 12px">
+  <label class="ck" style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="isShort"> ⚡ Это Shorts (короткое видео)</label>
   <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Файл</label>
   <input id="file" type="file" accept="video/*" style="width:100%">
   <button class="btn" id="go" style="margin-top:16px">Загрузить</button>
@@ -47,6 +48,7 @@ document.getElementById('go').onclick=function(){
   msg('Создаю…');
   var cat=document.getElementById('cat').value, sub=document.getElementById('sub').value.trim();
   var tags=document.getElementById('tags')?document.getElementById('tags').value:'';
+  var sh=document.getElementById('isShort'); if(sh&&sh.checked) tags='#shorts '+tags;
   fetch(createPath,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({token:TOK,title:title,desc:desc,mime:f.type,category:cat,subcategory:sub,tags:tags})}).then(function(r){return r.json();}).then(function(j){
     if(!j.ok){msg(j.error||'Ошибка');return;}

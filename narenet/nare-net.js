@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.70';
+const VERSION = '1.71';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -3901,7 +3901,7 @@ function phPublic(p, full) {
 function photoList(req, res) {
     const q = query(req);
     let list = policy.photos.filter(p => p.ready);
-    if (q.nick) list = list.filter(p => p.nick === q.nick);
+    if (q.nick) { const qn = String(q.nick).toLowerCase(); list = list.filter(p => (p.nick || '').toLowerCase() === qn); }
     list = list.slice().reverse().slice(0, 200).map(p => phPublic(p, false));
     send(res, 200, { photos: list });
 }
@@ -4709,7 +4709,7 @@ function videoList(req, res) {
     const cat = clean(q.category, 32).toLowerCase();
     const sub = clean(q.subcategory, 40).toLowerCase();
     let list = policy.videos.filter(v => v.ready);
-    if (ch) list = list.filter(v => v.nick === ch);
+    if (ch) list = list.filter(v => (v.nick || '').toLowerCase() === ch);
     if (cat) list = list.filter(v => (v.category || '').toLowerCase() === cat);
     if (sub) list = list.filter(v => (v.subcategory || '').toLowerCase() === sub);
     if (term) list = list.filter(v => (v.title || '').toLowerCase().indexOf(term) >= 0 || (v.user || '').toLowerCase().indexOf(term) >= 0);

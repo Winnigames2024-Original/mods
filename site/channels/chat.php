@@ -41,6 +41,23 @@ require __DIR__ . '/../_inc/head.php';
     <span class="muted" id="e-msg"></span>
   </div>
   <?php endif; ?>
+  <!-- разделы канала -->
+  <div class="tabs" id="chtabs">
+    <button class="tab active" type="button" data-t="home">🏠 Главная</button>
+    <button class="tab" type="button" data-t="videos">🎬 Видео</button>
+    <button class="tab" type="button" data-t="recs">⏺ Записи</button>
+    <button class="tab" type="button" data-t="shorts">⚡ Shorts</button>
+    <button class="tab" type="button" data-t="photos">🖼 Фото</button>
+    <button class="tab" type="button" data-t="chat">💬 Чат</button>
+  </div>
+
+  <div class="tab-pane active" data-pane="home"><div id="ch-home"><p class="muted">Загрузка…</p></div></div>
+  <div class="tab-pane" data-pane="videos"><div id="ch-videos" class="mgrid"></div></div>
+  <div class="tab-pane" data-pane="recs"><div id="ch-recs" class="mgrid"></div></div>
+  <div class="tab-pane" data-pane="shorts"><div id="ch-shorts" class="mgrid shorts"></div></div>
+  <div class="tab-pane" data-pane="photos"><div id="ch-photos" class="mgrid"></div></div>
+
+  <div class="tab-pane" data-pane="chat">
   <?php if (!empty($info['canMod'])): ?>
   <div class="row-form" style="margin-bottom:8px">
     <input id="muser" placeholder="Ник для модерации" maxlength="16" style="flex:1">
@@ -62,9 +79,11 @@ require __DIR__ . '/../_inc/head.php';
   <div class="row-form" style="margin-top:8px"><input id="ct" placeholder="Сообщение в канал" maxlength="600" style="flex:1"><button class="btn" id="cs">Отправить</button></div>
   <?php else: ?><p class="muted"><a href="/login/">Войдите</a>, чтобы писать.</p><?php endif; ?>
   <p class="muted" style="margin-top:10px">ID канала для ботов: <code>channel:<?= h($id) ?></code></p>
+  </div><!-- /chat pane -->
 </div>
 <script>
 var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(me() ? token() : '') ?>, since=0;
+var OWNER=<?= json_encode($info['owner'] ?? '') ?>;
 function cmod(action){ var u=document.getElementById('muser').value.trim(); if(!u)return;
   fetch('/channel/mod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,id:ID,action:action,user:u})}).then(function(r){return r.json();}).then(function(j){ alert(j.ok?j.result:(j.error||'Ошибка')); if(j.ok)document.getElementById('muser').value=''; }); }
 function setmod(remove){ var u=document.getElementById('moduser').value.trim(); if(!u)return;
@@ -81,6 +100,34 @@ function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'applic
       node('/channel/update',body).then(function(j){ if(j.ok){ msg.textContent='Готово!'; location.reload(); } else msg.textContent=j.error||'Ошибка'; });
     }); }); };
 })();
+// --- разделы канала ---
+Array.prototype.forEach.call(document.querySelectorAll('#chtabs .tab'),function(t){t.addEventListener('click',function(){
+  var name=this.getAttribute('data-t');
+  Array.prototype.forEach.call(document.querySelectorAll('#chtabs .tab'),function(x){x.classList.toggle('active',x===t);});
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-pane'),function(p){p.classList.toggle('active',p.getAttribute('data-pane')===name);});
+});});
+function fmtDur(s){s=Math.round(s);var m=Math.floor(s/60),x=s%60;return m+':'+(x<10?'0':'')+x;}
+function vthumb(v){ return v.thumb?('style="background-image:url(\''+String(v.thumb).replace(/'/g,'')+'\');background-size:cover;background-position:center"'):''; }
+function vcard(v){ return '<a class="mcard" href="/watch/'+encodeURIComponent(v.id)+'/"><div class="mthumb vid" '+vthumb(v)+'>'+(v.dur?'<span class="dur">'+fmtDur(v.dur)+'</span>':'')+'</div><div class="mmeta"><div class="mtitle">'+esc(v.title||'')+'</div><div class="muted">'+(v.views||0)+' просмотров</div></div></a>'; }
+function pcard(p){ return '<a class="mcard" href="/media/photo.php?p='+encodeURIComponent(p.id)+'"><div class="mthumb" style="background-image:url(\'/photo/img/'+encodeURIComponent(p.id)+'\');background-size:cover;background-position:center"></div><div class="mmeta"><div class="mtitle">'+esc(p.title||'Фото')+'</div></div></a>'; }
+var VIDS=[],PHOTOS=[];
+function isRec(v){return (v.tags||[]).indexOf('стрим')>=0;}
+function isShort(v){return !isRec(v)&&((v.tags||[]).indexOf('shorts')>=0||(v.dur>0&&v.dur<=60));}
+function fill(){
+  var vids=VIDS.filter(function(v){return !isRec(v)&&!isShort(v);}), recs=VIDS.filter(isRec), shorts=VIDS.filter(isShort);
+  document.getElementById('ch-videos').innerHTML=vids.length?vids.map(vcard).join(''):'<p class="muted">Нет видео.</p>';
+  document.getElementById('ch-recs').innerHTML=recs.length?recs.map(vcard).join(''):'<p class="muted">Нет записей эфиров.</p>';
+  document.getElementById('ch-shorts').innerHTML=shorts.length?shorts.map(vcard).join(''):'<p class="muted">Нет shorts.</p>';
+  document.getElementById('ch-photos').innerHTML=PHOTOS.length?PHOTOS.map(pcard).join(''):'<p class="muted">Нет фото.</p>';
+  function sect(title,arr,render){ return arr.length?('<h3>'+title+'</h3><div class="mgrid">'+arr.slice(0,8).map(render).join('')+'</div>'):''; }
+  var home=sect('Видео',vids,vcard)+sect('Записи эфиров',recs,vcard)+sect('Shorts',shorts,vcard)+sect('Фото',PHOTOS,pcard);
+  document.getElementById('ch-home').innerHTML=home||'<p class="muted">На канале пока пусто.</p>';
+}
+if(OWNER){
+  fetch('/video/list?channel='+encodeURIComponent(OWNER)).then(function(r){return r.json();}).then(function(j){ VIDS=(j.videos||[]); fill(); }).catch(function(){});
+  fetch('/photo/list?nick='+encodeURIComponent(OWNER)).then(function(r){return r.json();}).then(function(j){ PHOTOS=(j.photos||[]); fill(); }).catch(function(){});
+}
+
 function poll(){ node('/channel/chat/get',{id:ID,since:since}).then(function(j){
   if(j.ok&&j.msgs&&j.msgs.length){ var box=document.getElementById('chat');
     j.msgs.forEach(function(m){var d=document.createElement('div');d.className='lmsg'+(m.bot?' bot':'');d.innerHTML='<b>'+esc(m.from)+':</b> '+esc(m.text);box.appendChild(d);});

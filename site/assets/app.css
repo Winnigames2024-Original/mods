@@ -246,3 +246,11 @@ html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
 .rc-screen-wrap:fullscreen #scr, .rc-screen-wrap:fullscreen #vid{max-height:100vh;height:100vh;width:100%}
 /* превью студии тоже по окну */
 .rc-screen-wrap canvas{max-height:70vh}
+
+/* --- Разделы канала: длительность и shorts --- */
+.mthumb{position:relative}
+.mthumb .dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.78);color:#fff;font-size:12px;
+  padding:1px 6px;border-radius:5px;font-weight:600}
+.mgrid.shorts{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.mgrid.shorts .mthumb{aspect-ratio:9/16;background-size:cover;background-position:center}
+#ch-home h3{margin:18px 0 8px}
