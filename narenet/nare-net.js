@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.72';
+const VERSION = '1.73';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -535,6 +535,7 @@ if (!policy.apiCode) policy.apiCode = '';        // секретный код д
 if (!policy.smKill) policy.smKill = {};          // ник -> ts: закрыть ServerManager у этого игрока
 if (!policy.smKillAll) policy.smKillAll = 0;     // ts: закрыть ServerManager у всех
 if (!policy.dm) policy.dm = {};                   // личные сообщения: ключ "nickA|nickB"(lower) -> [сообщения]
+if (!policy.streamKeys) policy.streamKeys = {};   // nick(lower) -> ключ трансляции для OBS (RTMP)
 if (!policy.ai) policy.ai = { provider: '', key: '', model: '', base: '', enabled: false };
 // provider: 'gemini' | 'openai'(совместимые: Groq/OpenRouter/и т.п.)
 // key: ключ API; model: имя модели; base: базовый URL (для openai-совместимых); enabled: вкл/выкл
@@ -3952,7 +3953,57 @@ function photoDelete(req, res) {
 }
 
 // ------------------------------------------------------------ живые трансляции
-function streamLive(s) { return s && now() - s.seen < STREAM_ONLINE; }
+function streamLive(s) { return !!s && (s.hlsLive || (now() - s.seen < STREAM_ONLINE)); }
+
+// ---- RTMP (OBS): ключи трансляции + события от медиа-сервера ----
+const RTMP_HOST = process.env.NARENET_RTMP_HOST || '151.245.217.104';
+const RTMP_SECRET = process.env.NARENET_RTMP_SECRET || 'nare-rtmp-9f3b';   // общий секрет с nms.js
+function streamKeyFor(nick) {
+    const low = nick.toLowerCase();
+    if (!policy.streamKeys[low]) { policy.streamKeys[low] = crypto.randomBytes(10).toString('hex'); savePolicy(); }
+    return policy.streamKeys[low];
+}
+function nickByKey(key) {
+    key = String(key || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+    if (!key) return null;
+    for (const [low, k] of Object.entries(policy.streamKeys)) if (k === key) return low;
+    return null;
+}
+// игрок получает свой ключ и адрес для OBS
+function streamKey(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        if (body && body.regen) { policy.streamKeys[nick.toLowerCase()] = crypto.randomBytes(10).toString('hex'); savePolicy(); }
+        const key = streamKeyFor(nick);
+        send(res, 200, { ok: true, key, server: 'rtmp://' + RTMP_HOST + '/live', hls: '/live-hls/' + key + '/index.m3u8' });
+    });
+}
+// node-media-server сообщает о начале/конце публикации по RTMP
+function rtmpEvent(req, res) {
+    readJsonBody(req, body => {
+        if (!body || body.secret !== RTMP_SECRET) return send(res, 403, { error: 'нет' });
+        const key = String(body.key || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+        const nick = nickByKey(key);
+        if (!nick) return send(res, 404, { ok: false, error: 'ключ не найден' });   // отклонит публикацию
+        if (policy.noStream[nick]) return send(res, 403, { ok: false, error: 'трансляции запрещены' });
+        if (body.action === 'publish') {
+            // своя одна трансляция на ник
+            for (const [id, s] of streams) if (s.nick === nick && s.id !== key) { finalizeVod(s); streams.delete(id); }
+            const user = (acc(nick) || {}).username || nick;
+            const ex = streams.get(key) || {};
+            streams.set(key, Object.assign({
+                nick, user, title: ex.title || ('Эфир ' + nick), category: 'games', subcategory: '',
+                channel: nick, nameSlug: key, link: '/live/watch.php?s=' + key,
+                jpg: '', at: now(), viewers: new Map(), chat: [], bans: {}, media: { init: '', seq: 0, buf: [] }
+            }, ex, { type: 'hls', hlsKey: key, hlsLive: true, seen: now(), everLive: true }));
+            log('RTMP публикация', nick, key);
+        } else if (body.action === 'done') {
+            const s = streams.get(key); if (s) { s.hlsLive = false; s.seen = now() - STREAM_ONLINE - 1; }
+            log('RTMP конец', nick, key);
+        }
+        send(res, 200, { ok: true, nick });
+    });
+}
 function streamStart(req, res) {
     readJsonBody(req, body => {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
@@ -4025,6 +4076,7 @@ function streamFrame(req, res) {
         const live = streamLive(s);
         send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
                          viewers: s.viewers.size, viewerList: viewerList(s), hasVideo: !!(s.media && s.media.init),
+                         hls: s.type === 'hls' ? ('/live-hls/' + s.hlsKey + '/index.m3u8') : '',
                          category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }
@@ -5532,6 +5584,8 @@ const server = http.createServer((req, res) => {
     if (route === '/stream/media/push' && req.method === 'POST') return streamMediaPush(req, res);  // webm-чанки (настоящее видео)
     if (route === '/stream/media/get' && req.method === 'POST') return streamMediaGet(req, res);
     if (route === '/stream/viewers' && req.method === 'POST') return streamViewers(req, res);        // кто смотрит
+    if (route === '/stream/key' && req.method === 'POST') return streamKey(req, res);                // ключ OBS (RTMP)
+    if (route === '/stream/rtmp/event' && req.method === 'POST') return rtmpEvent(req, res);          // хук от node-media-server
     if (route === '/dm/send' && req.method === 'POST') return dmSend(req, res);                      // личные сообщения
     if (route === '/dm/thread' && req.method === 'POST') return dmThread(req, res);
     if (route === '/dm/threads' && req.method === 'POST') return dmThreads(req, res);

@@ -37,6 +37,17 @@ require __DIR__ . '/../_inc/head.php';
     <button class="btn" id="start" style="margin-top:16px">Выйти в эфир</button>
     <div class="msg" id="st" style="display:none"></div>
     <p class="muted" style="margin-top:10px">Идёт настоящим видео (webm) со звуком — как живой эфир, с небольшой задержкой в пару секунд. Это нормально.</p>
+    <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+    <button class="btn ghost" type="button" id="obsBtn">📡 Транслировать через OBS (RTMP, как в VK)</button>
+    <div id="obsBox" style="display:none;margin-top:10px">
+      <p class="muted" style="margin-top:0">Вставь это в OBS: Настройки → Трансляция → Сервис «Пользовательский».</p>
+      <label class="fl">Сервер</label>
+      <div class="row-form"><input id="obsServer" class="fi" readonly style="flex:1"><button class="btn ghost" type="button" onclick="copyField('obsServer',this)">Копировать</button></div>
+      <label class="fl" style="margin-top:8px">Ключ потока (секрет, никому не показывай)</label>
+      <div class="row-form"><input id="obsKey" class="fi" type="password" readonly style="flex:1"><button class="btn ghost" type="button" onclick="var k=document.getElementById('obsKey');k.type=k.type==='password'?'text':'password';">Показать</button><button class="btn ghost" type="button" onclick="copyField('obsKey',this)">Копировать</button></div>
+      <button class="btn ghost" type="button" id="obsRegen" style="margin-top:8px">Сменить ключ</button>
+      <p class="muted" style="font-size:13px;margin-top:8px">После «Запустить трансляцию» в OBS эфир появится на сайте в «Эфиры». Зрители смотрят через HLS.</p>
+    </div>
   </div>
 
   <div id="live" style="display:none">
@@ -78,6 +89,13 @@ var screenStream=null, camStream=null, micStream=null;
 var camOn=false, micOn=false, camPos='br', camScale=0.26, maxW=1920;
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 function msg(t){var e=document.getElementById('st');e.style.display='block';e.textContent=t;}
+function copyField(id,btn){ var el=document.getElementById(id); navigator.clipboard.writeText(el.value); var o=btn.textContent; btn.textContent='✓'; setTimeout(function(){btn.textContent=o;},1200); }
+// панель OBS: ключ и адрес RTMP
+(function(){ var btn=document.getElementById('obsBtn'); if(!btn)return; var loaded=false;
+  function load(regen){ node('/stream/key',{token:TOK,regen:!!regen}).then(function(j){ if(j.ok){ document.getElementById('obsServer').value=j.server; document.getElementById('obsKey').value=j.key; } }); }
+  btn.onclick=function(){ var b=document.getElementById('obsBox'); var show=b.style.display==='none'; b.style.display=show?'block':'none'; if(show&&!loaded){ loaded=true; load(false); } };
+  document.getElementById('obsRegen').onclick=function(){ if(confirm('Сменить ключ? Старый перестанет работать в OBS.')) load(true); };
+})();
 function qToW(q){ return q==='1440'?2560:(q==='720'?1280:1920); }
 
 document.getElementById('start').onclick=function(){

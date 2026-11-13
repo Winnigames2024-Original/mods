@@ -1,0 +1,16 @@
+[Unit]
+Description=NareNet RTMP (node-media-server) — приём OBS по RTMP и раздача HLS
+After=network.target narenet.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/narenet-rtmp
+ExecStart=/usr/bin/node /root/narenet-rtmp/nms.js
+Environment=NARE_RTMP_SECRET=nare-rtmp-9f3b
+Environment=NARE_HLS_ROOT=/var/lib/narenet/hls
+Environment=NARE_FFMPEG=/usr/bin/ffmpeg
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

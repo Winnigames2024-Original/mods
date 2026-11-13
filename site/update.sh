@@ -49,6 +49,26 @@ if [ -f "$NGINX_CONF" ] && ! grep -q "narewatch" "$NGINX_CONF"; then
   else mv "$NGINX_CONF.bak" "$NGINX_CONF"; logger "narelauncher: nginx правило видео откатано (ошибка конфига)"; fi
 fi
 
+# --- правило nginx для HLS-эфиров (OBS/RTMP -> HLS через node-media-server на :8000) ---
+if [ -f "$NGINX_CONF" ] && ! grep -q "narehls" "$NGINX_CONF"; then
+  cp "$NGINX_CONF" "$NGINX_CONF.bak"
+  awk '1; /index index\.php/ && !d {
+    print "    # narehls: HLS-эфиры с RTMP-сервера";
+    print "    location /live-hls/ { proxy_pass http://127.0.0.1:8000/live/; add_header Access-Control-Allow-Origin *; add_header Cache-Control no-cache; }";
+    d=1 }' "$NGINX_CONF" > "$NGINX_CONF.tmp" && mv "$NGINX_CONF.tmp" "$NGINX_CONF"
+  if nginx -t >/dev/null 2>&1; then systemctl reload nginx; rm -f "$NGINX_CONF.bak"; logger "narelauncher: nginx правило HLS добавлено";
+  else mv "$NGINX_CONF.bak" "$NGINX_CONF"; logger "narelauncher: nginx правило HLS откатано (ошибка конфига)"; fi
+fi
+
+# --- обновляем nms.js у RTMP-сервера, если он уже установлен ---
+if [ -d /root/narenet-rtmp ] && [ -f "$SRC/rtmp/nms.js" ]; then
+  if ! cmp -s "$SRC/rtmp/nms.js" /root/narenet-rtmp/nms.js; then
+    cp "$SRC/rtmp/nms.js" /root/narenet-rtmp/nms.js
+    systemctl restart nare-rtmp 2>/dev/null || true
+    logger "narelauncher: nms.js обновлён"
+  fi
+fi
+
 # --- nare-net.js (Node) ---
 if [ -f "$SRC/narenet/nare-net.js" ] && [ -d /root/narenet ]; then
   if ! cmp -s "$SRC/narenet/nare-net.js" /root/narenet/nare-net.js; then

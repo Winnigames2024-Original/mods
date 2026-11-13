@@ -76,6 +76,7 @@ require __DIR__ . '/../_inc/head.php';
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <script>
 var ID=<?= json_encode($id) ?>, TOK=<?= json_encode(token()) ?>, ME=<?= json_encode(me() ?: '') ?>;
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
@@ -93,6 +94,12 @@ function smod(action){ var u=document.getElementById('muser').value.trim(); if(!
 
 // ---------- МЕТА + статус + зрители + запасной кадр ----------
 var vid=document.getElementById('vid'), scr=document.getElementById('scr'), streamerNick=null;
+// HLS (эфиры из OBS/RTMP, как в VK)
+var hls=null, hlsUrl='';
+function setupHls(url){ if(hlsUrl===url)return; hlsUrl=url;
+  if(vid.canPlayType('application/vnd.apple.mpegurl')){ vid.src=url; vid.play().catch(function(){}); }
+  else if(window.Hls&&Hls.isSupported()){ if(hls)hls.destroy(); hls=new Hls({liveSyncDurationCount:3,lowLatencyMode:true}); hls.loadSource(url); hls.attachMedia(vid); hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){});}); }
+}
 function show404(){ document.getElementById('watchbox').style.display='none'; document.getElementById('notfound').style.display='flex'; }
 function meta(){ node('/stream/frame',{token:TOK,id:ID}).then(function(j){
   if(j.needLogin){ location.href='/login/'; return; }
@@ -113,7 +120,8 @@ function meta(){ node('/stream/frame',{token:TOK,id:ID}).then(function(j){
   if(j.nick&&ME&&j.nick.toLowerCase()===ME.toLowerCase()){ document.getElementById('modrow').style.display='flex'; }
   renderViewers(j.viewerList||[]);
   // режим: настоящее видео или запасной кадр
-  if(j.hasVideo){ vid.style.display='block'; scr.style.display='none'; }
+  if(j.hls){ setupHls(j.hls); vid.style.display='block'; scr.style.display='none'; }
+  else if(j.hasVideo){ vid.style.display='block'; scr.style.display='none'; }
   else { vid.style.display='none'; scr.style.display='block'; if(j.jpg)scr.src='data:image/jpeg;base64,'+j.jpg; }
   // наложение статуса
   var offText=j.online?'':(j.lost?'Пропало соединение у стримера. Ждём, когда он вернётся…':'Стрим не запущен. Ожидайте, пока вернётся тот, кто его запустил.');
