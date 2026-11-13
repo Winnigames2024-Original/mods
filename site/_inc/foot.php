@@ -116,7 +116,9 @@ var SUPTOK=<?= json_encode(me() ? token() : '') ?>;
 })();
 (function(){
   var btn=document.getElementById('designToggle'); if(!btn)return;
-  function label(){ btn.textContent=document.documentElement.classList.contains('simple')?'◑ Обычный дизайн':'◑ Простой дизайн'; }
+  function label(){ var simple=document.documentElement.classList.contains('simple');
+    btn.innerHTML=simple?'<span class="dt-ico">🌙</span> Тёмный':'<span class="dt-ico">☀️</span> Светлый';
+    btn.setAttribute('aria-label',simple?'Включить тёмный дизайн':'Включить светлый дизайн'); }
   label();
   btn.addEventListener('click',function(){
     var s=document.documentElement.classList.toggle('simple');

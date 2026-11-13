@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.68';
+const VERSION = '1.69';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -534,6 +534,7 @@ if (!policy.noStream) policy.noStream = {};      // nick -> true: запрет �
 if (!policy.apiCode) policy.apiCode = '';        // секретный код для управления по URL (перезапуск/обновление)
 if (!policy.smKill) policy.smKill = {};          // ник -> ts: закрыть ServerManager у этого игрока
 if (!policy.smKillAll) policy.smKillAll = 0;     // ts: закрыть ServerManager у всех
+if (!policy.dm) policy.dm = {};                   // личные сообщения: ключ "nickA|nickB"(lower) -> [сообщения]
 if (!policy.ai) policy.ai = { provider: '', key: '', model: '', base: '', enabled: false };
 // provider: 'gemini' | 'openai'(совместимые: Groq/OpenRouter/и т.п.)
 // key: ключ API; model: имя модели; base: базовый URL (для openai-совместимых); enabled: вкл/выкл
@@ -3948,7 +3949,9 @@ function streamStart(req, res) {
         if (policy.noStream[nick]) return send(res, 403, { error: 'трансляции вам запрещены администратором' });
         // одна активная трансляция на ник
         for (const [id, s] of streams) if (s.nick === nick) streams.delete(id);
-        const id = crypto.randomBytes(6).toString('hex');
+        // id задаёт стример; если пусто — генерируем. Чистим и следим за уникальностью.
+        let id = clean(body.id, 40).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (!id || streams.has(id)) id = crypto.randomBytes(6).toString('hex');
         const user = (acc(nick) || {}).username || nick;
         const title = clean(body.title, 120) || ('Эфир ' + nick);
         const slug = (v, max) => (String(v || '').toLowerCase().replace(/[^a-z0-9а-я]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, max));
@@ -3960,8 +3963,9 @@ function streamStart(req, res) {
         const nameSlug = slug(body.name, 40) || slug(title, 40) || 'live';
         const link = '/live/' + encodeURIComponent(category) + '/' + encodeURIComponent(subSlug) + '/' + encodeURIComponent(nameSlug);
         streams.set(id, { nick, user, title, category, subcategory, channel, subSlug, nameSlug, link,
-                          jpg: '', seen: now(), at: now(), viewers: new Map(), chat: [], bans: {} });
-        send(res, 200, { ok: true, id, link });
+                          jpg: '', seen: now(), at: now(), viewers: new Map(), chat: [], bans: {},
+                          media: { init: '', seq: 0, buf: [] } });   // буфер видео (webm-чанки) для MSE
+        send(res, 200, { ok: true, id, link, watch: '/live/watch.php?s=' + encodeURIComponent(id) });
     });
 }
 function streamPush(req, res) {
@@ -3984,21 +3988,34 @@ function streamList(req, res) {
     const out = [];
     for (const [id, s] of streams) {
         if (!streamLive(s)) { continue; }
-        for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
+        for (const [k, v] of s.viewers) if (now() - ((v && v.at) || 0) > 15000) s.viewers.delete(k);
         out.push({ id, user: s.user, title: s.title, viewers: s.viewers.size, at: s.at,
+                   cover: s.jpg || '',   // обложка = последний кадр эфира прямо сейчас
                    category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     }
     send(res, 200, { streams: out });
 }
+// отметить зрителя по нику (смотреть можно только из аккаунта) и подчистить ушедших
+function touchViewer(s, nick) {
+    if (nick) s.viewers.set(nick, { at: now(), user: (acc(nick) || {}).username || nick });
+    for (const [k, v] of s.viewers) if (now() - ((v && v.at) || 0) > 15000) s.viewers.delete(k);
+}
+function viewerList(s) {
+    const out = [];
+    for (const [k, v] of s.viewers) out.push({ nick: k, user: (v && v.user) || k });
+    return out;
+}
 function streamFrame(req, res) {
     readJsonBody(req, body => {
-        const s = streams.get(clean(body && body.id, 20));
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 200, { ok: true, needLogin: true, found: false, online: false });
+        const s = streams.get(clean(body && body.id, 40));
         if (!s) return send(res, 200, { ok: true, found: false, online: false });
-        s.viewers.set(plainIp(req.socket), now());
-        for (const [ip, t] of s.viewers) if (now() - t > 15000) s.viewers.delete(ip);
+        touchViewer(s, nick);
         const live = streamLive(s);
         send(res, 200, { ok: true, found: true, online: live, lost: !live && !!s.everLive, jpg: s.jpg, title: s.title, user: s.user, nick: s.nick,
-                         viewers: s.viewers.size, category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
+                         viewers: s.viewers.size, viewerList: viewerList(s), hasVideo: !!(s.media && s.media.init),
+                         category: s.category, subcategory: s.subcategory || '', channel: s.channel, link: s.link });
     });
 }
 // микрофон эфира: ведущий шлёт короткие самостоятельные аудио-клипы, зрители их проигрывают
@@ -4020,9 +4037,115 @@ function streamAudioGet(req, res) {
         else send(res, 200, { ok: true, seq });
     });
 }
+// --- НАСТОЯЩЕЕ ВИДЕО (MSE): стример шлёт webm-чанки, зрители собирают в поток ---
+const STREAM_MEDIA_KEEP = 40;   // сколько последних чанков держим для догоняющих зрителей
+function streamMediaPush(req, res) {
+    readJsonBodyLimit(req, 3 * 1024 * 1024, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const s = streams.get(clean(body && body.id, 40)); if (!s || s.nick !== nick) return send(res, 404, { error: 'нет вашей трансляции' });
+        if (!s.media) s.media = { init: '', seq: 0, buf: [] };
+        const chunk = typeof body.chunk === 'string' ? body.chunk : '';
+        if (!chunk) return send(res, 400, { error: 'пустой чанк' });
+        if (chunk.length > 2_600_000) return send(res, 413, { error: 'чанк большой' });
+        if (body.init === true) {                 // первый чанк с заголовком webm (init-сегмент)
+            s.media.init = chunk; s.media.seq = 0; s.media.buf = []; s.media.epoch = (s.media.epoch || 0) + 1;
+        } else {
+            s.media.seq++; s.media.buf.push({ seq: s.media.seq, chunk, at: now() });
+            if (s.media.buf.length > STREAM_MEDIA_KEEP) s.media.buf.shift();
+        }
+        s.seen = now(); s.everLive = true;
+        send(res, 200, { ok: true, seq: s.media.seq });
+    });
+}
+function streamMediaGet(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 200, { ok: true, needLogin: true });
+        const s = streams.get(clean(body && body.id, 40));
+        if (!s) return send(res, 200, { ok: true, found: false });
+        touchViewer(s, nick);
+        const m = s.media || { init: '', seq: 0, buf: [] };
+        const since = Number(body.since) || 0;
+        const live = streamLive(s);
+        const out = { ok: true, found: true, online: live, lost: !live && !!s.everLive,
+                      seq: m.seq, epoch: m.epoch || 0, hasVideo: !!m.init, viewers: s.viewers.size,
+                      title: s.title, user: s.user, nick: s.nick, category: s.category,
+                      subcategory: s.subcategory || '', link: s.link };
+        if (since <= 0) {                         // новый зритель: даём init + последние чанки
+            out.init = m.init;
+            out.chunks = m.buf.slice(-6).map(x => ({ seq: x.seq, chunk: x.chunk }));
+        } else {
+            out.chunks = m.buf.filter(x => x.seq > since).map(x => ({ seq: x.seq, chunk: x.chunk }));
+        }
+        send(res, 200, out);
+    });
+}
+// кто сейчас смотрит эфир (ник + имя)
+function streamViewers(req, res) {
+    readJsonBody(req, body => {
+        const s = streams.get(clean(body && body.id, 40)); if (!s) return send(res, 404, { error: 'нет эфира' });
+        for (const [k, v] of s.viewers) if (now() - ((v && v.at) || 0) > 15000) s.viewers.delete(k);
+        send(res, 200, { ok: true, viewers: viewerList(s), count: s.viewers.size });
+    });
+}
+
+// ======================= ЛИЧНЫЕ СООБЩЕНИЯ (ЛК) =======================
+function dmKey(a, b) { return [String(a).toLowerCase(), String(b).toLowerCase()].sort().join('|'); }
+function dmSend(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const to = clean(body && body.to, 24); if (!to) return send(res, 400, { error: 'кому?' });
+        if (!accounts[to] && !isAdmin(to)) { // ищем без учёта регистра
+            const found = Object.keys(accounts).find(x => x.toLowerCase() === to.toLowerCase());
+            if (!found) return send(res, 404, { error: 'нет такого игрока' });
+        }
+        const real = Object.keys(accounts).find(x => x.toLowerCase() === to.toLowerCase()) || to;
+        if (real.toLowerCase() === nick.toLowerCase()) return send(res, 400, { error: 'это вы сами' });
+        const text = clean(body && body.text, 1000); if (!text) return send(res, 400, { error: 'пусто' });
+        if (!policy.dm) policy.dm = {};
+        const key = dmKey(nick, real);
+        const arr = policy.dm[key] || (policy.dm[key] = []);
+        arr.push({ from: nick, fromUser: (acc(nick) || {}).username || nick, text, at: now(), read: false });
+        if (arr.length > 500) arr.shift();
+        savePolicy();
+        send(res, 200, { ok: true });
+    });
+}
+function dmThread(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const withNick = clean(body && body.with, 24); if (!withNick) return send(res, 400, { error: 'с кем?' });
+        const real = Object.keys(accounts).find(x => x.toLowerCase() === withNick.toLowerCase()) || withNick;
+        const key = dmKey(nick, real);
+        const arr = (policy.dm && policy.dm[key]) || [];
+        let changed = false;
+        arr.forEach(m => { if (m.from.toLowerCase() !== nick.toLowerCase() && !m.read) { m.read = true; changed = true; } });
+        if (changed) savePolicy();
+        send(res, 200, { ok: true, withUser: (acc(real) || {}).username || real, with: real, msgs: arr });
+    });
+}
+function dmThreads(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const low = nick.toLowerCase();
+        const out = [];
+        for (const key of Object.keys(policy.dm || {})) {
+            const parts = key.split('|'); if (!parts.includes(low)) continue;
+            const otherLow = parts[0] === low ? parts[1] : parts[0];
+            const real = Object.keys(accounts).find(x => x.toLowerCase() === otherLow) || otherLow;
+            const arr = policy.dm[key]; const last = arr[arr.length - 1];
+            const unread = arr.filter(m => m.from.toLowerCase() !== low && !m.read).length;
+            out.push({ with: real, withUser: (acc(real) || {}).username || real,
+                       last: last ? last.text : '', at: last ? last.at : 0, unread });
+        }
+        out.sort((a, b) => b.at - a.at);
+        send(res, 200, { ok: true, threads: out });
+    });
+}
+
 function streamChatGet(req, res) {
     readJsonBody(req, body => {
-        const s = streams.get(clean(body && body.id, 20)); if (!s) return send(res, 404, { error: 'нет эфира' });
+        const s = streams.get(clean(body && body.id, 40)); if (!s) return send(res, 404, { error: 'нет эфира' });
         const since = Math.max(0, Number(body.since) || 0);
         send(res, 200, { ok: true, msgs: s.chat.slice(since), total: s.chat.length });
     });
@@ -4079,13 +4202,36 @@ function channelCreate(req, res) {
         const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
         const name = clean(body.name, 60); if (!name) return send(res, 400, { error: 'нужно имя канала' });
         const id = crypto.randomBytes(5).toString('hex');
-        policy.channels.push({ id, name, desc: clean(body.desc, 300), owner: nick, at: now() });
+        const username = (clean(body.username, 24) || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        policy.channels.push({ id, name, desc: clean(body.desc, 300), owner: nick, at: now(),
+                               username, avatar: '', cover: '' });
         policy.channelChat[id] = [];
         savePolicy(); send(res, 200, { ok: true, id });
     });
 }
+// изменить оформление канала: имя, @username, описание, аватар, обложку (data:image base64)
+function channelUpdate(req, res) {
+    readJsonBodyLimit(req, 2 * 1024 * 1024, body => {
+        const nick = sessionNick(body && body.token); if (!nick) return send(res, 403, { error: 'нужен вход' });
+        const c = chById(clean(body && body.id, 20)); if (!c) return send(res, 404, { error: 'нет канала' });
+        if (c.owner !== nick && !isAdmin(nick)) return send(res, 403, { error: 'не ваш канал' });
+        if (typeof body.name === 'string' && clean(body.name, 60)) c.name = clean(body.name, 60);
+        if (typeof body.desc === 'string') c.desc = clean(body.desc, 300);
+        if (typeof body.username === 'string') {
+            const u = clean(body.username, 24).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            // @username уникален среди каналов
+            if (!u || !policy.channels.some(x => x.id !== c.id && (x.username || '').toLowerCase() === u)) c.username = u;
+            else return send(res, 409, { error: 'этот @username уже занят' });
+        }
+        const img = (v) => { v = String(v || ''); return /^data:image\/(png|jpeg|jpg|webp);base64,/.test(v) && v.length < 1_200_000 ? v : null; };
+        if ('avatar' in body) { const a = img(body.avatar); if (a !== null) c.avatar = a; else if (body.avatar === '') c.avatar = ''; }
+        if ('cover' in body) { const cv = img(body.cover); if (cv !== null) c.cover = cv; else if (body.cover === '') c.cover = ''; }
+        savePolicy(); send(res, 200, { ok: true });
+    });
+}
 function channelList(req, res) {
     send(res, 200, { channels: policy.channels.map(c => ({ id: c.id, name: c.name, desc: c.desc || '', owner: c.owner, at: c.at,
+        username: c.username || '', avatar: c.avatar || '', cover: c.cover || '',
         msgs: (policy.channelChat[c.id] || []).length })) });
 }
 function channelChatGet(req, res) {
@@ -4099,6 +4245,7 @@ function channelChatGet(req, res) {
         const owner = !!(mine && (mine === c.owner || isAdmin(mine)));
         const mod = owner || !!(mine && Array.isArray(c.mods) && c.mods.some(x => x.toLowerCase() === mine.toLowerCase()));
         send(res, 200, { ok: true, name: c.name, desc: c.desc || '', owner: c.owner,
+            username: c.username || '', avatar: c.avatar || '', cover: c.cover || '',
             isOwner: owner, canMod: mod, mods: owner ? (c.mods || []) : undefined, msgs: arr.slice(since), total: arr.length });
     });
 }
@@ -4411,6 +4558,19 @@ function vidsTotal() {
     return t;
 }
 
+// теги: из строки "#minecraft, обзор #топ" или массива -> ["minecraft","обзор","топ"], до 10
+function parseTags(v) {
+    let raw = [];
+    if (Array.isArray(v)) raw = v;
+    else if (typeof v === 'string') raw = v.split(/[,\s]+/);
+    const out = [];
+    for (let t of raw) {
+        t = String(t || '').replace(/^#+/, '').toLowerCase().replace(/[^a-z0-9а-яё_-]/gi, '').slice(0, 24);
+        if (t && !out.includes(t)) out.push(t);
+        if (out.length >= 10) break;
+    }
+    return out;
+}
 function videoCreate(req, res) {
     readJsonBodyLimit(req, SHOT_MAX, body => {
         if (!body) return send(res, 413, { error: 'слишком большое превью' });
@@ -4428,6 +4588,7 @@ function videoCreate(req, res) {
             title, desc, mime, thumb, at: now(), dur: Number(body.dur) || 0,
             category: (clean(body.category, 32) || '').toLowerCase().replace(/[^a-z0-9а-я_-]/gi, ''),
             subcategory: clean(body.subcategory, 40),
+            tags: parseTags(body.tags),
             views: 0, likes: [], comments: [], ready: false
         };
         policy.videos.push(v);
@@ -5303,6 +5464,12 @@ const server = http.createServer((req, res) => {
     if (route === '/stream/stop' && req.method === 'POST') return streamStop(req, res);
     if (route === '/stream/list') return streamList(req, res);
     if (route === '/stream/frame' && req.method === 'POST') return streamFrame(req, res);
+    if (route === '/stream/media/push' && req.method === 'POST') return streamMediaPush(req, res);  // webm-чанки (настоящее видео)
+    if (route === '/stream/media/get' && req.method === 'POST') return streamMediaGet(req, res);
+    if (route === '/stream/viewers' && req.method === 'POST') return streamViewers(req, res);        // кто смотрит
+    if (route === '/dm/send' && req.method === 'POST') return dmSend(req, res);                      // личные сообщения
+    if (route === '/dm/thread' && req.method === 'POST') return dmThread(req, res);
+    if (route === '/dm/threads' && req.method === 'POST') return dmThreads(req, res);
     if (route === '/stream/audio/push' && req.method === 'POST') return streamAudioPush(req, res);
     if (route === '/stream/audio/get' && req.method === 'POST') return streamAudioGet(req, res);
     if (route === '/stream/chat/get' && req.method === 'POST') return streamChatGet(req, res);
@@ -5311,6 +5478,7 @@ const server = http.createServer((req, res) => {
 
     // --- каналы с общим чатом ---
     if (route === '/channel/create' && req.method === 'POST') return channelCreate(req, res);
+    if (route === '/channel/update' && req.method === 'POST') return channelUpdate(req, res);
     if (route === '/channel/list') return channelList(req, res);
     if (route === '/channel/chat/get' && req.method === 'POST') return channelChatGet(req, res);
     if (route === '/channel/chat/send' && req.method === 'POST') return channelChatSend(req, res);
@@ -5354,6 +5522,22 @@ const server = http.createServer((req, res) => {
         return send(res, 405, { error: 'не тот метод' });
     }
 
+    // дружелюбная 404: браузеру — красивую страницу, остальным — JSON
+    const accept = String(req.headers['accept'] || '');
+    if (accept.includes('text/html')) {
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end('<!doctype html><html lang="ru"><head><meta charset="utf-8">' +
+            '<meta name="viewport" content="width=device-width,initial-scale=1"><title>404 — NareLauncher</title>' +
+            '<style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+            'font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0b0f17;color:#e6edf3;text-align:center;padding:24px;gap:10px}' +
+            '.c{font:700 14px/1 system-ui;letter-spacing:.15em;color:#5b8cff}.b{font-size:clamp(28px,6vw,54px);font-weight:800}' +
+            '.s{color:#8b949e;max-width:440px}a{display:inline-block;margin-top:14px;padding:10px 18px;border-radius:10px;' +
+            'background:#5b8cff;color:#fff;text-decoration:none;font-weight:600}a.g{background:transparent;color:#8b949e;border:1px solid #30363d}</style>' +
+            '</head><body><div class="c">NARELAUNCHER · 404</div><div class="b">Страница не найдена</div>' +
+            '<p class="s">Такого адреса здесь нет. Возможно, ссылка устарела или была набрана с ошибкой.</p>' +
+            '<div><a href="https://narelauncher.winnigames2024.ru/">На главную</a> ' +
+            '<a class="g" href="https://narelauncher.winnigames2024.ru/live/">Эфиры</a></div></body></html>');
+    }
     send(res, 404, { error: 'нет такого адреса', see: ['/ping', '/rooms', '/announce', '/bye', '/file/<sha1>'] });
 });
 

@@ -38,6 +38,17 @@ if [ -f "$NGINX_CONF" ] && ! grep -q "narecat" "$NGINX_CONF"; then
   else mv "$NGINX_CONF.bak" "$NGINX_CONF"; logger "narelauncher: nginx правило категорий откатано (ошибка конфига)"; fi
 fi
 
+# --- правило nginx для красивых ссылок видео: /watch/<id>/ -> /media/watch.php?v=<id> ---
+if [ -f "$NGINX_CONF" ] && ! grep -q "narewatch" "$NGINX_CONF"; then
+  cp "$NGINX_CONF" "$NGINX_CONF.bak"
+  awk '1; /index index\.php/ && !d {
+    print "    # narewatch: красивые ссылки на видео";
+    print "    rewrite ^/watch/([^/]+)/?$ /media/watch.php?v=$1 last;";
+    d=1 }' "$NGINX_CONF" > "$NGINX_CONF.tmp" && mv "$NGINX_CONF.tmp" "$NGINX_CONF"
+  if nginx -t >/dev/null 2>&1; then systemctl reload nginx; rm -f "$NGINX_CONF.bak"; logger "narelauncher: nginx правило видео добавлено";
+  else mv "$NGINX_CONF.bak" "$NGINX_CONF"; logger "narelauncher: nginx правило видео откатано (ошибка конфига)"; fi
+fi
+
 # --- nare-net.js (Node) ---
 if [ -f "$SRC/narenet/nare-net.js" ] && [ -d /root/narenet ]; then
   if ! cmp -s "$SRC/narenet/nare-net.js" /root/narenet/nare-net.js; then

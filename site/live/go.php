@@ -9,6 +9,8 @@ require __DIR__ . '/../_inc/head.php';
   <div id="setup" class="panel" style="max-width:560px">
     <label class="fl">Название</label>
     <input id="title" maxlength="120" placeholder="Мой стрим" class="fi">
+    <label class="fl" style="margin-top:10px">ID стрима (для ссылки ?s=…; пусто — сгенерируется сам)</label>
+    <input id="sid" class="fi" maxlength="40" placeholder="напр. my-live-1 (англ., цифры, дефис)">
     <div class="row-form" style="margin-top:10px">
       <select id="cat" class="fi" style="flex:1">
         <option value="games">Игры</option><option value="just-chatting">Разговоры</option>
@@ -33,7 +35,7 @@ require __DIR__ . '/../_inc/head.php';
     </div>
     <button class="btn" id="start" style="margin-top:16px">Выйти в эфир</button>
     <div class="msg" id="st" style="display:none"></div>
-    <p class="muted" style="margin-top:10px">Видео идёт кадрами в хорошем качестве (небольшая задержка — это нормально). Звук — отдельным потоком с задержкой.</p>
+    <p class="muted" style="margin-top:10px">Идёт настоящим видео (webm) со звуком — как живой эфир, с небольшой задержкой в пару секунд. Это нормально.</p>
   </div>
 
   <div id="live" style="display:none">
@@ -72,7 +74,7 @@ require __DIR__ . '/../_inc/head.php';
 <script>
 var TOK=<?= json_encode(token()) ?>, SID=null, LINK='';
 var screenStream=null, camStream=null, micStream=null;
-var camOn=false, micOn=false, camPos='br', camScale=0.26, maxW=1920, frameTimer=null, micRec=null, micStop=false;
+var camOn=false, micOn=false, camPos='br', camScale=0.26, maxW=1920;
 function node(p,d){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
 function msg(t){var e=document.getElementById('st');e.style.display='block';e.textContent=t;}
 function qToW(q){ return q==='1440'?2560:(q==='720'?1280:1920); }
@@ -85,49 +87,68 @@ document.getElementById('start').onclick=function(){
   if(wantS) chain=chain.then(function(){return navigator.mediaDevices.getDisplayMedia({video:{frameRate:15}}).then(function(ms){screenStream=ms;document.getElementById('screenV').srcObject=ms;ms.getVideoTracks()[0].addEventListener('ended',stop);});});
   if(wantC) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({video:true}).then(function(ms){camStream=ms;camOn=true;document.getElementById('camV').srcObject=ms;});});
   if(wantM) chain=chain.then(function(){return navigator.mediaDevices.getUserMedia({audio:true}).then(function(ms){micStream=ms;micOn=true;});});
-  chain.then(function(){ return node('/stream/start',{token:TOK,title:(document.getElementById('title').value.trim()||'Эфир'),category:document.getElementById('cat').value,subcategory:document.getElementById('sub').value.trim(),name:document.getElementById('name').value.trim()}); })
-  .then(function(j){ if(!j.ok){msg(j.error||'Ошибка');return;} SID=j.id; LINK=location.origin+(j.link||('/live/watch.php?s='+j.id));
+  chain.then(function(){ return node('/stream/start',{token:TOK,id:document.getElementById('sid').value.trim(),title:(document.getElementById('title').value.trim()||'Эфир'),category:document.getElementById('cat').value,subcategory:document.getElementById('sub').value.trim(),name:document.getElementById('name').value.trim()}); })
+  .then(function(j){ if(!j.ok){msg(j.error||'Ошибка');return;} SID=j.id; LINK=location.origin+(j.watch||('/live/watch.php?s='+j.id));
     document.getElementById('setup').style.display='none'; document.getElementById('live').style.display='block';
-    document.getElementById('watch').href=j.link||('/live/watch.php?s='+j.id);
+    document.getElementById('watch').href=j.watch||('/live/watch.php?s='+j.id);
     document.getElementById('camToggle').textContent='🎥 Камера: '+(camOn?'вкл':'выкл');
     document.getElementById('micToggle').textContent='🎤 Микрофон: '+(micOn?'вкл':'выкл');
-    listDevices(); loopFrames(); if(micOn) recordClip(); pollv();
+    listDevices(); drawLoop(); startRecorder(); pollv();
   }).catch(function(e){ msg('Не удалось: '+e.message); });
 };
 
-function loopFrames(){
+// плавная отрисовка на canvas (экран + камера PiP), размер = исходный кадр (без обрезки)
+var rafId=null;
+function drawLoop(){
   var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
   var sV=document.getElementById('screenV'), cV=document.getElementById('camV');
-  frameTimer=setInterval(function(){
+  function tick(){
     var baseW=0,baseH=0;
     if(screenStream&&sV.videoWidth){ baseW=sV.videoWidth; baseH=sV.videoHeight; }
     else if(camStream&&cV.videoWidth){ baseW=cV.videoWidth; baseH=cV.videoHeight; }
-    if(!baseW) return;
-    var scale=baseW>maxW?maxW/baseW:1; cv.width=Math.round(baseW*scale); cv.height=Math.round(baseH*scale);
-    if(screenStream&&sV.videoWidth) ctx.drawImage(sV,0,0,cv.width,cv.height);
-    else { ctx.fillStyle='#000'; ctx.fillRect(0,0,cv.width,cv.height); }
-    if(camOn&&camStream&&cV.videoWidth){
-      var cw=Math.round(cv.width*camScale), ch=Math.round(cw*cV.videoHeight/cV.videoWidth), m=Math.round(cv.width*0.015);
-      var x=(camPos==='tl'||camPos==='bl')?m:cv.width-cw-m, y=(camPos==='tl'||camPos==='tr')?m:cv.height-ch-m;
-      ctx.drawImage(cV,x,y,cw,ch); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(x,y,cw,ch);
+    if(baseW){
+      var scale=baseW>maxW?maxW/baseW:1; var W=Math.round(baseW*scale), H=Math.round(baseH*scale);
+      if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+      if(screenStream&&sV.videoWidth) ctx.drawImage(sV,0,0,W,H);
+      else { ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); }
+      if(camOn&&camStream&&cV.videoWidth){
+        var cw=Math.round(W*camScale), ch=Math.round(cw*cV.videoHeight/cV.videoWidth), m=Math.round(W*0.015);
+        var x=(camPos==='tl'||camPos==='bl')?m:W-cw-m, y=(camPos==='tl'||camPos==='tr')?m:H-ch-m;
+        ctx.drawImage(cV,x,y,cw,ch); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(x,y,cw,ch);
+      }
     }
-    node('/stream/push',{token:TOK,id:SID,jpg:cv.toDataURL('image/jpeg',0.72).split(',')[1]});
-  },700);
+    rafId=requestAnimationFrame(tick);
+  }
+  tick();
 }
 
-// микрофон: самостоятельные аудио-клипы ~1.4с
-function audioMime(){ var m=['audio/webm;codecs=opus','audio/webm','audio/mp4']; for(var i=0;i<m.length;i++) if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m[i])) return m[i]; return ''; }
-function recordClip(){
-  if(micStop||!micOn||!micStream||!SID){ return; }
+// НАСТОЯЩЕЕ ВИДЕО: пишем canvas (+микрофон) в webm и шлём чанками на сервер
+var rec=null, recFirst=true, combined=null;
+function videoMime(){ var m=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm']; for(var i=0;i<m.length;i++) if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m[i])) return m[i]; return ''; }
+function vBitrate(){ return maxW>=2560?6000000:(maxW>=1920?4000000:2500000); }
+function startRecorder(){
+  try{ if(rec){ rec.onstop=null; rec.stop(); } }catch(e){}
+  var cv=document.getElementById('cv');
+  // дождёмся, пока у canvas появится размер
+  if(!cv.width){ setTimeout(startRecorder,200); return; }
+  var canvasStream=cv.captureStream(30);
+  var tracks=canvasStream.getVideoTracks();
+  if(micOn&&micStream){ micStream.getAudioTracks().forEach(function(t){ tracks.push(t); }); }
+  combined=new MediaStream(tracks);
+  var mime=videoMime(); if(!mime){ msg('Браузер не умеет записывать видео'); return; }
+  recFirst=true;
   try{
-    micRec=new MediaRecorder(micStream,audioMime()?{mimeType:audioMime()}:undefined); var chunks=[];
-    micRec.ondataavailable=function(e){ if(e.data&&e.data.size) chunks.push(e.data); };
-    micRec.onstop=function(){ var blob=new Blob(chunks); var fr=new FileReader(); fr.onload=function(){ var b=(''+fr.result).split(',')[1]; if(b&&SID&&micOn) node('/stream/audio/push',{token:TOK,id:SID,clip:b}); setTimeout(recordClip,80); }; fr.readAsDataURL(blob); };
-    micRec.start(); setTimeout(function(){ try{micRec.stop();}catch(e){} },1400);
-  }catch(e){ setTimeout(recordClip,1000); }
+    rec=new MediaRecorder(combined,{mimeType:mime,videoBitsPerSecond:vBitrate()});
+    rec.ondataavailable=function(e){ if(!e.data||!e.data.size||!SID)return;
+      var fr=new FileReader(); fr.onload=function(){ var b64=(''+fr.result).split(',')[1]; if(!b64)return;
+        node('/stream/media/push',{token:TOK,id:SID,init:recFirst,chunk:b64}); recFirst=false; };
+      fr.readAsDataURL(e.data); };
+    rec.start(1000);   // чанк раз в секунду
+  }catch(e){ msg('Запись видео: '+e.message); }
 }
+function restartRecorder(){ startRecorder(); }   // после смены микрофона/качества — перезапуск с новым init
 
-function pollv(){ if(!SID)return; node('/stream/frame',{id:SID}).then(function(j){ if(j.ok)document.getElementById('vw').textContent=' · '+(j.viewers||0)+' смотрят'; }).finally(function(){setTimeout(pollv,4000);}); }
+function pollv(){ if(!SID)return; node('/stream/viewers',{id:SID}).then(function(j){ if(j.ok){ var n=j.count||0; var names=(j.viewers||[]).map(function(v){return v.user;}).join(', '); document.getElementById('vw').textContent=' · '+n+' смотрят'+(names?(' ('+names+')'):''); } }).finally(function(){setTimeout(pollv,4000);}); }
 
 function listDevices(){ navigator.mediaDevices.enumerateDevices().then(function(ds){
   var cs=document.getElementById('camDev'), ms=document.getElementById('micDev'); cs.innerHTML='';ms.innerHTML='';
@@ -145,14 +166,14 @@ Array.prototype.forEach.call(document.querySelectorAll('.campos'),function(b){ b
 document.getElementById('camBig').onclick=function(){ camScale=Math.min(0.5,camScale+0.05); };
 document.getElementById('camSmall').onclick=function(){ camScale=Math.max(0.12,camScale-0.05); };
 document.getElementById('micToggle').onclick=function(){
-  if(micOn){ micOn=false; this.textContent='🎤 Микрофон: выкл'; }
+  if(micOn){ micOn=false; this.textContent='🎤 Микрофон: выкл'; restartRecorder(); }
   else { var dev=document.getElementById('micDev').value;
-    navigator.mediaDevices.getUserMedia({audio:dev?{deviceId:{exact:dev}}:true}).then(function(ms){ if(micStream)micStream.getTracks().forEach(function(t){t.stop();}); micStream=ms; micOn=true; document.getElementById('micToggle').textContent='🎤 Микрофон: вкл'; listDevices(); recordClip(); }).catch(function(e){alert('Микрофон: '+e.message);}); }
+    navigator.mediaDevices.getUserMedia({audio:dev?{deviceId:{exact:dev}}:true}).then(function(ms){ if(micStream)micStream.getTracks().forEach(function(t){t.stop();}); micStream=ms; micOn=true; document.getElementById('micToggle').textContent='🎤 Микрофон: вкл'; listDevices(); restartRecorder(); }).catch(function(e){alert('Микрофон: '+e.message);}); }
 };
-document.getElementById('micDev').onchange=function(){ if(!micOn)return; var dev=this.value; navigator.mediaDevices.getUserMedia({audio:{deviceId:{exact:dev}}}).then(function(ms){ if(micStream)micStream.getTracks().forEach(function(t){t.stop();}); micStream=ms; }); };
-document.getElementById('q2').onchange=function(){ maxW=qToW(this.value); };
+document.getElementById('micDev').onchange=function(){ if(!micOn)return; var dev=this.value; navigator.mediaDevices.getUserMedia({audio:{deviceId:{exact:dev}}}).then(function(ms){ if(micStream)micStream.getTracks().forEach(function(t){t.stop();}); micStream=ms; restartRecorder(); }); };
+document.getElementById('q2').onchange=function(){ maxW=qToW(this.value); restartRecorder(); };
 
-function stop(){ if(frameTimer)clearInterval(frameTimer); micStop=true; if(SID)node('/stream/stop',{token:TOK,id:SID});
+function stop(){ if(rafId)cancelAnimationFrame(rafId); try{if(rec){rec.onstop=null;rec.stop();}}catch(e){} if(SID)node('/stream/stop',{token:TOK,id:SID});
   [screenStream,camStream,micStream].forEach(function(s){ if(s)s.getTracks().forEach(function(t){t.stop();}); }); location.href='/live/'; }
 document.getElementById('stop').onclick=stop;
 document.getElementById('copy').onclick=function(){ navigator.clipboard.writeText(LINK); this.textContent='Скопировано ✓'; };

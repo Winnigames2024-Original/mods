@@ -185,3 +185,56 @@ html.simple .cp-msg.bot,html.simple .cp-foot input{background:#f3f4f6}
 .gh404-big{font-size:clamp(28px,6vw,54px);font-weight:800;letter-spacing:.02em;line-height:1.05}
 .gh404-sub{max-width:520px;color:var(--muted,#8b949e);margin:4px 0 14px}
 html.simple .gh404-code{color:#2563eb}
+
+/* --- Эфир: видео и запасной кадр во всю ширину (чинит обрезку) --- */
+.rc-screen-wrap #scr, .rc-screen-wrap #vid{display:block;width:100%;height:auto;background:#05070c}
+/* --- Зрители эфира --- */
+.vbadge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:rgba(91,140,255,.25);
+  color:var(--accent,#5b8cff);font-size:12px;font-weight:700;text-align:center;vertical-align:middle}
+.vlist{display:flex;flex-direction:column;gap:6px}
+.vrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(128,128,128,.07);
+  border:1px solid rgba(128,128,128,.15);border-radius:10px}
+.vav{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#5b8cff,#8b5bff);flex:0 0 auto}
+.vname{flex:1;font-weight:600}
+
+/* --- Личные сообщения --- */
+.dm-wrap{display:grid;grid-template-columns:280px 1fr;gap:14px;align-items:start}
+@media(max-width:700px){.dm-wrap{grid-template-columns:1fr}}
+.dm-threads{max-height:70vh;overflow-y:auto;padding:8px}
+.dm-thread{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;cursor:pointer}
+.dm-thread:hover{background:rgba(128,128,128,.1)}
+.dm-thread.active{background:rgba(91,140,255,.15)}
+.dm-last{display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.dm-conv{display:flex;flex-direction:column;min-height:60vh;max-height:70vh;padding:0}
+.dm-head{padding:12px 14px;border-bottom:1px solid rgba(128,128,128,.2)}
+.dm-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.dm-msg{max-width:72%;padding:8px 12px;border-radius:14px;position:relative;font-size:14px;word-wrap:break-word}
+.dm-msg.me{align-self:flex-end;background:linear-gradient(135deg,#5b8cff,#6b7bff);color:#fff;border-bottom-right-radius:4px}
+.dm-msg.them{align-self:flex-start;background:rgba(128,128,128,.18);border-bottom-left-radius:4px}
+.dm-time{display:block;font-size:10px;opacity:.6;margin-top:3px;text-align:right}
+.dm-foot{padding:10px;border-top:1px solid rgba(128,128,128,.2)}
+
+/* --- Кнопка переключения дизайна (полированная) --- */
+.design-toggle{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;
+  border:1px solid rgba(128,128,128,.3);background:rgba(128,128,128,.1);color:inherit;font:600 13px/1 inherit;
+  cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.design-toggle:hover{background:rgba(91,140,255,.18);border-color:var(--accent,#5b8cff)}
+.design-toggle:active{transform:scale(.96)}
+.design-toggle .dt-ico{font-size:15px;line-height:1}
+html.simple .design-toggle{background:#eef1f6;border-color:#d4dae3}
+html.simple .design-toggle:hover{background:#e3e9ff;border-color:#2563eb}
+
+/* --- Теги видео --- */
+.tagrow{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.tagchip{padding:4px 10px;border-radius:999px;background:rgba(91,140,255,.14);color:var(--accent,#5b8cff);
+  font-size:13px;font-weight:600;text-decoration:none}
+.tagchip:hover{background:rgba(91,140,255,.25)}
+
+/* --- Шапка канала (обложка/аватар/username) --- */
+.ch-banner{height:120px;border-radius:14px;background:linear-gradient(135deg,#5b8cff,#8b5bff);background-size:cover;background-position:center}
+.ch-head{display:flex;align-items:flex-end;gap:14px;margin:-34px 0 14px;padding:0 6px;position:relative}
+.ch-ava{width:76px;height:76px;border-radius:18px;flex:0 0 auto;display:grid;place-items:center;font-size:30px;font-weight:800;color:#fff;
+  background:linear-gradient(135deg,#8b5bff,#5b8cff);border:3px solid var(--bg,#0b0f17);background-position:center}
+.ch-meta{flex:1;padding-bottom:2px}
+.ch-actions{display:flex;gap:6px;align-items:center;padding-bottom:4px;flex-wrap:wrap}

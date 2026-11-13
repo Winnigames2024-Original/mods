@@ -36,7 +36,8 @@ require __DIR__ . '/../../_inc/head.php';
       <div class="card"><h3>Регистрация</h3><p><?= !empty($p['since']) ? h(date('d.m.Y', (int)($p['since']/1000))) : '—' ?></p></div>
     </div>
     <?php if (me() && me() !== ($p['nick'] ?? $user)): ?>
-      <p style="margin-top:16px"><button class="btn" id="subbtn" type="button">Подписаться</button></p>
+      <p style="margin-top:16px"><button class="btn" id="subbtn" type="button">Подписаться</button>
+        <a class="btn ghost" href="/messages/?with=<?= urlencode($p['nick'] ?? $user) ?>">✉ Написать</a></p>
     <?php elseif (!me()): ?>
       <p style="margin-top:16px"><a class="btn" href="/login/">Войдите, чтобы подписаться</a></p>
     <?php endif; ?>

@@ -15,7 +15,7 @@ $streams = api_get('/stream/list')['streams'] ?? [];
 <div class="mgrid">
   <?php foreach ($streams as $s): $href = !empty($s['link']) ? $s['link'] : ('/live/watch.php?s=' . urlencode($s['id'])); ?>
   <a class="mcard" href="<?= h($href) ?>">
-    <div class="mthumb vid"><span class="live-dot">● LIVE</span></div>
+    <div class="mthumb vid"<?= !empty($s['cover']) ? ' style="background-image:url(\'data:image/jpeg;base64,'.h($s['cover']).'\');background-size:cover;background-position:center"' : '' ?>><span class="live-dot">● LIVE</span></div>
     <div class="mmeta"><div class="mtitle"><?= h($s['title']) ?></div>
       <div class="muted"><?= h($s['user']) ?> · <?= (int)$s['viewers'] ?> смотрят<?php if (!empty($s['subcategory'])): ?> · <?= h($s['subcategory']) ?><?php elseif (!empty($s['category'])): ?> · <?= h($s['category']) ?><?php endif; ?></div></div>
   </a>

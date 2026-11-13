@@ -22,6 +22,8 @@ require __DIR__ . '/../_inc/head.php';
   <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Подкатегория (например Minecraft)</label>
   <input id="sub" maxlength="40" placeholder="Minecraft" list="subs" style="width:100%;background:#0a0d14;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:11px 12px">
   <datalist id="subs"><option value="Minecraft"><option value="CS2"><option value="GTA V"><option value="Dota 2"><option value="Fortnite"><option value="Roblox"></datalist>
+  <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Теги (через пробел или запятую, с # или без)</label>
+  <input id="tags" maxlength="200" placeholder="#minecraft обзор #топ" style="width:100%;background:#0a0d14;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:11px 12px">
   <label style="display:block;color:var(--dim);font-size:13px;margin:10px 0 4px">Файл</label>
   <input id="file" type="file" accept="video/*" style="width:100%">
   <button class="btn" id="go" style="margin-top:16px">Загрузить</button>
@@ -44,8 +46,9 @@ document.getElementById('go').onclick=function(){
   var rawBase=kind==='video'?'/video/raw/':'/photo/raw/';
   msg('Создаю…');
   var cat=document.getElementById('cat').value, sub=document.getElementById('sub').value.trim();
+  var tags=document.getElementById('tags')?document.getElementById('tags').value:'';
   fetch(createPath,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({token:TOK,title:title,desc:desc,mime:f.type,category:cat,subcategory:sub})}).then(function(r){return r.json();}).then(function(j){
+    body:JSON.stringify({token:TOK,title:title,desc:desc,mime:f.type,category:cat,subcategory:sub,tags:tags})}).then(function(r){return r.json();}).then(function(j){
     if(!j.ok){msg(j.error||'Ошибка');return;}
     var id=j.id; msg('Загружаю файл…');
     document.getElementById('pw').style.display='block';

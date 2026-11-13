@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../_inc/config.php';
+require_login();                 // смотреть видео можно только из аккаунта
 $id = $_GET['v'] ?? '';
 $resp = api_get('/video/get?id=' . urlencode($id));
 $v = $resp['video'] ?? null;
@@ -15,6 +16,9 @@ require __DIR__ . '/../_inc/head.php';
   <div class="btn-row" style="margin:12px 0">
     <button class="btn ghost" id="like">👍 <span id="likes"><?= (int)$v['likes'] ?></span></button>
   </div>
+  <?php if (!empty($v['tags']) && is_array($v['tags'])): ?>
+  <div class="tagrow"><?php foreach ($v['tags'] as $tg): ?><a class="tagchip" href="/search/?q=<?= urlencode('#'.$tg) ?>">#<?= h($tg) ?></a><?php endforeach; ?></div>
+  <?php endif; ?>
   <?php if (!empty($v['desc'])): ?><div class="panel" style="white-space:pre-wrap"><?= h($v['desc']) ?></div><?php endif; ?>
 
   <h2 style="margin-top:20px">Комментарии</h2>

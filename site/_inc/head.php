@@ -61,6 +61,7 @@ $ogimg = $PAGE_OG_IMAGE ?? (SITE . '/assets/cover.png');
     <a href="/download/">Скачать</a>
     <?php if (me()): ?>
       <a href="/subscriptions/">Подписки</a>
+      <a href="/messages/">Сообщения</a>
       <a href="/servers/mine/">Мои серверы</a>
       <a href="/bots/">Боты</a>
       <a href="/remote/">Удалёнка</a>
