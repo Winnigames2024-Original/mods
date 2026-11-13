@@ -153,6 +153,34 @@ require __DIR__ . '/../_inc/head.php';
     document.getElementById('aiKey').focus();
   }
   </script>
+  <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button type="button" class="btn" id="aiTestBtn">🔍 Проверить ИИ</button>
+    <span id="aiTestSt" class="muted" style="font-size:13px"></span>
+  </div>
+  <div id="aiTestOut" style="display:none;margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(128,128,128,.06);font-size:14px"></div>
+  <script>
+  (function(){
+    var TOK=<?= json_encode($tok) ?>;
+    var btn=document.getElementById('aiTestBtn'), st=document.getElementById('aiTestSt'), out=document.getElementById('aiTestOut');
+    btn.onclick=function(){
+      btn.disabled=true; st.textContent='Отправляю тестовый запрос…'; out.style.display='none';
+      var q='Привет! Это тест. Ответь одним коротким предложением, что ты работаешь.';
+      fetch('/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOK,text:q,history:[]})})
+        .then(function(r){return r.json();})
+        .then(function(j){
+          btn.disabled=false;
+          var badge, color;
+          if(j && j.local){ badge='🧠 Ответил ЛОКАЛЬНЫЙ мозг'+(j.note?(' ('+j.note+')'):' (внешний ИИ не задан или недоступен)'); color='#ffd24a'; }
+          else if(j && j.configured){ badge='✅ Ответил ВНЕШНИЙ ИИ (OpenRouter/Groq/Gemini)'; color='#4bb34b'; }
+          else { badge='⚠ ИИ не настроен'; color='#ff6b74'; }
+          st.innerHTML='<b style="color:'+color+'">'+badge+'</b>';
+          out.style.display='block';
+          out.innerHTML='<div class="muted" style="font-size:12px;margin-bottom:4px">Ответ Наря:</div>'+((j&&j.reply)?String(j.reply).replace(/[<>]/g,''):'(пусто)');
+        })
+        .catch(function(){ btn.disabled=false; st.innerHTML='<b style="color:#ff6b74">Ошибка сети — сервер ИИ не ответил</b>'; });
+    };
+  })();
+  </script>
   <form method="post" style="margin-top:8px" onsubmit="return confirm('Очистить всё, что ИИ выучил?')">
     <input type="hidden" name="act" value="aiforget">
     <button class="btn ghost" type="submit">Очистить память ИИ</button>
