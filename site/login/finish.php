@@ -13,5 +13,6 @@ $p = $_SESSION['pending'];
 $_SESSION['nick']  = $p['nick'];
 $_SESSION['token'] = $p['token'];
 $_SESSION['admin'] = !empty($p['admin']);
+nare_set_auth($p['token']);   // запомнить вход в cookie
 unset($_SESSION['pending'], $_SESSION['login2fa']);
 echo json_encode(['ok' => true]);

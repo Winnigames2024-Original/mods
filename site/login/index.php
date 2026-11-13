@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
         $_SESSION['nick'] = $r['nick'];
         $_SESSION['token'] = $r['token'];
         $_SESSION['admin'] = !empty($r['admin']);
+        nare_set_auth($r['token']);   // запомнить вход в cookie
         header('Location: /profile/my/'); exit;
     }
     $err = $r['error'] ?? 'Не удалось войти';

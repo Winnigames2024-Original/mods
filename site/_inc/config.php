@@ -67,3 +67,27 @@ function launcher_version() {
     $v = $j['version'] ?? '—';
     return $v;
 }
+
+/** Постоянный вход через cookie (чтобы не выкидывало). */
+function nare_set_auth($token) {
+    if (!$token) return;
+    $opts = ['expires' => time() + 30 * 24 * 60 * 60, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax'];
+    if (PHP_VERSION_ID >= 70300) setcookie('nare_auth', $token, $opts);
+    else setcookie('nare_auth', $token, $opts['expires'], '/', '', true, true);
+    $_COOKIE['nare_auth'] = $token;
+}
+function nare_clear_auth() {
+    @setcookie('nare_auth', '', time() - 3600, '/', '', true, true);
+    unset($_COOKIE['nare_auth']);
+}
+
+// Если браузерная сессия истекла, но есть cookie «запомнить вход» — восстанавливаем вход.
+if (empty($_SESSION['nick']) && !empty($_COOKIE['nare_auth'])) {
+    $who = api_post('/account/whoami', ['token' => $_COOKIE['nare_auth']]);
+    if (!empty($who['ok'])) {
+        $_SESSION['nick']  = $who['nick'];
+        $_SESSION['token'] = $_COOKIE['nare_auth'];
+    } elseif (array_key_exists('ok', $who) && !$who['ok']) {
+        nare_clear_auth();   // токен протух — чистим cookie
+    }
+}

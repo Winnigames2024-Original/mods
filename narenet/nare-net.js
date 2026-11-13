@@ -56,7 +56,7 @@ const VIDEOS_MAX = 8 * 1024 * 1024 * 1024;  // всё видео
 const ROOMS_MAX = 200;
 const OPEN_WAIT = 8 * 1000;           // сколько ждём встречное соединение хозяина
 
-const VERSION = '1.71';
+const VERSION = '1.72';
 
 // ---------------------------------------------------------------- хозяйство
 
@@ -636,7 +636,7 @@ function goodPassword(password) {
 //      не выкидывал всех из аккаунтов и из удалённого управления.
 
 const sessions = new Map();                     // token -> { nick, exp }
-const SESSION_LIFE = 12 * 60 * 60 * 1000;
+const SESSION_LIFE = 30 * 24 * 60 * 60 * 1000;   // 30 дней, и продлевается при каждом заходе
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 (function loadSessions() {
@@ -747,6 +747,7 @@ function sessionNick(tok) {
     const s = sessions.get(tok);
     if (!s) return null;
     if (now() > s.exp) { sessions.delete(tok); return null; }
+    s.exp = now() + SESSION_LIFE;   // скользящее продление: активный вход не истекает
     return s.nick;
 }
 
@@ -868,6 +869,15 @@ function accountRegister(req, res) {
     });
 }
 
+// проверка токена из cookie: вернуть ник, если вход ещё живой (и продлить его)
+function accountWhoami(req, res) {
+    readJsonBody(req, body => {
+        const nick = sessionNick(body && body.token);
+        if (!nick) return send(res, 200, { ok: false });
+        const a = acc(nick) || {};
+        send(res, 200, { ok: true, nick, user: a.username || nick });
+    });
+}
 function accountLogin(req, res) {
     readJsonBody(req, body => {
         if (!body) return send(res, 400, { error: 'это не JSON' });
@@ -5348,6 +5358,7 @@ const server = http.createServer((req, res) => {
     if (route === '/account/delete' && req.method === 'POST') return accountDelete(req, res);
     if (route === '/account/devices' && req.method === 'POST') return devicesList(req, res);
     if (route === '/account/device/unlink' && req.method === 'POST') return deviceUnlink(req, res);
+    if (route === '/account/whoami' && req.method === 'POST') return accountWhoami(req, res);
     if (route === '/account/logout' && req.method === 'POST') return accountLogout(req, res);
     if (route === '/account/logout/others' && req.method === 'POST') return accountLogoutOthers(req, res);
 

@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../_inc/config.php';
-if (isset($_GET['logout'])) { session_destroy(); header('Location: /home/'); exit; }
+if (isset($_GET['logout'])) { if (token()) api_post('/account/logout', ['token' => token()]); nare_clear_auth(); session_destroy(); header('Location: /home/'); exit; }
 require_login();
 $nick = me();
 
