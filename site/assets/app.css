@@ -441,3 +441,9 @@ a.card:hover,.mcard:hover .mthumb{box-shadow:0 6px 20px rgba(0,0,0,.18)}
 .stheme-hearts #wrap{border:6px solid #ff5b7a;box-shadow:0 0 0 4px #fff,0 0 0 8px #ffd0d8}
 .stheme-hearts h1{color:#c81d3c}
 .stheme-pick{background:rgba(128,128,128,.1);border:1px solid rgba(128,128,128,.25);color:inherit;border-radius:9px;padding:7px 10px;font:inherit}
+
+/* полоска версий — только для админа, внизу слева */
+.ver-strip{position:fixed;left:0;bottom:0;z-index:55;background:rgba(0,0,0,.6);color:#cfd6e4;
+  font-size:12px;line-height:1;padding:6px 12px 6px 10px;border-top-right-radius:10px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.08);border-left:0;border-bottom:0;pointer-events:none;letter-spacing:.02em}
+.ver-strip b{color:#fff;font-weight:700}

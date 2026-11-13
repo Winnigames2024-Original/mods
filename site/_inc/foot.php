@@ -1,4 +1,11 @@
 </main>
+<?php if (!empty($_SESSION['admin'])):
+  $siteVer = @trim(@file_get_contents(__DIR__ . '/../.sitever')) ?: 'dev';
+  $lv = @json_decode(@file_get_contents(__DIR__ . '/../.launcher.json'), true);
+  $launcherVer = (is_array($lv) && !empty($lv['version'])) ? $lv['version'] : '—';
+?>
+<div class="ver-strip" title="Версии (видно только админу)">⚙ Сайт <b><?= h($siteVer) ?></b> · Лаунчер <b><?= h($launcherVer) ?></b></div>
+<?php endif; ?>
 <footer class="foot">
   <div>© <?= date('Y') ?> NareLauncher · бесплатный лаунчер Minecraft</div>
   <nav>

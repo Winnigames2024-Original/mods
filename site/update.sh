@@ -21,6 +21,9 @@ changed=0
 if [ -d "$SRC/site" ]; then
   cp -r "$SRC/site/." "$WEBROOT/"
   rm -f "$WEBROOT/install.sh" "$WEBROOT/update.sh" "$WEBROOT/DEPLOY.md"
+  # версии для админской полоски: сайт = короткий хеш коммита, лаунчер = из update.json
+  git rev-parse --short HEAD > "$WEBROOT/.sitever" 2>/dev/null || true
+  cp -f "$SRC/narelauncher/update.json" "$WEBROOT/.launcher.json" 2>/dev/null || true
   chown -R www-data:www-data "$WEBROOT"
   changed=1
 fi
