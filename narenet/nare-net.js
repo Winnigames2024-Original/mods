@@ -4469,6 +4469,8 @@ const STREAM_MEDIA_KEEP = 40;   // сколько последних чанко�
 // брошенные эфиры (стример закрыл окно без «завершить») — через 90 c сохраняем и убираем
 setInterval(() => {
     for (const [id, s] of streams) {
+        // живой RTMP/HLS-эфир НЕ удаляем: у него seen не обновляется кадрами, но он в эфире (hlsLive)
+        if (s.hlsLive) continue;
         if (now() - s.seen > 90 * 1000) { finalizeVod(s); streams.delete(id); }
     }
 }, 30 * 1000);
