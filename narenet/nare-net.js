@@ -2170,6 +2170,10 @@ function aiParseTool(text) {
 //  - знает базовые факты о платформе (встроенная база).
 //  Мозг хранится в ai_brain.json и переживает перезапуск.
 // ======================================================================
+// журнал вызовов ИИ (для админки: видно, ответил внешний ИИ или локальный мозг и почему)
+const aiCalls = [];
+function aiCallRecord(o) { aiCalls.push(Object.assign({ at: now() }, o)); if (aiCalls.length > 100) aiCalls.shift(); }
+
 const AI_BRAIN_FILE = path.join(DATA_DIR, 'ai_brain.json');
 let brain = { tri: {}, qa: [], seen: 0, taught: 0 };
 try { brain = Object.assign(brain, JSON.parse(fs.readFileSync(AI_BRAIN_FILE, 'utf8'))); } catch (e) {}
@@ -2340,25 +2344,32 @@ function aiGenerate(messages, image, systemText, cb) {
                 msgs.push({ role, content: mm.text || '' });
             }
         });
-        const body = { model, messages: msgs, temperature: 0.7, max_tokens: 1024 };
+        let body = { model, messages: msgs, temperature: 0.7, max_tokens: 1024 };
         const headers = { 'Authorization': 'Bearer ' + key };
         // OpenRouter: бесплатные модели часто пропадают/лимитируются — передаём список дублёров,
-        // OpenRouter сам переключится на рабочую (его механизм models-fallback).
+        // OpenRouter сам переключится на рабочую (его механизм models-fallback, максимум 3 модели).
         if (/openrouter\.ai/i.test(base)) {
             headers['HTTP-Referer'] = 'https://narelauncher.winnigames2024.ru';
             headers['X-Title'] = 'NareLauncher';
-            // актуальные бесплатные слаги часто лимитируются/пропадают — даём перебор.
-            // 'openrouter/free' сам выбирает любую свободную бесплатную модель.
-            // ВАЖНО: OpenRouter разрешает в массиве models не более 3 штук.
-            const fallbacks = ['openrouter/free', 'google/gemma-4-26b-a4b-it:free', 'nvidia/nemotron-3.5-lightning:free'];
-            const list = [model]; for (const f of fallbacks) { if (list.length >= 3) break; if (list.indexOf(f) < 0) list.push(f); }
-            body.models = list.slice(0, 3);   // OpenRouter переберёт по очереди, если модель недоступна/лимит
+            // если выбрана бесплатная (:free) или пустая модель — первой ставим openrouter/free
+            // (сам выбирает живую бесплатную), чтобы «мёртвый» сохранённый слаг не мешал.
+            const flaky = !model || /:free$/i.test(model) || model === 'openrouter/free';
+            const base3 = flaky
+                ? ['openrouter/free', 'google/gemma-4-26b-a4b-it:free', 'nvidia/nemotron-3.5-lightning:free']
+                : [model, 'openrouter/free', 'google/gemma-4-26b-a4b-it:free'];
+            const list = []; for (const m of base3) { if (list.length >= 3) break; if (m && list.indexOf(m) < 0) list.push(m); }
+            body.models = list;
+            body.model = list[0];
         }
+        const reqModel = body.model;
         return httpsPostJson(base + '/chat/completions', headers, body, (err, code, json, txt) => {
-            if (err) return cb(err);
-            if (code !== 200) return cb(new Error('ИИ вернул ' + code + ': ' + String(txt).slice(0, 200)));
+            if (err) { aiCallRecord({ provider: 'openai', base, model: reqModel, ok: false, error: err.message }); return cb(err); }
+            if (code !== 200) { const em = (json && json.error && json.error.message) || String(txt).slice(0, 200);
+                aiCallRecord({ provider: 'openai', base, model: reqModel, ok: false, code, error: em });
+                return cb(new Error('ИИ вернул ' + code + ': ' + em)); }
             const reply = json && json.choices && json.choices[0] && json.choices[0].message &&
                 (typeof json.choices[0].message.content === 'string' ? json.choices[0].message.content : '');
+            aiCallRecord({ provider: 'openai', base, model: reqModel, ok: true, used: (json && json.model) || '' });
             cb(null, reply || '(пустой ответ)');
         });
     }
@@ -2383,6 +2394,7 @@ function aiChat(req, res) {
             // даже без настройки внешнего ИИ отвечаем локальным мозгом (бесплатно)
             const localAns = localReply(text || '');
             brainLearnText(text); brainLearnText(localAns);
+            aiCallRecord({ provider: 'local', ok: true, reason: 'внешний ИИ не настроен' });
             return send(res, 200, { ok: true, configured: true, local: true, reply: localAns });
         }
 
@@ -2402,6 +2414,7 @@ function aiChat(req, res) {
             aiGenerate(messages, steps === 1 ? image : null, systemText, (err, reply, flag) => {
                 if (flag === 'nokey') { const la = localReply(text || ''); brainLearnText(text); brainLearnText(la); return send(res, 200, { ok: true, configured: true, local: true, reply: la }); }
                 if (err) { log('ai error', err.message); const la = localReply(text || ''); brainLearnText(text);
+                    aiCallRecord({ provider: 'local', ok: true, reason: 'внешний ИИ ошибся: ' + String(err.message).slice(0, 200) });
                     return send(res, 200, { ok: true, configured: true, local: true, reply: la, note: 'внешний ИИ недоступен, ответил локально',
                         extError: admin ? String(err.message).slice(0, 400) : undefined }); }
                 const tool = aiParseTool(reply);
@@ -2454,7 +2467,7 @@ function aiAdminConfig(req, res) {
             enabled: !!policy.ai.enabled, hasKey: !!k, keyHint: k ? (k.slice(0, 4) + '…' + k.slice(-3)) : '',
             memoryBytes: (aiMemoryRead() || '').length,
             brain: { phrases: Object.keys(brain.tri).length, qa: brain.qa.length, seen: brain.seen, taught: brain.taught }
-        } });
+        }, logs: aiCalls.slice(-25).reverse() });
     });
 }
 

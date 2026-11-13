@@ -158,6 +158,29 @@ require __DIR__ . '/../_inc/head.php';
     <span id="aiTestSt" class="muted" style="font-size:13px"></span>
   </div>
   <div id="aiTestOut" style="display:none;margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(128,128,128,.06);font-size:14px"></div>
+
+  <?php $aiLogs = api_post('/admin/ai/config', ['token' => $tok])['logs'] ?? []; ?>
+  <div style="margin-top:14px">
+    <b>📜 Журнал ИИ (последние запросы):</b>
+    <?php if (!$aiLogs): ?>
+      <p class="muted" style="font-size:13px">Пока пусто — задай вопрос Наря или нажми «Проверить ИИ».</p>
+    <?php else: ?>
+      <div style="margin-top:6px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px">
+        <table class="tbl" style="margin:0;font-size:13px">
+          <tr><th>Время</th><th>Кто ответил</th><th>Детали</th></tr>
+          <?php foreach ($aiLogs as $lg):
+            $t = date('H:i:s', (int)(($lg['at'] ?? 0)/1000));
+            $ok = !empty($lg['ok']);
+            if (($lg['provider'] ?? '') === 'local') { $who = '🧠 локальный'; $det = $lg['reason'] ?? ''; }
+            elseif ($ok) { $who = '✅ внешний ИИ'; $det = 'модель: '.h($lg['used'] ?: ($lg['model'] ?? '')); }
+            else { $who = '❌ ошибка внешнего'; $det = (isset($lg['code'])?('HTTP '.$lg['code'].' · '):'').h($lg['error'] ?? ''); }
+          ?>
+            <tr><td><?= $t ?></td><td><?= $who ?></td><td style="max-width:360px;word-break:break-word"><?= $det ?></td></tr>
+          <?php endforeach; ?>
+        </table>
+      </div>
+    <?php endif; ?>
+  </div>
   <script>
   (function(){
     var TOK=<?= json_encode($tok) ?>;
