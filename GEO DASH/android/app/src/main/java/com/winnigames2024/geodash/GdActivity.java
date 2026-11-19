@@ -1,7 +1,6 @@
 package com.winnigames2024.geodash;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -152,35 +151,45 @@ public abstract class GdActivity extends Activity {
 
     protected void toast(String s) { ui.post(() -> Toast.makeText(this, s, Toast.LENGTH_SHORT).show()); }
 
-    protected void go(Class<?> cls) { startActivity(new Intent(this, cls)); }
+    /** Переход без анимации. */
+    protected void go(Class<?> cls) { go(cls, null, null); }
 
     protected void go(Class<?> cls, String key, String value) {
         Intent i = new Intent(this, cls);
-        i.putExtra(key, value);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        if (key != null) i.putExtra(key, value);
         startActivity(i);
+        overridePendingTransition(0, 0);
+    }
+
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
+    }
+
+    @Override protected void onPause() {
+        super.onPause();
+        Music.pause();          // музыка не играет, когда приложение свёрнуто
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        Music.resume();
     }
 
     protected void ask(String title, String def, java.util.function.Consumer<String> cb) {
-        final EditText e = new EditText(this);
-        e.setTextColor(Gd.PAPER);
-        e.setText(def == null ? "" : def);
-        new AlertDialog.Builder(this).setTitle(title).setView(e)
-                .setPositiveButton("OK", (d, w) -> cb.accept(e.getText().toString().trim()))
-                .setNegativeButton("Отмена", null).show();
+        GdDialog.input(this, title, "", def, false, cb::accept);
     }
 
     protected void askPassword(String title, java.util.function.Consumer<String> cb) {
-        final EditText e = new EditText(this);
-        e.setTextColor(Gd.PAPER);
-        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new AlertDialog.Builder(this).setTitle(title).setView(e)
-                .setPositiveButton("OK", (d, w) -> cb.accept(e.getText().toString()))
-                .setNegativeButton("Отмена", null).show();
+        GdDialog.input(this, title, "пароль", "", true, cb::accept);
     }
 
     protected void confirm(String msg, Runnable yes) {
-        new AlertDialog.Builder(this).setMessage(msg)
-                .setPositiveButton("Да", (d, w) -> yes.run())
-                .setNegativeButton("Нет", null).show();
+        GdDialog.confirm(this, "GEO DASH", msg, yes);
+    }
+
+    protected void menu(String title, String[] items, GdDialog.OnPick cb) {
+        GdDialog.items(this, title, items, cb);
     }
 }

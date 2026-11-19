@@ -274,17 +274,16 @@ namespace GEO_DASH.UI
             var st = lv.Settings;
             if (st.CopyMode == 0)
             {
-                MessageBox.Show("Автор закрыл копирование этого уровня.", "Копирование запрещено",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                GdDialog.Info(this, "Копирование запрещено", "Автор закрыл копирование этого уровня.");
                 return;
             }
             if (st.CopyMode == 1)
             {
-                var pass = LevelListForm.Prompt("Копирование по паролю. Введи пароль автора:");
+                var pass = GdDialog.Prompt(this, "GEO DASH", "Копирование по паролю. Введи пароль автора:");
                 if (pass == null) return;
                 if (!string.Equals(pass.Trim(), st.CopyPassword, StringComparison.Ordinal))
                 {
-                    MessageBox.Show("Неверный пароль.", "Копирование", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    GdDialog.Info(this, "Копирование", "Неверный пароль.");
                     return;
                 }
             }

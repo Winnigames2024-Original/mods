@@ -32,6 +32,7 @@ public class MainActivity extends GdActivity {
                 Api.sync(null);
                 account = Api.me();
                 setStatus(Api.online ? "Готово" : "Офлайн — доступны локальные и сохранённые уровни");
+                Updater.check(MainActivity.this);
             });
         } else {
             Api.async(() -> { account = Api.me(); ui.post(() -> { if (statusView != null) statusView.invalidate(); }); });
@@ -65,18 +66,18 @@ public class MainActivity extends GdActivity {
                 0.73f, 0.52f, 0.22f, 0.13f, () -> go(DailyActivity.class));
 
         btn("", Ui.I_PROFILE, Color.rgb(120, 190, 255), Color.rgb(30, 90, 190),
-                0.33f, 0.80f, 0.075f, 0.13f, () -> go(ProfileActivity.class));
+                0.30f, 0.78f, 0.09f, 0.16f, () -> go(ProfileActivity.class)).caption("ПРОФИЛЬ");
         btn("", Ui.I_FRIENDS, Color.rgb(255, 150, 200), Color.rgb(160, 50, 110),
-                0.42f, 0.80f, 0.075f, 0.13f, () -> go(FriendsActivity.class));
+                0.40f, 0.78f, 0.09f, 0.16f, () -> go(FriendsActivity.class)).caption("ДРУЗЬЯ");
         btn("", Ui.I_SETTINGS, Color.rgb(160, 170, 200), Color.rgb(70, 80, 120),
-                0.51f, 0.80f, 0.075f, 0.13f, () -> go(SettingsActivity.class));
+                0.50f, 0.78f, 0.09f, 0.16f, () -> go(SettingsActivity.class)).caption("НАСТРОЙКИ");
         btn("", Ui.I_REFRESH, Color.rgb(120, 220, 180), Color.rgb(30, 120, 100),
-                0.60f, 0.80f, 0.075f, 0.13f, () -> Api.async(() -> {
+                0.60f, 0.78f, 0.09f, 0.16f, () -> Api.async(() -> {
                     setStatus("Синхронизация…");
                     Api.sync(null);
                     account = Api.me();
                     setStatus(Api.online ? "Синхронизировано" : "Нет сети");
-                }));
+                })).caption("СИНХРО");
 
         statusView = new StatusView(this);
         root.addView(statusView, new FrameLayout.LayoutParams(

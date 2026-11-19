@@ -65,7 +65,7 @@ namespace GEO_DASH.UI
             T("Настройки уровня", 140, (s, e) => OpenSettings(), Theme.Accent);
             T("Музыка по ID", 110, (s, e) => OpenMusic());
             T("Загрузить на сервер", 150, (s, e) => Upload(), Theme.Accent2);
-            T("Копия", 70, (s, e) => { var c = LocalStore.CopyLevel(_lv); MessageBox.Show("Создана копия: " + c.Settings.Name); });
+            T("Копия", 70, (s, e) => { var c = LocalStore.CopyLevel(_lv); GdDialog.Info(this, "GEO DASH", "Создана копия: " + c.Settings.Name); });
             T("Отмена", 70, (s, e) => Undo());
             T("Вернуть", 70, (s, e) => Redo());
 
@@ -638,7 +638,7 @@ namespace GEO_DASH.UI
             Save();
             if (!AppConfig.LoggedIn)
             {
-                MessageBox.Show("Сначала войди в аккаунт (меню → Аккаунт).");
+                GdDialog.Info(this, "GEO DASH", "Сначала войди в аккаунт (меню → Аккаунт).");
                 return;
             }
             _status.Text = "Загружаю на сервер…";
@@ -649,12 +649,12 @@ namespace GEO_DASH.UI
                 _lv.Settings.Version++;
                 Save();
                 _status.Text = $"Загружено. ID уровня на сервере: {r.Data.Id}";
-                MessageBox.Show($"Уровень на сервере под ID {r.Data.Id}.\nСсылка: {AppConfig.Settings.SiteUrl}levels/view.php?id={r.Data.Id}");
+                GdDialog.Info(this, "GEO DASH", $"Уровень на сервере под ID {r.Data.Id}.\nСсылка: {AppConfig.Settings.SiteUrl}levels/view.php?id={r.Data.Id}");
             }
             else
             {
                 _status.Text = "Не вышло: " + r.Error;
-                MessageBox.Show(r.Error + "\n\nЕсли нет сети — уровень уедет на сервер сам, когда сеть появится.");
+                GdDialog.Info(this, "Загрузка", r.Error + "\n\nЕсли нет сети — уровень уедет на сервер сам, когда сеть появится.");
             }
         }
     }

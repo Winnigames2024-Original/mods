@@ -111,8 +111,7 @@ namespace GEO_DASH.UI
                 _msg = $"У тебя последняя версия ({Updater.CurrentVersion})";
                 Content.Invalidate(); return;
             }
-            if (MessageBox.Show($"Есть версия {info.version}. Обновить?", "Обновление",
-                MessageBoxButtons.YesNo) == DialogResult.Yes)
+            if (GdDialog.Confirm(this, "Обновление", $"Есть версия {info.version}. Обновить?"))
             {
                 if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(x => { _msg = x; Content.Invalidate(); })))
                     Application.Exit();

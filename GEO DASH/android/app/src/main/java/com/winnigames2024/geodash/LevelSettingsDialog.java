@@ -1,72 +1,99 @@
 package com.winnigames2024.geodash;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.*;
 
-/** Настройки уровня: режим, скорость, сложность, музыка по ID, защита от копирования. */
+/** Настройки уровня — свой диалог: поля и переключатели ◀ ▶, без системных виджетов. */
 public class LevelSettingsDialog {
+
+    /** Переключатель значения стрелками. */
+    static class Picker {
+        int value;
+        final String[] options;
+        final TextView label;
+
+        Picker(String[] options, int value, TextView label) {
+            this.options = options; this.value = value; this.label = label;
+            update();
+        }
+
+        void move(int d) {
+            value = (value + d + options.length) % options.length;
+            update();
+        }
+
+        void update() { label.setText(options[Math.max(0, Math.min(options.length - 1, value))]); }
+    }
 
     public static void show(Activity a, Level lv, Runnable onSaved) {
         Level.Settings s = lv.settings;
+        final EditText[] f = new EditText[5];
+        final Picker[] p = new Picker[4];
+        final boolean[] flags = {s.startMini, s.startDual, s.startMirror, s.startGravityUp, s.twoPlayer};
 
-        ScrollView sv = new ScrollView(a);
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(40, 20, 40, 20);
-        sv.addView(box);
+        LinearLayout box = GdDialog.custom(a, "НАСТРОЙКИ УРОВНЯ", "СОХРАНИТЬ", () -> {
+            s.name = f[0].getText().toString().trim();
+            s.desc = f[1].getText().toString();
+            try { s.songId = Integer.parseInt(f[2].getText().toString().trim()); } catch (Exception ignored) { }
+            s.songName = f[3].getText().toString().trim();
+            s.copyPassword = f[4].getText().toString().trim();
+            s.difficulty = p[0].value;
+            s.startMode = p[1].value;
+            s.startSpeed = p[2].value;
+            s.copyMode = p[3].value;
+            s.startMini = flags[0];
+            s.startDual = flags[1];
+            s.startMirror = flags[2];
+            s.startGravityUp = flags[3];
+            s.twoPlayer = flags[4];
+            if (s.songId != 0) Api.async(() -> Music.ensureSong(s.songId));
+            if (onSaved != null) onSaved.run();
+        });
 
-        EditText name = field(a, box, "Название", s.name, false);
-        EditText desc = field(a, box, "Описание", s.desc, false);
+        f[0] = field(a, box, "название", s.name, false);
+        f[1] = field(a, box, "описание", s.desc, false);
 
-        Spinner diff = spinner(a, box, "Сложность", Gd.DIFFS, s.difficulty);
-        Spinner mode = spinner(a, box, "Режим игрока на старте", Gd.MODE_NAMES, s.startMode);
-        Spinner speed = spinner(a, box, "Скорость на старте", Gd.SPEED_NAMES, s.startSpeed);
+        p[0] = picker(a, box, "Сложность", Gd.DIFFS, s.difficulty);
+        p[1] = picker(a, box, "Режим на старте", Gd.MODE_NAMES, s.startMode);
+        p[2] = picker(a, box, "Скорость на старте", Gd.SPEED_NAMES, s.startSpeed);
 
-        CheckBox mini = check(a, box, "мини-размер", s.startMini);
-        CheckBox dual = check(a, box, "дуал", s.startDual);
-        CheckBox mirror = check(a, box, "зеркально", s.startMirror);
-        CheckBox gravUp = check(a, box, "старт с перевёрнутой гравитацией", s.startGravityUp);
-        CheckBox two = check(a, box, "режим на двоих", s.twoPlayer);
+        toggle(a, box, "мини-размер", flags, 0);
+        toggle(a, box, "дуал", flags, 1);
+        toggle(a, box, "зеркально", flags, 2);
+        toggle(a, box, "гравитация вверх", flags, 3);
+        toggle(a, box, "на двоих", flags, 4);
 
-        EditText song = field(a, box, "ID трека (минус — встроенный)", String.valueOf(s.songId), true);
-        EditText songName = field(a, box, "Название трека", s.songName, false);
+        f[2] = field(a, box, "ID трека (минус — встроенный)", String.valueOf(s.songId), true);
+        f[3] = field(a, box, "название трека", s.songName, false);
 
-        Spinner copy = spinner(a, box, "Копирование уровня",
+        p[3] = picker(a, box, "Копирование уровня",
                 new String[]{"Запрещено", "По паролю", "Свободно"}, Math.max(0, Math.min(2, s.copyMode)));
-        EditText copyPass = field(a, box, "Пароль для копирования", s.copyPassword, false);
-
-        new AlertDialog.Builder(a).setTitle("Настройки уровня").setView(sv)
-                .setPositiveButton("СОХРАНИТЬ", (d, w) -> {
-                    s.name = name.getText().toString().trim();
-                    s.desc = desc.getText().toString();
-                    s.difficulty = diff.getSelectedItemPosition();
-                    s.startMode = mode.getSelectedItemPosition();
-                    s.startSpeed = speed.getSelectedItemPosition();
-                    s.startMini = mini.isChecked();
-                    s.startDual = dual.isChecked();
-                    s.startMirror = mirror.isChecked();
-                    s.startGravityUp = gravUp.isChecked();
-                    s.twoPlayer = two.isChecked();
-                    try { s.songId = Integer.parseInt(song.getText().toString().trim()); } catch (Exception ignored) { }
-                    s.songName = songName.getText().toString().trim();
-                    s.copyMode = copy.getSelectedItemPosition();
-                    s.copyPassword = copyPass.getText().toString().trim();
-                    if (s.songId != 0) Api.async(() -> Music.ensureSong(s.songId));
-                    if (onSaved != null) onSaved.run();
-                })
-                .setNegativeButton("Отмена", null).show();
+        f[4] = field(a, box, "пароль для копирования", s.copyPassword, false);
     }
 
-    static EditText field(Activity a, LinearLayout box, String label, String value, boolean number) {
-        box.addView(label(a, label));
+    static TextView caption(Activity a, LinearLayout box, String text) {
+        TextView t = new TextView(a);
+        t.setText(text);
+        t.setTextColor(Gd.NEON);
+        t.setTextSize(14);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(0, 14, 0, 4);
+        box.addView(t);
+        return t;
+    }
+
+    static EditText field(Activity a, LinearLayout box, String hint, String value, boolean number) {
+        caption(a, box, hint);
         EditText e = new EditText(a);
         e.setText(value == null ? "" : value);
         e.setTextColor(Gd.PAPER);
         e.setBackgroundColor(Color.rgb(20, 18, 48));
+        e.setPadding(18, 12, 18, 12);
         e.setSingleLine(true);
         if (number) e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
         box.addView(e, new LinearLayout.LayoutParams(
@@ -74,30 +101,48 @@ public class LevelSettingsDialog {
         return e;
     }
 
-    static Spinner spinner(Activity a, LinearLayout box, String label, String[] items, int sel) {
-        box.addView(label(a, label));
-        Spinner sp = new Spinner(a);
-        ArrayAdapter<String> ad = new ArrayAdapter<>(a, android.R.layout.simple_spinner_dropdown_item, items);
-        sp.setAdapter(ad);
-        sp.setSelection(Math.max(0, Math.min(items.length - 1, sel)));
-        box.addView(sp);
-        return sp;
+    static Picker picker(Activity a, LinearLayout box, String title, String[] options, int value) {
+        caption(a, box, title);
+
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        box.addView(row, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView label = new TextView(a);
+        label.setTextColor(Gd.PAPER);
+        label.setTextSize(16);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setGravity(Gravity.CENTER);
+        label.setBackgroundColor(Color.rgb(20, 18, 48));
+        label.setPadding(12, 14, 12, 14);
+
+        final Picker pick = new Picker(options, value, label);
+
+        Ui.GdBtn left = new Ui.GdBtn(a).set("", Ui.I_BACK, Color.rgb(150, 160, 200), Color.rgb(60, 66, 110));
+        left.setOnClickListener(v -> pick.move(-1));
+        Ui.GdBtn right = new Ui.GdBtn(a).set("", Ui.I_PLAY, Color.rgb(150, 160, 200), Color.rgb(60, 66, 110));
+        right.setOnClickListener(v -> pick.move(1));
+
+        int h = 110;
+        row.addView(left, new LinearLayout.LayoutParams(h, h));
+        row.addView(label, new LinearLayout.LayoutParams(0, h, 1f));
+        row.addView(right, new LinearLayout.LayoutParams(h, h));
+        return pick;
     }
 
-    static CheckBox check(Activity a, LinearLayout box, String label, boolean v) {
-        CheckBox c = new CheckBox(a);
-        c.setText(label);
-        c.setChecked(v);
-        c.setTextColor(Gd.PAPER);
-        box.addView(c);
-        return c;
-    }
-
-    static TextView label(Activity a, String s) {
-        TextView t = new TextView(a);
-        t.setText(s);
-        t.setTextColor(Gd.NEON);
-        t.setPadding(0, 16, 0, 4);
-        return t;
+    static void toggle(Activity a, LinearLayout box, String title, boolean[] flags, int index) {
+        Ui.GdBtn b = new Ui.GdBtn(a);
+        Runnable paint = () -> b.set((flags[index] ? "✔  " : "✕  ") + title,
+                flags[index] ? Ui.I_CHECK : Ui.I_CROSS,
+                flags[index] ? Color.rgb(120, 255, 170) : Color.rgb(150, 150, 180),
+                flags[index] ? Color.rgb(20, 150, 100) : Color.rgb(60, 62, 100));
+        paint.run();
+        b.setOnClickListener(v -> { flags[index] = !flags[index]; paint.run(); b.invalidate(); });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 110);
+        lp.setMargins(0, 10, 0, 0);
+        box.addView(b, lp);
     }
 }

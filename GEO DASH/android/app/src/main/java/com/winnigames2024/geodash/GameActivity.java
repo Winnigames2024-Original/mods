@@ -22,7 +22,10 @@ public class GameActivity extends Activity {
         pending = lv;
         pendingPractice = practice;
         pendingTest = false;
-        ctx.startActivity(new Intent(ctx, GameActivity.class));
+        Intent i = new Intent(ctx, GameActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        ctx.startActivity(i);
+        if (ctx instanceof Activity) ((Activity) ctx).overridePendingTransition(0, 0);
     }
 
     /** Тест из редактора — результат не пишется в прогресс. */
@@ -30,7 +33,10 @@ public class GameActivity extends Activity {
         pending = lv;
         pendingPractice = false;
         pendingTest = true;
-        ctx.startActivity(new Intent(ctx, GameActivity.class));
+        Intent i = new Intent(ctx, GameActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        ctx.startActivity(i);
+        if (ctx instanceof Activity) ((Activity) ctx).overridePendingTransition(0, 0);
     }
 
     @Override protected void onCreate(Bundle b) {
@@ -96,5 +102,10 @@ public class GameActivity extends Activity {
     @Override public void onBackPressed() {
         if (gv != null) gv.stop();
         finish();
+    }
+
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
     }
 }

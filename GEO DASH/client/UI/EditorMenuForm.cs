@@ -125,8 +125,7 @@ namespace GEO_DASH.UI
         {
             var lv = Cur;
             if (lv == null) return;
-            if (MessageBox.Show($"Удалить «{lv.Settings.Name}»?", "My Levels",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (!GdDialog.Confirm(this, "My Levels", $"Удалить «{lv.Settings.Name}»?")) return;
             LocalStore.DeleteMyLevel(lv);
             Reload();
         }

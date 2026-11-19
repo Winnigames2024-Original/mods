@@ -1,7 +1,6 @@
 package com.winnigames2024.geodash;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.*;
@@ -20,7 +19,10 @@ public class EditorCanvasActivity extends Activity {
 
     public static void edit(Context ctx, Level lv) {
         editing = lv;
-        ctx.startActivity(new Intent(ctx, EditorCanvasActivity.class));
+        Intent i = new Intent(ctx, EditorCanvasActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        ctx.startActivity(i);
+        if (ctx instanceof Activity) ((Activity) ctx).overridePendingTransition(0, 0);
     }
 
     Level lv;
@@ -98,12 +100,11 @@ public class EditorCanvasActivity extends Activity {
     void palette() {
         final List<String> names = new ArrayList<>();
         for (Palette.Item it : Palette.ITEMS) names.add(it.label);
-        new AlertDialog.Builder(this).setTitle("Объект")
-                .setItems(names.toArray(new String[0]), (d, i) -> {
-                    brush = Palette.ITEMS.get(i);
-                    mode = 0;
-                    updateInfo();
-                }).show();
+        GdDialog.items(this, "ОБЪЕКТ", names.toArray(new String[0]), i -> {
+            brush = Palette.ITEMS.get(i);
+            mode = 0;
+            updateInfo();
+        });
     }
 
     void save() {
@@ -132,6 +133,11 @@ public class EditorCanvasActivity extends Activity {
     void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
 
     @Override public void onBackPressed() { save(); finish(); }
+
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
+    }
 
     // ------------------------------------------------------------ канва
 

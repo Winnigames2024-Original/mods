@@ -129,8 +129,7 @@ namespace GEO_DASH.UI
         async Task DeleteUser()
         {
             var a = SelUser; if (a == null) return;
-            if (MessageBox.Show($"Удалить игрока {a.Name} со всеми уровнями?", "Админка",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (!GdDialog.Confirm(this, "Админка", $"Удалить игрока {a.Name} со всеми уровнями?")) return;
             var r = await ApiClient.AdminDeleteUserAsync(a.Name);
             _msg = r.Ok ? "Удалён " + a.Name : r.Error;
             await Reload();
@@ -181,8 +180,7 @@ namespace GEO_DASH.UI
         async Task DeleteLevel()
         {
             var l = SelLevel; if (l == null) return;
-            if (MessageBox.Show($"Удалить уровень #{l.Id} «{l.Name}»?", "Админка",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (!GdDialog.Confirm(this, "Админка", $"Удалить уровень #{l.Id} «{l.Name}»?")) return;
             var r = await ApiClient.DeleteLevelAsync(l.Id);
             _msg = r.Ok ? "Удалён" : r.Error;
             await Reload();
@@ -190,7 +188,7 @@ namespace GEO_DASH.UI
 
         async Task Broadcast()
         {
-            var t = LevelListForm.Prompt("Текст объявления для всех игроков:");
+            var t = GdDialog.Prompt(this, "GEO DASH", "Текст объявления для всех игроков:");
             if (string.IsNullOrWhiteSpace(t)) return;
             var r = await ApiClient.AdminBroadcastAsync(t);
             _msg = r.Ok ? "Объявление отправлено" : r.Error;

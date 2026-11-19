@@ -35,7 +35,7 @@ public class Ui {
 
     /** Кнопка в стиле игры: плита с обводкой, иконка и подпись. */
     public static class GdBtn extends View {
-        public String text = "", sub = "";
+        public String text = "", sub = "", caption = "";
         public int icon = I_NONE, col1 = Color.rgb(90, 160, 255), col2 = Color.rgb(25, 70, 170);
         float anim;
         boolean down;
@@ -51,6 +51,9 @@ public class Ui {
         }
 
         public GdBtn sub(String s) { sub = s; return this; }
+
+        /** Подпись под картинкой — что это за кнопка. */
+        public GdBtn caption(String s) { caption = s; return this; }
 
         @Override public boolean onTouchEvent(MotionEvent e) {
             switch (e.getActionMasked()) {
@@ -75,13 +78,24 @@ public class Ui {
             Gd.plate(c, r, Gd.lighten(col1, down ? -0.1f : 0.08f), col2, Math.min(r.height() * 0.26f, 26f));
 
             boolean iconOnly = text == null || text.isEmpty();
-            float size = Math.min(r.height() * 0.56f, r.width() * 0.6f);
+            boolean hasCaption = iconOnly && caption != null && !caption.isEmpty();
+            float size = Math.min(r.height() * (hasCaption ? 0.48f : 0.56f), r.width() * 0.6f);
             if (icon != I_NONE) {
-                RectF ir = iconOnly
-                        ? new RectF(r.centerX() - size / 2, r.centerY() - size / 2, r.centerX() + size / 2, r.centerY() + size / 2)
-                        : new RectF(r.left + 14, r.centerY() - size / 2, r.left + 14 + size, r.centerY() + size / 2);
+                RectF ir;
+                if (hasCaption) {
+                    float top = r.top + r.height() * 0.10f;
+                    ir = new RectF(r.centerX() - size / 2, top, r.centerX() + size / 2, top + size);
+                } else if (iconOnly) {
+                    ir = new RectF(r.centerX() - size / 2, r.centerY() - size / 2,
+                            r.centerX() + size / 2, r.centerY() + size / 2);
+                } else {
+                    ir = new RectF(r.left + 14, r.centerY() - size / 2, r.left + 14 + size, r.centerY() + size / 2);
+                }
                 icon(c, icon, ir, Gd.PAPER);
             }
+            if (hasCaption)
+                Gd.outlined(c, caption, r.centerX(), r.bottom - r.height() * 0.12f,
+                        Math.min(r.height() * 0.18f, r.width() * 0.17f), Gd.PAPER, Paint.Align.CENTER);
             if (!iconOnly) {
                 float tx = icon == I_NONE ? r.centerX() : r.left + (icon == I_NONE ? 0 : size + 24);
                 Paint.Align al = icon == I_NONE ? Paint.Align.CENTER : Paint.Align.LEFT;

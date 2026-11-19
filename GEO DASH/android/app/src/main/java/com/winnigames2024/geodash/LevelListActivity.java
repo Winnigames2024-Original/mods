@@ -1,6 +1,5 @@
 package com.winnigames2024.geodash;
 
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.widget.LinearLayout;
 
@@ -110,8 +109,7 @@ public class LevelListActivity extends GdActivity {
         String[] items = mode.equals("my")
                 ? new String[]{"Играть", "Тренировка", "Редактировать", "Залить на сервер", "Удалить"}
                 : new String[]{"Играть", "Тренировка", "Копировать в мои", "Удалить из SAVED"};
-        new AlertDialog.Builder(this).setTitle(lv.settings.name)
-                .setItems(items, (d, i) -> {
+        menu(lv.settings.name, items, i -> {
                     if (i == 0) GameActivity.play(this, lv, false);
                     else if (i == 1) GameActivity.play(this, lv, true);
                     else if (i == 2) {
@@ -129,7 +127,7 @@ public class LevelListActivity extends GdActivity {
                             load();
                         });
                     }
-                }).show();
+                });
     }
 
     void upload(Level lv) {
@@ -173,15 +171,15 @@ public class LevelListActivity extends GdActivity {
 
     void onlineMenu(JSONObject o) {
         final int id = o.optInt("id");
-        new AlertDialog.Builder(this).setTitle("#" + id + "  " + o.optString("name"))
-                .setItems(new String[]{"Играть", "Сохранить офлайн", "Копировать в мои", "Лайк", "Профиль автора"},
-                        (d, i) -> {
+        menu("#" + id + "  " + o.optString("name"),
+                new String[]{"Играть", "Сохранить офлайн", "Копировать в мои", "Лайк", "Профиль автора"},
+                        i -> {
                             if (i == 0) fetchThen(id, lv -> GameActivity.play(this, lv, false));
                             else if (i == 1) fetchThen(id, lv -> toast("Сохранено в SAVED"));
                             else if (i == 2) fetchThen(id, this::copyToMine);
                             else if (i == 3) Api.async(() -> { Api.like(id); ui.post(() -> toast("Лайк отправлен")); });
                             else go(ProfileActivity.class, "user", o.optString("author"));
-                        }).show();
+                        });
     }
 
     void fetchThen(int id, java.util.function.Consumer<Level> cb) {

@@ -335,6 +335,8 @@ namespace GEO_DASH.UI
         public float FontSize = 11f;
         public bool Circle;
         public string Sub = "";
+        /// <summary>Подпись под иконкой для кнопок без текста.</summary>
+        public string Caption = "";
         bool _hover, _down;
         float _anim;
         readonly System.Windows.Forms.Timer _t = new() { Interval = 16 };
@@ -376,13 +378,24 @@ namespace GEO_DASH.UI
             Gd.Plate(g, r, Gd.Lighten(Color1, _hover ? 0.18 : 0.04), Color2, Circle ? r.Height / 2 : Radius, 3.2f);
 
             bool iconOnly = string.IsNullOrEmpty(Text);
+            bool hasCaption = iconOnly && !string.IsNullOrEmpty(Caption);
             if (Icon != GdIcon.None)
             {
-                float s = Math.Min(r.Height * (iconOnly ? 0.62f : 0.56f), r.Width * 0.6f);
+                float s = Math.Min(r.Height * (iconOnly ? (hasCaption ? 0.50f : 0.62f) : 0.56f), r.Width * 0.6f);
                 var ir = iconOnly
-                    ? new RectangleF(r.X + r.Width / 2 - s / 2, r.Y + r.Height / 2 - s / 2, s, s)
+                    ? new RectangleF(r.X + r.Width / 2 - s / 2,
+                                     r.Y + r.Height * (hasCaption ? 0.08f : 0.5f) - (hasCaption ? 0 : s / 2), s, s)
                     : new RectangleF(r.X + 12, r.Y + r.Height / 2 - s / 2, s, s);
                 Gd.Icon(g, Icon, ir, Gd.Paper);
+            }
+
+            // подпись под картинкой — что это за кнопка
+            if (hasCaption)
+            {
+                using var fc = Gd.Title(Math.Max(6.5f, Math.Min(9.5f, r.Width * 0.085f)));
+                Gd.Outlined(g, Caption, fc,
+                    new RectangleF(r.X + 2, r.Bottom - r.Height * 0.34f, r.Width - 4, r.Height * 0.3f),
+                    Gd.Paper, thick: 2.4f);
             }
 
             if (!iconOnly)

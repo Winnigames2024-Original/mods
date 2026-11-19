@@ -114,8 +114,7 @@ namespace GEO_DASH.UI
         {
             if (_friends.SelectedIndices.Count == 0) return;
             var name = _f[_friends.SelectedIndices[0]].Name;
-            if (MessageBox.Show("Удалить " + name + " из друзей?", "Друзья",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (!GdDialog.Confirm(this, "Друзья", "Удалить " + name + " из друзей?")) return;
             var r = await ApiClient.FriendRemoveAsync(name);
             _msg = r.Ok ? "Удалён" : r.Error;
             await Reload();

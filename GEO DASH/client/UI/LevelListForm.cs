@@ -139,17 +139,16 @@ namespace GEO_DASH.UI
 
             if (st.CopyMode == 0)
             {
-                MessageBox.Show("Автор закрыл копирование этого уровня.", "Копирование запрещено",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                GdDialog.Info(this, "Копирование запрещено", "Автор закрыл копирование этого уровня.");
                 return;
             }
             if (st.CopyMode == 1)
             {
-                string pass = Prompt("Уровень копируется по паролю. Введи пароль автора:");
+                string pass = GdDialog.Prompt(this, "Копирование", "Уровень копируется по паролю. Введи пароль автора:", "", true);
                 if (pass == null) return;
                 if (!string.Equals(pass.Trim(), st.CopyPassword, StringComparison.Ordinal))
                 {
-                    MessageBox.Show("Неверный пароль.", "Копирование", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    GdDialog.Info(this, "Копирование", "Неверный пароль.");
                     return;
                 }
             }
@@ -162,7 +161,7 @@ namespace GEO_DASH.UI
             c.Settings.CopyMode = 0;
             c.Settings.CopyPassword = "";
             LocalStore.SaveMyLevel(c);
-            MessageBox.Show("Скопировано в «Мои уровни».", "Готово");
+            GdDialog.Info(this, "Готово", "Скопировано в «Мои уровни».");
         }
 
         async Task Redownload()
@@ -180,7 +179,7 @@ namespace GEO_DASH.UI
         {
             var lv = Sel;
             if (lv == null) return;
-            if (!AppConfig.LoggedIn) { MessageBox.Show("Сначала войди в аккаунт."); return; }
+            if (!AppConfig.LoggedIn) { GdDialog.Info(this, "GEO DASH", "Сначала войди в аккаунт."); return; }
             _msg = "Загружаю…"; Content.Invalidate();
             var r = await ApiClient.UploadLevelAsync(lv, lv.Settings.ServerId, lv.Settings.Password);
             if (r.Ok && r.Data != null)
@@ -197,28 +196,10 @@ namespace GEO_DASH.UI
         {
             var lv = Sel;
             if (lv == null) return;
-            if (MessageBox.Show("Удалить «" + lv.Settings.Name + "»?", "Удаление",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (!GdDialog.Confirm(this, "Удаление", "Удалить «" + lv.Settings.Name + "»?")) return;
             if (_mode == LevelListMode.My) LocalStore.DeleteMyLevel(lv);
             else LocalStore.DeleteSaved(lv.Settings.ServerId);
             Reload();
-        }
-
-        public static string Prompt(string text, string def = "")
-        {
-            using var f = new Form
-            {
-                Text = "GEO DASH", Width = 420, Height = 180, FormBorderStyle = FormBorderStyle.FixedDialog,
-                StartPosition = FormStartPosition.CenterParent, BackColor = Gd.Deep, ForeColor = Gd.Paper,
-                MaximizeBox = false, MinimizeBox = false
-            };
-            var l = new Label { Left = 16, Top = 14, Width = 370, Height = 40, Text = text, ForeColor = Gd.Paper };
-            var tb = new TextBox { Left = 16, Top = 58, Width = 370, Text = def, BackColor = Color.FromArgb(24, 20, 54), ForeColor = Gd.Paper };
-            var ok = new Button { Left = 206, Top = 94, Width = 85, Text = "OK", DialogResult = DialogResult.OK };
-            var ca = new Button { Left = 301, Top = 94, Width = 85, Text = "Отмена", DialogResult = DialogResult.Cancel };
-            f.Controls.AddRange(new Control[] { l, tb, ok, ca });
-            f.AcceptButton = ok; f.CancelButton = ca;
-            return f.ShowDialog() == DialogResult.OK ? tb.Text : null;
         }
 
         protected override void OnRender(Graphics g)

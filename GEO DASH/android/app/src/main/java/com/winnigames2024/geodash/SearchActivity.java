@@ -1,6 +1,5 @@
 package com.winnigames2024.geodash;
 
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -118,9 +117,9 @@ public class SearchActivity extends GdActivity {
 
     void levelMenu(JSONObject o) {
         final int id = o.optInt("id");
-        new AlertDialog.Builder(this).setTitle("#" + id + "  " + o.optString("name"))
-                .setItems(new String[]{"Играть", "Сохранить офлайн", "Лайк", "Профиль автора"},
-                        (d, i) -> {
+        menu("#" + id + "  " + o.optString("name"),
+                new String[]{"Играть", "Сохранить офлайн", "Лайк", "Профиль автора"},
+                        i -> {
                             if (i == 0 || i == 1) {
                                 toast("Скачиваю…");
                                 Api.async(() -> {
@@ -134,18 +133,17 @@ public class SearchActivity extends GdActivity {
                                 });
                             } else if (i == 2) Api.async(() -> { Api.like(id); ui.post(() -> toast("Лайк отправлен")); });
                             else go(ProfileActivity.class, "user", o.optString("author"));
-                        }).show();
+                        });
     }
 
     void userMenu(String name) {
-        new AlertDialog.Builder(this).setTitle(name)
-                .setItems(new String[]{"Профиль", "В друзья", "Его уровни"}, (d, i) -> {
+        menu(name, new String[]{"Профиль", "В друзья", "Его уровни"}, i -> {
                     if (i == 0) go(ProfileActivity.class, "user", name);
                     else if (i == 1) Api.async(() -> {
                         boolean ok = Api.friendAction("request", name);
                         ui.post(() -> toast(ok ? "Запрос отправлен" : "Нет сети — встало в очередь"));
                     });
                     else go(LevelListActivity.class, "mode", "user:" + name);
-                }).show();
+                });
     }
 }

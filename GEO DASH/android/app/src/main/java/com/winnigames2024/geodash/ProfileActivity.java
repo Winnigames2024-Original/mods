@@ -1,6 +1,5 @@
 package com.winnigames2024.geodash;
 
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.text.InputType;
 import android.view.ViewGroup;
@@ -84,26 +83,42 @@ public class ProfileActivity extends GdActivity {
     }
 
     void login() {
-        LinearLayout b = new LinearLayout(this);
-        b.setOrientation(LinearLayout.VERTICAL);
-        b.setPadding(40, 20, 40, 20);
-        final EditText name = new EditText(this);
-        name.setHint("имя игрока");
-        name.setText(Store.user());
-        name.setTextColor(Gd.PAPER);
-        final EditText pass = new EditText(this);
-        pass.setHint("пароль");
-        pass.setTextColor(Gd.PAPER);
-        pass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        b.addView(name, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        b.addView(pass, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        final EditText[] fields = new EditText[2];
+        final boolean[] register = {false};
 
-        new AlertDialog.Builder(this).setTitle("Вход в GEO DASH").setView(b)
-                .setPositiveButton("ВОЙТИ", (d, w) -> auth(name.getText().toString(), pass.getText().toString(), false))
-                .setNeutralButton("РЕГИСТРАЦИЯ", (d, w) -> auth(name.getText().toString(), pass.getText().toString(), true))
-                .setNegativeButton("Отмена", null).show();
+        LinearLayout content = GdDialog.custom(this, "ВХОД В GEO DASH", "ВОЙТИ",
+                () -> auth(fields[0].getText().toString(), fields[1].getText().toString(), register[0]));
+
+        fields[0] = field(content, "имя игрока", Store.user(), false);
+        fields[1] = field(content, "пароль", "", true);
+
+        Ui.GdBtn reg = new Ui.GdBtn(this).set("РЕГИСТРАЦИЯ", Ui.I_PLUS,
+                Color.rgb(120, 190, 255), Color.rgb(30, 90, 190));
+        reg.setOnClickListener(v -> {
+            register[0] = true;
+            auth(fields[0].getText().toString(), fields[1].getText().toString(), true);
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.13f));
+        lp.setMargins(0, 16, 0, 0);
+        content.addView(reg, lp);
+    }
+
+    EditText field(LinearLayout box, String hint, String value, boolean password) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setText(value);
+        e.setTextColor(Gd.PAPER);
+        e.setHintTextColor(Gd.DIM);
+        e.setBackgroundColor(Color.rgb(20, 18, 48));
+        e.setPadding(20, 14, 20, 14);
+        e.setSingleLine(true);
+        if (password) e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 12, 0, 0);
+        box.addView(e, lp);
+        return e;
     }
 
     void auth(String n, String p, boolean reg) {

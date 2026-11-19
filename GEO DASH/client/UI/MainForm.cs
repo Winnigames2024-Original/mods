@@ -25,6 +25,11 @@ namespace GEO_DASH.UI
             _poll.Tick += async (s, e) => await RefreshAccountAsync(false);
             _poll.Start();
             FormClosed += (s, e) => { MusicPlayer.Stop(); Sfx.Dispose(); };
+
+            // музыка меню не играет, когда игра свёрнута или ушла в фон
+            Deactivate += (s, e) => BeginInvoke(() => { if (ActiveForm == null) MusicPlayer.Pause(); });
+            Activated += (s, e) => MusicPlayer.Resume();
+            Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) MusicPlayer.Pause(); };
         }
 
         GdButton _bEditor, _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync;
@@ -44,16 +49,21 @@ namespace GEO_DASH.UI
             _bDaily = Add("DAILY / WEEKLY", GdIcon.Daily, 0, 0, 190, 64, Color.FromArgb(210, 130, 255), Color.FromArgb(110, 40, 180),
                 (s, e) => Open(new DailyForm()), "уровень дня и недели");
 
-            _bProfile = Add("", GdIcon.Profile, 0, 0, 62, 62, Color.FromArgb(90, 190, 255), Color.FromArgb(20, 90, 170),
+            _bProfile = Add("", GdIcon.Profile, 0, 0, 84, 86, Color.FromArgb(90, 190, 255), Color.FromArgb(20, 90, 170),
                 (s, e) => Open(new ProfileForm(AppConfig.Settings.UserName)));
-            _bFriends = Add("", GdIcon.Friends, 0, 0, 62, 62, Color.FromArgb(255, 140, 200), Color.FromArgb(150, 40, 110),
+            _bProfile.Caption = "ПРОФИЛЬ";
+            _bFriends = Add("", GdIcon.Friends, 0, 0, 84, 86, Color.FromArgb(255, 140, 200), Color.FromArgb(150, 40, 110),
                 (s, e) => Open(new FriendsForm()));
-            _bSettings = Add("", GdIcon.Settings, 0, 0, 62, 62, Color.FromArgb(160, 170, 200), Color.FromArgb(70, 80, 120),
+            _bFriends.Caption = "ДРУЗЬЯ";
+            _bSettings = Add("", GdIcon.Settings, 0, 0, 84, 86, Color.FromArgb(160, 170, 200), Color.FromArgb(70, 80, 120),
                 (s, e) => Open(new SettingsForm()));
-            _bSync = Add("", GdIcon.Refresh, 0, 0, 62, 62, Color.FromArgb(120, 220, 180), Color.FromArgb(30, 120, 100),
+            _bSettings.Caption = "НАСТРОЙКИ";
+            _bSync = Add("", GdIcon.Refresh, 0, 0, 84, 86, Color.FromArgb(120, 220, 180), Color.FromArgb(30, 120, 100),
                 async (s, e) => await SyncAsync());
-            _bAdmin = Add("", GdIcon.Admin, 0, 0, 62, 62, Color.FromArgb(255, 110, 110), Color.FromArgb(150, 30, 40),
+            _bSync.Caption = "СИНХРО";
+            _bAdmin = Add("", GdIcon.Admin, 0, 0, 84, 86, Color.FromArgb(255, 110, 110), Color.FromArgb(150, 30, 40),
                 (s, e) => Open(new AdminForm()));
+            _bAdmin.Caption = "АДМИНКА";
             _bAdmin.Visible = AppConfig.IsAdminUser;
 
             Layout2();
@@ -70,13 +80,14 @@ namespace GEO_DASH.UI
             _bSaved.Location = new Point(cx + 230, cy - 80);
             _bDaily.Location = new Point(cx + 230, cy + 0);
 
-            int y = ClientSize.Height - 86;
-            int bx = cx - 165;
+            int y = ClientSize.Height - 112;
+            int count = 4 + (AppConfig.IsAdminUser ? 1 : 0);
+            int bx = cx - (count * 92 - 8) / 2;
             foreach (var b in new[] { _bProfile, _bFriends, _bSettings, _bSync, _bAdmin })
             {
                 if (b == null) continue;
                 b.Location = new Point(bx, y);
-                if (b.Visible) bx += 72;
+                if (b.Visible) bx += 92;
             }
             Content.Invalidate();
         }

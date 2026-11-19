@@ -1,6 +1,5 @@
 package com.winnigames2024.geodash;
 
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.widget.LinearLayout;
 
@@ -67,21 +66,19 @@ public class FriendsActivity extends GdActivity {
     }
 
     void answer(String name) {
-        new AlertDialog.Builder(this).setTitle(name)
-                .setItems(new String[]{"Принять", "Отклонить", "Профиль"}, (d, i) -> {
+        menu(name, new String[]{"Принять", "Отклонить", "Профиль"}, i -> {
                     if (i == 0) act("accept", name);
                     else if (i == 1) act("decline", name);
                     else go(ProfileActivity.class, "user", name);
-                }).show();
+                });
     }
 
     void friendMenu(String name) {
-        new AlertDialog.Builder(this).setTitle(name)
-                .setItems(new String[]{"Профиль", "Его уровни", "Удалить из друзей"}, (d, i) -> {
+        menu(name, new String[]{"Профиль", "Его уровни", "Удалить из друзей"}, i -> {
                     if (i == 0) go(ProfileActivity.class, "user", name);
                     else if (i == 1) go(LevelListActivity.class, "mode", "user:" + name);
                     else confirm("Удалить " + name + " из друзей?", () -> act("remove", name));
-                }).show();
+                });
     }
 
     void act(String action, String name) {

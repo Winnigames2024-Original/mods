@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Структура экранов как в игре: отдельные формы и Activity — PLAY, EDITOR (мои уровни + редактор), CREATOR (Saved, Search, Daily, Weekly, Featured, Epic, Users, Top). Поиск уровней по названию и по ID, поиск игроков. Редактор уровней теперь и на Android. Диалог автообновления.",
+  "notes": "Свои диалоги вместо системных окон, подписи под иконками кнопок, переходы между экранами без анимации, музыка замолкает когда игра свёрнута, автообновление apk и exe через update.json.",
   "date": "2026-11-19"
 }

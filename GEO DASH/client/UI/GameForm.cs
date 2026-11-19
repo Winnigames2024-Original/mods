@@ -196,11 +196,28 @@ namespace GEO_DASH.UI
             base.OnMouseUp(e);
         }
 
-        void TogglePause()
+        void TogglePause() => SetPaused(!_paused);
+
+        /// <summary>Пауза останавливает и музыку — в том числе когда окно свернули или ушли в другое приложение.</summary>
+        void SetPaused(bool value)
         {
-            _paused = !_paused;
+            if (_paused == value) return;
+            _paused = value;
             if (_paused) MusicPlayer.Pause(); else MusicPlayer.Resume();
             Invalidate();
+        }
+
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            // другое приложение получило фокус — ставим игру и музыку на паузу
+            BeginInvoke(() => { if (ActiveForm == null) SetPaused(true); });
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (WindowState == FormWindowState.Minimized) SetPaused(true);
         }
 
         // ------------------------------------------------------------- рендер
