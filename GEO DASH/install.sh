@@ -257,4 +257,5 @@ else
 echo "  HTTPS:       повторить:  certbot --nginx -d $DOMAIN --redirect -m $SSL_EMAIL"
 fi
 echo "  DNS:         A-запись  geodash -> IP этого сервера"
+echo "  Порты:       80, 443 и $API_PORT должны быть открыты (фаервол тут не трогается)"
 echo "================================================================"
