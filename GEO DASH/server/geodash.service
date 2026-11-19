@@ -1,0 +1,28 @@
+[Unit]
+Description=GEO DASH API — аккаунты, уровни, друзья, музыка (Winnigames2024)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=geodash
+Group=geodash
+WorkingDirectory=/opt/geodash
+ExecStart=/usr/bin/node /opt/geodash/geodash-api.js
+Restart=always
+RestartSec=3
+
+Environment=GEODASH_PORT=37534
+Environment=GEODASH_DIR=/var/lib/geodash
+Environment=GEODASH_ADMIN=Winnigames2024
+Environment=GEODASH_MODERATION=off
+Environment=GEODASH_VERSION_FILE=/opt/geodash/update.json
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/geodash
+
+[Install]
+WantedBy=multi-user.target

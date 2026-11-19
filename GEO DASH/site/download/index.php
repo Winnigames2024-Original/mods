@@ -1,0 +1,61 @@
+<?php
+require_once __DIR__ . '/../_inc/api.php';
+$dir = __DIR__;
+$exe = file_exists("$dir/GEO_DASH.exe") ? filesize("$dir/GEO_DASH.exe") : 0;
+$apk = file_exists("$dir/GEO_DASH.apk") ? filesize("$dir/GEO_DASH.apk") : 0;
+$rel = file_exists("$dir/.release") ? trim(file_get_contents("$dir/.release")) : '';
+$upd = file_exists("$dir/.updated") ? trim(file_get_contents("$dir/.updated")) : '';
+$mb  = fn($b) => $b ? number_format($b / 1048576, 1, ',', ' ') . ' МБ' : '—';
+$host = $_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru';
+gd_head('Скачать', 'download');
+?>
+<section class="section"><div class="container">
+  <h2>Скачать GEO DASH</h2>
+  <p class="muted">Версия: <b><?= h($rel ?: 'dev') ?></b><?= $upd ? ' · обновлено ' . h(substr($upd, 0, 16)) : '' ?></p>
+
+  <div class="grid c2" style="margin-top:18px">
+    <div class="card">
+      <h3>Windows</h3>
+      <p class="muted">Один файл .exe, ничего ставить не надо. Уровни, музыка и сохранения лежат в папке <b>assets</b> рядом с игрой.</p>
+      <p class="muted">Размер: <?= $mb($exe) ?></p>
+      <p style="margin-top:14px">
+        <?php if ($exe): ?>
+          <a class="btn green" href="/download/GEO_DASH.exe">СКАЧАТЬ .EXE</a>
+        <?php else: ?>
+          <span class="badge">сборка ещё не выложена</span>
+        <?php endif; ?>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Android</h3>
+      <p class="muted">APK с тем же движком и тем же аккаунтом. Уровни и песни сохраняются в <b>assets</b> приложения и играются офлайн.</p>
+      <p class="muted">Размер: <?= $mb($apk) ?></p>
+      <p style="margin-top:14px">
+        <?php if ($apk): ?>
+          <a class="btn pink" href="/download/GEO_DASH.apk">СКАЧАТЬ .APK</a>
+        <?php else: ?>
+          <span class="badge">сборка ещё не выложена</span>
+        <?php endif; ?>
+      </p>
+      <p class="muted" style="margin-top:10px">При установке разреши «Установка из неизвестных источников».</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Как играть без интернета</h3>
+    <p class="muted">
+      Основные уровни (Easy / Hard / Insane) и их музыка уже внутри игры. Онлайн-уровни можно сохранить
+      кнопкой «Сохранить (SAVED)» — они лягут в assets вместе с треком. Daily, Weekly и офлайн-паки,
+      отмеченные админом, качаются сами. Прогресс, монеты и загрузки уровней копятся офлайн и уезжают
+      на сервер, как только появится сеть.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Свой сервер (Debian 12 / Ubuntu)</h3>
+    <pre class="cmd">curl -fsSL http://<?= h($host) ?>/install.sh | sudo bash</pre>
+    <p class="muted">Поднимет API на порту 37534, этот сайт и автообновление из GitHub каждые 5 минут.</p>
+  </div>
+</div></section>
+<?php gd_foot();
