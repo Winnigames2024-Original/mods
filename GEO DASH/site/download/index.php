@@ -75,11 +75,5 @@ gd_head('Скачать', 'download');
       на сервер, как только появится сеть.
     </p>
   </div>
-
-  <div class="card" style="margin-top:18px">
-    <h3>Свой сервер (Debian 12 / Ubuntu)</h3>
-    <pre class="cmd">curl -fsSL http://<?= h($host) ?>/install.sh | sudo bash</pre>
-    <p class="muted">Поднимет API на порту 37534, этот сайт и автообновление из GitHub каждые 5 минут.</p>
-  </div>
 </div></section>
 <?php gd_foot();

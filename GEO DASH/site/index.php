@@ -88,10 +88,4 @@ gd_head('Главная', 'home');
   </table>
   <p><a class="btn small ghost" href="/levels/">Все уровни</a></p>
 </div></section>
-
-<section class="section"><div class="container">
-  <h2>Свой сервер</h2>
-  <p class="muted">Debian 12 / Ubuntu — одна команда:</p>
-  <pre class="cmd">curl -fsSL http://<?= h($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru') ?>/install.sh | sudo bash</pre>
-</div></section>
 <?php gd_foot();

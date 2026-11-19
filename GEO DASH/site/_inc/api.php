@@ -107,7 +107,7 @@ function gd_foot() {
     ?></main>
 <footer><div class="container flex">
   <div>GEO DASH — <?= h(GD_BRAND) ?>. Движок, графика и встроенный саундтрек сделаны для этой игры.</div>
-  <div class="right"><a href="/api/ping">API</a> · <a href="/download/">Скачать</a> · <a href="/install.sh">install.sh</a></div>
+  <div class="right"><a href="/download/">Скачать</a> · <a href="/levels/">Уровни</a> · <a href="/images/">Toolbox</a></div>
 </div></footer>
 </body></html><?php
 }
