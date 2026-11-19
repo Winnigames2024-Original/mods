@@ -23,31 +23,40 @@ ONLY_BUILDS="${1:-}"
 log() { logger -t geodash-update "$*" 2>/dev/null || true; echo "$*"; }
 
 # ---------------------------------------------------------- сборки с GitHub
+# Сборки лежат прямо в репозитории: GEO DASH/download/GEO_DASH.exe и .apk
 fetch_builds() {
   mkdir -p "$WEB/download"
-  local api="https://api.github.com/repos/$OWNER/$REPO/releases/latest"
-  local json
-  json="$(curl -fsSL --max-time 25 "$api" 2>/dev/null || true)"
-  [ -z "$json" ] && return 0
+  local changed_build=0
 
-  local tag
-  tag="$(echo "$json" | grep -m1 '"tag_name"' | sed 's/.*: *"\(.*\)".*/\1/')" || true
-  [ -z "$tag" ] && return 0
+  if [ -d "$SRC/.git" ]; then
+    for f in GEO_DASH.exe GEO_DASH.apk; do
+      if [ -f "$SRC/$SUBDIR/download/$f" ]; then
+        if ! cmp -s "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"; then
+          cp -f "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"
+          log "$f обновлён ($(du -h "$WEB/download/$f" | cut -f1))"
+          changed_build=1
+        fi
+      fi
+    done
+  fi
 
-  local cur=""
-  [ -f "$WEB/download/.release" ] && cur="$(cat "$WEB/download/.release")"
-  [ "$cur" = "$tag" ] && return 0
+  # запасной путь: если репозиторий ещё не скачан — тянем напрямую с raw.githubusercontent
+  if [ ! -f "$WEB/download/GEO_DASH.exe" ]; then
+    curl -fsSL --max-time 600 \
+      "https://raw.githubusercontent.com/$OWNER/$REPO/main/GEO%20DASH/download/GEO_DASH.exe" \
+      -o "$WEB/download/GEO_DASH.exe" 2>/dev/null && log "exe скачан с raw" || true
+  fi
+  if [ ! -f "$WEB/download/GEO_DASH.apk" ]; then
+    curl -fsSL --max-time 600 \
+      "https://raw.githubusercontent.com/$OWNER/$REPO/main/GEO%20DASH/download/GEO_DASH.apk" \
+      -o "$WEB/download/GEO_DASH.apk" 2>/dev/null && log "apk скачан с raw" || true
+  fi
 
-  log "новый релиз: $tag — качаю сборки"
-  echo "$json" | grep '"browser_download_url"' | sed 's/.*: *"\(.*\)".*/\1/' | while read -r url; do
-    case "$url" in
-      *.exe) curl -fsSL --max-time 300 "$url" -o "$WEB/download/GEO_DASH.exe" && log "exe обновлён" ;;
-      *.apk) curl -fsSL --max-time 300 "$url" -o "$WEB/download/GEO_DASH.apk" && log "apk обновлён" ;;
-    esac
-  done
-
-  echo "$tag" > "$WEB/download/.release"
-  date -Iseconds > "$WEB/download/.updated"
+  if [ "$changed_build" = "1" ] || [ ! -f "$WEB/download/.updated" ]; then
+    [ -f "$SRC/$SUBDIR/update.json" ] && \
+      grep -m1 '"version"' "$SRC/$SUBDIR/update.json" | sed 's/.*: *"\(.*\)".*/\1/' > "$WEB/download/.release" 2>/dev/null || true
+    date -Iseconds > "$WEB/download/.updated"
+  fi
   chown -R www-data:www-data "$WEB/download" 2>/dev/null || true
 }
 
