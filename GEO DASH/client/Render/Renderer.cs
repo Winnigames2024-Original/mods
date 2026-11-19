@@ -65,6 +65,9 @@ namespace GEO_DASH.Render
                 g.FillRectangle(gb, rect);
             }
 
+            // огромные глаза на фоне — следят за игроком и вспыхивают в такт
+            if (w.Level.Settings?.EyesBackground == true) DrawEyes(g, w, v);
+
             DrawGroundAndRoof(g, w, v);
 
             var vis = v.VisibleWorld();
@@ -81,7 +84,9 @@ namespace GEO_DASH.Render
                 double sx = o.ScaleX * (st?.SX ?? 1), sy = o.ScaleY * (st?.SY ?? 1);
                 var r = new RectangleF((float)(o.X + dx), (float)(o.Y + dy),
                                        (float)(def.W * sx), (float)(def.H * sy));
+                // отсечение: всё, что за экраном, не рисуем
                 if (r.Right < vis.Left || r.Left > vis.Right) continue;
+                if (r.Bottom > vis.Bottom || r.Top < vis.Top) continue;
 
                 if (def.Invisible && !editor && !ShowTriggers) continue;
                 if (o.HideInGame && !editor) continue;          // «скрытый» блок — только в редакторе
@@ -121,6 +126,55 @@ namespace GEO_DASH.Render
             // фон едет медленнее уровня — как в игре
             GdBackdrop.DrawBackground(g, rect, st?.BgId ?? 1, bg,
                 camX * v.Scale * 0.26, camY * v.Scale * 0.16, tex);
+        }
+
+        // кисти для глаз создаются один раз — в кадре ничего не выделяется
+        static readonly SolidBrush EyeWhite = new(Color.FromArgb(235, 245, 245, 245));
+        static readonly SolidBrush EyeDark = new(Color.FromArgb(255, 12, 12, 14));
+        static readonly SolidBrush EyePupil = new(Color.FromArgb(255, 220, 30, 40));
+        static readonly Pen EyePen = new(Color.FromArgb(255, 10, 10, 12), 6f);
+
+        /// <summary>
+        /// Фон уровня «iSpy»: три огромных глаза. Зрачок тянется к игроку,
+        /// на долю такта белок вспыхивает красным.
+        /// </summary>
+        static void DrawEyes(Graphics g, GameWorld w, ViewTransform v)
+        {
+            float cw = v.Client.Width, ch = v.Client.Height;
+            if (cw < 10 || ch < 10) return;
+
+            // доля такта: трек BIKE идёт примерно на 107,7 удара в минуту
+            double beat = (w.Time % 0.557) / 0.557;
+            float flash = (float)Math.Max(0, 1 - beat * 3);
+
+            var px = v.W2S(w.P1.X, w.P1.Y);
+
+            for (int i = 0; i < 3; i++)
+            {
+                // глаза едут медленнее уровня — получается глубина
+                float ex = (float)(((i * 0.37 + 0.18) * cw - w.Cam.CamX * v.Scale * 0.08) % (cw * 1.5));
+                if (ex < -cw * 0.4f) ex += cw * 1.5f;
+                float ey = ch * (i == 1 ? 0.30f : 0.46f);
+                float rw = ch * (i == 1 ? 0.42f : 0.30f);
+                float rh = rw * 0.62f;
+
+                var eye = new RectangleF(ex - rw / 2, ey - rh / 2, rw, rh);
+                EyeWhite.Color = Color.FromArgb(235,
+                    245, (int)(245 * (1 - flash * 0.85f)), (int)(245 * (1 - flash * 0.85f)));
+                g.FillEllipse(EyeWhite, eye);
+                g.DrawEllipse(EyePen, eye);
+
+                // зрачок смотрит на игрока
+                float dx = Math.Clamp((px.X - ex) / (cw * 0.5f), -1f, 1f);
+                float dy = Math.Clamp((px.Y - ey) / (ch * 0.5f), -1f, 1f);
+                float pr = rh * 0.34f;
+                var pupil = new RectangleF(ex + dx * rw * 0.22f - pr, ey + dy * rh * 0.22f - pr, pr * 2, pr * 2);
+                g.FillEllipse(EyeDark, pupil);
+
+                EyePupil.Color = Color.FromArgb((int)(120 + 135 * flash), 220, 30, 40);
+                g.FillEllipse(EyePupil, new RectangleF(pupil.X + pr * 0.45f, pupil.Y + pr * 0.45f,
+                                                       pr * 1.1f, pr * 1.1f));
+            }
         }
 
         static void DrawGroundAndRoof(Graphics g, GameWorld w, ViewTransform v)

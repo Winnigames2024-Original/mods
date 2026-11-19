@@ -69,6 +69,8 @@ public class Level {
                 objColor = 0xFF000000, obj2Color = 0xFFFFFFFF;
         public int version = 1, serverId = 0, copyMode = 0;
         public int bgId = 1, groundId = 1;
+        /** Огромные глаза на фоне: следят за игроком и вспыхивают красным. */
+        public boolean eyesBackground;
         public boolean isCopy;
         public int copiedFrom;
         public String copiedAuthor = "";
@@ -155,6 +157,7 @@ public class Level {
             s.put("SongId", t.songId);
             s.put("SongName", t.songName);
             s.put("SongArtist", t.songArtist);
+            s.put("EyesBackground", t.eyesBackground);
             s.put("SongOffsetSec", t.songOffset);
             s.put("BgColor", t.bgColor);
             s.put("GroundColor", t.groundColor);
@@ -245,6 +248,7 @@ public class Level {
                 Settings t = lv.settings;
                 t.name = s.optString("Name", t.name);
                 t.desc = s.optString("Description", "");
+                t.eyesBackground = s.optBoolean("EyesBackground", false);
                 t.author = s.optString("Author", "");
                 t.startMode = indexOf(MODES, s.optString("StartMode", "Cube"), 0);
                 t.startSpeed = indexOf(SPEEDS, s.optString("StartSpeed", "Normal"), 1);

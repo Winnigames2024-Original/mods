@@ -51,8 +51,7 @@ namespace GEO_DASH
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Не получилось открыть уровень:\n" + ex.Message,
-                    "GEO DASH", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                GdDialog.Info(null, "УРОВЕНЬ НЕ ОТКРЫЛСЯ", ex.Message);
             }
         }
 
@@ -62,8 +61,7 @@ namespace GEO_DASH
             {
                 var log = Path.Combine(AppConfig.DataDir, "crash.log");
                 File.AppendAllText(log, $"[{DateTime.Now:s}] {ex}\n\n");
-                MessageBox.Show("Ошибка: " + ex?.Message + "\n\nПодробности: " + log,
-                    "GEO DASH", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                GdDialog.Info(null, "ОШИБКА", (ex?.Message ?? "неизвестно") + "\n\nПодробности: " + log);
             }
             catch { }
         }

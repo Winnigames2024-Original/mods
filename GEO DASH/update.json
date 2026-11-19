@@ -1,8 +1,8 @@
 {
-  "version": "1.8.2",
+  "version": "1.9.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Режим «Червяк» переделан: по клику прорывается сквозь блок на другую сторону и переворачивается, со следом. Иконки всех восьми режимов рисуются один раз и кэшируются. Свой портал червяка. Убраны звуки на нажатие в игре. Встроенные треки больше не портятся при генерации, музыка уровня честно сообщает, если не пошла; трек можно скачать прямо с карточки уровня.",
+  "notes": "Пять новых уровней: Neon Tunnel, Subterranean Pulse, Phase Shift, Core Overload и демон iSpyWithMyLittleEye под трек BIKE с глазами на фоне. Везде задействован режим Червяка. Уведомления слева снизу как в Steam, системных окон больше нет, отсечение невидимых объектов по обеим осям.",
   "date": "2026-11-19"
 }

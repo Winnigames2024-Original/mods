@@ -244,6 +244,7 @@ namespace GEO_DASH.UI
             }
 
             Status($"Доступно обновление {info.version}");
+            Toasts.Show("Есть обновление " + info.version, info.notes, Toasts.Kind.Download, 7);
             using var f = new UpdateForm(info);
             f.ShowDialog(this);
             Content.Invalidate();

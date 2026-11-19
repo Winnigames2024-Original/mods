@@ -314,6 +314,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             c.drawRect(0, 0, W, H, gp);
         }
 
+        // огромные глаза на фоне — следят за игроком и вспыхивают в такт
+        if (level.settings.eyesBackground) drawEyes(c, W, H);
+
         drawGround(c, W, H);
 
         float visLeft = (float) ((0 - W / 2.0) / scale() + eng.camX) - 120;
@@ -325,6 +328,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             Level.Obj o = eng.level.objects.get(i);
             Catalog.Def d = Catalog.get(o.typeId);
             if (d.invisible) continue;
+            if (o.hideInGame) continue;            // «скрытый» блок — только в редакторе
             double x = o.x + s.dx;
             if (x + d.w * o.scaleX < visLeft || x > visRight) continue;
             drawObject(c, i, o, d, s);
@@ -343,6 +347,49 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 "время: " + String.format("%.1f", eng.time) + " c",
                 "коснись экрана, чтобы выйти"});
 
+    }
+
+    // кисти для глаз создаются один раз — в кадре ничего не выделяется
+    private final Paint eyeWhite = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint eyeDark = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint eyeRed = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint eyeLine = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    /** Фон уровня iSpy: три огромных глаза, зрачок тянется к игроку. */
+    void drawEyes(Canvas c, int W, int H) {
+        eyeDark.setColor(0xFF0C0C0E);
+        eyeLine.setColor(0xFF0A0A0C);
+        eyeLine.setStyle(Paint.Style.STROKE);
+        eyeLine.setStrokeWidth(Math.max(3f, H * 0.008f));
+
+        double beat = (eng.time % 0.557) / 0.557;
+        float flash = (float) Math.max(0, 1 - beat * 3);
+
+        float px = (float) ((eng.p1.x - eng.camX) * scale() + W / 2.0);
+        float py = (float) (H / 2.0 - (eng.p1.y - eng.camY) * scale());
+
+        for (int i = 0; i < 3; i++) {
+            float ex = (float) (((i * 0.37 + 0.18) * W - eng.camX * scale() * 0.08) % (W * 1.5));
+            if (ex < -W * 0.4f) ex += W * 1.5f;
+            float ey = H * (i == 1 ? 0.30f : 0.46f);
+            float rw = H * (i == 1 ? 0.42f : 0.30f);
+            float rh = rw * 0.62f;
+
+            int g2 = (int) (245 * (1 - flash * 0.85f));
+            eyeWhite.setColor(Color.argb(235, 245, g2, g2));
+            RectF eye = new RectF(ex - rw / 2, ey - rh / 2, ex + rw / 2, ey + rh / 2);
+            c.drawOval(eye, eyeWhite);
+            c.drawOval(eye, eyeLine);
+
+            float dx = Math.max(-1f, Math.min(1f, (px - ex) / (W * 0.5f)));
+            float dy = Math.max(-1f, Math.min(1f, (py - ey) / (H * 0.5f)));
+            float pr = rh * 0.34f;
+            float cx = ex + dx * rw * 0.22f, cy = ey + dy * rh * 0.22f;
+            c.drawCircle(cx, cy, pr, eyeDark);
+
+            eyeRed.setColor(Color.argb((int) (120 + 135 * flash), 220, 30, 40));
+            c.drawCircle(cx + pr * 0.45f, cy + pr * 0.45f, pr * 0.55f, eyeRed);
+        }
     }
 
     void drawGround(Canvas c, int W, int H) {

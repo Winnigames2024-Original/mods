@@ -30,6 +30,8 @@ namespace GEO_DASH.Core
         public bool SongFadeOut { get; set; } = true;
 
         // оформление
+        /// <summary>Огромные глаза на фоне: следят за игроком и вспыхивают красным.</summary>
+        public bool EyesBackground { get; set; }
         public int BgId { get; set; } = 1;
         public int GroundId { get; set; } = 1;
         public int BgColor { get; set; } = unchecked((int)0xFF2040A0);

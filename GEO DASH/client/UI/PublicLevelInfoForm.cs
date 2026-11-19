@@ -138,6 +138,7 @@ namespace GEO_DASH.UI
             if (path != null)
             {
                 _msg = "Трек #" + id + " скачан — играет";
+                Toasts.Show("Трек скачан", "#" + id + "  " + _lv.Settings.SongName, Toasts.Kind.Download);
                 _ = MusicPlayer.PlayAsync(id, 0, 0.6, true);
             }
             else if (!ApiClient.Online)
@@ -164,6 +165,7 @@ namespace GEO_DASH.UI
                 _publish.Text = "ОБНОВИТЬ НА СЕРВЕРЕ";
                 _unpublish.Visible = true;
                 _msg = "Опубликовано: уровень #" + r.Data.Id;
+                Toasts.Ok("Уровень опубликован", _lv.Settings.Name + "  #" + r.Data.Id);
             }
             else _msg = string.IsNullOrEmpty(r.Error) ? "Не получилось опубликовать" : r.Error;
             Content.Invalidate();
@@ -185,6 +187,7 @@ namespace GEO_DASH.UI
                 _unpublish.Visible = false;
                 _publish.Text = "ОПУБЛИКОВАТЬ";
                 _msg = "Уровень снят с публикации";
+                Toasts.Show("Снято с публикации", _lv.Settings.Name, Toasts.Kind.Warn);
             }
             else _msg = string.IsNullOrEmpty(r.Error) ? "Не получилось снять" : r.Error;
             Content.Invalidate();

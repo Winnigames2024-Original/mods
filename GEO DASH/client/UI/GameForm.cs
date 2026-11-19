@@ -149,6 +149,8 @@ namespace GEO_DASH.UI
         {
             _bestPercent = 1;
             Toast("Уровень пройден!");
+            Toasts.Show("Уровень пройден", _level.Settings.Name + " — попыток: " + _attempts,
+                        Toasts.Kind.Star);
             SaveRun();
         }
 
