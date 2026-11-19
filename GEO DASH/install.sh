@@ -142,7 +142,9 @@ server {
         proxy_read_timeout 120s;
     }
 
-    location /download/ {
+    # страница «Скачать» — это PHP; файлы сборок отдаём как загрузку
+    location = /download/ { try_files /download/index.php =404; }
+    location ~ ^/download/.+\.(exe|apk|zip)\$ {
         add_header Content-Disposition "attachment";
         try_files \$uri =404;
     }

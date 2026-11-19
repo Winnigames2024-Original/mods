@@ -64,10 +64,31 @@ fetch_builds() {
   chown -R www-data:www-data "$WEB/download" 2>/dev/null || true
 }
 
+
+# ------------------------------------------- страница «Скачать» в nginx
+# В старом конфиге весь /download/ отдавался как файл, из-за чего сама
+# страница /download/ возвращала 404. Чиним на месте, без переустановки.
+fix_download_location() {
+  local CONF=/etc/nginx/sites-available/geodash
+  [ -f "$CONF" ] || return 0
+  grep -q 'location = /download/' "$CONF" && return 0
+  grep -q 'location /download/' "$CONF" || return 0
+
+  perl -0pi -e 's|\s*location /download/ \{\n\s*add_header Content-Disposition "attachment";\n\s*try_files \$uri =404;\n\s*\}|\n    location = /download/ { try_files /download/index.php =404; }\n    location ~ ^/download/.+\\.(exe|apk|zip)\$ {\n        add_header Content-Disposition "attachment";\n        try_files \$uri =404;\n    }|s' "$CONF"
+
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1 || true
+    log "страница /download/ починена в nginx"
+  fi
+}
+
 if [ "$ONLY_BUILDS" = "--only-builds" ]; then
   fetch_builds
+  fix_download_location
   exit 0
 fi
+
+fix_download_location
 
 [ -d "$SRC/.git" ] || exit 0
 cd "$SRC"
