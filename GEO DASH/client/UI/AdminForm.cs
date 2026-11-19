@@ -20,7 +20,7 @@ namespace GEO_DASH.UI
 
             _users = Make(24, 130, 420, 300, new[] { "Игрок", "★", "Уровни", "Статус" });
             _levels = Make(460, 130, 690, 300, new[] { "ID", "Название", "Автор", "Сложность", "Флаги" });
-            Controls.Add(_users); Controls.Add(_levels);
+            Host(_users); Host(_levels);
 
             _diff = new ComboBox
             {
@@ -29,7 +29,7 @@ namespace GEO_DASH.UI
             };
             foreach (Difficulty d in Enum.GetValues<Difficulty>()) _diff.Items.Add(Difficulties.Label(d));
             _diff.SelectedIndex = 3;
-            Controls.Add(_diff);
+            Host(_diff);
 
             // пользователи
             Add("БАН / РАЗБАН", GdIcon.Lock, 24, 440, 200, 46, Color.FromArgb(240, 140, 90), Color.FromArgb(150, 60, 20),
@@ -81,8 +81,8 @@ namespace GEO_DASH.UI
 
         async Task Reload()
         {
-            if (!AppConfig.IsAdminUser) { _msg = "Доступно только для " + AppConfig.AdminUser; Invalidate(); return; }
-            _msg = "Загружаю…"; Invalidate();
+            if (!AppConfig.IsAdminUser) { _msg = "Доступно только для " + AppConfig.AdminUser; Content.Invalidate(); return; }
+            _msg = "Загружаю…"; Content.Invalidate();
 
             var u = await ApiClient.AdminUsersAsync();
             _u = u.Data ?? new();
@@ -112,7 +112,7 @@ namespace GEO_DASH.UI
             }
 
             _msg = $"игроков: {_u.Count}, уровней: {_l.Count}" + (u.FromCache ? " (из кэша)" : "");
-            Invalidate();
+            Content.Invalidate();
         }
 
         AccountDto SelUser => _users.SelectedIndices.Count > 0 ? _u[_users.SelectedIndices[0]] : null;
@@ -194,13 +194,12 @@ namespace GEO_DASH.UI
             if (string.IsNullOrWhiteSpace(t)) return;
             var r = await ApiClient.AdminBroadcastAsync(t);
             _msg = r.Ok ? "Объявление отправлено" : r.Error;
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "АДМИНКА", "пользователь " + AppConfig.AdminUser);
+                        Header(g, "АДМИНКА", "пользователь " + AppConfig.AdminUser);
             using var f = Gd.Bold(11f);
             Gd.Outlined(g, "Игроки", f, new RectangleF(24, 104, 300, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             Gd.Outlined(g, "Уровни", f, new RectangleF(460, 104, 300, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);

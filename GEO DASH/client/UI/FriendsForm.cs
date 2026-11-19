@@ -18,14 +18,14 @@ namespace GEO_DASH.UI
 
             _friends = MakeList(24, 140, 460, 380, new[] { "Друг", "★", "С" });
             _requests = MakeList(508, 140, 460, 250, new[] { "Запрос от / кому", "Когда", "Тип" });
-            Controls.Add(_friends); Controls.Add(_requests);
+            Host(_friends); Host(_requests);
 
             _add = new TextBox
             {
                 Left = 508, Top = 420, Width = 290, Font = Gd.Bold(11f),
                 BackColor = Color.FromArgb(20, 18, 48), ForeColor = Gd.Paper, BorderStyle = BorderStyle.FixedSingle
             };
-            Controls.Add(_add);
+            Host(_add);
             Add("ОТПРАВИТЬ ЗАПРОС", GdIcon.Plus, 806, 414, 162, 44, Color.FromArgb(120, 220, 255), Color.FromArgb(20, 110, 180),
                 async (s, e) => await Send());
 
@@ -64,8 +64,8 @@ namespace GEO_DASH.UI
 
         async Task Reload()
         {
-            if (!AppConfig.LoggedIn) { _msg = "Войди в аккаунт, чтобы видеть друзей"; Invalidate(); return; }
-            _msg = "Загружаю…"; Invalidate();
+            if (!AppConfig.LoggedIn) { _msg = "Войди в аккаунт, чтобы видеть друзей"; Content.Invalidate(); return; }
+            _msg = "Загружаю…"; Content.Invalidate();
 
             var f = await ApiClient.FriendsAsync();
             var r = await ApiClient.FriendRequestsAsync();
@@ -86,13 +86,13 @@ namespace GEO_DASH.UI
 
             _msg = (f.FromCache || r.FromCache) ? "Офлайн: показаны последние данные" :
                    $"друзей: {_f.Count}, запросов: {_r.Count}";
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task Send()
         {
             var n = _add.Text.Trim();
-            if (n.Length < 3) { _msg = "Введи имя игрока"; Invalidate(); return; }
+            if (n.Length < 3) { _msg = "Введи имя игрока"; Content.Invalidate(); return; }
             var r = await ApiClient.FriendRequestAsync(n);
             _msg = r.Ok ? "Запрос отправлен игроку " + n : r.Error;
             _add.Clear();
@@ -104,7 +104,7 @@ namespace GEO_DASH.UI
             if (_requests.SelectedIndices.Count == 0) return;
             var req = _r[_requests.SelectedIndices[0]];
             bool incoming = string.Equals(req.To, AppConfig.Settings.UserName, StringComparison.OrdinalIgnoreCase);
-            if (!incoming) { _msg = "Это твой исходящий запрос"; Invalidate(); return; }
+            if (!incoming) { _msg = "Это твой исходящий запрос"; Content.Invalidate(); return; }
             var r = accept ? await ApiClient.FriendAcceptAsync(req.From) : await ApiClient.FriendDeclineAsync(req.From);
             _msg = r.Ok ? (accept ? "Теперь вы друзья" : "Запрос отклонён") : r.Error;
             await Reload();
@@ -121,10 +121,9 @@ namespace GEO_DASH.UI
             await Reload();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "ДРУЗЬЯ", "запросы принимаются и отклоняются здесь и на сайте");
+                        Header(g, "ДРУЗЬЯ", "запросы принимаются и отклоняются здесь и на сайте");
             using var f = Gd.Bold(11f);
             Gd.Outlined(g, "Мои друзья", f, new RectangleF(24, 112, 300, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             Gd.Outlined(g, "Запросы", f, new RectangleF(508, 112, 300, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);

@@ -23,5 +23,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".PlayActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".CreatorActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".LevelListActivity"    android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".SearchActivity"       android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".DailyActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".EditorActivity"       android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".EditorCanvasActivity" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".GameActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".ProfileActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".FriendsActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".SettingsActivity"     android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
     </application>
 </manifest>

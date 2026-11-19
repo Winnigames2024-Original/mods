@@ -33,12 +33,12 @@ namespace GEO_DASH.UI
         {
             _play = new GdPlayButton { Size = new Size(210, 210) };
             _play.Click += (s, e) => { Sfx.Play("click"); Open(new PlayMenuForm()); };
-            Controls.Add(_play);
+            Host(_play);
 
-            _bEditor = Add("СОЗДАТЬ", GdIcon.Edit, 0, 0, 190, 64, Color.FromArgb(255, 170, 60), Color.FromArgb(180, 90, 10),
-                (s, e) => Open(new LevelListForm(LevelListMode.My)), "редактор уровней");
-            _bOnline = Add("ОНЛАЙН", GdIcon.Online, 0, 0, 190, 64, Color.FromArgb(80, 160, 255), Color.FromArgb(20, 70, 180),
-                (s, e) => Open(new OnlineForm()), "уровни игроков");
+            _bEditor = Add("EDITOR", GdIcon.Edit, 0, 0, 190, 64, Color.FromArgb(255, 170, 60), Color.FromArgb(180, 90, 10),
+                (s, e) => Open(new EditorMenuForm()), "мои уровни и редактор");
+            _bOnline = Add("CREATOR", GdIcon.Online, 0, 0, 190, 64, Color.FromArgb(80, 160, 255), Color.FromArgb(20, 70, 180),
+                (s, e) => Open(new CreatorForm()), "поиск, daily, игроки");
             _bSaved = Add("SAVED", GdIcon.Download, 0, 0, 190, 64, Color.FromArgb(120, 230, 160), Color.FromArgb(30, 130, 80),
                 (s, e) => Open(new LevelListForm(LevelListMode.Saved)), "офлайн-уровни");
             _bDaily = Add("DAILY / WEEKLY", GdIcon.Daily, 0, 0, 190, 64, Color.FromArgb(210, 130, 255), Color.FromArgb(110, 40, 180),
@@ -78,13 +78,12 @@ namespace GEO_DASH.UI
                 b.Location = new Point(bx, y);
                 if (b.Visible) bx += 72;
             }
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            using (var f = Gd.Title(44f))
+                        using (var f = Gd.Title(44f))
                 Gd.Outlined(g, "GEO DASH", f, new RectangleF(0, 28, ClientSize.Width, 60), Gd.Paper, thick: 5f);
             using (var f = Gd.Bold(11f))
                 Gd.Outlined(g, "by " + AppConfig.Brand + "   ·   v" + Updater.CurrentVersion, f,
@@ -144,7 +143,7 @@ namespace GEO_DASH.UI
             using (f) f.ShowDialog(this);
             _bAdmin.Visible = AppConfig.IsAdminUser;
             Layout2();
-            Invalidate();
+            Content.Invalidate();
         }
 
         // ------------------------------------------------------------ запуск
@@ -172,16 +171,16 @@ namespace GEO_DASH.UI
             await LocalStore.SyncAsync(new Progress<string>(Status));
             await RefreshAccountAsync(true);
             Status(ApiClient.Online ? "Готово" : "Офлайн-режим: доступны локальные и сохранённые уровни");
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task RefreshAccountAsync(bool force)
         {
-            if (!AppConfig.LoggedIn) { _me = null; Invalidate(); return; }
+            if (!AppConfig.LoggedIn) { _me = null; Content.Invalidate(); return; }
             var r = await ApiClient.MeAsync();
             if (r.Ok) _me = r.Data;
             else _me = LocalStore.CachedMe();
-            Invalidate();
+            Content.Invalidate();
         }
 
         /// <summary>Проверка обновления — только когда сервер онлайн; показывает диалог обновления.</summary>
@@ -200,14 +199,14 @@ namespace GEO_DASH.UI
             Status($"Доступно обновление {info.version}");
             using var f = new UpdateForm(info);
             f.ShowDialog(this);
-            Invalidate();
+            Content.Invalidate();
         }
 
         void Status(string s)
         {
             if (InvokeRequired) { try { BeginInvoke(() => Status(s)); } catch { } return; }
             _status = s;
-            Invalidate();
+            Content.Invalidate();
         }
     }
 }

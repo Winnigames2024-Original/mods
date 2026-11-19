@@ -24,7 +24,7 @@ namespace GEO_DASH.UI
                 BackColor = Color.FromArgb(24, 20, 54), ForeColor = Gd.Paper,
                 BorderStyle = BorderStyle.FixedSingle, UseSystemPasswordChar = true
             };
-            Controls.Add(_name); Controls.Add(_pass);
+            Host(_name); Host(_pass);
 
             Add("ВОЙТИ", GdIcon.Check, 150, 255, 125, 52, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100),
                 async (s, e) => await Go(false));
@@ -34,7 +34,7 @@ namespace GEO_DASH.UI
                 (s, e) =>
                 {
                     AppConfig.Settings.Token = ""; AppConfig.Settings.UserName = ""; AppConfig.Settings.IsAdmin = false;
-                    AppConfig.Save(); _msg = "Вышли из аккаунта"; Invalidate();
+                    AppConfig.Save(); _msg = "Вышли из аккаунта"; Content.Invalidate();
                 });
 
             _pass.KeyDown += async (s, e) => { if (e.KeyCode == Keys.Enter) await Go(false); };
@@ -43,8 +43,8 @@ namespace GEO_DASH.UI
         async Task Go(bool register)
         {
             string n = _name.Text.Trim(), p = _pass.Text;
-            if (n.Length < 3 || p.Length < 3) { _msg = "Имя и пароль — от 3 символов"; Invalidate(); return; }
-            _msg = register ? "Регистрирую…" : "Вхожу…"; Invalidate();
+            if (n.Length < 3 || p.Length < 3) { _msg = "Имя и пароль — от 3 символов"; Content.Invalidate(); return; }
+            _msg = register ? "Регистрирую…" : "Вхожу…"; Content.Invalidate();
 
             var r = register ? await ApiClient.RegisterAsync(n, p) : await ApiClient.LoginAsync(n, p);
             if (r.Ok && r.Data != null && r.Data.Ok)
@@ -54,7 +54,7 @@ namespace GEO_DASH.UI
                 AppConfig.Settings.IsAdmin = r.Data.Account?.Admin ?? false;
                 AppConfig.Save();
                 _msg = "Готово! Привет, " + AppConfig.Settings.UserName;
-                Invalidate();
+                Content.Invalidate();
                 await Task.Delay(500);
                 DialogResult = DialogResult.OK;
                 Close();
@@ -64,14 +64,13 @@ namespace GEO_DASH.UI
                 _msg = r.Ok ? (r.Data?.Error ?? "Ошибка") : r.Error;
                 if (!ApiClient.Online)
                     _msg += "\nБез сети вход невозможен, но играть офлайн можно.";
-                Invalidate();
+                Content.Invalidate();
             }
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "АККАУНТ", AppConfig.Settings.ServerHost + ":" + AppConfig.Settings.ServerPort);
+                        Header(g, "АККАУНТ", AppConfig.Settings.ServerHost + ":" + AppConfig.Settings.ServerPort);
             using var f = Gd.Bold(11f);
             Gd.Outlined(g, "Имя", f, new RectangleF(60, 150, 90, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             Gd.Outlined(g, "Пароль", f, new RectangleF(60, 205, 90, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);

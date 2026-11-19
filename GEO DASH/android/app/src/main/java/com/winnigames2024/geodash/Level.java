@@ -87,6 +87,125 @@ public class Level {
         return max;
     }
 
+    // ------------------------------------------------------------ запись
+
+    /** Сохраняет уровень в тот же формат .gdl, что и игра на Windows. */
+    public String toJson() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("Format", 1);
+
+            JSONObject s = new JSONObject();
+            Settings t = settings;
+            s.put("Name", t.name);
+            s.put("Description", t.desc);
+            s.put("Author", t.author);
+            s.put("StartMode", MODES[clamp(t.startMode, MODES.length)]);
+            s.put("StartSpeed", SPEEDS[clamp(t.startSpeed, SPEEDS.length)]);
+            s.put("StartMini", t.startMini);
+            s.put("StartDual", t.startDual);
+            s.put("StartMirror", t.startMirror);
+            s.put("StartGravityUp", t.startGravityUp);
+            s.put("Difficulty", DIFFS[clamp(t.difficulty, DIFFS.length)]);
+            s.put("SongId", t.songId);
+            s.put("SongName", t.songName);
+            s.put("SongArtist", t.songArtist);
+            s.put("SongOffsetSec", t.songOffset);
+            s.put("BgColor", t.bgColor);
+            s.put("GroundColor", t.groundColor);
+            s.put("LineColor", t.lineColor);
+            s.put("ObjColor", t.objColor);
+            s.put("Obj2Color", t.obj2Color);
+            s.put("TwoPlayer", t.twoPlayer);
+            s.put("ReverseGameplay", t.reverse);
+            s.put("GravityScale", t.gravityScale);
+            s.put("LengthUnits", rightEdge());
+            s.put("Version", t.version);
+            s.put("LocalId", t.localId);
+            s.put("ServerId", t.serverId);
+            s.put("Password", t.password);
+            s.put("CopyMode", t.copyMode);
+            s.put("CopyPassword", t.copyPassword);
+            root.put("Settings", s);
+
+            JSONArray arr = new JSONArray();
+            int id = 1;
+            for (Obj o : objects) {
+                JSONObject j = new JSONObject();
+                j.put("Id", o.id > 0 ? o.id : id++);
+                j.put("TypeId", o.typeId);
+                j.put("X", o.x);
+                j.put("Y", o.y);
+                j.put("Rotation", o.rotation);
+                j.put("ScaleX", o.scaleX);
+                j.put("ScaleY", o.scaleY);
+                j.put("ZOrder", o.zOrder);
+                j.put("BaseColorChannel", o.baseColor);
+                j.put("DetailColorChannel", o.detailColor);
+                j.put("Opacity", o.opacity);
+                if (o.groups.length > 0) {
+                    JSONArray g = new JSONArray();
+                    for (int v : o.groups) g.put(v);
+                    j.put("Groups", g);
+                }
+                j.put("Portal", PORTALS[clamp(o.portal, PORTALS.length)]);
+                j.put("Orb", ORBS[clamp(o.orb, ORBS.length)]);
+                j.put("Pad", PADS[clamp(o.pad, PADS.length)]);
+                if (o.coinIndex != 0) j.put("CoinIndex", o.coinIndex);
+                if (o.teleportTargetY != 0) j.put("TeleportTargetY", o.teleportTargetY);
+                if (o.text != null && !o.text.isEmpty()) j.put("Text", o.text);
+                if (o.trig != null) j.put("Trigger", trigJson(o.trig));
+                arr.put(j);
+            }
+            root.put("Objects", arr);
+            return root.toString();
+        } catch (Exception e) {
+            return raw == null ? "{}" : raw;
+        }
+    }
+
+    static JSONObject trigJson(Trig t) throws Exception {
+        JSONObject j = new JSONObject();
+        j.put("Type", TRIGS[clamp(t.type, TRIGS.length)]);
+        j.put("TargetGroup", t.targetGroup);
+        j.put("MoveX", t.moveX);
+        j.put("MoveY", t.moveY);
+        j.put("Duration", t.duration);
+        j.put("Degrees", t.degrees);
+        j.put("ScaleX", t.scaleX);
+        j.put("ScaleY", t.scaleY);
+        j.put("Opacity", t.opacity);
+        j.put("Activate", t.activate);
+        j.put("SpawnDelay", t.spawnDelay);
+        j.put("MultiTrigger", t.multiTrigger);
+        j.put("TouchTriggered", t.touchTriggered);
+        j.put("SpawnTriggered", t.spawnTriggered);
+        j.put("ColorChannel", t.colorChannel);
+        j.put("Color", t.color);
+        j.put("FadeTime", t.fadeTime);
+        j.put("PulseFadeIn", t.pulseIn);
+        j.put("PulseHold", t.pulseHold);
+        j.put("PulseFadeOut", t.pulseOut);
+        j.put("PulseToGroup", t.pulseToGroup);
+        j.put("ShakeStrength", t.shakeStrength);
+        j.put("ShakeInterval", t.shakeInterval);
+        j.put("ItemId", t.itemId);
+        j.put("Count", t.count);
+        j.put("TargetCount", t.targetCount);
+        j.put("GroupB", t.groupB);
+        j.put("BlockA", t.blockA);
+        j.put("Chance", t.chance);
+        j.put("TimerSeconds", t.timerSeconds);
+        j.put("CamZoom", t.camZoom);
+        j.put("SongId", t.songId);
+        j.put("GravityDir", t.gravityDir);
+        j.put("TeleportY", t.teleportY);
+        j.put("Speed", SPEEDS[clamp(t.speed, SPEEDS.length)]);
+        return j;
+    }
+
+    static int clamp(int v, int len) { return v < 0 ? 0 : (v >= len ? 0 : v); }
+
     // ------------------------------------------------------------ разбор
 
     public static Level parse(String json) {

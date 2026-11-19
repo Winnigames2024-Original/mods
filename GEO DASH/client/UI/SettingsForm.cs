@@ -26,7 +26,7 @@ namespace GEO_DASH.UI
                     Left = 280, Top = y, Width = w, Text = val, Font = Gd.Bold(11f),
                     BackColor = Color.FromArgb(20, 18, 48), ForeColor = Gd.Paper, BorderStyle = BorderStyle.FixedSingle
                 };
-                Controls.Add(t);
+                Host(t);
                 return t;
             }
             CheckBox Ck(int y, string t, bool v)
@@ -36,7 +36,7 @@ namespace GEO_DASH.UI
                     Left = 280, Top = y, Width = 420, Text = t, Checked = v,
                     ForeColor = Gd.Paper, BackColor = Color.Transparent, Font = Gd.Bold(10f), FlatStyle = FlatStyle.Flat
                 };
-                Controls.Add(c);
+                Host(c);
                 return c;
             }
             TrackBar Tr(int y, double v)
@@ -46,7 +46,7 @@ namespace GEO_DASH.UI
                     Left = 276, Top = y, Width = 280, Minimum = 0, Maximum = 100,
                     Value = (int)Math.Clamp(v * 100, 0, 100), TickFrequency = 10, BackColor = Gd.Deep
                 };
-                Controls.Add(t);
+                Host(t);
                 return t;
             }
 
@@ -64,7 +64,7 @@ namespace GEO_DASH.UI
             _fpsCap.Items.AddRange(new object[] { "60", "75", "120", "144", "240" });
             _fpsCap.SelectedItem = s.Fps.ToString();
             if (_fpsCap.SelectedIndex < 0) _fpsCap.SelectedIndex = 0;
-            Controls.Add(_fpsCap);
+            Host(_fpsCap);
 
             _fps = Ck(380, "показывать FPS", s.ShowFps);
             _hit = Ck(408, "показывать хитбоксы", s.ShowHitboxes);
@@ -98,31 +98,30 @@ namespace GEO_DASH.UI
             MusicPlayer.SetVolume(s.MusicVolume);
             Sfx.Volume = (float)s.SfxVolume;
             _msg = "Сохранено. Папка данных: " + AppConfig.DataDir;
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task CheckUpdate()
         {
-            _msg = "Проверяю GitHub…"; Invalidate();
+            _msg = "Проверяю GitHub…"; Content.Invalidate();
             var info = await Updater.CheckAsync();
-            if (info == null) { _msg = "Не удалось получить update.json"; Invalidate(); return; }
+            if (info == null) { _msg = "Не удалось получить update.json"; Content.Invalidate(); return; }
             if (!Updater.IsNewer(info.version, Updater.CurrentVersion))
             {
                 _msg = $"У тебя последняя версия ({Updater.CurrentVersion})";
-                Invalidate(); return;
+                Content.Invalidate(); return;
             }
             if (MessageBox.Show($"Есть версия {info.version}. Обновить?", "Обновление",
                 MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
-                if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(x => { _msg = x; Invalidate(); })))
+                if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(x => { _msg = x; Content.Invalidate(); })))
                     Application.Exit();
             }
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "НАСТРОЙКИ", "данные игры: " + AppConfig.DataDir);
+                        Header(g, "НАСТРОЙКИ", "данные игры: " + AppConfig.DataDir);
             using var f = Gd.Bold(11f);
             void L(string t, int y) => Gd.Outlined(g, t, f, new RectangleF(40, y, 230, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             L("Сервер (IP)", 112);

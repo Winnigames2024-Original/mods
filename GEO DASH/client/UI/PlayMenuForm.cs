@@ -42,7 +42,7 @@ namespace GEO_DASH.UI
             _bPractice.Location = new Point(cx - 120, ClientSize.Height - 78);
             _bPrev.Location = new Point(24, ClientSize.Height / 2 - 30);
             _bNext.Location = new Point(ClientSize.Width - 84, ClientSize.Height / 2 - 30);
-            Invalidate();
+            Content.Invalidate();
         }
 
         void Move(int d)
@@ -50,7 +50,7 @@ namespace GEO_DASH.UI
             Sfx.Play("click");
             _index = (_index + d + _levels.Count) % _levels.Count;
             PlayPreview();
-            Invalidate();
+            Content.Invalidate();
         }
 
         void PlayPreview()
@@ -66,13 +66,12 @@ namespace GEO_DASH.UI
             using (var f = new GameForm(lv.DeepClone(), practice))
                 f.ShowDialog(this);
             PlayPreview();
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "ОСНОВНЫЕ УРОВНИ", "музыка встроена — работает без интернета");
+                        Header(g, "ОСНОВНЫЕ УРОВНИ", "музыка встроена — работает без интернета");
 
             var lv = _levels[_index];
             var st = lv.Settings;

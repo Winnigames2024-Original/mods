@@ -458,30 +458,52 @@ namespace GEO_DASH.UI
         }
     }
 
-    /// <summary>Форма с анимированным фоном в стиле игры.</summary>
+    /// <summary>Панель с двойной буферизацией — на ней строятся все экраны.</summary>
+    public class GdPanel : Panel
+    {
+        public GdPanel()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
+                     | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            BackColor = Gd.Deep;
+        }
+    }
+
+    /// <summary>
+    /// Окно-оболочка: вся начинка экрана лежит на панели <see cref="Content"/>,
+    /// фон и заголовок рисуются на ней же.
+    /// </summary>
     public class GdForm : Form
     {
         protected double T;
         readonly System.Windows.Forms.Timer _anim = new() { Interval = 33 };
         public Color BgA = Gd.Deep2, BgB = Gd.Deep;
 
+        /// <summary>Панель-основа экрана: сюда добавляются все контролы.</summary>
+        protected readonly GdPanel Content = new() { Dock = DockStyle.Fill };
+
         public GdForm()
         {
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
             BackColor = Gd.Deep;
             ForeColor = Gd.Paper;
             Font = Gd.Reg(10f);
             StartPosition = FormStartPosition.CenterParent;
             KeyPreview = true;
-            _anim.Tick += (s, e) => { T += 0.033; Invalidate(false); };
+
+            Controls.Add(Content);
+            Content.Paint += (s, e) =>
+            {
+                Gd.Background(e.Graphics, Content.ClientRectangle, T, BgA, BgB);
+                OnRender(e.Graphics);
+            };
+
+            _anim.Tick += (s, e) => { T += 0.033; Content.Invalidate(false); };
             Shown += (s, e) => _anim.Start();
             FormClosed += (s, e) => _anim.Stop();
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            Gd.Background(e.Graphics, ClientRectangle, T, BgA, BgB);
-        }
+        /// <summary>Рисование экрана поверх фона (вместо OnPaint формы).</summary>
+        protected virtual void OnRender(Graphics g) { }
 
         protected void Header(Graphics g, string title, string sub = "")
         {
@@ -494,6 +516,14 @@ namespace GEO_DASH.UI
             }
         }
 
+        /// <summary>Добавить контрол на панель экрана.</summary>
+        protected T2 Host<T2>(T2 c) where T2 : Control
+        {
+            Content.Controls.Add(c);
+            c.BringToFront();
+            return c;
+        }
+
         protected GdButton Add(string text, GdIcon ic, int x, int y, int w, int h, Color c1, Color c2, EventHandler click, string sub = "")
         {
             var b = new GdButton
@@ -502,9 +532,7 @@ namespace GEO_DASH.UI
                 Color1 = c1, Color2 = c2, Sub = sub
             };
             if (click != null) b.Click += click;
-            Controls.Add(b);
-            b.BringToFront();
-            return b;
+            return Host(b);
         }
     }
 }

@@ -148,6 +148,41 @@ public class Api {
         } catch (Exception ignored) { }
     }
 
+    /** Залить уровень на сервер (из редактора на телефоне). Возвращает id или 0. */
+    public static int uploadLevel(Level lv) {
+        try {
+            JSONObject b = new JSONObject();
+            b.put("id", lv.settings.serverId);
+            b.put("password", lv.settings.password);
+            b.put("name", lv.settings.name);
+            b.put("desc", lv.settings.desc);
+            b.put("songId", lv.settings.songId);
+            b.put("songName", lv.settings.songName);
+            b.put("difficulty", lv.settings.difficulty);
+            b.put("length", lv.rightEdge());
+            b.put("localId", lv.settings.localId);
+            b.put("data", lv.toJson());
+            String r = rawPost("/api/levels", b.toString());
+            if (r == null) {
+                Store.enqueue("/api/levels", b.toString(), "upload:" + lv.settings.localId);
+                return 0;
+            }
+            return new JSONObject(r).optInt("id", 0);
+        } catch (Exception e) { return 0; }
+    }
+
+    public static JSONArray searchUsers(String q) {
+        return arr(cachedGet("/api/users?q=" + enc(q), "usersearch"));
+    }
+
+    public static JSONArray levelsOf(String author) {
+        return arr(cachedGet("/api/levels?author=" + enc(author) + "&sort=recent", "levels_of_" + author));
+    }
+
+    public static JSONObject user(String name) {
+        return obj(cachedGet("/api/users/" + enc(name), "user_" + name));
+    }
+
     public static void like(int levelId) {
         try {
             String body = new JSONObject().put("like", true).toString();

@@ -25,7 +25,7 @@ namespace GEO_DASH.UI
                 BackColor = Color.FromArgb(20, 18, 48), ForeColor = Gd.Paper, BorderStyle = BorderStyle.FixedSingle
             };
             _search.KeyDown += async (s, e) => { if (e.KeyCode == Keys.Enter) await Reload(); };
-            Controls.Add(_search);
+            Host(_search);
 
             _sort = new ComboBox
             {
@@ -35,7 +35,7 @@ namespace GEO_DASH.UI
             _sort.Items.AddRange(new object[] { "Новые", "Популярные", "Лучшие", "Featured", "Epic" });
             _sort.SelectedIndex = 0;
             _sort.SelectedIndexChanged += async (s, e) => await Reload();
-            Controls.Add(_sort);
+            Host(_sort);
 
             _diff = new ComboBox
             {
@@ -46,7 +46,7 @@ namespace GEO_DASH.UI
             foreach (Difficulty d in Enum.GetValues<Difficulty>()) _diff.Items.Add(Difficulties.Label(d));
             _diff.SelectedIndex = 0;
             _diff.SelectedIndexChanged += async (s, e) => await Reload();
-            Controls.Add(_diff);
+            Host(_diff);
 
             _list = new ListView
             {
@@ -63,7 +63,7 @@ namespace GEO_DASH.UI
             _list.Columns.Add("♥", 55);
             _list.Columns.Add("↓", 60);
             _list.DoubleClick += async (s, e) => await Play();
-            Controls.Add(_list);
+            Host(_list);
 
             int x = 804, y = 134;
             void B(string t, GdIcon ic, Color c1, Color c2, EventHandler h)
@@ -90,7 +90,7 @@ namespace GEO_DASH.UI
 
         async Task Reload()
         {
-            _msg = "Загружаю…"; Invalidate();
+            _msg = "Загружаю…"; Content.Invalidate();
             string sort = _sort.SelectedIndex switch
             {
                 1 => "popular", 2 => "top", 3 => "featured", 4 => "epic", _ => "recent"
@@ -119,16 +119,16 @@ namespace GEO_DASH.UI
                 _list.Items.Add(it);
             }
             if (_list.Items.Count > 0) _list.Items[0].Selected = true;
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task<LevelData> Fetch(LevelDto d)
         {
             if (d == null) return null;
-            _msg = "Скачиваю уровень…"; Invalidate();
-            var lv = await LocalStore.DownloadAsync(d.Id, true, new Progress<string>(s => { _msg = s; Invalidate(); }));
+            _msg = "Скачиваю уровень…"; Content.Invalidate();
+            var lv = await LocalStore.DownloadAsync(d.Id, true, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
             if (lv == null) _msg = "Не удалось скачать (нет сети?)";
-            Invalidate();
+            Content.Invalidate();
             return lv;
         }
 
@@ -139,14 +139,14 @@ namespace GEO_DASH.UI
             MusicPlayer.Stop();
             using (var f = new GameForm(lv.DeepClone())) f.ShowDialog(this);
             _msg = "";
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task Save()
         {
             var lv = await Fetch(Sel);
             if (lv != null) _msg = "Сохранено в SAVED — доступно без интернета";
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task CopyToEditor()
@@ -183,7 +183,7 @@ namespace GEO_DASH.UI
             c.Settings.CopyPassword = "";
             LocalStore.SaveMyLevel(c);
             _msg = "Скопировано в «Мои уровни»";
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task Like()
@@ -192,7 +192,7 @@ namespace GEO_DASH.UI
             if (d == null) return;
             var r = await ApiClient.LikeAsync(d.Id, true);
             _msg = r.Ok ? "Лайк отправлен" : r.Error;
-            Invalidate();
+            Content.Invalidate();
         }
 
         void OpenAuthor()
@@ -203,10 +203,9 @@ namespace GEO_DASH.UI
             f.ShowDialog(this);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "ОНЛАЙН-УРОВНИ", ApiClient.Online ? "сервер " + AppConfig.Settings.ServerHost : "офлайн — только кэш");
+                        Header(g, "ОНЛАЙН-УРОВНИ", ApiClient.Online ? "сервер " + AppConfig.Settings.ServerHost : "офлайн — только кэш");
             using var f = Gd.Bold(10f);
             if (!string.IsNullOrEmpty(_msg))
                 Gd.Outlined(g, _msg, f, new RectangleF(24, ClientSize.Height - 40, 760, 24),

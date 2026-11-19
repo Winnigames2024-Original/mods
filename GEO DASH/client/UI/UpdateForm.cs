@@ -43,7 +43,7 @@ namespace GEO_DASH.UI
 
             var prog = new Progress<string>(s => Status(s));
             var timer = new System.Windows.Forms.Timer { Interval = 60 };
-            timer.Tick += (a, b) => { _bar = Math.Min(0.95, _bar + 0.012); Invalidate(); };
+            timer.Tick += (a, b) => { _bar = Math.Min(0.95, _bar + 0.012); Content.Invalidate(); };
             timer.Start();
 
             bool ok = await Updater.DownloadAndApplyAsync(_info, prog);
@@ -68,13 +68,12 @@ namespace GEO_DASH.UI
         {
             if (InvokeRequired) { try { BeginInvoke(() => Status(s)); } catch { } return; }
             _status = s;
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "ЕСТЬ ОБНОВЛЕНИЕ", "сервер онлайн — можно обновиться прямо сейчас");
+                        Header(g, "ЕСТЬ ОБНОВЛЕНИЕ", "сервер онлайн — можно обновиться прямо сейчас");
 
             var card = new RectangleF(40, 110, ClientSize.Width - 80, 220);
             Gd.Plate(g, card, Color.FromArgb(38, 48, 96), Color.FromArgb(18, 22, 54), 18f, 4f);

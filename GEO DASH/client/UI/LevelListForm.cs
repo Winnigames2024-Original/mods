@@ -34,7 +34,7 @@ namespace GEO_DASH.UI
             _list.Columns.Add("Прогресс", 90);
             _list.Columns.Add(mode == LevelListMode.My ? "Сервер" : "ID", 70);
             _list.DoubleClick += (s, e) => Play(false);
-            Controls.Add(_list);
+            Host(_list);
 
             int x = 744, y = 110;
             GdButton B(string t, GdIcon ic, Color c1, Color c2, EventHandler h)
@@ -88,7 +88,7 @@ namespace GEO_DASH.UI
                 _list.Items.Add(it);
             }
             if (_list.Items.Count > 0) _list.Items[0].Selected = true;
-            Invalidate();
+            Content.Invalidate();
         }
 
         LevelData Sel => _list.SelectedIndices.Count > 0 && _list.SelectedIndices[0] < _data.Count
@@ -170,8 +170,8 @@ namespace GEO_DASH.UI
             var lv = Sel;
             if (lv?.Settings.ServerId > 0)
             {
-                _msg = "Скачиваю…"; Invalidate();
-                await LocalStore.DownloadAsync(lv.Settings.ServerId, true, new Progress<string>(s => { _msg = s; Invalidate(); }));
+                _msg = "Скачиваю…"; Content.Invalidate();
+                await LocalStore.DownloadAsync(lv.Settings.ServerId, true, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
                 Reload();
             }
         }
@@ -181,7 +181,7 @@ namespace GEO_DASH.UI
             var lv = Sel;
             if (lv == null) return;
             if (!AppConfig.LoggedIn) { MessageBox.Show("Сначала войди в аккаунт."); return; }
-            _msg = "Загружаю…"; Invalidate();
+            _msg = "Загружаю…"; Content.Invalidate();
             var r = await ApiClient.UploadLevelAsync(lv, lv.Settings.ServerId, lv.Settings.Password);
             if (r.Ok && r.Data != null)
             {
@@ -221,15 +221,15 @@ namespace GEO_DASH.UI
             return f.ShowDialog() == DialogResult.OK ? tb.Text : null;
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            Header(e.Graphics, _mode == LevelListMode.My ? "МОИ УРОВНИ" : "SAVED — СОХРАНЁННЫЕ",
+            Header(g, _mode == LevelListMode.My ? "МОИ УРОВНИ" : "SAVED — СОХРАНЁННЫЕ",
                 _mode == LevelListMode.My
                     ? "хранятся в assets/levels рядом с игрой"
                     : "скачанные и офлайн-уровни: assets/saved (играются без интернета)");
             if (!string.IsNullOrEmpty(_msg))
                 using (var f = Gd.Bold(10f))
-                    Gd.Outlined(e.Graphics, _msg, f, new RectangleF(24, ClientSize.Height - 40, 700, 24), Gd.Gold,
+                    Gd.Outlined(g, _msg, f, new RectangleF(24, ClientSize.Height - 40, 700, 24), Gd.Gold,
                         StringAlignment.Near, thick: 2.2f);
         }
     }

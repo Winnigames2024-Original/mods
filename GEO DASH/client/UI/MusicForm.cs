@@ -27,7 +27,7 @@ namespace GEO_DASH.UI
                 Font = Gd.Bold(14f), BackColor = Color.FromArgb(22, 20, 52), ForeColor = Gd.Paper,
                 BorderStyle = BorderStyle.FixedSingle
             };
-            Controls.Add(_id);
+            Host(_id);
 
             _builtin = new ListBox
             {
@@ -44,7 +44,7 @@ namespace GEO_DASH.UI
                     SongName = t.Name; SongArtist = t.Artist;
                 }
             };
-            Controls.Add(_builtin);
+            Host(_builtin);
 
             Add("ПРОСЛУШАТЬ", GdIcon.Play, 40, 200, 220, 50, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100),
                 async (s, e) => await Preview());
@@ -64,17 +64,17 @@ namespace GEO_DASH.UI
         async Task Preview()
         {
             int id = (int)_id.Value;
-            _msg = "Готовлю трек…"; Invalidate();
+            _msg = "Готовлю трек…"; Content.Invalidate();
             bool ok = await MusicPlayer.PlayAsync(id, 0, 1, true);
             _msg = ok ? "Играет трек " + id : "Не получилось: " + MusicPlayer.LastError;
-            Invalidate();
+            Content.Invalidate();
         }
 
         async Task Download()
         {
             int id = (int)_id.Value;
-            _msg = "Скачиваю…"; Invalidate();
-            var path = await MusicPlayer.EnsureAsync(id, new Progress<string>(s => { _msg = s; Invalidate(); }));
+            _msg = "Скачиваю…"; Content.Invalidate();
+            var path = await MusicPlayer.EnsureAsync(id, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
             if (path != null)
             {
                 var info = await ApiClient.SongInfoAsync(id);
@@ -85,13 +85,12 @@ namespace GEO_DASH.UI
                 _msg = "Готово: " + path;
             }
             else _msg = "Не вышло: " + MusicPlayer.LastError;
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, "МУЗЫКА ПО ID", "любой трек Newgrounds по номеру + встроенный саундтрек");
+                        Header(g, "МУЗЫКА ПО ID", "любой трек Newgrounds по номеру + встроенный саундтрек");
             using var f = Gd.Bold(11f);
             Gd.Outlined(g, "ID трека", f, new RectangleF(40, 124, 300, 22), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             Gd.Outlined(g, "Встроенные треки (работают офлайн)", f, new RectangleF(400, 124, 340, 22), Gd.Paper, StringAlignment.Near, thick: 2.2f);

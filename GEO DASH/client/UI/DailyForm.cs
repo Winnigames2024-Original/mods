@@ -17,9 +17,9 @@ namespace GEO_DASH.UI
             BgA = Color.FromArgb(56, 24, 86);
 
             Add("DAILY", GdIcon.Daily, 60, 110, 220, 56, Color.FromArgb(120, 200, 255), Color.FromArgb(30, 90, 190),
-                (s, e) => { _weeklySelected = false; Invalidate(); });
+                (s, e) => { _weeklySelected = false; Content.Invalidate(); });
             Add("WEEKLY", GdIcon.Weekly, 300, 110, 220, 56, Color.FromArgb(220, 150, 255), Color.FromArgb(120, 50, 190),
-                (s, e) => { _weeklySelected = true; Invalidate(); });
+                (s, e) => { _weeklySelected = true; Content.Invalidate(); });
 
             Add("ИГРАТЬ", GdIcon.Play, 60, ClientSize.Height - 90, 250, 60, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100),
                 async (s, e) => await Play());
@@ -33,12 +33,12 @@ namespace GEO_DASH.UI
 
         async Task Reload()
         {
-            _msg = "Загружаю…"; Invalidate();
+            _msg = "Загружаю…"; Content.Invalidate();
             var d = await ApiClient.DailyAsync();
             var w = await ApiClient.WeeklyAsync();
             _daily = d.Data; _weekly = w.Data;
             _msg = d.FromCache || w.FromCache ? "Офлайн: последние скачанные" : "";
-            Invalidate();
+            Content.Invalidate();
         }
 
         LevelDto Cur => (_weeklySelected ? _weekly : _daily)?.Level;
@@ -47,26 +47,25 @@ namespace GEO_DASH.UI
         {
             var l = Cur;
             if (l == null) return;
-            var lv = await LocalStore.DownloadAsync(l.Id, true, new Progress<string>(s => { _msg = s; Invalidate(); }));
-            if (lv == null) { _msg = "Нет сети и уровень не сохранён офлайн"; Invalidate(); return; }
+            var lv = await LocalStore.DownloadAsync(l.Id, true, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
+            if (lv == null) { _msg = "Нет сети и уровень не сохранён офлайн"; Content.Invalidate(); return; }
             MusicPlayer.Stop();
             using (var f = new GameForm(lv.DeepClone())) f.ShowDialog(this);
-            _msg = ""; Invalidate();
+            _msg = ""; Content.Invalidate();
         }
 
         async Task Save()
         {
             var l = Cur;
             if (l == null) return;
-            await LocalStore.DownloadAsync(l.Id, true, new Progress<string>(s => { _msg = s; Invalidate(); }));
+            await LocalStore.DownloadAsync(l.Id, true, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
             _msg = "Сохранено в SAVED";
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, _weeklySelected ? "УРОВЕНЬ НЕДЕЛИ" : "УРОВЕНЬ ДНЯ",
+                        Header(g, _weeklySelected ? "УРОВЕНЬ НЕДЕЛИ" : "УРОВЕНЬ ДНЯ",
                 "скачиваются автоматически и играются без интернета");
 
             var dto = _weeklySelected ? _weekly : _daily;

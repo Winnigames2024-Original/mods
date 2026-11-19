@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Первая версия: 8 режимов (включая червяка), скорости до 6x, все триггеры, редактор, аккаунты, друзья, daily/weekly, офлайн-режим, музыка по ID с Newgrounds и свой встроенный саундтрек.",
+  "notes": "Структура экранов как в игре: отдельные формы и Activity — PLAY, EDITOR (мои уровни + редактор), CREATOR (Saved, Search, Daily, Weekly, Featured, Epic, Users, Top). Поиск уровней по названию и по ID, поиск игроков. Редактор уровней теперь и на Android. Диалог автообновления.",
   "date": "2026-11-19"
 }

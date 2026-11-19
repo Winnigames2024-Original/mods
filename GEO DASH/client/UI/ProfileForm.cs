@@ -29,7 +29,7 @@ namespace GEO_DASH.UI
             _list.Columns.Add("Сложность", 120);
             _list.Columns.Add("♥", 60);
             _list.Columns.Add("↓", 70);
-            Controls.Add(_list);
+            Host(_list);
 
             int x = 648, y = 330;
             void B(string t, GdIcon ic, Color c1, Color c2, EventHandler h)
@@ -40,7 +40,7 @@ namespace GEO_DASH.UI
                     async (s, e) => { using (var f = new LoginForm()) f.ShowDialog(this); await Reload(); });
             else
                 B("ДОБАВИТЬ В ДРУЗЬЯ", GdIcon.Friends, Color.FromArgb(255, 150, 200), Color.FromArgb(160, 50, 110),
-                    async (s, e) => { var r = await ApiClient.FriendRequestAsync(_user); _msg = r.Ok ? "Запрос отправлен" : r.Error; Invalidate(); });
+                    async (s, e) => { var r = await ApiClient.FriendRequestAsync(_user); _msg = r.Ok ? "Запрос отправлен" : r.Error; Content.Invalidate(); });
 
             B("ОБНОВИТЬ", GdIcon.Refresh, Color.FromArgb(160, 170, 210), Color.FromArgb(70, 80, 130), async (s, e) => await Reload());
             B("НАЗАД", GdIcon.Back, Color.FromArgb(160, 160, 190), Color.FromArgb(70, 70, 110), (s, e) => Close());
@@ -50,8 +50,8 @@ namespace GEO_DASH.UI
 
         async Task Reload()
         {
-            if (string.IsNullOrEmpty(_user)) { _msg = "Ты не вошёл в аккаунт"; Invalidate(); return; }
-            _msg = "Загружаю…"; Invalidate();
+            if (string.IsNullOrEmpty(_user)) { _msg = "Ты не вошёл в аккаунт"; Content.Invalidate(); return; }
+            _msg = "Загружаю…"; Content.Invalidate();
 
             var a = _user == AppConfig.Settings.UserName ? await ApiClient.MeAsync() : await ApiClient.UserAsync(_user);
             _acc = a.Data ?? (_user == AppConfig.Settings.UserName ? LocalStore.CachedMe() : null);
@@ -67,13 +67,12 @@ namespace GEO_DASH.UI
                 }));
 
             _msg = a.FromCache || l.FromCache ? "Офлайн: последние данные" : "";
-            Invalidate();
+            Content.Invalidate();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnRender(Graphics g)
         {
-            var g = e.Graphics;
-            Header(g, (_acc?.Name ?? _user ?? "ГОСТЬ").ToUpperInvariant(),
+                        Header(g, (_acc?.Name ?? _user ?? "ГОСТЬ").ToUpperInvariant(),
                 _acc?.Banned == true ? "аккаунт заблокирован" : (_acc?.Admin == true ? "администратор" : ""));
 
             var card = new RectangleF(24, 110, ClientSize.Width - 48, 196);
