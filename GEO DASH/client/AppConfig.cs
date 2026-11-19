@@ -19,6 +19,8 @@ namespace GEO_DASH
         public bool Fullscreen { get; set; }
         public int Fps { get; set; } = 60;
         public string UpdateChannel { get; set; } = "main";
+        /// <summary>Где лежат кнопки в игре — настраивается в самой игре по кнопке «=».</summary>
+        public Core.GuiLayout Gui { get; set; } = new();
     }
 
     public static class AppConfig

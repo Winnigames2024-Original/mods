@@ -11,7 +11,9 @@ public class FriendsActivity extends GdActivity {
 
     LinearLayout box;
 
-    @Override protected int bgA() { return Color.rgb(70, 20, 60); }
+    @Override protected int bgA() { return Color.rgb(215, 60, 150); }
+    @Override protected int bgId() { return 18; }
+    @Override protected int groundId() { return 6; }
     @Override protected String headTitle() { return "ДРУЗЬЯ"; }
     @Override protected String headSub() { return "запросы принимаются и здесь, и на сайте"; }
 

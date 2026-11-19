@@ -15,7 +15,9 @@ public class ProfileActivity extends GdActivity {
     JSONObject acc;
     LinearLayout box;
 
-    @Override protected int bgA() { return Color.rgb(20, 40, 80); }
+    @Override protected int bgA() { return Color.rgb(45, 115, 210); }
+    @Override protected int bgId() { return 8; }
+    @Override protected int groundId() { return 3; }
     @Override protected String headTitle() { return (who == null || who.isEmpty() ? "АККАУНТ" : who.toUpperCase()); }
     @Override protected String headSub() { return Api.online ? "" : "офлайн — показаны последние данные"; }
 

@@ -22,7 +22,7 @@ import java.util.List;
 public class Store {
 
     static Context ctx;
-    static SharedPreferences prefs;
+    public static SharedPreferences prefs;
 
     public static void init(Context c) {
         ctx = c.getApplicationContext();
@@ -123,6 +123,13 @@ public class Store {
             String s = readFile(f);
             if (s != null) res.add(Level.parse(s));
         }
+        return res;
+    }
+
+    /** Свои уровни: созданные с нуля (copied = false) или скопированные. */
+    public static List<Level> myLevels(boolean copied) {
+        List<Level> res = new ArrayList<>();
+        for (Level l : myLevels()) if (l.settings.isCopy == copied) res.add(l);
         return res;
     }
 

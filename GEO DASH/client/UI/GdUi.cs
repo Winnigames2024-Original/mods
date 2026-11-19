@@ -15,6 +15,9 @@ namespace GEO_DASH.UI
     {
         public static readonly Color Deep = Color.FromArgb(14, 12, 34);
         public static readonly Color Deep2 = Color.FromArgb(30, 18, 66);
+        /// <summary>Цвет фона главного меню — тот самый синий.</summary>
+        public static readonly Color BgBlue = Color.FromArgb(40, 125, 255);
+        public static readonly Color GroundBlue = Color.FromArgb(0, 102, 255);
         public static readonly Color Neon = Color.FromArgb(0, 230, 255);
         public static readonly Color Magenta = Color.FromArgb(255, 60, 190);
         public static readonly Color Lime = Color.FromArgb(130, 255, 120);
@@ -59,67 +62,83 @@ namespace GEO_DASH.UI
             g.SmoothingMode = old;
         }
 
+        /// <summary>Плита интерфейса: градиент, чёрная обводка, блик сверху и тёмная кромка снизу.</summary>
         public static void Plate(Graphics g, RectangleF r, Color a, Color b, float rad = 14f, float border = 3f)
         {
+            if (r.Width <= 2 || r.Height <= 2) return;
             using var path = Round(r, rad);
-            using (var br = new LinearGradientBrush(r, a, b, LinearGradientMode.Vertical))
+            using (var br = new LinearGradientBrush(new RectangleF(r.X, r.Y - 1, r.Width, r.Height + 2),
+                       a, b, LinearGradientMode.Vertical))
                 g.FillPath(br, path);
+
+            // тёмная кромка снизу — объём, как у кнопок в игре
+            var st = g.Save();
+            g.SetClip(path);
+            var low = new RectangleF(r.X, r.Bottom - r.Height * 0.26f, r.Width, r.Height * 0.26f);
+            using (var br = new LinearGradientBrush(new RectangleF(low.X, low.Y - 1, low.Width, low.Height + 2),
+                       Color.FromArgb(0, 0, 0, 0), Color.FromArgb(90, 0, 0, 0), LinearGradientMode.Vertical))
+                g.FillRectangle(br, low);
+            g.Restore(st);
+
+            // блик сверху
+            var top = new RectangleF(r.X + border, r.Y + border * 0.8f, r.Width - border * 2, r.Height * 0.40f);
+            if (top.Width > 2 && top.Height > 2)
+            {
+                using var hp = Round(top, Math.Max(2f, rad * 0.75f));
+                using var hb = new LinearGradientBrush(new RectangleF(top.X, top.Y - 1, top.Width, top.Height + 2),
+                    Color.FromArgb(70, 255, 255, 255), Color.FromArgb(12, 255, 255, 255), LinearGradientMode.Vertical);
+                g.FillPath(hb, hp);
+            }
+
             using (var pen = new Pen(Ink, border) { LineJoin = LineJoin.Round })
                 g.DrawPath(pen, path);
-            // блик
-            var top = new RectangleF(r.X + border, r.Y + border, r.Width - border * 2, r.Height * 0.32f);
-            using var hp = Round(top, rad * 0.7f);
-            using var hb = new SolidBrush(Color.FromArgb(46, 255, 255, 255));
-            g.FillPath(hb, hp);
         }
 
+        /// <summary>Кнопка игры: та же плита плюс «нажатие» — она проваливается и темнеет.</summary>
+        public static void ButtonPlate(Graphics g, RectangleF r, Color c1, Color c2, float rad, bool pressed, bool hover)
+        {
+            if (r.Width <= 2 || r.Height <= 2) return;
+            if (!pressed)
+            {
+                using var sp = Round(new RectangleF(r.X, r.Y + Math.Max(3f, r.Height * 0.07f), r.Width, r.Height), rad);
+                using var sb = new SolidBrush(Color.FromArgb(110, 0, 0, 0));
+                g.FillPath(sb, sp);
+            }
+            var a = pressed ? Lighten(c1, -0.22) : Lighten(c1, hover ? 0.20 : 0.08);
+            var b = pressed ? Lighten(c2, -0.22) : c2;
+            Plate(g, r, a, b, rad, 3.4f);
+        }
+
+        /// <summary>Тёмная панель под списки и карточки — как окна в игре.</summary>
         public static void Glass(Graphics g, RectangleF r, float rad = 16f)
         {
+            if (r.Width <= 2 || r.Height <= 2) return;
             using var path = Round(r, rad);
-            using (var br = new SolidBrush(Color.FromArgb(150, 16, 14, 40)))
+            using (var br = new LinearGradientBrush(new RectangleF(r.X, r.Y - 1, r.Width, r.Height + 2),
+                       Color.FromArgb(205, 36, 26, 74), Color.FromArgb(215, 18, 13, 44), LinearGradientMode.Vertical))
                 g.FillPath(br, path);
-            using (var pen = new Pen(Color.FromArgb(120, 140, 170, 255), 2f))
+            using (var pen = new Pen(Color.FromArgb(70, 255, 255, 255), 2f))
+                g.DrawPath(pen, Round(new RectangleF(r.X + 3, r.Y + 3, r.Width - 6, r.Height - 6), Math.Max(2f, rad - 3)));
+            using (var pen = new Pen(Ink, 3.2f) { LineJoin = LineJoin.Round })
                 g.DrawPath(pen, path);
         }
 
         // ---------------------------------------------------- анимированный фон
 
         public static void Background(Graphics g, Rectangle r, double t, Color c1, Color c2)
+            => Background(g, r, t, 1, 1, c1, c2);
+
+        /// <summary>Фон экрана как в игре: ровный цвет с едущим узором и пол со своей текстурой.</summary>
+        public static void Background(Graphics g, Rectangle r, double t, int bgId, int groundId, Color bg, Color ground)
         {
             if (r.Width <= 0 || r.Height <= 0) return;
-            using (var br = new LinearGradientBrush(r, c1, c2, LinearGradientMode.ForwardDiagonal))
-                g.FillRectangle(br, r);
+            float scale = Math.Clamp(r.Height / 620f, 0.65f, 1.9f);
 
-            // «пол» как в игре
-            int floor = (int)(r.Height * 0.82);
-            using (var br = new LinearGradientBrush(new Rectangle(0, floor, r.Width, r.Height - floor),
-                       Color.FromArgb(200, 20, 16, 54), Color.FromArgb(255, 8, 6, 22), LinearGradientMode.Vertical))
-                g.FillRectangle(br, new Rectangle(0, floor, r.Width, r.Height - floor));
-            using (var pen = new Pen(Color.FromArgb(180, Neon), 3f))
-                g.DrawLine(pen, 0, floor, r.Width, floor);
+            GdBackdrop.DrawBackground(g, r, bgId, bg, t * 42, Math.Sin(t * 0.25) * 10, scale);
 
-            float step = 86;
-            float off = (float)(-(t * 90) % step);
-            using (var pen = new Pen(Color.FromArgb(26, 255, 255, 255), 2f))
-                for (float x = off; x < r.Width + step; x += step)
-                    g.DrawLine(pen, x, 0, x + 140, floor);
-
-            using (var pen = new Pen(Color.FromArgb(60, Neon), 2f))
-                for (float x = off; x < r.Width + step; x += step)
-                    g.DrawLine(pen, x, floor, x - 80, r.Height);
-
-            // парящие фигуры
-            for (int i = 0; i < 7; i++)
-            {
-                double p = (t * 0.25 + i * 0.37) % 1.0;
-                float x = (float)(r.Width * (1.1 - p * 1.25));
-                float y = (float)(r.Height * (0.12 + 0.52 * ((i * 0.17 + Math.Sin(t * 0.5 + i) * 0.1 + 1) % 1)));
-                float s = 18 + i % 3 * 12;
-                using var br = new SolidBrush(Color.FromArgb(30, i % 2 == 0 ? Neon : Magenta));
-                if (i % 3 == 0) g.FillEllipse(br, x, y, s, s);
-                else if (i % 3 == 1) g.FillRectangle(br, x, y, s, s);
-                else g.FillPolygon(br, new[] { new PointF(x, y + s), new PointF(x + s, y + s), new PointF(x + s / 2, y) });
-            }
+            float gh = Math.Max(56f, r.Height * 0.155f);
+            GdBackdrop.DrawGround(g, new RectangleF(r.X, r.Bottom - gh, r.Width, gh),
+                groundId, ground, Color.White, t * 170, scale);
         }
 
         // ---------------------------------------------------- иконки
@@ -349,8 +368,8 @@ namespace GEO_DASH.UI
             Size = new Size(200, 52);
             _t.Tick += (s, e) =>
             {
-                float target = _down ? -1f : (_hover ? 1f : 0f);
-                _anim += (target - _anim) * 0.28f;
+                float target = _hover ? 1f : 0f;
+                _anim += (target - _anim) * 0.30f;
                 if (Math.Abs(target - _anim) < 0.01f) { _anim = target; _t.Stop(); }
                 Invalidate();
             };
@@ -366,16 +385,14 @@ namespace GEO_DASH.UI
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = TextRenderingHint.AntiAlias;
 
-            float pop = _anim * 3f;
-            var r = new RectangleF(2 - pop * 0.3f, 3 - pop, Width - 4 + pop * 0.6f, Height - 6 + pop);
+            // кнопка «проваливается» при нажатии и чуть растёт под курсором — как в игре
+            float k = _down ? 0.93f : 1f + Math.Max(0, _anim) * 0.045f;
+            float w = (Width - 5) * k, h = (Height - 8) * k;
+            var r = new RectangleF((Width - w) / 2f, (Height - h) / 2f + (_down ? 3f : 0f), w, h);
             if (r.Width <= 2 || r.Height <= 2) return;
 
-            // тень
-            using (var sp = Gd.Round(new RectangleF(r.X + 2, r.Y + 5, r.Width, r.Height), Circle ? r.Height / 2 : Radius))
-            using (var sb = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
-                g.FillPath(sb, sp);
-
-            Gd.Plate(g, r, Gd.Lighten(Color1, _hover ? 0.18 : 0.04), Color2, Circle ? r.Height / 2 : Radius, 3.2f);
+            float rad = Circle ? r.Height / 2 : Math.Min(Radius, Math.Min(r.Width, r.Height) * 0.28f);
+            Gd.ButtonPlate(g, r, Color1, Color2, rad, _down, _hover);
 
             bool iconOnly = string.IsNullOrEmpty(Text);
             bool hasCaption = iconOnly && !string.IsNullOrEmpty(Caption);
@@ -392,10 +409,18 @@ namespace GEO_DASH.UI
             // подпись под картинкой — что это за кнопка
             if (hasCaption)
             {
-                using var fc = Gd.Title(Math.Max(6.5f, Math.Min(9.5f, r.Width * 0.085f)));
-                Gd.Outlined(g, Caption, fc,
-                    new RectangleF(r.X + 2, r.Bottom - r.Height * 0.34f, r.Width - 4, r.Height * 0.3f),
-                    Gd.Paper, thick: 2.4f);
+                bool hasSub = !string.IsNullOrEmpty(Sub);
+                float fs = Math.Clamp(Math.Min(r.Height * 0.115f, r.Width * 0.095f), 6.5f, 14f);
+                using var fc = Gd.Title(fs);
+                float ch = fs * 1.9f;
+                float cy = hasSub ? r.Bottom - ch - fs * 1.5f : r.Bottom - r.Height * 0.32f;
+                Gd.Outlined(g, Caption, fc, new RectangleF(r.X + 3, cy, r.Width - 6, ch), Gd.Paper, thick: 2.6f);
+                if (hasSub)
+                {
+                    using var fsb = Gd.Bold(Math.Max(6f, fs * 0.66f));
+                    Gd.Outlined(g, Sub, fsb, new RectangleF(r.X + 3, cy + ch - 2, r.Width - 6, fs * 1.5f),
+                        Color.FromArgb(225, 235, 240, 255), thick: 2.1f);
+                }
             }
 
             if (!iconOnly)
@@ -433,29 +458,39 @@ namespace GEO_DASH.UI
             _timer.Tick += (s, e) => { _t += 0.016; Invalidate(); };
             _timer.Start();
             MouseEnter += (s, e) => _hover = true;
-            MouseLeave += (s, e) => _hover = false;
+            MouseLeave += (s, e) => { _hover = false; _down = false; };
+            MouseDown += (s, e) => _down = true;
+            MouseUp += (s, e) => _down = false;
         }
+
+        bool _down;
 
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            float pulse = (float)(1 + Math.Sin(_t * 2.4) * 0.025) * (_hover ? 1.06f : 1f);
-            float size = Math.Min(Width, Height) * 0.9f * pulse;
-            var r = new RectangleF(Width / 2f - size / 2, Height / 2f - size / 2, size, size);
+            float pulse = (float)(1 + Math.Sin(_t * 2.2) * 0.02) * (_down ? 0.93f : _hover ? 1.05f : 1f);
+            float size = Math.Min(Width, Height) * 0.88f * pulse;
+            var r = new RectangleF(Width / 2f - size / 2, Height / 2f - size / 2 + (_down ? 4 : 0), size, size);
 
-            for (int i = 3; i >= 1; i--)
-            {
-                using var pen = new Pen(Color.FromArgb(30 + i * 10, Gd.Neon), 3f);
-                var rr = r; rr.Inflate(i * 7f, i * 7f);
-                g.DrawEllipse(pen, rr);
-            }
+            // тень под кнопкой
+            if (!_down)
+                using (var sb = new SolidBrush(Color.FromArgb(120, 0, 0, 0)))
+                    g.FillEllipse(sb, r.X, r.Y + size * 0.06f, r.Width, r.Height);
 
-            using (var br = new LinearGradientBrush(r, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 160, 110), LinearGradientMode.Vertical))
+            using (var br = new LinearGradientBrush(new RectangleF(r.X, r.Y - 1, r.Width, r.Height + 2),
+                       Color.FromArgb(150, 255, 190), Color.FromArgb(10, 150, 95), LinearGradientMode.Vertical))
                 g.FillEllipse(br, r);
-            using (var pen = new Pen(Gd.Ink, 5f)) g.DrawEllipse(pen, r);
-            using (var br = new SolidBrush(Color.FromArgb(60, 255, 255, 255)))
-                g.FillPie(br, r.X + 6, r.Y + 6, r.Width - 12, r.Height - 12, 190, 160);
+
+            // верхний блик и нижняя тень внутри — объём
+            using (var br = new SolidBrush(Color.FromArgb(80, 255, 255, 255)))
+                g.FillPie(br, r.X + size * 0.08f, r.Y + size * 0.05f, r.Width - size * 0.16f, r.Height * 0.62f, 180, 180);
+            using (var br = new SolidBrush(Color.FromArgb(60, 0, 40, 20)))
+                g.FillPie(br, r.X + size * 0.06f, r.Y + size * 0.35f, r.Width - size * 0.12f, r.Height * 0.6f, 0, 180);
+
+            using (var pen = new Pen(Gd.Ink, 6f)) g.DrawEllipse(pen, r);
+            using (var pen = new Pen(Color.FromArgb(120, 255, 255, 255), 3f))
+                g.DrawEllipse(pen, r.X + 7, r.Y + 7, r.Width - 14, r.Height - 14);
 
             float s = size * 0.34f;
             var cx = r.X + r.Width / 2 + s * 0.08f;
@@ -490,7 +525,12 @@ namespace GEO_DASH.UI
     {
         protected double T;
         readonly System.Windows.Forms.Timer _anim = new() { Interval = 33 };
-        public Color BgA = Gd.Deep2, BgB = Gd.Deep;
+        /// <summary>Цвет фона экрана.</summary>
+        public Color BgA = Gd.BgBlue;
+        /// <summary>Цвет пола; если не задан — считается по цвету фона.</summary>
+        public Color BgB = Color.Empty;
+        /// <summary>Номер узора фона (1..20) и пола (1..10) — как в игре.</summary>
+        public int BgId = 1, GroundId = 1;
 
         /// <summary>Панель-основа экрана: сюда добавляются все контролы.</summary>
         protected readonly GdPanel Content = new() { Dock = DockStyle.Fill };
@@ -506,7 +546,8 @@ namespace GEO_DASH.UI
             Controls.Add(Content);
             Content.Paint += (s, e) =>
             {
-                Gd.Background(e.Graphics, Content.ClientRectangle, T, BgA, BgB);
+                Gd.Background(e.Graphics, Content.ClientRectangle, T, BgId, GroundId,
+                    BgA, BgB.A == 0 ? GdBackdrop.GroundOf(BgA) : BgB);
                 OnRender(e.Graphics);
             };
 

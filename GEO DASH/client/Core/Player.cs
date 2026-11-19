@@ -7,6 +7,8 @@ namespace GEO_DASH.Core
         public bool Released;
         public bool Hold2;     // кнопка 2 (вторая клавиша / ПКМ)
         public bool Pressed2;
+        /// <summary>Платформер: -1 влево, +1 вправо, 0 стоим.</summary>
+        public int MoveX;
 
         public static PlayerInput None => new PlayerInput();
     }

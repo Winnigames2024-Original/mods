@@ -11,7 +11,9 @@ public class SettingsActivity extends GdActivity {
     EditText host, port, site;
     SeekBar music, sfx;
 
-    @Override protected int bgA() { return Color.rgb(28, 30, 70); }
+    @Override protected int bgA() { return Color.rgb(70, 75, 205); }
+    @Override protected int bgId() { return 14; }
+    @Override protected int groundId() { return 8; }
     @Override protected String headTitle() { return "НАСТРОЙКИ"; }
     @Override protected String headSub() { return Store.assets().getAbsolutePath(); }
 

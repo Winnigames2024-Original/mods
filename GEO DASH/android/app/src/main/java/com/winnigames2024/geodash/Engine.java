@@ -140,6 +140,7 @@ public class Engine {
         buildIndex();
         rightEdge = lv.rightEdge();
         reverse = lv.settings.reverse;
+        platformer = lv.settings.platformerFreeMove;
         restart();
     }
 
@@ -230,6 +231,11 @@ public class Engine {
 
     // ------------------------------------------------------------ шаг
 
+    /** Платформер: игрок сам ходит влево-вправо. */
+    public boolean platformer;
+    /** -1 влево, +1 вправо, 0 стоим (только для платформера). */
+    public int moveX;
+
     public void update(double dt, boolean hold1, boolean pressed1, boolean hold2, boolean pressed2) {
         if (dead) { deathTimer += dt; return; }
         if (finished) { time += dt; return; }
@@ -250,7 +256,10 @@ public class Engine {
     }
 
     void step(Player p, double dt, boolean hold, boolean pressed) {
-        double vx = p.speedUnits() * (reverse ? -1 : 1);
+        // платформер: едем туда, куда жмём, а не вперёд сами
+        double vx = platformer
+                ? p.speedUnits() * Math.max(-1, Math.min(1, moveX))
+                : p.speedUnits() * (reverse ? -1 : 1);
         double prevY = p.y;
         p.x += vx * dt;
 
@@ -425,13 +434,20 @@ public class Engine {
             double overlapL = (p.x + half) - rBottomX(r), overlapR = rTopX(r) - (p.x - half);
             double halfW = Math.min(overlapL, overlapR);
 
+            // стоим со стороны притяжения; удар другой стороной — смерть, как в игре
+            boolean groundMode = p.mode == Gd.CUBE || p.mode == Gd.BALL
+                    || p.mode == Gd.ROBOT || p.mode == Gd.SPIDER;
+
             if (fromAbove && p.vy <= 0.0001) {
+                if (p.gravityDir < 0 && groundMode && Math.abs(p.vy) > 40) { die(); return; }
                 p.y = rTop + half; p.vy = 0;
                 if (p.gravityDir > 0) { p.onGround = true; p.robotJumping = false; } else p.onCeiling = true;
                 continue;
             }
             if (fromBelow && p.vy >= -0.0001) {
                 if (d.topOnly) continue;
+                // прыгнул, а сверху блок — разбился
+                if (p.gravityDir > 0 && groundMode && Math.abs(p.vy) > 40) { die(); return; }
                 p.y = rBottom - half; p.vy = 0;
                 if (p.gravityDir < 0) { p.onGround = true; p.robotJumping = false; } else p.onCeiling = true;
                 continue;

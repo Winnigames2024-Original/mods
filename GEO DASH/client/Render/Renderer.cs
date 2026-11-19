@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using GEO_DASH.Core;
+using GEO_DASH.UI;
 
 namespace GEO_DASH.Render
 {
@@ -53,7 +54,7 @@ namespace GEO_DASH.Render
             g.CompositingQuality = CompositingQuality.HighSpeed;
 
             var bg = w.Colors.Eff(ColorSystem.ChBg);
-            DrawBackground(g, v, bg, w.Cam.CamX);
+            DrawBackground(g, v, bg, w.Cam.CamX, w.Cam.CamY, w.Level.Settings);
 
             DrawGroundAndRoof(g, w, v);
 
@@ -101,60 +102,34 @@ namespace GEO_DASH.Render
 
         // ------------------------------------------------------------ фон
 
-        static void DrawBackground(Graphics g, ViewTransform v, Color bg, double camX)
+        static void DrawBackground(Graphics g, ViewTransform v, Color bg, double camX, double camY, LevelSettings st)
         {
             var rect = new Rectangle(0, 0, Math.Max(1, v.Client.Width), Math.Max(1, v.Client.Height));
-            using (var br = new LinearGradientBrush(rect,
-                       Blend(bg, Color.Black, 0.25), Blend(bg, Color.White, 0.06), LinearGradientMode.Vertical))
-                g.FillRectangle(br, rect);
-
-            // лёгкий подвижный узор
-            using var pen = new Pen(Color.FromArgb(28, 255, 255, 255), 2);
-            float step = 90 * v.Scale;
-            if (step < 8) return;
-            float off = (float)(-camX * v.Scale * 0.35 % step);
-            for (float x = off; x < rect.Width + step; x += step)
-            {
-                g.DrawLine(pen, x, 0, x + rect.Height * 0.4f, rect.Height);
-            }
+            float tex = Math.Clamp(v.Scale * 0.95f, 0.35f, 3f);
+            // фон едет медленнее уровня — как в игре
+            GdBackdrop.DrawBackground(g, rect, st?.BgId ?? 1, bg,
+                camX * v.Scale * 0.26, camY * v.Scale * 0.16, tex);
         }
 
         static void DrawGroundAndRoof(Graphics g, GameWorld w, ViewTransform v)
         {
             var gc = w.Colors.Eff(ColorSystem.ChGround);
             var line = w.Colors.Eff(ColorSystem.ChLine);
+            int gid = w.Level.Settings?.GroundId ?? 1;
+            float tex = Math.Clamp(v.Scale * 0.95f, 0.35f, 3f);
+            double scroll = w.Cam.CamX * v.Scale;
 
             var top = v.W2S(0, w.GroundY);
             if (top.Y < v.Client.Height)
-            {
-                var r = new RectangleF(0, top.Y, v.Client.Width, v.Client.Height - top.Y + 2);
-                using (var br = new LinearGradientBrush(
-                    new RectangleF(0, top.Y, v.Client.Width, Math.Max(4, v.Client.Height - top.Y + 2)),
-                    gc, Blend(gc, Color.Black, 0.45), LinearGradientMode.Vertical))
-                    g.FillRectangle(br, r);
-                using var pen = new Pen(line, 3);
-                g.DrawLine(pen, 0, top.Y, v.Client.Width, top.Y);
-
-                // полосы «движения» земли
-                using var p2 = new Pen(Color.FromArgb(40, 255, 255, 255), 2);
-                float step = 60 * v.Scale;
-                if (step > 6)
-                {
-                    float off = (float)(-w.Cam.CamX * v.Scale % step);
-                    for (float x = off; x < v.Client.Width + step; x += step)
-                        g.DrawLine(p2, x, top.Y + 2, x, v.Client.Height);
-                }
-            }
+                GdBackdrop.DrawGround(g,
+                    new RectangleF(0, top.Y, v.Client.Width, v.Client.Height - top.Y + 2),
+                    gid, gc, line, scroll, tex);
 
             var roof = v.W2S(0, w.RoofY);
             if (roof.Y > 0)
-            {
-                var r = new RectangleF(0, -2, v.Client.Width, roof.Y + 2);
-                using var br = new SolidBrush(Color.FromArgb(200, Blend(gc, Color.Black, 0.3)));
-                g.FillRectangle(br, r);
-                using var pen = new Pen(line, 3);
-                g.DrawLine(pen, 0, roof.Y, v.Client.Width, roof.Y);
-            }
+                GdBackdrop.DrawGround(g,
+                    new RectangleF(0, -2, v.Client.Width, roof.Y + 2),
+                    gid, gc, line, scroll, tex, true);
         }
 
         // ------------------------------------------------------- объекты

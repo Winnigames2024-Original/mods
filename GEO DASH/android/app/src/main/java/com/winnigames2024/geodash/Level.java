@@ -46,11 +46,16 @@ public class Level {
         public String name = "Уровень", desc = "", author = "", songName = "", songArtist = "";
         public int startMode = Gd.CUBE, startSpeed = 1, difficulty = 0;
         public boolean startMini, startDual, startMirror, startGravityUp, twoPlayer, reverse;
+        public boolean platformerFreeMove;
         public int songId = 0;
         public double songOffset = 0, gravityScale = 1, lengthUnits = 0;
         public int bgColor = 0xFF2040A0, groundColor = 0xFF1A2E80, lineColor = 0xFFFFFFFF,
                 objColor = 0xFF000000, obj2Color = 0xFFFFFFFF;
         public int version = 1, serverId = 0, copyMode = 0;
+        public int bgId = 1, groundId = 1;
+        public boolean isCopy;
+        public int copiedFrom;
+        public String copiedAuthor = "";
         public String localId = "", password = "", copyPassword = "";
     }
 
@@ -118,6 +123,7 @@ public class Level {
             s.put("Obj2Color", t.obj2Color);
             s.put("TwoPlayer", t.twoPlayer);
             s.put("ReverseGameplay", t.reverse);
+            s.put("PlatformerFreeMove", t.platformerFreeMove);
             s.put("GravityScale", t.gravityScale);
             s.put("LengthUnits", rightEdge());
             s.put("Version", t.version);
@@ -126,37 +132,16 @@ public class Level {
             s.put("Password", t.password);
             s.put("CopyMode", t.copyMode);
             s.put("CopyPassword", t.copyPassword);
+            s.put("BgId", t.bgId);
+            s.put("GroundId", t.groundId);
+            s.put("IsCopy", t.isCopy);
+            s.put("CopiedFrom", t.copiedFrom);
+            s.put("CopiedAuthor", t.copiedAuthor);
             root.put("Settings", s);
 
             JSONArray arr = new JSONArray();
             int id = 1;
-            for (Obj o : objects) {
-                JSONObject j = new JSONObject();
-                j.put("Id", o.id > 0 ? o.id : id++);
-                j.put("TypeId", o.typeId);
-                j.put("X", o.x);
-                j.put("Y", o.y);
-                j.put("Rotation", o.rotation);
-                j.put("ScaleX", o.scaleX);
-                j.put("ScaleY", o.scaleY);
-                j.put("ZOrder", o.zOrder);
-                j.put("BaseColorChannel", o.baseColor);
-                j.put("DetailColorChannel", o.detailColor);
-                j.put("Opacity", o.opacity);
-                if (o.groups.length > 0) {
-                    JSONArray g = new JSONArray();
-                    for (int v : o.groups) g.put(v);
-                    j.put("Groups", g);
-                }
-                j.put("Portal", PORTALS[clamp(o.portal, PORTALS.length)]);
-                j.put("Orb", ORBS[clamp(o.orb, ORBS.length)]);
-                j.put("Pad", PADS[clamp(o.pad, PADS.length)]);
-                if (o.coinIndex != 0) j.put("CoinIndex", o.coinIndex);
-                if (o.teleportTargetY != 0) j.put("TeleportTargetY", o.teleportTargetY);
-                if (o.text != null && !o.text.isEmpty()) j.put("Text", o.text);
-                if (o.trig != null) j.put("Trigger", trigJson(o.trig));
-                arr.put(j);
-            }
+            for (Obj o : objects) arr.put(objJson(o, o.id > 0 ? o.id : id++));
             root.put("Objects", arr);
             return root.toString();
         } catch (Exception e) {
@@ -228,6 +213,7 @@ public class Level {
                 t.startGravityUp = s.optBoolean("StartGravityUp");
                 t.twoPlayer = s.optBoolean("TwoPlayer");
                 t.reverse = s.optBoolean("ReverseGameplay");
+                t.platformerFreeMove = s.optBoolean("PlatformerFreeMove", false);
                 t.songId = s.optInt("SongId", 0);
                 t.songName = s.optString("SongName", "");
                 t.songArtist = s.optString("SongArtist", "");
@@ -245,6 +231,11 @@ public class Level {
                 t.password = s.optString("Password", "");
                 t.copyMode = s.optInt("CopyMode", 0);
                 t.copyPassword = s.optString("CopyPassword", "");
+                t.bgId = s.optInt("BgId", 1);
+                t.groundId = s.optInt("GroundId", 1);
+                t.isCopy = s.optBoolean("IsCopy", false);
+                t.copiedFrom = s.optInt("CopiedFrom", 0);
+                t.copiedAuthor = s.optString("CopiedAuthor", "");
             }
             JSONArray arr = root.optJSONArray("Objects");
             if (arr != null) {
@@ -256,6 +247,37 @@ public class Level {
             }
         } catch (Exception ignored) { }
         return lv;
+    }
+
+    /** Объект в JSON — тем же форматом, что понимает parseObj. */
+    static JSONObject objJson(Obj o, int id) {
+        JSONObject j = new JSONObject();
+        try {
+            j.put("Id", id > 0 ? id : o.id);
+            j.put("TypeId", o.typeId);
+            j.put("X", o.x);
+            j.put("Y", o.y);
+            j.put("Rotation", o.rotation);
+            j.put("ScaleX", o.scaleX);
+            j.put("ScaleY", o.scaleY);
+            j.put("ZOrder", o.zOrder);
+            j.put("BaseColorChannel", o.baseColor);
+            j.put("DetailColorChannel", o.detailColor);
+            j.put("Opacity", o.opacity);
+            if (o.groups.length > 0) {
+                JSONArray g = new JSONArray();
+                for (int v : o.groups) g.put(v);
+                j.put("Groups", g);
+            }
+            j.put("Portal", PORTALS[clamp(o.portal, PORTALS.length)]);
+            j.put("Orb", ORBS[clamp(o.orb, ORBS.length)]);
+            j.put("Pad", PADS[clamp(o.pad, PADS.length)]);
+            if (o.coinIndex != 0) j.put("CoinIndex", o.coinIndex);
+            if (o.teleportTargetY != 0) j.put("TeleportTargetY", o.teleportTargetY);
+            if (o.text != null && !o.text.isEmpty()) j.put("Text", o.text);
+            if (o.trig != null) j.put("Trigger", trigJson(o.trig));
+        } catch (Exception ignored) { }
+        return j;
     }
 
     static Obj parseObj(JSONObject o) {

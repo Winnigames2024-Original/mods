@@ -40,6 +40,12 @@ namespace GEO_DASH.UI
         bool _panning, _movingSel, _boxSelect;
         RectangleF _selBox;
 
+        /// <summary>Свайп-выделение: ведёшь мышью/пальцем — всё под курсором выделяется.</summary>
+        bool _swipe = true;
+        bool _swiping;
+        /// <summary>Выбранная в палитре конструкция (ставится целиком).</summary>
+        BuildPiece _piece;
+
         public EditorForm(LevelData lv)
         {
             _lv = lv;
@@ -198,12 +204,12 @@ namespace GEO_DASH.UI
             _content.Controls.Add(_palette);
             _palette.BringToFront();
 
-            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное" })
+            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное", "Конструкции" })
             {
                 string c = cat;
                 var b = new GdButton
                 {
-                    Text = cat, Width = 118, Height = 34, FontSize = 8.5f,
+                    Text = cat, Width = 112, Height = 34, FontSize = 8f,
                     Color1 = cat == _category ? Color.FromArgb(120, 220, 255) : Color.FromArgb(70, 76, 125),
                     Color2 = cat == _category ? Color.FromArgb(20, 110, 180) : Color.FromArgb(34, 38, 70),
                     Margin = new Padding(0, 0, 6, 0)
@@ -259,6 +265,46 @@ namespace GEO_DASH.UI
                         AddItem(new LevelObject { TypeId = 100, Trigger = new TriggerData { Type = t } },
                             ObjButton.ShortTrigger(t));
                     break;
+
+                case "Конструкции":
+                    {
+                        var pieces = BuildLibrary.All();
+                        if (pieces.Count == 0)
+                        {
+                            _palette.Controls.Add(new Label
+                            {
+                                Text = "Пусто. Выдели кусок уровня в EDIT свайпом\nи нажми «СОХРАНИТЬ КАК КОНСТРУКЦИЮ».",
+                                Width = 420, Height = 44, ForeColor = Theme.Dim, BackColor = Color.Transparent
+                            });
+                            break;
+                        }
+                        foreach (var piece in pieces)
+                        {
+                            var pc = piece;
+                            var b = new ObjButton
+                            {
+                                Piece = pc, Caption = pc.Name, Size = new Size(84, 84),
+                                Margin = new Padding(4), Selected = _piece != null && _piece.Name == pc.Name
+                            };
+                            b.Click += (s2, e2) =>
+                            {
+                                _piece = pc;
+                                foreach (var c in _palette.Controls) if (c is ObjButton ob) ob.Selected = ob == b;
+                                _palette.Invalidate(true);
+                                Status("Конструкция «" + pc.Name + "»: клик по полю — поставить целиком");
+                            };
+                            b.MouseUp += (s2, e2) =>
+                            {
+                                if (e2.Button != MouseButtons.Right) return;
+                                if (!GdDialog.Confirm(this, "Конструкции", $"Удалить «{pc.Name}»?")) return;
+                                BuildLibrary.Delete(pc.Name);
+                                if (_piece != null && _piece.Name == pc.Name) _piece = null;
+                                ShowCategory("Конструкции");
+                            };
+                            _palette.Controls.Add(b);
+                        }
+                        break;
+                    }
 
                 default:
                     foreach (var d in ObjectCatalog.All.Values)
@@ -386,6 +432,28 @@ namespace GEO_DASH.UI
                 Color.FromArgb(120, 190, 255), Color.FromArgb(30, 90, 190), EditTrigger);
             B("СНЯТЬ ВЫДЕЛЕНИЕ", GdIcon.Cross, 668, 124, 190, 50, gray1, gray2, () => _sel.Clear());
 
+            B("СОХРАНИТЬ КАК КОНСТРУКЦИЮ", GdIcon.Save, 868, 124, 260, 50,
+                Color.FromArgb(120, 255, 180), Color.FromArgb(20, 150, 100), SaveSelectionAsPiece);
+
+            var swipeBtn = new GdButton
+            {
+                Text = _swipe ? "СВАЙП: ВКЛ" : "СВАЙП: ВЫКЛ", Icon = GdIcon.Edit,
+                Left = 1056, Top = 12, Width = 180, Height = 50, FontSize = 8.5f,
+                Color1 = _swipe ? Color.FromArgb(120, 255, 170) : Color.FromArgb(150, 150, 185),
+                Color2 = _swipe ? Color.FromArgb(20, 150, 100) : Color.FromArgb(60, 62, 100)
+            };
+            swipeBtn.Click += (s2, e2) =>
+            {
+                _swipe = !_swipe;
+                swipeBtn.Text = _swipe ? "СВАЙП: ВКЛ" : "СВАЙП: ВЫКЛ";
+                swipeBtn.Color1 = _swipe ? Color.FromArgb(120, 255, 170) : Color.FromArgb(150, 150, 185);
+                swipeBtn.Color2 = _swipe ? Color.FromArgb(20, 150, 100) : Color.FromArgb(60, 62, 100);
+                swipeBtn.Invalidate();
+                Status(_swipe ? "Свайп: веди мышью — выделяется всё под курсором"
+                              : "Свайп выключен: ЛКМ по пустому — рамка выделения");
+            };
+            p.Controls.Add(swipeBtn);
+
             B("ВЫДЕЛИТЬ ВСЁ", GdIcon.Check, 868, 12, 180, 50, gray1, gray2, () =>
             {
                 _sel.Clear();
@@ -404,8 +472,8 @@ namespace GEO_DASH.UI
 
             p.Controls.Add(new Label
             {
-                Text = "ЛКМ — выделить, ЛКМ по выделенному — тащить, ЛКМ по пустому — рамка,\n" +
-                       "СКМ или Alt — двигать вид, стрелки клавиатуры — двигать выделенное",
+                Text = "ЛКМ — выделить, ЛКМ по выделенному — тащить, свайп по пустому — выделение росчерком (Shift — рамка),\n" +
+                       "СКМ или Alt — двигать вид, стрелки — двигать выделенное, «СОХРАНИТЬ КАК КОНСТРУКЦИЮ» — свой блок в палитру",
                 Left = 70, Top = 192, Width = 980, Height = 36,
                 ForeColor = Theme.Dim, BackColor = Color.Transparent
             });
@@ -671,6 +739,13 @@ namespace GEO_DASH.UI
                             _movingSel = true;
                             _dragStart = w;
                         }
+                        else if (_swipe && (ModifierKeys & Keys.Shift) == 0)
+                        {
+                            // свайп: ведёшь — выделяется всё, по чему провёл
+                            _swiping = true;
+                            _sel.Clear();
+                            _dragStart = w;
+                        }
                         else
                         {
                             _boxSelect = true;
@@ -713,6 +788,14 @@ namespace GEO_DASH.UI
 
             var w = _v.S2W(e.X, e.Y);
 
+            if (_swiping)
+            {
+                int under = HitTest(w);
+                if (under >= 0 && !_sel.Contains(under)) { _sel.Add(under); UpdateStatus(); }
+                _canvas.Invalidate();
+                return;
+            }
+
             if (_boxSelect)
             {
                 _selBox = RectangleF.FromLTRB(
@@ -748,6 +831,12 @@ namespace GEO_DASH.UI
 
         void CanvasUp(object s, MouseEventArgs e)
         {
+            if (_swiping)
+            {
+                _swiping = false;
+                if (_sel.Count > 0) Status($"Выделено свайпом: {_sel.Count}");
+            }
+
             if (_boxSelect)
             {
                 _boxSelect = false;
@@ -777,6 +866,19 @@ namespace GEO_DASH.UI
 
         void PlaceObject(PointF p)
         {
+            // выбрана своя конструкция — ставим её целиком
+            if (_category == "Конструкции" && _piece != null)
+            {
+                PushUndo();
+                var stamp = BuildLibrary.Stamp(_piece, p.X, p.Y);
+                _sel.Clear();
+                foreach (var o in stamp) { _lv.Add(o); _sel.Add(_lv.Objects.Count - 1); }
+                Sfx.Play("click");
+                RebuildPreview();
+                Status($"Поставлена конструкция «{_piece.Name}» — {stamp.Count} объектов");
+                return;
+            }
+
             var def = ObjectCatalog.Get(_brush.TypeId);
             foreach (var o in _lv.Objects)
                 if (Math.Abs(o.X - p.X) < 1 && Math.Abs(o.Y - p.Y) < 1 && o.TypeId == _brush.TypeId) return;
@@ -809,6 +911,21 @@ namespace GEO_DASH.UI
             else if (e.KeyCode == Keys.Right) { MoveSel(_step, 0); e.Handled = true; }
             else if (e.KeyCode == Keys.Up) { MoveSel(0, _step); e.Handled = true; }
             else if (e.KeyCode == Keys.Down) { MoveSel(0, -_step); e.Handled = true; }
+        }
+
+        /// <summary>Сохранить выделенное как свою конструкцию — потом ставится одним кликом.</summary>
+        void SaveSelectionAsPiece()
+        {
+            if (_sel.Count == 0) { Status("Сначала выдели объекты — свайпом или рамкой"); return; }
+            string name = GdDialog.Prompt(this, "Своя конструкция",
+                $"Название для {_sel.Count} объектов:", "Конструкция " + (BuildLibrary.All().Count + 1));
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            var objs = _sel.Where(i => i >= 0 && i < _lv.Objects.Count).Select(i => _lv.Objects[i]);
+            var piece = BuildLibrary.Save(name.Trim(), objs);
+            if (piece == null) { Status("Не вышло сохранить"); return; }
+            _piece = piece;
+            Status($"Конструкция «{piece.Name}» сохранена — ищи её в BUILD, вкладка «Конструкции»");
         }
 
         void RebuildPreview()

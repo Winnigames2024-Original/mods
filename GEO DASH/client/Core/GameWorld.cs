@@ -34,6 +34,8 @@ namespace GEO_DASH.Core
         public Player P2 = new() { PlayerIndex = 1 };
         public bool DualMode;
         public bool Reverse;
+        /// <summary>Платформер: игрок сам ходит влево-вправо.</summary>
+        public bool Platformer;
         public ColorSystem Colors = new();
         public Camera Cam = new();
         public TriggerEngine Trig;
@@ -81,6 +83,7 @@ namespace GEO_DASH.Core
             BuildIndex();
             RightEdge = lv.RightEdge();
             Reverse = lv.Settings.ReverseGameplay;
+            Platformer = lv.Settings.PlatformerFreeMove;
             Restart(true);
         }
 
@@ -227,7 +230,10 @@ namespace GEO_DASH.Core
 
         void StepPlayer(Player p, double dt, PlayerInput inp, ref SpiderRequest sreq)
         {
-            double vx = p.SpeedUnits * (Reverse ? -1 : 1) * (p.Mirror ? 1 : 1);
+            // платформер: едем туда, куда жмём, а не вперёд сами
+            double vx = Platformer
+                ? p.SpeedUnits * Math.Clamp(inp.MoveX, -1, 1)
+                : p.SpeedUnits * (Reverse ? -1 : 1) * (p.Mirror ? 1 : 1);
             double prevX = p.X, prevY = p.Y;
 
             p.X += vx * dt;
@@ -329,8 +335,12 @@ namespace GEO_DASH.Core
                 bool fromAbove = prevBottom >= r.Top - 0.6;
                 bool fromBelow = prevTop <= r.Bottom + 0.6;
 
+                // на земле стоим со стороны притяжения; удар другой стороной — смерть, как в игре
+                bool groundMode = p.Mode is GameMode.Cube or GameMode.Ball or GameMode.Robot or GameMode.Spider;
+
                 if (fromAbove && p.VY <= 0.0001)
                 {
+                    if (p.GravityDir < 0 && groundMode && Math.Abs(p.VY) > 40) { Die(p); return; }
                     p.Y = r.Top + p.Size / 2;
                     p.VY = 0;
                     if (p.GravityDir > 0) { p.OnGround = true; p.RobotJumping = false; }
@@ -340,6 +350,8 @@ namespace GEO_DASH.Core
                 if (fromBelow && p.VY >= -0.0001)
                 {
                     if (d.TopOnly) continue;              // платформа: снизу проходим
+                    // прыгнул, а сверху блок — разбился
+                    if (p.GravityDir > 0 && groundMode && Math.Abs(p.VY) > 40) { Die(p); return; }
                     p.Y = r.Bottom - p.Size / 2;
                     p.VY = 0;
                     if (p.GravityDir < 0) { p.OnGround = true; p.RobotJumping = false; }

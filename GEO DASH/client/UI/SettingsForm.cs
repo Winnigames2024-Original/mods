@@ -16,7 +16,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Настройки";
             ClientSize = new Size(820, 640);
-            BgA = Color.FromArgb(28, 30, 70);
+            BgA = Color.FromArgb(70, 75, 205); BgId = 14; GroundId = 8;
             var s = AppConfig.Settings;
 
             TextBox Tb(int y, string val, int w = 240)

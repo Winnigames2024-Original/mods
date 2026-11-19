@@ -16,7 +16,7 @@ namespace GEO_DASH.UI
             _user = string.IsNullOrWhiteSpace(user) ? AppConfig.Settings.UserName : user;
             Text = "GEO DASH — Профиль";
             ClientSize = new Size(940, 640);
-            BgA = Color.FromArgb(20, 40, 80);
+            BgA = Color.FromArgb(45, 115, 210); BgId = 8; GroundId = 3;
 
             _list = new ListView
             {

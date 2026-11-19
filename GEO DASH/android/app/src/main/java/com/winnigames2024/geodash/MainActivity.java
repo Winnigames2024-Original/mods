@@ -78,6 +78,9 @@ public class MainActivity extends GdActivity {
                     account = Api.me();
                     setStatus(Api.online ? "Синхронизировано" : "Нет сети");
                 })).caption("СИНХРО");
+        if (Store.admin())
+            btn("", Ui.I_ADMIN, Color.rgb(255, 110, 110), Color.rgb(150, 30, 40),
+                    0.70f, 0.78f, 0.09f, 0.16f, () -> go(AdminActivity.class)).caption("АДМИНКА");
 
         statusView = new StatusView(this);
         root.addView(statusView, new FrameLayout.LayoutParams(

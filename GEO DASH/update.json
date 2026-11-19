@@ -1,7 +1,7 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Редактор уровней как в игре: режимы BUILD / EDIT / DELETE, палитра объектов по вкладкам с превью, панель правки (стрелки, шаг 0.5/1/5, поворот, отражение, копирование, правка объекта), undo/redo, зум. Постановки и стирания свайпом нет — объекты ставятся по одному клику.",
+  "notes": "Фон и дизайн как в Geometry Dash, меню EDITOR с публикацией и копиями, свои песни, обязательный вход с авто-входом, кнопка = и настройка GUI, платформер-кнопки, конструкции из выделения свайпом, карточки с картинками, новый саундтрек, расширенная админка",
   "date": "2026-11-19"
 }

@@ -14,7 +14,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Daily / Weekly";
             ClientSize = new Size(900, 600);
-            BgA = Color.FromArgb(56, 24, 86);
+            BgA = Color.FromArgb(160, 60, 220); BgId = 16; GroundId = 7;
 
             Add("DAILY", GdIcon.Daily, 60, 110, 220, 56, Color.FromArgb(120, 200, 255), Color.FromArgb(30, 90, 190),
                 (s, e) => { _weeklySelected = false; Content.Invalidate(); });

@@ -16,7 +16,7 @@ namespace GEO_DASH.UI
             _info = info;
             Text = "GEO DASH — Обновление";
             ClientSize = new Size(720, 460);
-            BgA = Color.FromArgb(18, 46, 86);
+            BgA = Color.FromArgb(30, 125, 215); BgId = 13; GroundId = 1;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
 

@@ -13,7 +13,9 @@ public class DailyActivity extends GdActivity {
     boolean weeklyTab;
     CardView card;
 
-    @Override protected int bgA() { return Color.rgb(56, 24, 86); }
+    @Override protected int bgA() { return Color.rgb(160, 60, 220); }
+    @Override protected int bgId() { return 16; }
+    @Override protected int groundId() { return 7; }
     @Override protected String headTitle() { return weeklyTab ? "УРОВЕНЬ НЕДЕЛИ" : "УРОВЕНЬ ДНЯ"; }
     @Override protected String headSub() { return "качается автоматически и играется без интернета"; }
 

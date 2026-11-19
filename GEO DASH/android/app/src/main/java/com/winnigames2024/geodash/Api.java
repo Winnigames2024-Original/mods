@@ -191,6 +191,15 @@ public class Api {
         } catch (Exception ignored) { }
     }
 
+    /** Название и исполнитель трека: {name, artist} или null. */
+    public static String[] songInfo(int id) {
+        try {
+            JSONObject o = obj(cachedGet("/api/music/" + id, "song_" + id));
+            if (o == null) return null;
+            return new String[]{o.optString("name", ""), o.optString("artist", "")};
+        } catch (Exception e) { return null; }
+    }
+
     /** Качает песню по ID: сначала через API, потом прямо с сайта /songs/<id>.mp3 */
     public static byte[] downloadSong(int id) {
         byte[] b = fetchBytes(base() + "/api/music/" + id + "/file");

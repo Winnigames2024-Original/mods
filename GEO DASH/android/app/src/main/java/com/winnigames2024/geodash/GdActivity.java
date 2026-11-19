@@ -21,8 +21,13 @@ public abstract class GdActivity extends Activity {
     protected final Handler ui = new Handler(Looper.getMainLooper());
     protected int W, H;
 
-    protected int bgA() { return Gd.DEEP2; }
-    protected int bgB() { return Gd.DEEP; }
+    /** Цвет фона экрана. */
+    protected int bgA() { return Gd.BG_BLUE; }
+    /** Цвет пола; 0 — считается по цвету фона. */
+    protected int bgB() { return 0; }
+    /** Номер узора фона (1..20) и пола (1..10). */
+    protected int bgId() { return 1; }
+    protected int groundId() { return 1; }
     protected String headTitle() { return ""; }
     protected String headSub() { return ""; }
 
@@ -37,14 +42,14 @@ public abstract class GdActivity extends Activity {
         Store.init(this);
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(Gd.DEEP);
+        root.setBackgroundColor(Gd.BG_BLUE);
         setContentView(root);
         rebuild();
     }
 
     protected void rebuild() {
         root.removeAllViews();
-        bg = new Ui.BgView(this, bgA(), bgB());
+        bg = new Ui.BgView(this, bgA(), bgB()).ids(bgId(), groundId());
         root.addView(bg, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         header = new HeaderView(this);
@@ -110,6 +115,15 @@ public abstract class GdActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(sv, Ui.lp(W, H, x, y, w, h));
         return box;
+    }
+
+    /** Карточка с мини-картинкой уровня. */
+    protected Ui.CardView levelCard(LinearLayout box, Level lv, String title, String line1, String line2,
+                                    int diff, Runnable onClick) {
+        Ui.CardView c = card(box, title, line1, line2, diff, onClick);
+        c.level = lv;
+        c.invalidate();
+        return c;
     }
 
     protected Ui.CardView card(LinearLayout box, String title, String line1, String line2,

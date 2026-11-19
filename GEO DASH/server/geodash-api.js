@@ -674,8 +674,10 @@ route('POST', '/api/music/:id/upload', async (req, res, p) => {
     const buf = Buffer.concat(chunks);
     if (buf.length < 8192) return bad(res, 'Файл слишком маленький');
     fs.writeFileSync(songFilePath(id), buf);
+    let title = 'Track ' + id;
+    try { title = decodeURIComponent(String(req.headers['x-song-name'] || '')) || title; } catch {}
     fs.writeFileSync(songMetaPath(id), JSON.stringify({
-      id, name: 'Track ' + id, artist: '', url: 'local', local: true,
+      id, name: title, artist: String(req.headers['x-song-artist'] || ''), url: 'local', local: true,
       size: buf.length, resolved: now()
     }));
     ok(res, { ok: true, id, size: buf.length });
@@ -747,6 +749,48 @@ route('POST', '/api/admin/delete-user', async (req, res) => {
   }
   delete db.users[key(b.name)];
   save.users(); save.levels();
+  ok(res);
+});
+
+// ---- назначить или снять админа
+route('POST', '/api/admin/grant', async (req, res) => {
+  const me = requireAdmin(req, res);
+  if (!me) return;
+  const b = await readBody(req);
+  const t = db.users[key(b.name)];
+  if (!t) return bad(res, 'Игрок не найден', 404);
+  if (key(t.name) === key(ADMIN) && !b.admin) return bad(res, 'Главного админа снять нельзя', 400);
+  t.admin = !!b.admin;
+  save.users();
+  ok(res, pub(t));
+});
+
+// ---- выдать звёзды, монеты и демонов
+route('POST', '/api/admin/give', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const b = await readBody(req);
+  const t = db.users[key(b.name)];
+  if (!t) return bad(res, 'Игрок не найден', 404);
+  t.stars = Math.max(0, (t.stars | 0) + (parseInt(b.stars || '0', 10) || 0));
+  t.coins = Math.max(0, (t.coins | 0) + (parseInt(b.coins || '0', 10) || 0));
+  t.demons = Math.max(0, (t.demons | 0) + (parseInt(b.demons || '0', 10) || 0));
+  save.users();
+  ok(res, pub(t));
+});
+
+// ---- сбросить пароль игроку
+route('POST', '/api/admin/reset-password', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const b = await readBody(req);
+  const t = db.users[key(b.name)];
+  if (!t) return bad(res, 'Игрок не найден', 404);
+  const pass = String(b.password || '');
+  if (pass.length < 3) return bad(res, 'Пароль — от 3 символов', 400);
+  t.salt = crypto.randomBytes(12).toString('hex');
+  t.pass = hash(pass, t.salt);
+  for (const [tok, v] of Object.entries(db.tokens))
+    if (key(v.name) === key(t.name)) delete db.tokens[tok];
+  save.users(); save.tokens();
   ok(res);
 });
 

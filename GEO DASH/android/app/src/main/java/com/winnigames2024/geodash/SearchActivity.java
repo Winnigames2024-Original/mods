@@ -15,8 +15,10 @@ public class SearchActivity extends GdActivity {
     LinearLayout box;
 
     @Override protected int bgA() {
-        return mode.equals("levels") ? Color.rgb(18, 40, 90) : Color.rgb(60, 24, 70);
+        return mode.equals("levels") ? Color.rgb(0, 145, 200) : Color.rgb(190, 60, 170);
     }
+    @Override protected int bgId() { return mode.equals("levels") ? 7 : 15; }
+    @Override protected int groundId() { return mode.equals("levels") ? 2 : 9; }
 
     @Override protected String headTitle() {
         switch (mode) {

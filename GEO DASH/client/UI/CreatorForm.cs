@@ -11,7 +11,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Creator";
             ClientSize = new Size(1060, 680);
-            BgA = Color.FromArgb(22, 36, 86);
+            BgA = Color.FromArgb(0, 160, 195); BgId = 3; GroundId = 5;
 
             int bw = 230, bh = 120;
             int gapX = 24, gapY = 22;

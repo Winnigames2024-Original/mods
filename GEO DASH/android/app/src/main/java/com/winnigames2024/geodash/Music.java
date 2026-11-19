@@ -46,6 +46,11 @@ public class Music {
         });
     }
 
+    /** Проиграть уже скачанный файл, не блокируя интерфейс. */
+    public static void playFileAsync(final File f, final int id) {
+        Api.async(() -> playFile(f, 0, 1f, true, id));
+    }
+
     public static synchronized void playFile(File f, double startSec, float volume, boolean loop, int id) {
         stop();
         try {

@@ -7,6 +7,8 @@ namespace GEO_DASH.UI
     public class ObjButton : Control
     {
         public LevelObject Model = new() { TypeId = 1 };
+        /// <summary>Если задана — кнопка рисует целую конструкцию, а не один объект.</summary>
+        public BuildPiece Piece;
         public string Caption = "";
         public bool Selected;
         bool _hover;
@@ -44,12 +46,42 @@ namespace GEO_DASH.UI
                     g.FillPath(br, path);
 
             var inner = new RectangleF(r.X + 8, r.Y + 6, r.Width - 16, r.Height - (string.IsNullOrEmpty(Caption) ? 12 : 20));
-            DrawObject(g, inner, Model);
+            if (Piece != null) DrawPiece(g, inner, Piece);
+            else DrawObject(g, inner, Model);
 
             if (!string.IsNullOrEmpty(Caption))
                 using (var f = Gd.Bold(6.5f))
                     Gd.Outlined(g, Caption, f, new RectangleF(r.X, r.Bottom - 15, r.Width, 13),
                         Gd.Paper, thick: 2f);
+        }
+
+        /// <summary>Мини-превью целой конструкции: все объекты вписываются в кнопку.</summary>
+        public static void DrawPiece(Graphics g, RectangleF r, BuildPiece piece)
+        {
+            if (piece == null || piece.Objects.Count == 0) return;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var o in piece.Objects)
+            {
+                var b = ObjectCatalog.Bounds(o);
+                minX = Math.Min(minX, b.X); minY = Math.Min(minY, b.Y);
+                maxX = Math.Max(maxX, b.X + b.Width); maxY = Math.Max(maxY, b.Y + b.Height);
+            }
+            double w = Math.Max(1, maxX - minX), h = Math.Max(1, maxY - minY);
+            float k = (float)Math.Min(r.Width / w, r.Height / h);
+            float ox = r.X + (r.Width - (float)(w * k)) / 2;
+            float oy = r.Y + (r.Height - (float)(h * k)) / 2;
+
+            foreach (var o in piece.Objects)
+            {
+                var b = ObjectCatalog.Bounds(o);
+                // мир Y вверх, экран Y вниз
+                var cell = new RectangleF(
+                    ox + (float)((b.X - minX) * k),
+                    oy + (float)((maxY - (b.Y + b.Height)) * k),
+                    Math.Max(2f, (float)(b.Width * k)),
+                    Math.Max(2f, (float)(b.Height * k)));
+                DrawObject(g, cell, o);
+            }
         }
 
         /// <summary>Мини-превью объекта для палитры и панели правки.</summary>

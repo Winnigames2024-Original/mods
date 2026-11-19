@@ -22,8 +22,9 @@ namespace GEO_DASH.UI
             _mode = mode;
             Text = "GEO DASH — " + Title();
             ClientSize = new Size(1100, 700);
-            BgA = mode == SearchMode.Users || mode == SearchMode.Top
-                ? Color.FromArgb(60, 24, 70) : Color.FromArgb(18, 40, 90);
+            bool people = mode == SearchMode.Users || mode == SearchMode.Top;
+            BgA = people ? Color.FromArgb(190, 60, 170) : Color.FromArgb(0, 145, 200);
+            BgId = people ? 15 : 7; GroundId = people ? 9 : 2;
 
             _query = new TextBox
             {

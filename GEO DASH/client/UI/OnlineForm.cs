@@ -17,7 +17,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Онлайн";
             ClientSize = new Size(1100, 680);
-            BgA = Color.FromArgb(16, 34, 76);
+            BgA = Color.FromArgb(30, 95, 225); BgId = 2; GroundId = 1;
 
             _search = new TextBox
             {

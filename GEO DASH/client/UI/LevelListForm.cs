@@ -9,8 +9,10 @@ namespace GEO_DASH.UI
     public class LevelListForm : GdForm
     {
         readonly LevelListMode _mode;
-        readonly ListView _list;
+        readonly FlowLayoutPanel _list;
+        readonly List<LevelCard> _cards = new();
         List<LevelData> _data = new();
+        int _index;
         string _msg = "";
 
         public LevelListForm(LevelListMode mode)
@@ -18,22 +20,17 @@ namespace GEO_DASH.UI
             _mode = mode;
             Text = mode == LevelListMode.My ? "GEO DASH — Мои уровни" : "GEO DASH — Сохранённые уровни";
             ClientSize = new Size(1040, 660);
-            BgA = mode == LevelListMode.My ? Color.FromArgb(60, 36, 16) : Color.FromArgb(16, 50, 40);
+            BgA = mode == LevelListMode.My ? Color.FromArgb(225, 125, 25) : Color.FromArgb(25, 170, 110);
+            BgId = mode == LevelListMode.My ? 5 : 10; GroundId = mode == LevelListMode.My ? 4 : 3;
 
-            _list = new ListView
+            // список карточек с картинкой уровня
+            _list = new FlowLayoutPanel
             {
                 Left = 24, Top = 110, Width = 700, Height = 500,
-                View = View.Details, FullRowSelect = true, HideSelection = false,
-                BackColor = Color.FromArgb(20, 18, 48), ForeColor = Gd.Paper,
-                BorderStyle = BorderStyle.FixedSingle, Font = Gd.Reg(10f)
+                BackColor = Color.FromArgb(150, 14, 12, 38),
+                AutoScroll = true, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, Padding = new Padding(6)
             };
-            _list.Columns.Add("Название", 250);
-            _list.Columns.Add("Сложность", 110);
-            _list.Columns.Add("Объектов", 80);
-            _list.Columns.Add("Музыка", 90);
-            _list.Columns.Add("Прогресс", 90);
-            _list.Columns.Add(mode == LevelListMode.My ? "Сервер" : "ID", 70);
-            _list.DoubleClick += (s, e) => Play(false);
             Host(_list);
 
             int x = 744, y = 110;
@@ -71,28 +68,39 @@ namespace GEO_DASH.UI
         void Reload()
         {
             _data = _mode == LevelListMode.My ? LocalStore.MyLevels() : LocalStore.SavedLevels();
-            _list.Items.Clear();
-            foreach (var lv in _data)
+            _list.Controls.Clear();
+            _cards.Clear();
+            int w = _list.ClientSize.Width - 28;
+
+            for (int i = 0; i < _data.Count; i++)
             {
-                var p = LocalStore.GetProgress(lv);
-                var it = new ListViewItem(new[]
+                int idx = i;
+                var card = new LevelCard
                 {
-                    lv.Settings.Name,
-                    Difficulties.Label(lv.Settings.Difficulty),
-                    lv.Objects.Count.ToString(),
-                    lv.Settings.SongId == 0 ? "—" : (lv.Settings.SongId < 0 ? "встроенная" : "#" + lv.Settings.SongId),
-                    $"{p.Best:0}%" + (p.Completed ? " ✓" : ""),
-                    lv.Settings.ServerId > 0 ? "#" + lv.Settings.ServerId : "—"
-                });
-                it.ForeColor = Difficulties.Tint(lv.Settings.Difficulty);
-                _list.Items.Add(it);
+                    Level = _data[i], Width = Math.Max(400, w), Height = 112,
+                    Margin = new Padding(2, 2, 2, 6), Selected = i == _index
+                };
+                card.Click += (s, e) => { Select(idx); };
+                card.DoubleClick += (s, e) => { Select(idx); Play(false); };
+                _cards.Add(card);
+                _list.Controls.Add(card);
             }
-            if (_list.Items.Count > 0) _list.Items[0].Selected = true;
+            if (_index >= _data.Count) _index = Math.Max(0, _data.Count - 1);
             Content.Invalidate();
         }
 
-        LevelData Sel => _list.SelectedIndices.Count > 0 && _list.SelectedIndices[0] < _data.Count
-            ? _data[_list.SelectedIndices[0]] : null;
+        void Select(int i)
+        {
+            _index = i;
+            for (int k = 0; k < _cards.Count; k++)
+            {
+                _cards[k].Selected = k == i;
+                _cards[k].Invalidate();
+            }
+            Content.Invalidate();
+        }
+
+        LevelData Sel => _index >= 0 && _index < _data.Count ? _data[_index] : null;
 
         void Play(bool practice)
         {

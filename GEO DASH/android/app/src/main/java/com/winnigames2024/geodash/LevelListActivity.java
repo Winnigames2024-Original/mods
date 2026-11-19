@@ -18,8 +18,10 @@ public class LevelListActivity extends GdActivity {
     LinearLayout box;
 
     @Override protected int bgA() {
-        return mode.startsWith("saved") ? Color.rgb(16, 50, 40) : Color.rgb(16, 34, 76);
+        return mode.startsWith("saved") ? Color.rgb(25, 170, 110) : Color.rgb(30, 95, 225);
     }
+    @Override protected int bgId() { return mode.startsWith("saved") ? 10 : 2; }
+    @Override protected int groundId() { return mode.startsWith("saved") ? 3 : 1; }
 
     @Override protected String headTitle() {
         if (mode.startsWith("user:")) return "УРОВНИ " + mode.substring(5).toUpperCase();
@@ -61,7 +63,7 @@ public class LevelListActivity extends GdActivity {
             }
             for (Level lv : list) {
                 double[] pr = Store.progress(lv);
-                card(box, lv.settings.name + (lv.settings.serverId > 0 ? "  #" + lv.settings.serverId : ""),
+                levelCard(box, lv, lv.settings.name + (lv.settings.serverId > 0 ? "  #" + lv.settings.serverId : ""),
                         "автор: " + lv.settings.author + "   " + Gd.DIFFS[lv.settings.difficulty]
                                 + (Music.isCached(lv.settings.songId) ? "   ♪ офлайн" : ""),
                         String.format("%.0f%%", pr[0]), lv.settings.difficulty,

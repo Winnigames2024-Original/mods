@@ -15,8 +15,8 @@ namespace GEO_DASH.UI
         public AdminForm()
         {
             Text = "GEO DASH — Админка";
-            ClientSize = new Size(1180, 720);
-            BgA = Color.FromArgb(70, 18, 24);
+            ClientSize = new Size(1180, 790);
+            BgA = Color.FromArgb(210, 45, 60); BgId = 19; GroundId = 10;
 
             _users = Make(24, 130, 420, 300, new[] { "Игрок", "★", "Уровни", "Статус" });
             _levels = Make(460, 130, 690, 300, new[] { "ID", "Название", "Автор", "Сложность", "Флаги" });
@@ -58,6 +58,15 @@ namespace GEO_DASH.UI
                 async (s, e) => await DeleteLevel());
             Add("ОБЪЯВЛЕНИЕ", GdIcon.Info, 990, 552, 150, 46, Color.FromArgb(160, 180, 230), Color.FromArgb(60, 80, 150),
                 async (s, e) => await Broadcast());
+
+            Add("АДМИН ВКЛ/ВЫКЛ", GdIcon.Admin, 24, 608, 200, 46, Color.FromArgb(255, 170, 90), Color.FromArgb(170, 85, 10),
+                async (s, e) => await GrantToggle());
+            Add("ВЫДАТЬ НАГРАДЫ", GdIcon.Star, 236, 608, 200, 46, Color.FromArgb(255, 215, 90), Color.FromArgb(170, 120, 10),
+                async (s, e) => await Give());
+            Add("СБРОС ПАРОЛЯ", GdIcon.Lock, 448, 608, 200, 46, Color.FromArgb(180, 190, 230), Color.FromArgb(80, 90, 160),
+                async (s, e) => await ResetPassword());
+            Add("ЗАЛИТЬ ПЕСНЮ MP3", GdIcon.Music, 660, 608, 230, 46, Color.FromArgb(255, 150, 215), Color.FromArgb(160, 40, 120),
+                async (s, e) => await UploadSong());
 
             Add("ОБНОВИТЬ", GdIcon.Refresh, 24, 496, 200, 46, Color.FromArgb(160, 170, 210), Color.FromArgb(70, 80, 130),
                 async (s, e) => await Reload());
@@ -112,6 +121,59 @@ namespace GEO_DASH.UI
             }
 
             _msg = $"игроков: {_u.Count}, уровней: {_l.Count}" + (u.FromCache ? " (из кэша)" : "");
+            Content.Invalidate();
+        }
+
+        async Task GrantToggle()
+        {
+            var u = SelUser; if (u == null) { _msg = "Выбери игрока"; Content.Invalidate(); return; }
+            bool make = !u.Admin;
+            if (!GdDialog.Confirm(this, "Админка",
+                    (make ? "Сделать админом: " : "Снять админку: ") + u.Name + "?")) return;
+            var r = await ApiClient.AdminGrantAsync(u.Name, make);
+            _msg = r.Ok ? (make ? u.Name + " теперь админ" : "Админка снята с " + u.Name) : r.Error;
+            await Reload();
+        }
+
+        async Task Give()
+        {
+            var u = SelUser; if (u == null) { _msg = "Выбери игрока"; Content.Invalidate(); return; }
+            string s1 = GdDialog.Prompt(this, "Награды", "Звёзды (можно со знаком −):", "10");
+            if (s1 == null) return;
+            string s2 = GdDialog.Prompt(this, "Награды", "Монеты:", "0");
+            if (s2 == null) return;
+            string s3 = GdDialog.Prompt(this, "Награды", "Демоны:", "0");
+            if (s3 == null) return;
+            int.TryParse(s1, out int st); int.TryParse(s2, out int co); int.TryParse(s3, out int de);
+            var r = await ApiClient.AdminGiveAsync(u.Name, st, co, de);
+            _msg = r.Ok ? $"{u.Name}: +{st}★ +{co} монет +{de} демонов" : r.Error;
+            await Reload();
+        }
+
+        async Task ResetPassword()
+        {
+            var u = SelUser; if (u == null) { _msg = "Выбери игрока"; Content.Invalidate(); return; }
+            string p = GdDialog.Prompt(this, "Сброс пароля", "Новый пароль для " + u.Name + ":", "", true);
+            if (string.IsNullOrWhiteSpace(p)) return;
+            var r = await ApiClient.AdminResetPasswordAsync(u.Name, p.Trim());
+            _msg = r.Ok ? "Пароль сменён, старые входы сброшены" : r.Error;
+            Content.Invalidate();
+        }
+
+        /// <summary>Залить свой mp3 как трек с нужным ID — Newgrounds не нужен.</summary>
+        async Task UploadSong()
+        {
+            string idTxt = GdDialog.Prompt(this, "Песня", "ID трека (по нему он будет в игре):", "1000001");
+            if (string.IsNullOrWhiteSpace(idTxt) || !int.TryParse(idTxt.Trim(), out int id) || id <= 0) return;
+
+            using var ofd = new OpenFileDialog { Filter = "Музыка (*.mp3)|*.mp3", Title = "Выбери mp3" };
+            if (ofd.ShowDialog(this) != DialogResult.OK) return;
+
+            _msg = "Заливаю песню…"; Content.Invalidate();
+            var bytes = await File.ReadAllBytesAsync(ofd.FileName);
+            var r = await ApiClient.AdminUploadSongAsync(id, bytes,
+                Path.GetFileNameWithoutExtension(ofd.FileName));
+            _msg = r.Ok ? $"Трек #{id} залит на сервер" : r.Error;
             Content.Invalidate();
         }
 

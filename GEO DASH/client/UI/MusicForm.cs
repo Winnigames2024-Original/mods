@@ -19,7 +19,7 @@ namespace GEO_DASH.UI
             SongId = current;
             Text = "GEO DASH — Музыка";
             ClientSize = new Size(760, 560);
-            BgA = Color.FromArgb(44, 20, 72);
+            BgA = Color.FromArgb(145, 50, 205); BgId = 12; GroundId = 6;
 
             _id = new NumericUpDown
             {
@@ -82,6 +82,7 @@ namespace GEO_DASH.UI
                 {
                     SongName = info.Data.Name; SongArtist = info.Data.Artist;
                 }
+                SongLibrary.Remember(id, SongName, SongArtist);
                 _msg = "Готово: " + path;
             }
             else _msg = "Не вышло: " + MusicPlayer.LastError;

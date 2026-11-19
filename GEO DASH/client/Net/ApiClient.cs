@@ -293,6 +293,44 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<object>> AdminBroadcastAsync(string text) =>
             PostAsync<object>("/api/admin/broadcast", new { text });
 
+        /// <summary>Назначить или снять админа.</summary>
+        public static Task<ApiReply<AccountDto>> AdminGrantAsync(string name, bool admin) =>
+            PostAsync<AccountDto>("/api/admin/grant", new { name, admin });
+
+        /// <summary>Выдать звёзды, монеты и демонов.</summary>
+        public static Task<ApiReply<AccountDto>> AdminGiveAsync(string name, int stars, int coins, int demons) =>
+            PostAsync<AccountDto>("/api/admin/give", new { name, stars, coins, demons });
+
+        /// <summary>Сбросить игроку пароль.</summary>
+        public static Task<ApiReply<object>> AdminResetPasswordAsync(string name, string password) =>
+            PostAsync<object>("/api/admin/reset-password", new { name, password });
+
+        /// <summary>Залить свой mp3 как трек с нужным ID.</summary>
+        public static async Task<ApiReply<JsonElement>> AdminUploadSongAsync(int id, byte[] mp3, string name)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Post, AppConfig.ApiBase + "/api/music/" + id + "/upload")
+                {
+                    Content = new ByteArrayContent(mp3)
+                };
+                if (!string.IsNullOrEmpty(AppConfig.Settings.Token))
+                    req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + AppConfig.Settings.Token);
+                req.Headers.TryAddWithoutValidation("X-Song-Name", Uri.EscapeDataString(name ?? ""));
+                using var resp = await Http.SendAsync(req);
+                var text = await resp.Content.ReadAsStringAsync();
+                if (!resp.IsSuccessStatusCode)
+                    return new ApiReply<JsonElement> { Ok = false, Error = "Сервер: " + (int)resp.StatusCode + " " + text };
+                Online = true;
+                return new ApiReply<JsonElement> { Ok = true, Data = JsonDocument.Parse(text).RootElement };
+            }
+            catch (Exception ex)
+            {
+                Online = false;
+                return new ApiReply<JsonElement> { Ok = false, Error = ex.Message };
+            }
+        }
+
         public static Task<ApiReply<JsonElement>> AdminStatsAsync() =>
             GetAsync<JsonElement>("/api/admin/stats", "adminstats");
 

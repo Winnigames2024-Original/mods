@@ -61,11 +61,21 @@ namespace GEO_DASH.Net
         {
             var c = src.DeepClone();
             c.Settings.LocalId = Guid.NewGuid().ToString("N");
+            c.Settings.IsCopy = true;
+            c.Settings.CopiedFrom = src.Settings.ServerId;
+            c.Settings.CopiedAuthor = string.IsNullOrEmpty(src.Settings.Author)
+                ? c.Settings.CopiedAuthor : src.Settings.Author;
             c.Settings.ServerId = 0;
+            c.Settings.Version = 1;
+            c.Settings.Password = "";
             c.Settings.Name = newName ?? (src.Settings.Name + " (копия)");
             SaveMyLevel(c);
             return c;
         }
+
+        /// <summary>Свои уровни: созданные с нуля (copied = false) или скопированные (copied = true).</summary>
+        public static List<LevelData> MyLevels(bool copied)
+            => MyLevels().Where(l => l.Settings.IsCopy == copied).ToList();
 
         // ------------------------------------------------------- скачанные (Saved)
 

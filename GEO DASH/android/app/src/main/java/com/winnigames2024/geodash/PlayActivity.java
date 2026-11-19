@@ -15,7 +15,9 @@ public class PlayActivity extends GdActivity {
     int index;
     CardBig card;
 
-    @Override protected int bgA() { return Color.rgb(40, 16, 70); }
+    @Override protected int bgA() { return Color.rgb(120, 60, 230); }
+    @Override protected int bgId() { return 11; }
+    @Override protected int groundId() { return 2; }
     @Override protected String headTitle() { return "ОСНОВНЫЕ УРОВНИ"; }
     @Override protected String headSub() { return "музыка встроена — играется без интернета"; }
 

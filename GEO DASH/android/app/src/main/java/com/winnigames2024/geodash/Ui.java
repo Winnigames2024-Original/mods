@@ -18,19 +18,28 @@ public class Ui {
     /** Анимированный фон в стиле игры. */
     public static class BgView extends View {
         double t;
-        int a = Gd.DEEP2, b = Gd.DEEP;
+        int bg = Gd.BG_BLUE, ground = 0;
+        int bgId = 1, groundId = 1;
 
-        public BgView(Context c) { this(c, Gd.DEEP2, Gd.DEEP); }
+        public BgView(Context c) { this(c, Gd.BG_BLUE, 0); }
 
-        public BgView(Context c, int colA, int colB) {
+        public BgView(Context c, int bgColor, int groundColor) {
             super(c);
-            a = colA; b = colB;
+            bg = bgColor;
+            ground = groundColor;
             postDelayed(new Runnable() {
                 @Override public void run() { t += 0.033; invalidate(); postDelayed(this, 33); }
             }, 33);
         }
 
-        @Override protected void onDraw(Canvas c) { Gd.background(c, getWidth(), getHeight(), t); }
+        public BgView ids(int bgPattern, int groundPattern) {
+            bgId = bgPattern; groundId = groundPattern; return this;
+        }
+
+        @Override protected void onDraw(Canvas c) {
+            int g = (ground == 0 || Color.alpha(ground) == 0) ? Backdrop.groundOf(bg) : ground;
+            Gd.background(c, getWidth(), getHeight(), t, bgId, groundId, bg, g);
+        }
     }
 
     /** Кнопка в стиле игры: плита с обводкой, иконка и подпись. */
@@ -69,21 +78,23 @@ public class Ui {
         @Override public boolean performClick() { return super.performClick(); }
 
         @Override protected void onDraw(Canvas c) {
-            float pop = anim * 3f;
-            RectF r = new RectF(3 + pop, 4 + pop, getWidth() - 3 - pop, getHeight() - 6 - pop);
+            float k = down ? 0.93f : 1f;
+            float w = (getWidth() - 5) * k, h = (getHeight() - 8) * k;
+            float cx = getWidth() / 2f, cy = getHeight() / 2f + (down ? 3f : 0f);
+            RectF r = new RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
             if (r.width() < 4 || r.height() < 4) return;
 
-            c.drawRoundRect(new RectF(r.left + 2, r.top + 5, r.right + 2, r.bottom + 5),
-                    r.height() * 0.22f, r.height() * 0.22f, Gd.fill(Color.argb(90, 0, 0, 0)));
-            Gd.plate(c, r, Gd.lighten(col1, down ? -0.1f : 0.08f), col2, Math.min(r.height() * 0.26f, 26f));
+            float rad = Math.min(Math.min(r.height(), r.width()) * 0.28f, 26f);
+            Gd.buttonPlate(c, r, col1, col2, rad, down);
 
             boolean iconOnly = text == null || text.isEmpty();
             boolean hasCaption = iconOnly && caption != null && !caption.isEmpty();
-            float size = Math.min(r.height() * (hasCaption ? 0.48f : 0.56f), r.width() * 0.6f);
+            boolean hasSub = sub != null && !sub.isEmpty();
+            float size = Math.min(r.height() * (hasCaption ? 0.46f : 0.56f), r.width() * 0.6f);
             if (icon != I_NONE) {
                 RectF ir;
                 if (hasCaption) {
-                    float top = r.top + r.height() * 0.10f;
+                    float top = r.top + r.height() * 0.09f;
                     ir = new RectF(r.centerX() - size / 2, top, r.centerX() + size / 2, top + size);
                 } else if (iconOnly) {
                     ir = new RectF(r.centerX() - size / 2, r.centerY() - size / 2,
@@ -93,47 +104,62 @@ public class Ui {
                 }
                 icon(c, icon, ir, Gd.PAPER);
             }
-            if (hasCaption)
-                Gd.outlined(c, caption, r.centerX(), r.bottom - r.height() * 0.12f,
-                        Math.min(r.height() * 0.18f, r.width() * 0.17f), Gd.PAPER, Paint.Align.CENTER);
+            if (hasCaption) {
+                float fs = Math.min(r.height() * 0.17f, r.width() * 0.15f);
+                float base = hasSub ? r.bottom - r.height() * 0.20f : r.bottom - r.height() * 0.12f;
+                Gd.outlined(c, caption, r.centerX(), base, fs, Gd.PAPER, Paint.Align.CENTER);
+                if (hasSub)
+                    Gd.outlined(c, sub, r.centerX(), base + fs * 0.95f, fs * 0.62f,
+                            Color.argb(230, 220, 232, 255), Paint.Align.CENTER);
+            }
             if (!iconOnly) {
-                float tx = icon == I_NONE ? r.centerX() : r.left + (icon == I_NONE ? 0 : size + 24);
+                float tx = icon == I_NONE ? r.centerX() : r.left + size + 24;
                 Paint.Align al = icon == I_NONE ? Paint.Align.CENTER : Paint.Align.LEFT;
-                float fs = Math.min(r.height() * (sub.isEmpty() ? 0.38f : 0.30f), r.width() * 0.13f);
-                float baseY = sub.isEmpty() ? r.centerY() + fs * 0.36f : r.centerY();
+                float fs = Math.min(r.height() * (hasSub ? 0.30f : 0.38f), r.width() * 0.13f);
+                float baseY = hasSub ? r.centerY() : r.centerY() + fs * 0.36f;
                 Gd.outlined(c, text, tx, baseY, fs, Gd.PAPER, al);
-                if (!sub.isEmpty())
+                if (hasSub)
                     Gd.outlined(c, sub, tx, r.centerY() + fs * 1.05f, fs * 0.66f,
                             Color.argb(230, 220, 232, 255), al);
             }
         }
     }
 
-    /** Карточка-плита (для списков). */
+    /** Карточка-плита (для списков) — с картинкой уровня, если она есть. */
     public static class CardView extends View {
         public String title = "", line1 = "", line2 = "";
         public int tint = Gd.PAPER, diff = -1;
         public boolean selected;
+        /** Если задан — слева рисуется мини-картинка уровня. */
+        public Level level;
 
         public CardView(Context c) { super(c); setClickable(true); }
 
         @Override protected void onDraw(Canvas c) {
             RectF r = new RectF(4, 4, getWidth() - 4, getHeight() - 4);
-            Gd.plate(c, r, selected ? Color.rgb(60, 58, 120) : Color.rgb(40, 36, 86),
-                    Color.rgb(22, 18, 54), 16f);
+            Gd.plate(c, r, selected ? Color.rgb(70, 110, 215) : Color.rgb(40, 38, 84),
+                    selected ? Color.rgb(26, 56, 150) : Color.rgb(22, 20, 52), 16f);
             float x = 18;
+
+            if (level != null) {
+                RectF th = new RectF(r.left + 8, r.top + 8, r.left + 8 + r.height() * 1.6f, r.bottom - 8);
+                Thumb.draw(c, th, level);
+                x = th.right + 14;
+            }
+
             if (diff >= 0) {
-                float s = r.height() * 0.66f;
+                float s = r.height() * 0.6f;
                 RectF fr = new RectF(x, r.centerY() - s / 2, x + s, r.centerY() + s / 2);
                 Gd.face(c, fr, diff);
-                x += s + 16;
+                x += s + 14;
             }
-            Gd.outlined(c, title, x, r.top + r.height() * 0.42f, r.height() * 0.30f, tint, Paint.Align.LEFT);
+            Gd.outlined(c, title, x, r.top + r.height() * 0.40f, r.height() * 0.26f, tint, Paint.Align.LEFT);
             if (!line1.isEmpty())
-                Gd.outlined(c, line1, x, r.top + r.height() * 0.74f, r.height() * 0.21f, Gd.DIM, Paint.Align.LEFT);
+                Gd.outlined(c, line1, x, r.top + r.height() * 0.66f, r.height() * 0.19f,
+                        Color.argb(235, 215, 230, 255), Paint.Align.LEFT);
             if (!line2.isEmpty())
-                Gd.outlined(c, line2, r.right - 18, r.top + r.height() * 0.74f, r.height() * 0.21f,
-                        Gd.NEON, Paint.Align.RIGHT);
+                Gd.outlined(c, line2, x, r.top + r.height() * 0.88f, r.height() * 0.19f,
+                        Gd.GOLD, Paint.Align.LEFT);
         }
     }
 

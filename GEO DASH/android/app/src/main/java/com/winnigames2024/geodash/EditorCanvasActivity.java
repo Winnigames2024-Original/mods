@@ -41,6 +41,9 @@ public class EditorCanvasActivity extends Activity {
     int mode = BUILD;
     Palette.Item brush;
     String category = "Блоки";
+    /** Свайп-выделение: ведёшь пальцем — выделяется всё, по чему провёл. */
+    boolean swipe = true;
+    Builds.Piece piece;
     double step = 30;
     final List<Integer> sel = new ArrayList<>();
     final List<Level.Obj> clipboard = new ArrayList<>();
@@ -177,7 +180,7 @@ public class EditorCanvasActivity extends Activity {
         panel.addView(tabsScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.10f)));
 
-        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное"};
+        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное", "Конструкции"};
         for (String c : cats) {
             final String cc = c;
             Ui.GdBtn b = new Ui.GdBtn(this).set(c, Ui.I_NONE,
@@ -198,12 +201,66 @@ public class EditorCanvasActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         int size = (int) (H * 0.17f);
+        if (category.equals("Конструкции")) {
+            for (final Builds.Piece p : Builds.all()) {
+                PieceBtn b = new PieceBtn(this, p);
+                b.setOnClickListener(v -> { piece = p; toast("Конструкция «" + p.name + "» — коснись поля"); setMode(BUILD); });
+                b.setOnLongClickListener(v -> {
+                    GdDialog.confirm(this, "Конструкции", "Удалить «" + p.name + "»?", () -> {
+                        Builds.delete(p.name);
+                        if (piece != null && piece.name.equals(p.name)) piece = null;
+                        setMode(BUILD);
+                    });
+                    return true;
+                });
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) (size * 1.3f), size);
+                lp.setMargins(6, 8, 6, 8);
+                items.addView(b, lp);
+            }
+            return;
+        }
         for (final Palette.Item it : Palette.byCategory(category)) {
             ObjBtn b = new ObjBtn(this, it);
-            b.setOnClickListener(v -> { brush = it; setMode(BUILD); });
+            b.setOnClickListener(v -> { brush = it; piece = null; setMode(BUILD); });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
             lp.setMargins(6, 8, 6, 8);
             items.addView(b, lp);
+        }
+    }
+
+    /** Кнопка палитры с превью целой конструкции. */
+    class PieceBtn extends View {
+        final Builds.Piece p;
+        PieceBtn(Context c, Builds.Piece it) { super(c); p = it; setClickable(true); }
+
+        @Override protected void onDraw(Canvas c) {
+            RectF r = new RectF(3, 3, getWidth() - 3, getHeight() - 3);
+            boolean on = piece != null && piece.name.equals(p.name);
+            Gd.plate(c, r, on ? Color.rgb(70, 110, 220) : Color.rgb(40, 42, 86),
+                    on ? Color.rgb(30, 60, 150) : Color.rgb(22, 22, 52), 14f);
+
+            double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+            for (Level.Obj o : p.objects) {
+                Catalog.Def d = Catalog.get(o.typeId);
+                minX = Math.min(minX, o.x); minY = Math.min(minY, o.y);
+                maxX = Math.max(maxX, o.x + d.w); maxY = Math.max(maxY, o.y + d.h);
+            }
+            double w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+            RectF area = new RectF(r.left + 8, r.top + r.height() * 0.10f, r.right - 8, r.bottom - r.height() * 0.26f);
+            float k = (float) Math.min(area.width() / w, area.height() / h);
+            float ox = area.left + (area.width() - (float) (w * k)) / 2f;
+            float oy = area.top + (area.height() - (float) (h * k)) / 2f;
+            for (Level.Obj o : p.objects) {
+                Catalog.Def d = Catalog.get(o.typeId);
+                RectF box = new RectF(
+                        ox + (float) ((o.x - minX) * k),
+                        oy + (float) ((maxY - (o.y + d.h)) * k),
+                        ox + (float) ((o.x - minX + d.w) * k),
+                        oy + (float) ((maxY - o.y) * k));
+                drawPreview(c, o, d, box);
+            }
+            Gd.outlined(c, p.name, r.centerX(), r.bottom - r.height() * 0.07f,
+                    Math.min(r.height() * 0.14f, r.width() * 0.13f), Gd.PAPER, Paint.Align.CENTER);
         }
     }
 
@@ -395,6 +452,12 @@ public class EditorCanvasActivity extends Activity {
         pBtn(row2, "УДАЛИТЬ", Ui.I_TRASH, this::deleteSel);
         pBtn(row2, "ОБЪЕКТ", Ui.I_SETTINGS, this::editObject);
         pBtn(row2, "СНЯТЬ", Ui.I_CROSS, sel::clear);
+        pBtn(row2, "СОХР. КОНСТР.", Ui.I_SAVE, this::savePiece);
+        pBtn(row2, swipe ? "СВАЙП: ВКЛ" : "СВАЙП: ВЫКЛ", Ui.I_EDIT, () -> {
+            swipe = !swipe;
+            toast(swipe ? "Свайп: веди пальцем — выделяется всё под ним" : "Свайп выключен");
+            setMode(EDIT);
+        });
     }
 
     void buildDeletePanel() {
@@ -463,6 +526,20 @@ public class EditorCanvasActivity extends Activity {
             if (horizontal) { o.flipX = !o.flipX; o.scaleX = -o.scaleX; }
             else { o.flipY = !o.flipY; o.scaleY = -o.scaleY; }
         }
+    }
+
+    /** Сохранить выделенное как свою конструкцию. */
+    void savePiece() {
+        if (sel.isEmpty()) { toast("Сначала выдели объекты — свайпом"); return; }
+        final java.util.List<Level.Obj> objs = new ArrayList<>();
+        for (int i : sel) if (i >= 0 && i < lv.objects.size()) objs.add(lv.objects.get(i));
+        GdDialog.input(this, "Название конструкции", "", "Конструкция " + (Builds.all().size() + 1), false, name -> {
+            if (name == null || name.trim().isEmpty()) return;
+            Builds.Piece p = Builds.save(name.trim(), objs);
+            if (p == null) { toast("Не вышло сохранить"); return; }
+            piece = p;
+            toast("Сохранено — вкладка «Конструкции» в BUILD");
+        });
     }
 
     void copySel() {
@@ -713,13 +790,22 @@ public class EditorCanvasActivity extends Activity {
                         if (hit >= 0) {
                             if (!sel.contains(hit)) { sel.clear(); sel.add(hit); }
                             movingSel = true;
-                        } else sel.clear();
+                        } else {
+                            sel.clear();
+                            swiping = swipe;       // ведём пальцем по пустому — выделяем росчерком
+                        }
                         invalidate();
                         updateInfo();
                     }
                     return true;
 
                 case MotionEvent.ACTION_MOVE:
+                    if (mode == EDIT && swiping) {
+                        int under = hitTest(wxp, wyp);
+                        if (under >= 0 && !sel.contains(under)) { sel.add(under); updateInfo(); }
+                        invalidate();
+                        return true;
+                    }
                     if (mode == EDIT && movingSel && !sel.isEmpty()) {
                         double dx = Math.round((wxp - dragX) / 30) * 30.0;
                         double dy = Math.round((wyp - dragY) / 30) * 30.0;
@@ -740,6 +826,7 @@ public class EditorCanvasActivity extends Activity {
                 case MotionEvent.ACTION_UP:
                     if (movingSel) pushUndo();
                     movingSel = false;
+                    swiping = false;
                     return true;
             }
             return true;
@@ -749,6 +836,8 @@ public class EditorCanvasActivity extends Activity {
             float dx = e.getX(0) - e.getX(1), dy = e.getY(0) - e.getY(1);
             return (float) Math.sqrt(dx * dx + dy * dy);
         }
+
+        boolean swiping;
 
         int hitTest(float wxp, float wyp) {
             for (int i = lv.objects.size() - 1; i >= 0; i--) {
@@ -762,6 +851,18 @@ public class EditorCanvasActivity extends Activity {
 
         void place(float px, float py) {
             double gx = Math.floor(px / 30) * 30, gy = Math.floor(py / 30) * 30;
+            if (category.equals("Конструкции") && piece != null) {
+                pushUndo();
+                sel.clear();
+                for (Level.Obj o : Builds.stamp(piece, gx, gy)) {
+                    lv.objects.add(o);
+                    sel.add(lv.objects.size() - 1);
+                }
+                Music.sfx("click");
+                invalidate();
+                updateInfo();
+                return;
+            }
             for (Level.Obj o : lv.objects)
                 if (Math.abs(o.x - gx) < 1 && Math.abs(o.y - gy) < 1 && o.typeId == brush.typeId) return;
             pushUndo();

@@ -12,11 +12,11 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("Winnigames2024")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("1.3.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.3.0+a9cdaf7ade36d091b0adf5ef7cb9acd774ee2958")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.4.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.4.0+254c0b607a77fb13654c15674c69353869ade2ef")]
 [assembly: System.Reflection.AssemblyProductAttribute("GEO DASH")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GEO DASH")]
-[assembly: System.Reflection.AssemblyVersionAttribute("1.3.0.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.4.0.0")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 

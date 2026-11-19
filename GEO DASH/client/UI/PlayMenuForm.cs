@@ -15,7 +15,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Основные уровни";
             ClientSize = new Size(1040, 640);
-            BgA = Color.FromArgb(40, 16, 70);
+            BgA = Color.FromArgb(120, 60, 230); BgId = 11; GroundId = 2;
             _levels = OfficialLevels.EnsureFiles();
 
             _bPrev = Add("", GdIcon.Back, 24, 300, 60, 60, Color.FromArgb(120, 130, 170), Color.FromArgb(50, 56, 90),

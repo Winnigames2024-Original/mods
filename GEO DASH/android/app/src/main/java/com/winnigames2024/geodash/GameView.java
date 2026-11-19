@@ -18,6 +18,13 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     Thread thread;
     volatile boolean running;
     boolean hold1, pressed1, hold2, pressed2, paused;
+    // настраиваемый интерфейс
+    final GuiLayout gui = GuiLayout.load();
+    boolean guiEdit;
+    GuiLayout.Item dragItem;
+    float dragOffX, dragOffY;
+    boolean btnLeft, btnRight;
+    final java.util.List<Object[]> hit = new java.util.ArrayList<>();   // {RectF, String}
     public boolean practice;
     int attempts = 1;
     double best, deathDelay;
@@ -77,6 +84,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             if (dt > 0.25) dt = 0.25;
 
             if (!paused) {
+                eng.moveX = (btnRight ? 1 : 0) - (btnLeft ? 1 : 0);
                 acc += dt;
                 int guard = 0;
                 while (acc >= FIXED && guard++ < 400) {
@@ -127,25 +135,88 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     @Override public boolean onTouchEvent(MotionEvent e) {
         int act = e.getActionMasked();
-        float x = e.getX(e.getActionIndex());
+        int idx = e.getActionIndex();
+        float x = e.getX(idx), y = e.getY(idx);
         boolean right = x > getWidth() / 2f;
 
         switch (act) {
             case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN: {
                 if (eng.finished) { exit(); return true; }
+                String id = hitId(x, y);
+
+                // режим настройки интерфейса
+                if (guiEdit) {
+                    if ("g:done".equals(id)) { guiEdit = false; gui.save(); say("Расположение сохранено"); return true; }
+                    if ("g:reset".equals(id)) { gui.reset(); gui.save(); return true; }
+                    if ("g:plus".equals(id)) { resizeGui(1.12); return true; }
+                    if ("g:minus".equals(id)) { resizeGui(1 / 1.12); return true; }
+                    if (id != null && id.startsWith("i:")) {
+                        dragItem = itemByName(id.substring(2));
+                        if (dragItem != null) {
+                            dragOffX = x - (float) (dragItem.x * getWidth());
+                            dragOffY = y - (float) (dragItem.y * getHeight());
+                        }
+                    }
+                    return true;
+                }
+
+                if (paused) {
+                    if ("p:resume".equals(id)) togglePause();
+                    else if ("p:restart".equals(id)) { attempts++; eng.restart(); togglePause(); }
+                    else if ("p:gui".equals(id)) { guiEdit = true; say("Тащи кнопки куда удобно"); }
+                    else if ("p:practice".equals(id)) {
+                        practice = !practice; eng.practice = practice;
+                        say(practice ? "Тренировка включена" : "Обычный режим");
+                    } else if ("p:exit".equals(id)) exit();
+                    return true;
+                }
+
+                if ("menu".equals(id)) { togglePause(); return true; }
+                if ("left".equals(id)) { btnLeft = true; return true; }
+                if ("right".equals(id)) { btnRight = true; return true; }
+                if ("jump".equals(id)) { if (!hold1) pressed1 = true; hold1 = true; return true; }
+
                 if (level.settings.twoPlayer && right) { if (!hold2) pressed2 = true; hold2 = true; }
                 else { if (!hold1) pressed1 = true; hold1 = true; }
+                return true;
+            }
+
+            case MotionEvent.ACTION_MOVE:
+                if (guiEdit && dragItem != null) {
+                    dragItem.x = Math.max(0.02, Math.min(0.98, (x - dragOffX) / Math.max(1, getWidth())));
+                    dragItem.y = Math.max(0.02, Math.min(0.98, (y - dragOffY) / Math.max(1, getHeight())));
+                }
                 return true;
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
             case MotionEvent.ACTION_CANCEL:
+                if (dragItem != null) { dragItem = null; gui.save(); }
+                btnLeft = false; btnRight = false;
                 if (level.settings.twoPlayer && right) hold2 = false; else hold1 = false;
                 if (e.getPointerCount() <= 1) { hold1 = false; hold2 = false; }
                 return true;
         }
         return true;
+    }
+
+    String hitId(float x, float y) {
+        for (int i = hit.size() - 1; i >= 0; i--) {
+            RectF r = (RectF) hit.get(i)[0];
+            if (r.contains(x, y)) return (String) hit.get(i)[1];
+        }
+        return null;
+    }
+
+    GuiLayout.Item itemByName(String n) {
+        for (GuiLayout.Item i : gui.items()) if (i.name.equals(n)) return i;
+        return null;
+    }
+
+    void resizeGui(double k) {
+        for (GuiLayout.Item i : gui.items()) i.size = Math.max(0.04, Math.min(0.6, i.size * k));
+        gui.save();
     }
 
     public void exit() { if (onExit != null) onExit.onExit(this); }
@@ -186,9 +257,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         int W = getWidth(), H = getHeight();
         int bg = eng.color(Engine.CH_BG);
 
-        Paint p = new Paint();
-        p.setShader(new LinearGradient(0, 0, 0, H, Gd.blend(bg, Color.BLACK, 0.25), Gd.blend(bg, Color.WHITE, 0.06), Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, W, H, p);
+        // фон как в игре: ровный цвет с узором, едет медленнее уровня
+        float tex = Math.max(0.35f, Math.min(3f, scale() * 0.95f));
+        Backdrop.background(c, new RectF(0, 0, W, H), level.settings.bgId, bg,
+                eng.camX * scale() * 0.26, eng.camY * scale() * 0.16, tex);
 
         drawGround(c, W, H);
 
@@ -216,36 +288,22 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 "попыток: " + attempts + "   монет: " + eng.coinsGot + "/3",
                 "время: " + String.format("%.1f", eng.time) + " c",
                 "коснись экрана, чтобы выйти"});
-        if (paused) drawOverlay(c, W, H, "ПАУЗА", new String[]{
-                "прогресс: " + (int) (eng.progress * 100) + "%",
-                "попытка " + attempts,
-                practice ? "режим тренировки" : "обычный режим"});
+
     }
 
     void drawGround(Canvas c, int W, int H) {
         int gc = eng.color(Engine.CH_GROUND), line = eng.color(Engine.CH_LINE);
-        float top = sy(eng.groundY);
-        if (top < H) {
-            Paint p = new Paint();
-            p.setShader(new LinearGradient(0, top, 0, H, gc, Gd.blend(gc, Color.BLACK, 0.45), Shader.TileMode.CLAMP));
-            c.drawRect(0, top, W, H, p);
-            c.drawLine(0, top, W, top, Gd.stroke(line, 3f));
+        int gid = level.settings.groundId;
+        float tex = Math.max(0.35f, Math.min(3f, scale() * 0.95f));
+        double scroll = eng.camX * scale();
 
-            float step = 60 * scale();
-            if (step > 6) {
-                Paint pp = Gd.stroke(Color.argb(40, 255, 255, 255), 2f);
-                float off = (float) (-(eng.camX * scale()) % step);
-                for (float x = off; x < W + step; x += step) c.drawLine(x, top + 2, x, H, pp);
-            }
-        }
+        float top = sy(eng.groundY);
+        if (top < H)
+            Backdrop.ground(c, new RectF(0, top, W, H + 2), gid, gc, line, scroll, tex, false);
+
         float roof = sy(eng.roofY);
-        if (roof > 0) {
-            c.drawRect(0, -2, W, roof, Gd.fill(Color.argb(200,
-                    Color.red(Gd.blend(gc, Color.BLACK, 0.3)),
-                    Color.green(Gd.blend(gc, Color.BLACK, 0.3)),
-                    Color.blue(Gd.blend(gc, Color.BLACK, 0.3)))));
-            c.drawLine(0, roof, W, roof, Gd.stroke(line, 3f));
-        }
+        if (roof > 0)
+            Backdrop.ground(c, new RectF(0, -2, W, roof), gid, gc, line, scroll, tex, true);
     }
 
     void drawObject(Canvas c, int i, Level.Obj o, Catalog.Def d, Engine.ObjState s) {
@@ -593,14 +651,26 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     void drawHud(Canvas c, int W, int H) {
-        float barW = Math.min(W * 0.6f, 600 * (W / 1280f));
-        RectF bar = new RectF(W / 2f - barW / 2, 16, W / 2f + barW / 2, 36);
-        c.drawRect(bar, Gd.fill(Color.argb(120, 10, 12, 22)));
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setShader(new LinearGradient(bar.left, 0, bar.right, 0, Gd.NEON, Gd.LIME, Shader.TileMode.CLAMP));
-        c.drawRect(new RectF(bar.left, bar.top, bar.left + (float) (bar.width() * eng.progress), bar.bottom), p);
-        c.drawRect(bar, Gd.stroke(Color.argb(200, 255, 255, 255), 2f));
-        Gd.outlined(c, (int) (eng.progress * 100) + "%", bar.right + 10, bar.bottom - 2, 20f, Color.WHITE, Paint.Align.LEFT);
+        hit.clear();
+
+        // ---- полоса прогресса
+        GuiLayout.Item pi = gui.progress;
+        float pw = (float) (pi.size * W), ph = Math.max(14f, H * 0.05f);
+        RectF bar = new RectF((float) (pi.x * W) - pw / 2, (float) (pi.y * H) - ph / 2,
+                (float) (pi.x * W) + pw / 2, (float) (pi.y * H) + ph / 2);
+        c.drawRoundRect(bar, ph / 2, ph / 2, Gd.fill(Color.argb(190, 10, 12, 26)));
+        float fw = (bar.width() - 6) * (float) eng.progress;
+        if (fw > 2) {
+            RectF f = new RectF(bar.left + 3, bar.top + 3, bar.left + 3 + fw, bar.bottom - 3);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setShader(new LinearGradient(0, f.top, 0, f.bottom,
+                    Color.rgb(140, 255, 170), Color.rgb(20, 170, 110), Shader.TileMode.CLAMP));
+            c.drawRoundRect(f, (bar.height() - 6) / 2, (bar.height() - 6) / 2, p);
+        }
+        c.drawRoundRect(bar, ph / 2, ph / 2, Gd.stroke(Gd.INK, 3f));
+        Gd.outlined(c, (int) (eng.progress * 100) + "%", bar.centerX(), bar.centerY() + ph * 0.22f,
+                ph * 0.6f, Gd.PAPER, Paint.Align.CENTER);
+        hit.add(new Object[]{bar, "i:" + pi.name});
 
         if (practice)
             for (double[] cp : eng.checkpoints) {
@@ -608,16 +678,100 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 c.drawLine(x, bar.top, x, bar.bottom, Gd.stroke(Color.rgb(120, 255, 160), 2f));
             }
 
-        Gd.outlined(c, "Попытка " + attempts, 16, 36, 22f, Color.WHITE, Paint.Align.LEFT);
+        // ---- кнопка «=»
+        RectF mr = GuiLayout.rect(gui.menu, W, H);
+        Gd.buttonPlate(c, mr, Color.rgb(150, 160, 205), Color.rgb(60, 66, 110), mr.height() * 0.26f, false);
+        Paint lines = Gd.stroke(Gd.PAPER, Math.max(3f, mr.height() * 0.09f));
+        c.drawLine(mr.centerX() - mr.width() * 0.26f, mr.centerY() - mr.height() * 0.12f,
+                mr.centerX() + mr.width() * 0.26f, mr.centerY() - mr.height() * 0.12f, lines);
+        c.drawLine(mr.centerX() - mr.width() * 0.26f, mr.centerY() + mr.height() * 0.12f,
+                mr.centerX() + mr.width() * 0.26f, mr.centerY() + mr.height() * 0.12f, lines);
+        hit.add(new Object[]{mr, guiEdit ? "i:" + gui.menu.name : "menu"});
+
+        // ---- кнопки платформера
+        if (eng.platformer || guiEdit) {
+            padButton(c, GuiLayout.rect(gui.left, W, H), "◄", "left", gui.left.name, btnLeft);
+            padButton(c, GuiLayout.rect(gui.right, W, H), "►", "right", gui.right.name, btnRight);
+            padButton(c, GuiLayout.rect(gui.jump, W, H), "▲", "jump", gui.jump.name, hold1);
+        }
+
+        // ---- сведения
+        float fs = Math.min(H * 0.045f, 26f);
+        Gd.outlined(c, "ПОПЫТКА " + attempts, mr.right + 12, mr.centerY() + fs * 0.35f, fs, Gd.PAPER, Paint.Align.LEFT);
         String info = Gd.MODE_NAMES[eng.p1.mode] + " · " + Gd.SPEED_NAMES[eng.p1.speed]
                 + (eng.p1.mini ? " · мини" : "") + (eng.dual ? " · дуал" : "")
                 + (practice ? " · тренировка" : "");
-        Gd.outlined(c, info, 16, 62, 16f, Gd.DIM, Paint.Align.LEFT);
-        if (eng.coinsGot > 0) Gd.outlined(c, "Монеты: " + eng.coinsGot, 16, 86, 16f, Gd.GOLD, Paint.Align.LEFT);
-        if (!Api.online) Gd.outlined(c, "ОФЛАЙН", W - 16, 36, 16f, Gd.GOLD, Paint.Align.RIGHT);
+        Gd.outlined(c, info, mr.right + 12, mr.bottom + fs * 0.7f, fs * 0.62f,
+                Color.argb(235, 215, 230, 255), Paint.Align.LEFT);
+        if (eng.coinsGot > 0)
+            for (int i = 0; i < eng.coinsGot; i++)
+                Gd.coin(c, new RectF(mr.right + 12 + i * fs * 1.1f, mr.bottom + fs, 
+                        mr.right + 12 + i * fs * 1.1f + fs * 0.9f, mr.bottom + fs * 1.9f), true);
+        if (!Api.online)
+            Gd.outlined(c, "ОФЛАЙН", W - 16, fs * 1.4f, fs * 0.62f, Gd.GOLD, Paint.Align.RIGHT);
 
         if (toastT > 0)
-            Gd.outlined(c, toast, W / 2f, H - 40, 22f, Color.WHITE, Paint.Align.CENTER);
+            Gd.outlined(c, toast, W / 2f, H - 40, fs * 0.9f, Gd.GOLD, Paint.Align.CENTER);
+
+        if (guiEdit) drawGuiEditor(c, W, H);
+        else if (paused) drawPause(c, W, H);
+    }
+
+    void padButton(Canvas c, RectF r, String sign, String id, String name, boolean down) {
+        Gd.buttonPlate(c, r, Color.rgb(120, 190, 255), Color.rgb(25, 85, 180), r.height() * 0.26f, down);
+        Gd.outlined(c, sign, r.centerX(), r.centerY() + r.height() * 0.17f, r.height() * 0.42f,
+                Gd.PAPER, Paint.Align.CENTER);
+        hit.add(new Object[]{r, guiEdit ? "i:" + name : id});
+    }
+
+    void gdBtn(Canvas c, RectF r, String text, String id, int c1, int c2) {
+        Gd.buttonPlate(c, r, c1, c2, r.height() * 0.26f, false);
+        Gd.outlined(c, text, r.centerX(), r.centerY() + r.height() * 0.13f,
+                Math.min(r.height() * 0.38f, r.width() * 0.11f), Gd.PAPER, Paint.Align.CENTER);
+        hit.add(new Object[]{r, id});
+    }
+
+    /** Режим «настроить GUI». */
+    void drawGuiEditor(Canvas c, int W, int H) {
+        c.drawColor(Color.argb(120, 8, 10, 24));
+        for (GuiLayout.Item i : gui.items()) {
+            RectF r = i == gui.progress
+                    ? new RectF((float) (i.x * W) - (float) (i.size * W) / 2, (float) (i.y * H) - 18,
+                                (float) (i.x * W) + (float) (i.size * W) / 2, (float) (i.y * H) + 18)
+                    : GuiLayout.rect(i, W, H);
+            Paint p = Gd.stroke(Gd.NEON, 3f);
+            p.setPathEffect(new DashPathEffect(new float[]{12, 8}, 0));
+            c.drawRect(r, p);
+            Gd.outlined(c, i.name, r.centerX(), r.top - 10, Math.min(H * 0.035f, 20f), Gd.NEON, Paint.Align.CENTER);
+        }
+        float bw = W * 0.17f, bh = H * 0.12f, y = H - bh - 14;
+        float x = W / 2f - (bw * 2 + bh * 2 + 24) / 2f;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), "ГОТОВО", "g:done", Color.rgb(120, 255, 170), Color.rgb(20, 150, 100));
+        gdBtn(c, new RectF(x + bw + 8, y, x + bw * 2 + 8, y + bh), "СБРОС", "g:reset", Color.rgb(255, 180, 90), Color.rgb(170, 95, 10));
+        gdBtn(c, new RectF(x + bw * 2 + 16, y, x + bw * 2 + bh + 16, y + bh), "+", "g:plus", Color.rgb(150, 160, 205), Color.rgb(60, 66, 110));
+        gdBtn(c, new RectF(x + bw * 2 + bh + 24, y, x + bw * 2 + bh * 2 + 24, y + bh), "−", "g:minus", Color.rgb(150, 160, 205), Color.rgb(60, 66, 110));
+        Gd.outlined(c, "тащи кнопки пальцем · + и − меняют размер · ГОТОВО — сохранить",
+                W / 2f, y - 16, Math.min(H * 0.04f, 22f), Gd.PAPER, Paint.Align.CENTER);
+    }
+
+    void drawPause(Canvas c, int W, int H) {
+        c.drawColor(Color.argb(185, 10, 12, 26));
+        Gd.outlined(c, "ПАУЗА", W / 2f, H * 0.16f, Math.min(54f, W * 0.055f), Gd.PAPER, Paint.Align.CENTER);
+        Gd.outlined(c, level.settings.name + "   ·   лучший " + (int) (best * 100) + "%   ·   попыток " + attempts,
+                W / 2f, H * 0.23f, Math.min(22f, W * 0.022f), Color.argb(235, 215, 230, 255), Paint.Align.CENTER);
+
+        float bw = Math.min(W * 0.34f, 420), bh = H * 0.115f, gap = H * 0.025f;
+        float x = W / 2f - bw / 2, y = H * 0.28f;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), "ПРОДОЛЖИТЬ", "p:resume", Color.rgb(120, 255, 170), Color.rgb(20, 150, 100));
+        y += bh + gap;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), "ЗАНОВО", "p:restart", Color.rgb(255, 190, 90), Color.rgb(175, 100, 10));
+        y += bh + gap;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), "НАСТРОИТЬ GUI", "p:gui", Color.rgb(140, 200, 255), Color.rgb(30, 95, 190));
+        y += bh + gap;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), practice ? "ТРЕНИРОВКА: ВКЛ" : "ТРЕНИРОВКА: ВЫКЛ", "p:practice",
+                Color.rgb(200, 170, 255), Color.rgb(100, 60, 180));
+        y += bh + gap;
+        gdBtn(c, new RectF(x, y, x + bw, y + bh), "ВЫХОД", "p:exit", Color.rgb(240, 120, 120), Color.rgb(150, 40, 50));
     }
 
     void drawOverlay(Canvas c, int W, int H, String title, String[] lines) {

@@ -5,7 +5,9 @@ import android.graphics.Color;
 /** CREATOR — хаб: Saved, Search, Daily, Weekly, Featured, Epic, Users, Top, My Levels. */
 public class CreatorActivity extends GdActivity {
 
-    @Override protected int bgA() { return Color.rgb(22, 36, 86); }
+    @Override protected int bgA() { return Color.rgb(0, 160, 195); }
+    @Override protected int bgId() { return 3; }
+    @Override protected int groundId() { return 5; }
     @Override protected String headTitle() { return "CREATOR"; }
     @Override protected String headSub() {
         return Api.online ? "сервер онлайн — поиск и игроки доступны" : "офлайн — работают SAVED и мои уровни";

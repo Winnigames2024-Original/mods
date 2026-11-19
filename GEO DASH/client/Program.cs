@@ -16,6 +16,9 @@ namespace GEO_DASH
             Application.ThreadException += (s, e) => Crash(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Crash(e.ExceptionObject as Exception);
 
+            // без аккаунта в игру не пускаем: авто-вход, иначе вход или регистрация
+            if (!AuthForm.Ensure()) return;
+
             Application.Run(new MainForm());
         }
 

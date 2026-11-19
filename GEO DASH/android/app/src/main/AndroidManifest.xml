@@ -15,7 +15,7 @@
         android:theme="@style/GdTheme">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".AuthActivity"
             android:exported="true"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
@@ -24,6 +24,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".MainActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
 
         <activity android:name=".PlayActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".CreatorActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
@@ -36,6 +38,9 @@
         <activity android:name=".ProfileActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".FriendsActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".SettingsActivity"     android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".MyLevelsActivity"     android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".SongsActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".AdminActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

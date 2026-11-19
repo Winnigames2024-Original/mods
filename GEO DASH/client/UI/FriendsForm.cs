@@ -14,7 +14,7 @@ namespace GEO_DASH.UI
         {
             Text = "GEO DASH — Друзья";
             ClientSize = new Size(1000, 640);
-            BgA = Color.FromArgb(70, 20, 60);
+            BgA = Color.FromArgb(215, 60, 150); BgId = 18; GroundId = 6;
 
             _friends = MakeList(24, 140, 460, 380, new[] { "Друг", "★", "С" });
             _requests = MakeList(508, 140, 460, 250, new[] { "Запрос от / кому", "Когда", "Тип" });

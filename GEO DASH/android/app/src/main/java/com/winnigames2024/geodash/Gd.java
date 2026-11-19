@@ -42,6 +42,7 @@ public final class Gd {
 
     // ------------------------------------------------------------ цвета ui
 
+    public static final int BG_BLUE = Color.rgb(40, 125, 255);
     public static final int DEEP = Color.rgb(11, 10, 30);
     public static final int DEEP2 = Color.rgb(30, 18, 66);
     public static final int NEON = Color.rgb(0, 230, 255);
@@ -99,54 +100,70 @@ public final class Gd {
         return p.measureText(s == null ? "" : s);
     }
 
-    /** Плита с градиентом и обводкой. */
+    /** Плита интерфейса: градиент, чёрная обводка, блик сверху и тёмная кромка снизу. */
     public static void plate(Canvas c, RectF r, int top, int bottom, float rad) {
+        if (r.width() <= 2 || r.height() <= 2) return;
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setShader(new LinearGradient(r.left, r.top, r.left, r.bottom, top, bottom, Shader.TileMode.CLAMP));
         c.drawRoundRect(r, rad, rad, p);
-        c.drawRoundRect(r, rad, rad, stroke(INK, Math.max(3f, r.height() * 0.06f)));
-        RectF hi = new RectF(r.left + 4, r.top + 4, r.right - 4, r.top + r.height() * 0.34f);
-        c.drawRoundRect(hi, rad * 0.7f, rad * 0.7f, fill(Color.argb(46, 255, 255, 255)));
+
+        int save = c.save();
+        Path clip = new Path();
+        clip.addRoundRect(r, rad, rad, Path.Direction.CW);
+        c.clipPath(clip);
+        Paint low = new Paint();
+        float ly = r.bottom - r.height() * 0.26f;
+        low.setShader(new LinearGradient(0, ly, 0, r.bottom,
+                Color.argb(0, 0, 0, 0), Color.argb(90, 0, 0, 0), Shader.TileMode.CLAMP));
+        c.drawRect(r.left, ly, r.right, r.bottom, low);
+        c.restoreToCount(save);
+
+        RectF hi = new RectF(r.left + 4, r.top + 3, r.right - 4, r.top + r.height() * 0.40f);
+        if (hi.width() > 2 && hi.height() > 2) {
+            Paint hp = new Paint(Paint.ANTI_ALIAS_FLAG);
+            hp.setShader(new LinearGradient(0, hi.top, 0, hi.bottom,
+                    Color.argb(70, 255, 255, 255), Color.argb(12, 255, 255, 255), Shader.TileMode.CLAMP));
+            c.drawRoundRect(hi, rad * 0.75f, rad * 0.75f, hp);
+        }
+
+        c.drawRoundRect(r, rad, rad, stroke(INK, Math.max(3f, Math.min(4.5f, r.height() * 0.06f))));
+    }
+
+    /** Кнопка: та же плита, при нажатии проваливается и темнеет. */
+    public static void buttonPlate(Canvas c, RectF r, int c1, int c2, float rad, boolean pressed) {
+        if (r.width() <= 2 || r.height() <= 2) return;
+        if (!pressed) {
+            RectF sh = new RectF(r);
+            sh.offset(0, Math.max(3f, r.height() * 0.07f));
+            c.drawRoundRect(sh, rad, rad, fill(Color.argb(110, 0, 0, 0)));
+        }
+        plate(c, r, lighten(c1, pressed ? -0.22f : 0.10f), pressed ? lighten(c2, -0.22f) : c2, rad);
     }
 
     public static void glass(Canvas c, RectF r, float rad) {
-        c.drawRoundRect(r, rad, rad, fill(Color.argb(150, 16, 14, 40)));
-        c.drawRoundRect(r, rad, rad, stroke(Color.argb(120, 140, 170, 255), 2f));
+        if (r.width() <= 2 || r.height() <= 2) return;
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setShader(new LinearGradient(0, r.top, 0, r.bottom,
+                Color.argb(205, 36, 26, 74), Color.argb(215, 18, 13, 44), Shader.TileMode.CLAMP));
+        c.drawRoundRect(r, rad, rad, p);
+        RectF inner = new RectF(r.left + 3, r.top + 3, r.right - 3, r.bottom - 3);
+        c.drawRoundRect(inner, Math.max(2f, rad - 3), Math.max(2f, rad - 3),
+                stroke(Color.argb(70, 255, 255, 255), 2f));
+        c.drawRoundRect(r, rad, rad, stroke(INK, 3.2f));
     }
 
-    /** Анимированный фон меню. */
+    /** Фон меню как в игре: ровный цвет с едущим узором и пол. */
     public static void background(Canvas c, int w, int h, double t) {
-        Paint p = new Paint();
-        p.setShader(new LinearGradient(0, 0, w, h, DEEP2, DEEP, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, w, h, p);
+        background(c, w, h, t, 1, 1, BG_BLUE, Backdrop.groundOf(BG_BLUE));
+    }
 
-        float floor = h * 0.82f;
-        Paint g = new Paint();
-        g.setShader(new LinearGradient(0, floor, 0, h, Color.argb(220, 20, 16, 54), Color.argb(255, 8, 6, 22), Shader.TileMode.CLAMP));
-        c.drawRect(0, floor, w, h, g);
-        c.drawLine(0, floor, w, floor, stroke(Color.argb(180, 0, 230, 255), 3f));
-
-        float step = Math.max(50f, w / 14f);
-        float off = (float) (-(t * 90) % step);
-        Paint line = stroke(Color.argb(26, 255, 255, 255), 2f);
-        for (float x = off; x < w + step; x += step) c.drawLine(x, 0, x + w * 0.12f, floor, line);
-        Paint line2 = stroke(Color.argb(60, 0, 230, 255), 2f);
-        for (float x = off; x < w + step; x += step) c.drawLine(x, floor, x - w * 0.07f, h, line2);
-
-        for (int i = 0; i < 6; i++) {
-            double ph = (t * 0.25 + i * 0.37) % 1.0;
-            float x = (float) (w * (1.1 - ph * 1.25));
-            float y = (float) (h * (0.12 + 0.5 * (((i * 0.17) + Math.sin(t * 0.5 + i) * 0.1 + 1) % 1)));
-            float s = w * 0.02f + (i % 3) * w * 0.012f;
-            Paint sh = fill(Color.argb(30, i % 2 == 0 ? 0 : 255, i % 2 == 0 ? 230 : 60, i % 2 == 0 ? 255 : 190));
-            if (i % 3 == 0) c.drawCircle(x, y, s, sh);
-            else if (i % 3 == 1) c.drawRect(x, y, x + s, y + s, sh);
-            else {
-                Path path = new Path();
-                path.moveTo(x, y + s); path.lineTo(x + s, y + s); path.lineTo(x + s / 2, y); path.close();
-                c.drawPath(path, sh);
-            }
-        }
+    public static void background(Canvas c, int w, int h, double t,
+                                  int bgId, int groundId, int bg, int ground) {
+        if (w <= 0 || h <= 0) return;
+        float scale = Math.max(0.65f, Math.min(1.9f, h / 620f));
+        Backdrop.background(c, new RectF(0, 0, w, h), bgId, bg, t * 42, Math.sin(t * 0.25) * 10, scale);
+        float gh = Math.max(56f, h * 0.155f);
+        Backdrop.ground(c, new RectF(0, h - gh, w, h), groundId, ground, Color.WHITE, t * 170, scale, false);
     }
 
     /** «Лицо» сложности. */

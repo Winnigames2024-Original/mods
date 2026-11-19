@@ -55,6 +55,13 @@ namespace GEO_DASH.Core
         public int CopyMode { get; set; } = 0;
         /// <summary>Пароль для копирования уровня в редактор (CopyMode = 1).</summary>
         public string CopyPassword { get; set; } = "";
+
+        /// <summary>Уровень получен копированием, а не создан с нуля.</summary>
+        public bool IsCopy { get; set; }
+        /// <summary>ID уровня на сервере, с которого сделана копия.</summary>
+        public int CopiedFrom { get; set; }
+        /// <summary>Автор оригинала, если это копия.</summary>
+        public string CopiedAuthor { get; set; } = "";
     }
 
     /// <summary>Параметры триггера. Один класс на все типы — лишние поля просто не используются.</summary>
