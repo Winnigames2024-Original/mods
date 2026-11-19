@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Свои диалоги вместо системных окон, подписи под иконками кнопок, переходы между экранами без анимации, музыка замолкает когда игра свёрнута, автообновление apk и exe через update.json.",
+  "notes": "Редактор уровней как в игре: режимы BUILD / EDIT / DELETE, палитра объектов по вкладкам с превью, панель правки (стрелки, шаг 0.5/1/5, поворот, отражение, копирование, правка объекта), undo/redo, зум. Постановки и стирания свайпом нет — объекты ставятся по одному клику.",
   "date": "2026-11-19"
 }

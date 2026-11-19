@@ -12,8 +12,14 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Редактор уровней на телефоне: сетка, палитра объектов, тест и загрузка. */
+/**
+ * Редактор уровней по образцу игры: режимы BUILD / EDIT / DELETE,
+ * палитра по вкладкам, панель правки со стрелками.
+ * Объекты ставятся по одному касанию — постановки свайпом нет.
+ */
 public class EditorCanvasActivity extends Activity {
+
+    static final int BUILD = 0, EDIT = 1, DELETE = 2;
 
     static Level editing;
 
@@ -26,22 +32,44 @@ public class EditorCanvasActivity extends Activity {
     }
 
     Level lv;
+    FrameLayout root;
     EditorView view;
+    LinearLayout panel;
+    LinearLayout modes;
     TextView info;
-    int mode = 0;            // 0 — ставить, 1 — удалять, 2 — двигать вид
-    Palette.Item brush = Palette.ITEMS.get(0);
+
+    int mode = BUILD;
+    Palette.Item brush;
+    String category = "Блоки";
+    double step = 30;
+    final List<Integer> sel = new ArrayList<>();
+    final List<Level.Obj> clipboard = new ArrayList<>();
+    final List<String> undo = new ArrayList<>();
+    final List<String> redo = new ArrayList<>();
+    int W, H;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Store.init(this);
 
         lv = editing;
         if (lv == null) { finish(); return; }
+        brush = Palette.ITEMS.get(0);
 
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         setContentView(root);
+        root.post(this::buildUi);
+    }
+
+    void buildUi() {
+        W = root.getWidth();
+        H = root.getHeight();
+        if (W == 0 || H == 0) { root.postDelayed(this::buildUi, 60); return; }
+
+        root.removeAllViews();
 
         view = new EditorView(this);
         root.addView(view, new FrameLayout.LayoutParams(
@@ -49,62 +77,510 @@ public class EditorCanvasActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setBackgroundColor(Color.argb(190, 10, 8, 26));
-        top.addView(tool("ОБЪЕКТ", v -> palette()));
-        top.addView(tool("СТАВИТЬ", v -> setMode(0)));
-        top.addView(tool("УДАЛЯТЬ", v -> setMode(1)));
-        top.addView(tool("ВИД", v -> setMode(2)));
-        top.addView(tool("ТЕСТ", v -> test()));
-        top.addView(tool("НАСТР.", v -> LevelSettingsDialog.show(this, lv, this::save)));
-        top.addView(tool("СОХР.", v -> { save(); toast("Сохранено"); }));
-        top.addView(tool("СЕРВЕР", v -> upload()));
-        top.addView(tool("ВЫХОД", v -> { save(); finish(); }));
+        top.setBackgroundColor(Color.argb(210, 14, 12, 36));
         root.addView(top, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.12f)));
+
+        topBtn(top, "ВЫХОД", Ui.I_BACK, Color.rgb(160, 160, 190), Color.rgb(70, 70, 110),
+                () -> { save(); finish(); });
+        topBtn(top, "СОХР.", Ui.I_SAVE, Color.rgb(120, 255, 170), Color.rgb(20, 150, 100),
+                () -> { save(); toast("Сохранено"); });
+        topBtn(top, "ОТМЕНА", Ui.I_BACK, Color.rgb(170, 175, 210), Color.rgb(70, 76, 125), this::doUndo);
+        topBtn(top, "ВЕРНУТЬ", Ui.I_REFRESH, Color.rgb(170, 175, 210), Color.rgb(70, 76, 125), this::doRedo);
+        topBtn(top, "ТЕСТ", Ui.I_PLAY, Color.rgb(120, 220, 255), Color.rgb(20, 110, 180), this::test);
+        topBtn(top, "НАСТР.", Ui.I_SETTINGS, Color.rgb(200, 170, 255), Color.rgb(100, 60, 180),
+                () -> LevelSettingsDialog.show(this, lv, this::save));
+        topBtn(top, "СЕРВЕР", Ui.I_UPLOAD, Color.rgb(255, 210, 90), Color.rgb(170, 120, 10), this::upload);
+        topBtn(top, "+", Ui.I_NONE, Color.rgb(140, 150, 190), Color.rgb(60, 66, 105),
+                () -> { view.zoom = Math.min(3f, view.zoom * 1.25f); view.invalidate(); });
+        topBtn(top, "−", Ui.I_NONE, Color.rgb(140, 150, 190), Color.rgb(60, 66, 105),
+                () -> { view.zoom = Math.max(0.25f, view.zoom / 1.25f); view.invalidate(); });
+
+        FrameLayout bottom = new FrameLayout(this);
+        bottom.setBackgroundColor(Color.argb(235, 18, 16, 44));
+        root.addView(bottom, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.40f), Gravity.BOTTOM));
+
+        modes = new LinearLayout(this);
+        modes.setOrientation(LinearLayout.VERTICAL);
+        modes.setBackgroundColor(Color.rgb(22, 20, 52));
+        bottom.addView(modes, new FrameLayout.LayoutParams((int) (W * 0.11f),
+                ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START));
+
+        panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        plp.leftMargin = (int) (W * 0.11f);
+        bottom.addView(panel, plp);
 
         info = new TextView(this);
-        info.setTextColor(Gd.PAPER);
-        info.setBackgroundColor(Color.argb(160, 10, 8, 26));
-        info.setPadding(16, 6, 16, 6);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+        info.setTextColor(Gd.DIM);
+        info.setTextSize(11);
+        info.setBackgroundColor(Color.argb(170, 10, 8, 26));
+        info.setPadding(14, 4, 14, 4);
+        FrameLayout.LayoutParams ilp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        root.addView(info, lp);
+        ilp.bottomMargin = (int) (H * 0.40f);
+        root.addView(info, ilp);
+
+        setMode(BUILD);
+        pushUndo();
+    }
+
+    void topBtn(LinearLayout bar, String text, int icon, int c1, int c2, Runnable r) {
+        Ui.GdBtn b = new Ui.GdBtn(this).set(text, icon, c1, c2);
+        b.setOnClickListener(v -> r.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        lp.setMargins(4, 6, 4, 6);
+        bar.addView(b, lp);
+    }
+
+    void modeButtons() {
+        modes.removeAllViews();
+        modeBtn("BUILD", Ui.I_PLUS, BUILD, Color.rgb(120, 255, 170), Color.rgb(20, 150, 100));
+        modeBtn("EDIT", Ui.I_EDIT, EDIT, Color.rgb(255, 190, 80), Color.rgb(170, 100, 10));
+        modeBtn("DELETE", Ui.I_TRASH, DELETE, Color.rgb(240, 120, 120), Color.rgb(150, 40, 50));
+    }
+
+    void modeBtn(String text, int icon, int m, int c1, int c2) {
+        Ui.GdBtn b = new Ui.GdBtn(this).set(text, icon,
+                mode == m ? c1 : Color.rgb(90, 95, 135), mode == m ? c2 : Color.rgb(44, 48, 82));
+        b.setOnClickListener(v -> setMode(m));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        lp.setMargins(6, 6, 6, 6);
+        modes.addView(b, lp);
+    }
+
+    void setMode(int m) {
+        mode = m;
+        Music.sfx("click");
+        if (panel == null) return;
+        panel.removeAllViews();
+        if (m == BUILD) buildPalette();
+        else if (m == EDIT) buildEditPanel();
+        else buildDeletePanel();
+        modeButtons();
+        updateInfo();
+        if (view != null) view.invalidate();
+    }
+
+    // ---------------------------------------------------- палитра
+
+    void buildPalette() {
+        HorizontalScrollView tabsScroll = new HorizontalScrollView(this);
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabsScroll.addView(tabs);
+        panel.addView(tabsScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.10f)));
+
+        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное"};
+        for (String c : cats) {
+            final String cc = c;
+            Ui.GdBtn b = new Ui.GdBtn(this).set(c, Ui.I_NONE,
+                    c.equals(category) ? Color.rgb(120, 220, 255) : Color.rgb(70, 76, 125),
+                    c.equals(category) ? Color.rgb(20, 110, 180) : Color.rgb(34, 38, 70));
+            b.setOnClickListener(v -> { category = cc; setMode(BUILD); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    (int) (W * 0.14f), ViewGroup.LayoutParams.MATCH_PARENT);
+            lp.setMargins(5, 6, 5, 4);
+            tabs.addView(b, lp);
+        }
+
+        HorizontalScrollView itemsScroll = new HorizontalScrollView(this);
+        LinearLayout items = new LinearLayout(this);
+        items.setOrientation(LinearLayout.HORIZONTAL);
+        itemsScroll.addView(items);
+        panel.addView(itemsScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        int size = (int) (H * 0.17f);
+        for (final Palette.Item it : Palette.byCategory(category)) {
+            ObjBtn b = new ObjBtn(this, it);
+            b.setOnClickListener(v -> { brush = it; setMode(BUILD); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+            lp.setMargins(6, 8, 6, 8);
+            items.addView(b, lp);
+        }
+    }
+
+    class ObjBtn extends View {
+        final Palette.Item item;
+        ObjBtn(Context c, Palette.Item it) { super(c); item = it; setClickable(true); }
+
+        @Override protected void onDraw(Canvas c) {
+            RectF r = new RectF(3, 3, getWidth() - 3, getHeight() - 3);
+            boolean on = item == brush;
+            Gd.plate(c, r, on ? Color.rgb(70, 110, 220) : Color.rgb(40, 42, 86),
+                    on ? Color.rgb(30, 60, 150) : Color.rgb(22, 22, 52), 14f);
+
+            Level.Obj o = item.make();
+            Catalog.Def d = Catalog.get(o.typeId);
+            float side = Math.min(r.width(), r.height()) * 0.5f;
+            RectF box = new RectF(r.centerX() - side / 2, r.top + r.height() * 0.14f,
+                    r.centerX() + side / 2, r.top + r.height() * 0.14f + side);
+            drawPreview(c, o, d, box);
+
+            Gd.outlined(c, item.label, r.centerX(), r.bottom - r.height() * 0.08f,
+                    Math.min(r.height() * 0.15f, r.width() * 0.17f), Gd.PAPER, Paint.Align.CENTER);
+        }
+    }
+
+    static void drawPreview(Canvas c, Level.Obj o, Catalog.Def d, RectF box) {
+        switch (d.style) {
+            case Catalog.ST_SPIKE: case Catalog.ST_SPIKE_SMALL: case Catalog.ST_SPIKE_HALF: {
+                Path p = new Path();
+                if (o.typeId == 22) { p.moveTo(box.left, box.top); p.lineTo(box.right, box.top); p.lineTo(box.centerX(), box.bottom); }
+                else { p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.centerX(), box.top); }
+                p.close();
+                c.drawPath(p, Gd.fill(Color.rgb(255, 120, 120)));
+                break;
+            }
+            case Catalog.ST_SPIKE_ROW: {
+                float w3 = box.width() / 3f;
+                for (int i = 0; i < 3; i++) {
+                    Path p = new Path();
+                    p.moveTo(box.left + i * w3, box.bottom);
+                    p.lineTo(box.left + (i + 1) * w3, box.bottom);
+                    p.lineTo(box.left + (i + 0.5f) * w3, box.top);
+                    p.close();
+                    c.drawPath(p, Gd.fill(Color.rgb(255, 120, 120)));
+                }
+                break;
+            }
+            case Catalog.ST_ORB:
+                c.drawOval(box, Gd.stroke(GameView.orbColor(o.orb), Math.max(3f, box.width() * 0.16f)));
+                break;
+            case Catalog.ST_PAD:
+                c.drawRect(new RectF(box.left, box.bottom - box.height() * 0.3f, box.right, box.bottom),
+                        Gd.fill(GameView.padColor(o.pad)));
+                break;
+            case Catalog.ST_PORTAL: {
+                int col = GameView.portalLook(o.portal)[0];
+                RectF pr = new RectF(box.left + box.width() * 0.2f, box.top, box.right - box.width() * 0.2f, box.bottom);
+                c.drawOval(pr, Gd.fill(col));
+                Gd.outlined(c, GameView.portalLabel(o.portal), pr.centerX(), pr.centerY() + pr.height() * 0.1f,
+                        Math.max(8f, pr.width() * 0.5f), Color.WHITE, Paint.Align.CENTER);
+                break;
+            }
+            case Catalog.ST_COIN: Gd.coin(c, box, true); break;
+            case Catalog.ST_PICKUP: {
+                Path p = new Path();
+                p.moveTo(box.centerX(), box.top); p.lineTo(box.right, box.centerY());
+                p.lineTo(box.centerX(), box.bottom); p.lineTo(box.left, box.centerY());
+                p.close();
+                c.drawPath(p, Gd.fill(Color.rgb(120, 255, 180)));
+                break;
+            }
+            case Catalog.ST_TRIGGER:
+                c.drawRect(box, Gd.fill(Color.rgb(70, 130, 255)));
+                Gd.outlined(c, o.trig == null ? "T" : shortTrig(o.trig.type), box.centerX(),
+                        box.centerY() + box.height() * 0.15f, Math.max(8f, box.width() * 0.42f),
+                        Color.WHITE, Paint.Align.CENTER);
+                break;
+            case Catalog.ST_SAW: case Catalog.ST_SAW_BIG:
+                c.drawOval(box, Gd.fill(Color.rgb(200, 205, 225)));
+                c.drawCircle(box.centerX(), box.centerY(), box.width() * 0.14f, Gd.fill(Color.rgb(50, 52, 74)));
+                break;
+            case Catalog.ST_HAZARD_BLOCK:
+                c.drawRect(box, Gd.fill(Color.rgb(200, 60, 70)));
+                break;
+            case Catalog.ST_FINISH:
+                c.drawRect(box, Gd.fill(Color.WHITE));
+                c.drawRect(new RectF(box.left, box.centerY(), box.centerX(), box.bottom),
+                        Gd.fill(Color.rgb(30, 30, 45)));
+                break;
+            case Catalog.ST_CHECKPOINT:
+                c.drawRect(box, Gd.stroke(Color.rgb(120, 255, 160), 2f));
+                break;
+            case Catalog.ST_TEXT:
+                Gd.outlined(c, "Aa", box.centerX(), box.centerY() + box.height() * 0.2f,
+                        box.height() * 0.7f, Gd.PAPER, Paint.Align.CENTER);
+                break;
+            case Catalog.ST_CIRCLE:
+                c.drawOval(box, Gd.fill(Color.rgb(150, 160, 230)));
+                break;
+            case Catalog.ST_TRI: {
+                Path p = new Path();
+                p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.centerX(), box.top);
+                p.close();
+                c.drawPath(p, Gd.fill(Color.rgb(150, 160, 230)));
+                break;
+            }
+            case Catalog.ST_GLOW:
+                c.drawOval(box, Gd.fill(Color.argb(120, 160, 200, 255)));
+                break;
+            case Catalog.ST_SLAB: case Catalog.ST_PLATFORM:
+                c.drawRect(new RectF(box.left, box.centerY(), box.right, box.bottom),
+                        Gd.fill(Color.rgb(225, 228, 248)));
+                break;
+            case Catalog.ST_SLOPE_UP: case Catalog.ST_SLOPE_DOWN: {
+                Path p = new Path();
+                if (d.style == Catalog.ST_SLOPE_UP) {
+                    p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.right, box.top);
+                } else {
+                    p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.left, box.top);
+                }
+                p.close();
+                c.drawPath(p, Gd.fill(Color.rgb(225, 228, 248)));
+                break;
+            }
+            default:
+                c.drawRect(box, Gd.fill(Color.rgb(225, 228, 248)));
+                c.drawRect(box, Gd.stroke(Color.rgb(120, 125, 170), 2f));
+        }
+    }
+
+    static String shortTrig(int t) {
+        switch (t) {
+            case Level.T_MOVE: return "MOV";
+            case Level.T_ROTATE: return "ROT";
+            case Level.T_SCALE: return "SCL";
+            case Level.T_ALPHA: return "ALP";
+            case Level.T_TOGGLE: return "TGL";
+            case Level.T_SPAWN: return "SPW";
+            case Level.T_STOP: return "STP";
+            case Level.T_PULSE: return "PLS";
+            case Level.T_COLOR: return "COL";
+            case Level.T_BG: return "BG";
+            case Level.T_GROUND: return "GRD";
+            case Level.T_SHAKE: return "SHK";
+            case Level.T_FOLLOW: return "FLW";
+            case Level.T_COUNT: return "CNT";
+            case Level.T_PICKUP: return "PCK";
+            case Level.T_RANDOM: return "RND";
+            case Level.T_TIMER: return "TMR";
+            case Level.T_CAMERA: return "CAM";
+            case Level.T_ZOOM: return "ZOM";
+            case Level.T_SONG: return "SNG";
+            case Level.T_GRAVITY: return "GRV";
+            case Level.T_TELEPORT: return "TPT";
+            case Level.T_SPEED: return "SPD";
+            case Level.T_END: return "END";
+            default: return "TRG";
+        }
+    }
+
+    // ---------------------------------------------------- панели режимов
+
+    void buildEditPanel() {
+        LinearLayout row1 = row();
+        LinearLayout row2 = row();
+
+        pBtn(row1, "", Ui.I_BACK, () -> moveSel(-step, 0));
+        pBtn(row1, "", Ui.I_UPLOAD, () -> moveSel(0, step));
+        pBtn(row1, "", Ui.I_DOWNLOAD, () -> moveSel(0, -step));
+        pBtn(row1, "", Ui.I_PLAY, () -> moveSel(step, 0));
+        pBtn(row1, "↺", Ui.I_NONE, () -> rotateSel(-90));
+        pBtn(row1, "↻", Ui.I_NONE, () -> rotateSel(90));
+        pBtn(row1, "⇄", Ui.I_NONE, () -> flipSel(true));
+        pBtn(row1, "⇅", Ui.I_NONE, () -> flipSel(false));
+
+        for (final double v : new double[]{15, 30, 150}) {
+            boolean on = Math.abs(step - v) < 0.01;
+            Ui.GdBtn b = new Ui.GdBtn(this).set(v == 15 ? "0.5" : v == 30 ? "1" : "5", Ui.I_NONE,
+                    on ? Color.rgb(120, 220, 255) : Color.rgb(150, 158, 200),
+                    on ? Color.rgb(20, 110, 180) : Color.rgb(60, 66, 110));
+            b.setOnClickListener(x -> { step = v; setMode(EDIT); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            lp.setMargins(5, 6, 5, 6);
+            row2.addView(b, lp);
+        }
+
+        pBtn(row2, "КОПИЯ", Ui.I_COPY, this::copySel);
+        pBtn(row2, "ВСТАВИТЬ", Ui.I_PLUS, this::pasteSel);
+        pBtn(row2, "УДАЛИТЬ", Ui.I_TRASH, this::deleteSel);
+        pBtn(row2, "ОБЪЕКТ", Ui.I_SETTINGS, this::editObject);
+        pBtn(row2, "СНЯТЬ", Ui.I_CROSS, sel::clear);
+    }
+
+    void buildDeletePanel() {
+        LinearLayout row1 = row();
+        pBtn(row1, "УДАЛИТЬ ВЫДЕЛЕННОЕ", Ui.I_TRASH, this::deleteSel);
+        pBtn(row1, "УДАЛИТЬ ТАКИЕ ЖЕ", Ui.I_TRASH, () -> {
+            if (sel.isEmpty()) return;
+            int type = lv.objects.get(sel.get(0)).typeId;
+            pushUndo();
+            for (int i = lv.objects.size() - 1; i >= 0; i--)
+                if (lv.objects.get(i).typeId == type) lv.objects.remove(i);
+            sel.clear();
+        });
+        pBtn(row1, "ОЧИСТИТЬ", Ui.I_CROSS, () ->
+                GdDialog.confirm(this, "Очистка", "Удалить все объекты уровня?", () -> {
+                    pushUndo();
+                    lv.objects.clear();
+                    sel.clear();
+                    view.invalidate();
+                    updateInfo();
+                }));
+
+        TextView t = new TextView(this);
+        t.setText("В режиме DELETE касание по объекту удаляет его.\n"
+                + "Стирания свайпом нет — объекты удаляются по одному.");
+        t.setTextColor(Gd.DIM);
+        t.setPadding(20, 10, 20, 10);
+        panel.addView(t);
+    }
+
+    LinearLayout row() {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        panel.addView(r, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        return r;
+    }
+
+    void pBtn(LinearLayout row, String text, int icon, Runnable r) {
+        Ui.GdBtn b = new Ui.GdBtn(this).set(text, icon, Color.rgb(150, 158, 200), Color.rgb(60, 66, 110));
+        b.setOnClickListener(v -> { r.run(); if (view != null) view.invalidate(); updateInfo(); });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        lp.setMargins(5, 6, 5, 6);
+        row.addView(b, lp);
+    }
+
+    // ---------------------------------------------------- операции
+
+    void moveSel(double dx, double dy) {
+        if (sel.isEmpty()) return;
+        pushUndo();
+        for (int i : sel) { lv.objects.get(i).x += dx; lv.objects.get(i).y += dy; }
+    }
+
+    void rotateSel(double deg) {
+        if (sel.isEmpty()) return;
+        pushUndo();
+        for (int i : sel) lv.objects.get(i).rotation = (lv.objects.get(i).rotation + deg) % 360;
+    }
+
+    void flipSel(boolean horizontal) {
+        if (sel.isEmpty()) return;
+        pushUndo();
+        for (int i : sel) {
+            Level.Obj o = lv.objects.get(i);
+            if (horizontal) { o.flipX = !o.flipX; o.scaleX = -o.scaleX; }
+            else { o.flipY = !o.flipY; o.scaleY = -o.scaleY; }
+        }
+    }
+
+    void copySel() {
+        clipboard.clear();
+        for (int i : sel) clipboard.add(copyObj(lv.objects.get(i)));
+        toast("Скопировано: " + clipboard.size());
+    }
+
+    void pasteSel() {
+        if (clipboard.isEmpty()) return;
+        pushUndo();
+        sel.clear();
+        for (Level.Obj o : clipboard) {
+            Level.Obj c = copyObj(o);
+            c.x += 30;
+            lv.objects.add(c);
+            sel.add(lv.objects.size() - 1);
+        }
+    }
+
+    static Level.Obj copyObj(Level.Obj o) {
+        Level.Obj c = new Level.Obj();
+        c.typeId = o.typeId; c.x = o.x; c.y = o.y; c.rotation = o.rotation;
+        c.scaleX = o.scaleX; c.scaleY = o.scaleY; c.flipX = o.flipX; c.flipY = o.flipY;
+        c.zOrder = o.zOrder; c.baseColor = o.baseColor; c.detailColor = o.detailColor;
+        c.opacity = o.opacity; c.portal = o.portal; c.orb = o.orb; c.pad = o.pad;
+        c.coinIndex = o.coinIndex; c.text = o.text; c.groups = o.groups.clone();
+        c.trig = o.trig;
+        return c;
+    }
+
+    void deleteSel() {
+        if (sel.isEmpty()) return;
+        pushUndo();
+        List<Integer> sorted = new ArrayList<>(sel);
+        java.util.Collections.sort(sorted, java.util.Collections.reverseOrder());
+        for (int i : sorted) if (i >= 0 && i < lv.objects.size()) lv.objects.remove(i);
+        sel.clear();
+    }
+
+    void editObject() {
+        if (sel.isEmpty()) { toast("Сначала выдели объект"); return; }
+        final Level.Obj o = lv.objects.get(sel.get(0));
+        final EditText[] f = new EditText[2];
+
+        LinearLayout box = GdDialog.custom(this, "ПРАВКА ОБЪЕКТА", "ПРИМЕНИТЬ", () -> {
+            pushUndo();
+            List<Integer> groups = new ArrayList<>();
+            for (String part : f[0].getText().toString().split(",")) {
+                try { int v = Integer.parseInt(part.trim()); if (v > 0) groups.add(v); } catch (Exception ignored) { }
+            }
+            int[] arr = new int[groups.size()];
+            for (int i = 0; i < arr.length; i++) arr[i] = groups.get(i);
+            double rot = 0;
+            try { rot = Double.parseDouble(f[1].getText().toString().trim()); } catch (Exception ignored) { }
+            for (int i : sel) {
+                Level.Obj t = lv.objects.get(i);
+                t.groups = arr.clone();
+                t.rotation = rot;
+            }
+            view.invalidate();
+            updateInfo();
+        });
+
+        f[0] = LevelSettingsDialog.field(this, box, "группы (через запятую)", join(o.groups), false);
+        f[1] = LevelSettingsDialog.field(this, box, "поворот, градусы", String.valueOf((int) o.rotation), true);
+
+        if (o.trig != null) {
+            Ui.GdBtn t = new Ui.GdBtn(this).set("ТИП ТРИГГЕРА", Ui.I_ADMIN,
+                    Color.rgb(120, 190, 255), Color.rgb(30, 90, 190));
+            t.setOnClickListener(v -> GdDialog.items(this, "ТРИГГЕР", Level.TRIGS, i -> {
+                pushUndo();
+                for (int k : sel) {
+                    Level.Obj x = lv.objects.get(k);
+                    if (x.trig != null) x.trig.type = i;
+                }
+                view.invalidate();
+            }));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 110);
+            lp.setMargins(0, 14, 0, 0);
+            box.addView(t, lp);
+        }
+    }
+
+    static String join(int[] a) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < a.length; i++) { if (i > 0) b.append(','); b.append(a[i]); }
+        return b.toString();
+    }
+
+    // ---------------------------------------------------- прочее
+
+    void pushUndo() {
+        undo.add(lv.toJson());
+        if (undo.size() > 60) undo.remove(0);
+        redo.clear();
+    }
+
+    void doUndo() {
+        if (undo.size() < 2) return;
+        redo.add(lv.toJson());
+        undo.remove(undo.size() - 1);
+        lv = Level.parse(undo.get(undo.size() - 1));
+        editing = lv;
+        sel.clear();
+        view.invalidate();
         updateInfo();
     }
 
-    Button tool(String t, View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(t);
-        b.setTextSize(12);
-        b.setTextColor(Color.WHITE);
-        b.setBackgroundColor(Color.argb(220, 44, 48, 96));
-        b.setPadding(4, 4, 4, 4);
-        b.setOnClickListener(l);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        lp.setMargins(3, 4, 3, 4);
-        b.setLayoutParams(lp);
-        return b;
-    }
-
-    void setMode(int m) { mode = m; updateInfo(); }
-
-    void updateInfo() {
-        String m = mode == 0 ? "ставить" : mode == 1 ? "удалять" : "двигать вид";
-        info.setText("режим: " + m + "   объект: " + brush.label
-                + "   объектов: " + lv.objects.size()
-                + "   длина: " + (int) (lv.rightEdge() / 30) + " клеток"
-                + "   (два пальца — зум и прокрутка)");
-    }
-
-    void palette() {
-        final List<String> names = new ArrayList<>();
-        for (Palette.Item it : Palette.ITEMS) names.add(it.label);
-        GdDialog.items(this, "ОБЪЕКТ", names.toArray(new String[0]), i -> {
-            brush = Palette.ITEMS.get(i);
-            mode = 0;
-            updateInfo();
-        });
+    void doRedo() {
+        if (redo.isEmpty()) return;
+        undo.add(lv.toJson());
+        lv = Level.parse(redo.remove(redo.size() - 1));
+        editing = lv;
+        sel.clear();
+        view.invalidate();
+        updateInfo();
     }
 
     void save() {
@@ -130,6 +606,16 @@ public class EditorCanvasActivity extends Activity {
         });
     }
 
+    void updateInfo() {
+        if (info == null) return;
+        String m = mode == BUILD ? "ставить" : mode == EDIT ? "правка" : "удалять";
+        info.setText("режим: " + m + "   объект: " + brush.label
+                + "   выделено: " + sel.size()
+                + "   объектов: " + lv.objects.size()
+                + "   длина: " + (int) (lv.rightEdge() / 30) + " клеток"
+                + "   шаг: " + (step / 30) + "   (два пальца — зум и прокрутка)");
+    }
+
     void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
 
     @Override public void onBackPressed() { save(); finish(); }
@@ -139,12 +625,13 @@ public class EditorCanvasActivity extends Activity {
         overridePendingTransition(0, 0);
     }
 
-    // ------------------------------------------------------------ канва
+    // ---------------------------------------------------- канва
 
     class EditorView extends View {
         float camX = 300, camY = 240, zoom = 1;
         float lastX, lastY, startDist;
-        boolean pinching;
+        boolean pinching, movingSel;
+        double dragX, dragY;
 
         EditorView(Context c) { super(c); }
 
@@ -157,98 +644,39 @@ public class EditorCanvasActivity extends Activity {
         @Override protected void onDraw(Canvas c) {
             c.drawColor(Color.rgb(16, 14, 40));
 
-            // земля
             float g0 = sy(0);
-            if (g0 < getHeight())
-                c.drawRect(0, g0, getWidth(), getHeight(), Gd.fill(Color.rgb(24, 20, 56)));
+            if (g0 < getHeight()) c.drawRect(0, g0, getWidth(), getHeight(), Gd.fill(Color.rgb(24, 20, 56)));
             c.drawLine(0, g0, getWidth(), g0, Gd.stroke(Gd.NEON, 3f));
 
-            // сетка
-            float step = 30 * scale();
-            if (step > 5) {
-                Paint p1 = Gd.stroke(Color.argb(40, 255, 255, 255), 1f);
-                Paint p2 = Gd.stroke(Color.argb(90, 255, 255, 255), 1f);
-                float left = wx(0), right = wx(getWidth());
-                for (double x = Math.floor(left / 30) * 30; x < right; x += 30) {
+            float step30 = 30 * scale();
+            if (step30 > 5) {
+                Paint p1 = Gd.stroke(Color.argb(38, 255, 255, 255), 1f);
+                Paint p2 = Gd.stroke(Color.argb(85, 255, 255, 255), 1f);
+                for (double x = Math.floor(wx(0) / 30) * 30; x < wx(getWidth()); x += 30) {
                     float X = sx(x);
                     c.drawLine(X, 0, X, getHeight(), (((int) x) % 240 == 0) ? p2 : p1);
                 }
-                float bot = wy(getHeight()), top = wy(0);
-                for (double y = Math.floor(bot / 30) * 30; y < top; y += 30) {
+                for (double y = Math.floor(wy(getHeight()) / 30) * 30; y < wy(0); y += 30) {
                     float Y = sy(y);
                     c.drawLine(0, Y, getWidth(), Y, (((int) y) % 240 == 0) ? p2 : p1);
                 }
             }
 
-            // объекты
             float visL = wx(0) - 60, visR = wx(getWidth()) + 60;
-            for (Level.Obj o : lv.objects) {
+            for (int i = 0; i < lv.objects.size(); i++) {
+                Level.Obj o = lv.objects.get(i);
                 Catalog.Def d = Catalog.get(o.typeId);
                 if (o.x + d.w < visL || o.x > visR) continue;
-                RectF r = new RectF(sx(o.x), sy(o.y + d.h * o.scaleY),
-                        sx(o.x + d.w * o.scaleX), sy(o.y));
-                drawObj(c, o, d, r);
+                RectF r = new RectF(sx(o.x), sy(o.y + d.h * Math.abs(o.scaleY)),
+                        sx(o.x + d.w * Math.abs(o.scaleX)), sy(o.y));
+                drawPreview(c, o, d, r);
+                if (sel.contains(i)) c.drawRect(r, Gd.stroke(Gd.GOLD, 3f));
             }
 
-            // старт игрока
             float ps = 30 * scale();
-            RectF pr = new RectF(sx(0) - ps / 2, sy(30), sx(0) + ps / 2, sy(0));
+            RectF pr = new RectF(sx(0), sy(30), sx(0) + ps, sy(0));
             c.drawRect(pr, Gd.stroke(Gd.LIME, 2f));
-            Gd.outlined(c, "СТАРТ", pr.centerX(), pr.top - 6, Math.max(10f, ps * 0.3f), Gd.LIME, Paint.Align.CENTER);
-        }
-
-        void drawObj(Canvas c, Level.Obj o, Catalog.Def d, RectF r) {
-            int col;
-            switch (d.kind) {
-                case Catalog.HAZARD: col = Color.rgb(255, 110, 110); break;
-                case Catalog.PORTAL: col = GameView.portalLook(o.portal)[0]; break;
-                case Catalog.ORB: col = GameView.orbColor(o.orb); break;
-                case Catalog.PAD: col = GameView.padColor(o.pad); break;
-                case Catalog.TRIGGER: col = Color.rgb(90, 150, 255); break;
-                case Catalog.COIN: col = Gd.GOLD; break;
-                case Catalog.FINISH: col = Color.WHITE; break;
-                default: col = Color.rgb(210, 215, 240);
-            }
-            switch (d.style) {
-                case Catalog.ST_SPIKE:
-                case Catalog.ST_SPIKE_SMALL:
-                case Catalog.ST_SPIKE_HALF: {
-                    Path p = new Path();
-                    if (o.typeId == 22) { p.moveTo(r.left, r.top); p.lineTo(r.right, r.top); p.lineTo(r.centerX(), r.bottom); }
-                    else { p.moveTo(r.left, r.bottom); p.lineTo(r.right, r.bottom); p.lineTo(r.centerX(), r.top); }
-                    p.close();
-                    c.drawPath(p, Gd.fill(col));
-                    break;
-                }
-                case Catalog.ST_ORB:
-                    c.drawOval(r, Gd.stroke(col, Math.max(2f, r.width() * 0.16f)));
-                    break;
-                case Catalog.ST_PAD:
-                    c.drawRect(r, Gd.fill(col));
-                    break;
-                case Catalog.ST_PORTAL:
-                    c.drawOval(r, Gd.fill(col));
-                    Gd.outlined(c, GameView.portalLabel(o.portal), r.centerX(), r.centerY(),
-                            Math.max(8f, r.width() * 0.4f), Color.WHITE, Paint.Align.CENTER);
-                    break;
-                case Catalog.ST_COIN:
-                    Gd.coin(c, r, true);
-                    break;
-                case Catalog.ST_TRIGGER:
-                    c.drawRect(r, Gd.fill(Color.argb(170, 70, 130, 255)));
-                    Gd.outlined(c, "T", r.centerX(), r.centerY() + r.height() * 0.2f,
-                            Math.max(8f, r.width() * 0.5f), Color.WHITE, Paint.Align.CENTER);
-                    break;
-                case Catalog.ST_TEXT:
-                    Gd.outlined(c, o.text, r.left, r.bottom, Math.max(10f, r.height() * 0.8f), col, Paint.Align.LEFT);
-                    break;
-                case Catalog.ST_FINISH:
-                    c.drawRect(r, Gd.fill(Color.argb(200, 240, 240, 250)));
-                    break;
-                default:
-                    c.drawRect(r, Gd.fill(col));
-                    c.drawRect(r, Gd.stroke(Color.argb(140, 255, 255, 255), 1.5f));
-            }
+            Gd.outlined(c, "СТАРТ", pr.centerX(), pr.top - 8, Math.max(10f, ps * 0.3f), Gd.LIME, Paint.Align.CENTER);
         }
 
         @Override public boolean onTouchEvent(MotionEvent e) {
@@ -256,39 +684,62 @@ public class EditorCanvasActivity extends Activity {
 
             if (e.getPointerCount() >= 2) {
                 float d = dist(e);
-                if (act == MotionEvent.ACTION_POINTER_DOWN) { startDist = d; pinching = true; }
+                float cx = (e.getX(0) + e.getX(1)) / 2, cy = (e.getY(0) + e.getY(1)) / 2;
+                if (act == MotionEvent.ACTION_POINTER_DOWN) { startDist = d; pinching = true; lastX = cx; lastY = cy; }
                 else if (act == MotionEvent.ACTION_MOVE && pinching && startDist > 10) {
                     zoom = Math.max(0.25f, Math.min(3f, zoom * (d / startDist)));
                     startDist = d;
-                    float cx = (e.getX(0) + e.getX(1)) / 2, cy = (e.getY(0) + e.getY(1)) / 2;
                     camX -= (cx - lastX) / scale();
                     camY += (cy - lastY) / scale();
                     lastX = cx; lastY = cy;
                     invalidate();
                 }
-                if (act == MotionEvent.ACTION_POINTER_DOWN) {
-                    lastX = (e.getX(0) + e.getX(1)) / 2;
-                    lastY = (e.getY(0) + e.getY(1)) / 2;
-                }
                 return true;
             }
+
+            float wxp = wx(e.getX()), wyp = wy(e.getY());
 
             switch (act) {
                 case MotionEvent.ACTION_DOWN:
                     pinching = false;
+                    movingSel = false;
                     lastX = e.getX(); lastY = e.getY();
-                    if (mode == 0) place(e.getX(), e.getY());
-                    else if (mode == 1) erase(e.getX(), e.getY());
+                    dragX = wxp; dragY = wyp;
+
+                    if (mode == BUILD) place(wxp, wyp);          // одно касание — один объект
+                    else if (mode == DELETE) erase(wxp, wyp);
+                    else {
+                        int hit = hitTest(wxp, wyp);
+                        if (hit >= 0) {
+                            if (!sel.contains(hit)) { sel.clear(); sel.add(hit); }
+                            movingSel = true;
+                        } else sel.clear();
+                        invalidate();
+                        updateInfo();
+                    }
                     return true;
 
                 case MotionEvent.ACTION_MOVE:
-                    if (mode == 2) {
+                    if (mode == EDIT && movingSel && !sel.isEmpty()) {
+                        double dx = Math.round((wxp - dragX) / 30) * 30.0;
+                        double dy = Math.round((wyp - dragY) / 30) * 30.0;
+                        if (dx != 0 || dy != 0) {
+                            for (int i : sel) { lv.objects.get(i).x += dx; lv.objects.get(i).y += dy; }
+                            dragX += dx; dragY += dy;
+                            invalidate();
+                        }
+                    } else {
+                        // перетаскивание двигает вид — объекты свайпом не ставятся и не стираются
                         camX -= (e.getX() - lastX) / scale();
                         camY += (e.getY() - lastY) / scale();
                         lastX = e.getX(); lastY = e.getY();
                         invalidate();
-                    } else if (mode == 0) place(e.getX(), e.getY());
-                    else if (mode == 1) erase(e.getX(), e.getY());
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_UP:
+                    if (movingSel) pushUndo();
+                    movingSel = false;
                     return true;
             }
             return true;
@@ -299,105 +750,124 @@ public class EditorCanvasActivity extends Activity {
             return (float) Math.sqrt(dx * dx + dy * dy);
         }
 
+        int hitTest(float wxp, float wyp) {
+            for (int i = lv.objects.size() - 1; i >= 0; i--) {
+                Level.Obj o = lv.objects.get(i);
+                Catalog.Def d = Catalog.get(o.typeId);
+                if (wxp >= o.x && wxp <= o.x + d.w * Math.abs(o.scaleX)
+                        && wyp >= o.y && wyp <= o.y + d.h * Math.abs(o.scaleY)) return i;
+            }
+            return -1;
+        }
+
         void place(float px, float py) {
-            double gx = Math.floor(wx(px) / 30) * 30, gy = Math.floor(wy(py) / 30) * 30;
+            double gx = Math.floor(px / 30) * 30, gy = Math.floor(py / 30) * 30;
             for (Level.Obj o : lv.objects)
                 if (Math.abs(o.x - gx) < 1 && Math.abs(o.y - gy) < 1 && o.typeId == brush.typeId) return;
-
-            Level.Obj o = new Level.Obj();
-            o.typeId = brush.typeId;
+            pushUndo();
+            Level.Obj o = brush.make();
             o.x = gx; o.y = gy;
-            o.portal = brush.portal;
-            o.orb = brush.orb;
-            o.pad = brush.pad;
-            if (brush.typeId == 75) o.text = "Текст";
-            if (brush.typeId == 100) {
-                o.trig = new Level.Trig();
-                o.trig.type = brush.trigType;
-            }
             lv.objects.add(o);
+            Music.sfx("click");
             invalidate();
             updateInfo();
         }
 
         void erase(float px, float py) {
-            float wxp = wx(px), wyp = wy(py);
-            for (int i = lv.objects.size() - 1; i >= 0; i--) {
-                Level.Obj o = lv.objects.get(i);
-                Catalog.Def d = Catalog.get(o.typeId);
-                if (wxp >= o.x && wxp <= o.x + d.w * o.scaleX && wyp >= o.y && wyp <= o.y + d.h * o.scaleY) {
-                    lv.objects.remove(i);
-                    invalidate();
-                    updateInfo();
-                    return;
-                }
+            int hit = hitTest(px, py);
+            if (hit >= 0) {
+                pushUndo();
+                lv.objects.remove(hit);
+                sel.clear();
+                invalidate();
+                updateInfo();
             }
         }
     }
 
-    /** Палитра объектов редактора. */
+    // ---------------------------------------------------- палитра объектов
+
     static class Palette {
         static class Item {
-            int typeId, portal, orb, pad, trigType;
-            String label;
-            Item(int t, String l) { typeId = t; label = l; }
+            int typeId, portal, orb, pad, trigType = -1;
+            String label, category;
+
+            Item(int t, String l, String cat) { typeId = t; label = l; category = cat; }
             Item portal(int p) { portal = p; return this; }
             Item orb(int o) { orb = o; return this; }
             Item pad(int p) { pad = p; return this; }
             Item trig(int t) { trigType = t; return this; }
+
+            Level.Obj make() {
+                Level.Obj o = new Level.Obj();
+                o.typeId = typeId; o.portal = portal; o.orb = orb; o.pad = pad;
+                if (typeId == 75) o.text = "Текст";
+                if (trigType >= 0) { o.trig = new Level.Trig(); o.trig.type = trigType; }
+                return o;
+            }
         }
 
         static final List<Item> ITEMS = new ArrayList<>();
 
-        static {
-            ITEMS.add(new Item(1, "Блок"));
-            ITEMS.add(new Item(8, "Кирпич"));
-            ITEMS.add(new Item(9, "Стекло"));
-            ITEMS.add(new Item(2, "Плита (низ)"));
-            ITEMS.add(new Item(3, "Плита (верх)"));
-            ITEMS.add(new Item(7, "Платформа"));
-            ITEMS.add(new Item(5, "Склон вверх"));
-            ITEMS.add(new Item(6, "Склон вниз"));
+        static List<Item> byCategory(String cat) {
+            List<Item> r = new ArrayList<>();
+            for (Item i : ITEMS) if (i.category.equals(cat)) r.add(i);
+            return r;
+        }
 
-            ITEMS.add(new Item(20, "Шип"));
-            ITEMS.add(new Item(21, "Малый шип"));
-            ITEMS.add(new Item(22, "Шип с потолка"));
-            ITEMS.add(new Item(27, "Половина шипа"));
-            ITEMS.add(new Item(23, "Пила"));
-            ITEMS.add(new Item(24, "Большая пила"));
-            ITEMS.add(new Item(25, "Три шипа"));
+        static {
+            ITEMS.add(new Item(1, "блок", "Блоки"));
+            ITEMS.add(new Item(8, "кирпич", "Блоки"));
+            ITEMS.add(new Item(9, "стекло", "Блоки"));
+            ITEMS.add(new Item(2, "плита н", "Блоки"));
+            ITEMS.add(new Item(3, "плита в", "Блоки"));
+            ITEMS.add(new Item(4, "тонкая", "Блоки"));
+            ITEMS.add(new Item(7, "платформа", "Блоки"));
+            ITEMS.add(new Item(5, "склон ↗", "Блоки"));
+            ITEMS.add(new Item(6, "склон ↘", "Блоки"));
+
+            ITEMS.add(new Item(20, "шип", "Шипы"));
+            ITEMS.add(new Item(21, "малый", "Шипы"));
+            ITEMS.add(new Item(22, "потолок", "Шипы"));
+            ITEMS.add(new Item(27, "половина", "Шипы"));
+            ITEMS.add(new Item(23, "пила", "Шипы"));
+            ITEMS.add(new Item(24, "пила XL", "Шипы"));
+            ITEMS.add(new Item(25, "три шипа", "Шипы"));
+            ITEMS.add(new Item(26, "опасный", "Шипы"));
 
             String[] orbNames = {"жёлтый", "розовый", "синий", "зелёный", "красный", "чёрный",
-                    "рывок", "грави-рывок", "паук", "переключатель"};
+                    "рывок", "гр-рывок", "паук", "перекл."};
             for (int i = 0; i < orbNames.length; i++)
-                ITEMS.add(new Item(40, "Орб: " + orbNames[i]).orb(i));
-
-            String[] padNames = {"жёлтый", "розовый", "синий", "красный", "паук"};
+                ITEMS.add(new Item(40, orbNames[i], "Шары и пады").orb(i));
+            String[] padNames = {"пад жёлт", "пад роз", "пад син", "пад красн", "пад паук"};
             for (int i = 0; i < padNames.length; i++)
-                ITEMS.add(new Item(50, "Пад: " + padNames[i]).pad(i));
+                ITEMS.add(new Item(50, padNames[i], "Шары и пады").pad(i));
 
             String[] portalNames = {"", "куб", "корабль", "шар", "НЛО", "волна", "робот", "паук", "червяк",
-                    "гравитация ↑", "гравитация ↓", "гравитация ⇅", "мини", "обычный",
-                    "дуал", "одиночный", "зеркало", "обычный вид",
+                    "грав ↑", "грав ↓", "грав ⇅", "мини", "обычный", "дуал", "один", "зеркало", "норм",
                     "0.5x", "1x", "2x", "3x", "4x", "5x", "6x", "телепорт"};
             for (int i = 1; i < portalNames.length; i++)
-                ITEMS.add(new Item(60, "Портал: " + portalNames[i]).portal(i));
+                ITEMS.add(new Item(60, portalNames[i], "Порталы").portal(i));
 
-            ITEMS.add(new Item(80, "Монета"));
-            ITEMS.add(new Item(82, "Пикап"));
-            ITEMS.add(new Item(70, "Декор: квадрат"));
-            ITEMS.add(new Item(71, "Декор: круг"));
-            ITEMS.add(new Item(72, "Декор: треугольник"));
-            ITEMS.add(new Item(75, "Текст"));
-            ITEMS.add(new Item(92, "Чекпоинт"));
-            ITEMS.add(new Item(90, "ФИНИШ"));
+            ITEMS.add(new Item(70, "квадрат", "Декор"));
+            ITEMS.add(new Item(71, "круг", "Декор"));
+            ITEMS.add(new Item(72, "треуг.", "Декор"));
+            ITEMS.add(new Item(73, "свечение", "Декор"));
+            ITEMS.add(new Item(75, "текст", "Декор"));
 
-            int[] trigs = {Level.T_MOVE, Level.T_TOGGLE, Level.T_ALPHA, Level.T_PULSE, Level.T_COLOR,
-                    Level.T_BG, Level.T_SHAKE, Level.T_ZOOM, Level.T_SONG, Level.T_SPEED, Level.T_END};
-            String[] trigNames = {"Move", "Toggle", "Alpha", "Pulse", "Color", "BG", "Shake",
-                    "Zoom", "Song", "Speed", "End"};
-            for (int i = 0; i < trigs.length; i++)
-                ITEMS.add(new Item(100, "Триггер: " + trigNames[i]).trig(trigs[i]));
+            ITEMS.add(new Item(80, "монета", "Сбор"));
+            ITEMS.add(new Item(82, "пикап", "Сбор"));
+
+            ITEMS.add(new Item(90, "ФИНИШ", "Служебное"));
+            ITEMS.add(new Item(92, "чекпоинт", "Служебное"));
+
+            int[] trigs = {Level.T_MOVE, Level.T_ROTATE, Level.T_SCALE, Level.T_ALPHA, Level.T_TOGGLE,
+                    Level.T_SPAWN, Level.T_STOP, Level.T_PULSE, Level.T_COLOR, Level.T_BG, Level.T_GROUND,
+                    Level.T_SHAKE, Level.T_FOLLOW, Level.T_COUNT, Level.T_PICKUP, Level.T_RANDOM,
+                    Level.T_TIMER, Level.T_CAMERA, Level.T_ZOOM, Level.T_SONG, Level.T_GRAVITY,
+                    Level.T_TELEPORT, Level.T_SPEED, Level.T_END};
+            for (int t : trigs)
+                ITEMS.add(new Item(100, shortTrig(t), "Триггеры").trig(t));
         }
     }
 }

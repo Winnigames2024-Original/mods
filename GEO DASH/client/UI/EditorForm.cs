@@ -1,301 +1,552 @@
+using GEO_DASH.Audio;
 using GEO_DASH.Core;
 using GEO_DASH.Net;
 using GEO_DASH.Render;
 
 namespace GEO_DASH.UI
 {
+    /// <summary>
+    /// Редактор уровней по образцу игры: режимы BUILD / EDIT / DELETE,
+    /// палитра объектов по вкладкам внизу, панель правки со стрелками.
+    /// Объекты ставятся по одному клику — постановки свайпом нет.
+    /// </summary>
     public class EditorForm : Form
     {
+        enum Mode { Build, Edit, Delete }
+
         LevelData _lv;
         readonly GameWorld _preview = new();
         readonly ViewTransform _v = new();
-        Panel _canvas;
-        ListBox _objList;
-        ComboBox _catBox;
-        Panel _props;
+
+        GdPanel _canvas;
+        Panel _bottom, _modeBar, _content;
         Label _status;
 
         double _camX = 300, _camY = 240, _zoom = 1;
         int _grid = 30;
         bool _snap = true;
-        int _selectedType = 1;
+        Mode _mode = Mode.Build;
+
         readonly List<int> _sel = new();
-        PointF _dragStart, _lastMouse;
-        bool _panning, _dragging, _boxSelect;
-        RectangleF _selBox;
+        List<LevelObject> _clipboard = new();
         readonly List<string> _undo = new();
         readonly List<string> _redo = new();
 
-        // текущие свойства для новых объектов
-        PortalKind _portalKind = PortalKind.ModeShip;
-        OrbKind _orbKind = OrbKind.Yellow;
-        PadKind _padKind = PadKind.Yellow;
-        TriggerData _trigTemplate = new();
+        LevelObject _brush = new() { TypeId = 1 };
+        string _category = "Блоки";
+        double _step = 30;            // шаг стрелок: 15 / 30 / 150
+
+        PointF _dragStart, _lastMouse;
+        bool _panning, _movingSel, _boxSelect;
+        RectangleF _selBox;
 
         public EditorForm(LevelData lv)
         {
             _lv = lv;
-            Theme.Apply(this, "Редактор — " + lv.Settings.Name);
-            ClientSize = new Size(1420, 820);
+            Text = AppConfig.AppName + " — Редактор — " + lv.Settings.Name;
+            BackColor = Gd.Deep;
+            ForeColor = Gd.Paper;
+            Font = Gd.Reg(9.5f);
+            ClientSize = new Size(1440, 860);
             WindowState = FormWindowState.Maximized;
+            KeyPreview = true;
+
             BuildUi();
             _preview.Init(_lv);
             PushUndo();
+            FormClosing += (s, e) => Save();
         }
+
+        // ------------------------------------------------------------ интерфейс
 
         void BuildUi()
         {
-            // ---------- верхняя панель ----------
-            var top = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Theme.Panel };
+            _status = new Label
+            {
+                Dock = DockStyle.Bottom, Height = 22, ForeColor = Theme.Dim,
+                BackColor = Color.FromArgb(14, 12, 34), TextAlign = ContentAlignment.MiddleLeft
+            };
+            Controls.Add(_status);
+
+            _bottom = new Panel { Dock = DockStyle.Bottom, Height = 236, BackColor = Color.FromArgb(18, 16, 44) };
+            Controls.Add(_bottom);
+
+            var top = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.FromArgb(18, 16, 44) };
             Controls.Add(top);
 
+            _canvas = new GdPanel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(16, 14, 40) };
+            Controls.Add(_canvas);
+            _canvas.BringToFront();
+
+            // ---------- верхняя панель ----------
             int x = 8;
-            Button T(string t, int w, EventHandler h, Color? c = null)
+            GdButton T(string text, GdIcon ic, int w, Color c1, Color c2, EventHandler h)
             {
-                var b = Theme.Btn(t, x, 5, w, 34, c);
+                var b = new GdButton
+                {
+                    Text = text, Icon = ic, Left = x, Top = 4, Width = w, Height = 44,
+                    Color1 = c1, Color2 = c2, FontSize = 9.5f
+                };
                 b.Click += h;
                 top.Controls.Add(b);
                 x += w + 6;
                 return b;
             }
 
-            T("Сохранить", 100, (s, e) => Save());
-            T("Тест ▶", 80, (s, e) => Playtest(false), Theme.Good);
-            T("Тренировка", 95, (s, e) => Playtest(true));
-            T("Настройки уровня", 140, (s, e) => OpenSettings(), Theme.Accent);
-            T("Музыка по ID", 110, (s, e) => OpenMusic());
-            T("Загрузить на сервер", 150, (s, e) => Upload(), Theme.Accent2);
-            T("Копия", 70, (s, e) => { var c = LocalStore.CopyLevel(_lv); GdDialog.Info(this, "GEO DASH", "Создана копия: " + c.Settings.Name); });
-            T("Отмена", 70, (s, e) => Undo());
-            T("Вернуть", 70, (s, e) => Redo());
+            T("ВЫХОД", GdIcon.Back, 110, Color.FromArgb(160, 160, 190), Color.FromArgb(70, 70, 110),
+                (s, e) => { Save(); Close(); });
+            T("СОХР.", GdIcon.Save, 100, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100),
+                (s, e) => { Save(); Status("Сохранено"); });
+            T("ОТМЕНА", GdIcon.Back, 110, Color.FromArgb(170, 175, 210), Color.FromArgb(70, 76, 125), (s, e) => Undo());
+            T("ВЕРНУТЬ", GdIcon.Refresh, 112, Color.FromArgb(170, 175, 210), Color.FromArgb(70, 76, 125), (s, e) => Redo());
+            T("ТЕСТ", GdIcon.Play, 100, Color.FromArgb(120, 220, 255), Color.FromArgb(20, 110, 180), (s, e) => Playtest(false));
+            T("ТРЕНИР.", GdIcon.Check, 110, Color.FromArgb(150, 185, 255), Color.FromArgb(50, 80, 170), (s, e) => Playtest(true));
+            T("НАСТРОЙКИ", GdIcon.Settings, 130, Color.FromArgb(200, 170, 255), Color.FromArgb(100, 60, 180), (s, e) => OpenSettings());
+            T("МУЗЫКА", GdIcon.Music, 115, Color.FromArgb(255, 180, 230), Color.FromArgb(150, 60, 130), (s, e) => OpenMusic());
+            T("НА СЕРВЕР", GdIcon.Upload, 135, Color.FromArgb(255, 210, 90), Color.FromArgb(170, 120, 10), async (s, e) => await Upload());
 
-            var gridLbl = Theme.Lbl("Сетка:", x, 14, 45); top.Controls.Add(gridLbl); x += 48;
-            var gridCb = Theme.Cb(x, 8, 70);
-            gridCb.Items.AddRange(new object[] { "30", "15", "10", "60" });
-            gridCb.SelectedIndex = 0;
-            gridCb.SelectedIndexChanged += (s, e) => { _grid = int.Parse(gridCb.Text); };
-            top.Controls.Add(gridCb); x += 76;
+            x += 14;
+            T("", GdIcon.Plus, 48, Color.FromArgb(140, 150, 190), Color.FromArgb(60, 66, 105),
+                (s, e) => { _zoom = Math.Min(4, _zoom * 1.25); _canvas.Invalidate(); });
+            T("", GdIcon.Cross, 48, Color.FromArgb(140, 150, 190), Color.FromArgb(60, 66, 105),
+                (s, e) => { _zoom = Math.Max(0.2, _zoom / 1.25); _canvas.Invalidate(); });
 
-            var snapChk = Theme.Chk("Привязка", x, 12, true, 90);
-            snapChk.CheckedChanged += (s, e) => _snap = snapChk.Checked;
-            top.Controls.Add(snapChk); x += 96;
-
-            var hbChk = Theme.Chk("Хитбоксы", x, 12, false, 90);
-            hbChk.CheckedChanged += (s, e) => { Renderer.ShowHitboxes = hbChk.Checked; _canvas.Invalidate(); };
-            top.Controls.Add(hbChk);
-
-            // ---------- левая палитра ----------
-            var left = new Panel { Dock = DockStyle.Left, Width = 210, BackColor = Theme.Bg2 };
-            Controls.Add(left);
-            left.Controls.Add(Theme.Lbl("Объекты", 8, 8, 180, Theme.H2));
-            _catBox = Theme.Cb(8, 34, 190);
-            foreach (var c in ObjectCatalog.Categories()) _catBox.Items.Add(c);
-            _catBox.SelectedIndexChanged += (s, e) => FillObjects();
-            left.Controls.Add(_catBox);
-
-            _objList = new ListBox
+            var snap = new CheckBox
             {
-                Left = 8, Top = 64, Width = 190, Height = 360,
-                BackColor = Theme.Bg, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle
+                Text = "привязка", Left = x + 6, Top = 16, Width = 90, Checked = true,
+                ForeColor = Gd.Paper, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat
             };
-            _objList.SelectedIndexChanged += (s, e) =>
+            snap.CheckedChanged += (s, e) => _snap = snap.Checked;
+            top.Controls.Add(snap);
+
+            var hb = new CheckBox
             {
-                if (_objList.SelectedItem is ObjectDef d) { _selectedType = d.Id; UpdateProps(); }
+                Text = "хитбоксы", Left = x + 102, Top = 16, Width = 92,
+                ForeColor = Gd.Paper, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat
             };
-            left.Controls.Add(_objList);
+            hb.CheckedChanged += (s, e) => { Renderer.ShowHitboxes = hb.Checked; _canvas.Invalidate(); };
+            top.Controls.Add(hb);
 
-            var hint = Theme.Lbl(
-                "ЛКМ — поставить\nПКМ — удалить\nSHIFT+ЛКМ — выделить\nсредняя/пробел — двигать вид\nколесо — зум\nDel — удалить выделенное\nCtrl+C/V — копировать\nCtrl+D — дублировать\nCtrl+Z/Y — отмена",
-                8, 436, 190, Theme.Body, Theme.Dim);
-            hint.Height = 180;
-            left.Controls.Add(hint);
+            // ---------- режимы ----------
+            _modeBar = new Panel { Dock = DockStyle.Left, Width = 132, BackColor = Color.FromArgb(22, 20, 52) };
+            _bottom.Controls.Add(_modeBar);
 
-            // ---------- правая панель свойств ----------
-            _props = new Panel { Dock = DockStyle.Right, Width = 280, BackColor = Theme.Bg2, AutoScroll = true };
-            Controls.Add(_props);
+            void M(string text, GdIcon ic, int top2, Mode m, Color c1, Color c2)
+            {
+                var b = new GdButton
+                {
+                    Text = text, Icon = ic, Left = 8, Top = top2, Width = 116, Height = 68,
+                    Color1 = c1, Color2 = c2, FontSize = 10f
+                };
+                b.Click += (s, e) => SetMode(m);
+                _modeBar.Controls.Add(b);
+            }
+            M("BUILD", GdIcon.Plus, 8, Mode.Build, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100));
+            M("EDIT", GdIcon.Edit, 82, Mode.Edit, Color.FromArgb(255, 190, 80), Color.FromArgb(170, 100, 10));
+            M("DELETE", GdIcon.Trash, 156, Mode.Delete, Color.FromArgb(240, 120, 120), Color.FromArgb(150, 40, 50));
+
+            _content = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(18, 16, 44) };
+            _bottom.Controls.Add(_content);
+            _content.BringToFront();
 
             // ---------- канва ----------
-            _canvas = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
-            typeof(Panel).GetProperty("DoubleBuffered",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                ?.SetValue(_canvas, true);
-            Controls.Add(_canvas);
-            _canvas.BringToFront();
-
             _canvas.Paint += CanvasPaint;
             _canvas.MouseDown += CanvasDown;
             _canvas.MouseMove += CanvasMove;
             _canvas.MouseUp += CanvasUp;
             _canvas.MouseWheel += (s, e) =>
             {
-                double f = e.Delta > 0 ? 1.12 : 1 / 1.12;
-                _zoom = Math.Clamp(_zoom * f, 0.2, 4);
+                _zoom = Math.Clamp(_zoom * (e.Delta > 0 ? 1.12 : 1 / 1.12), 0.2, 4);
                 _canvas.Invalidate();
             };
+            _canvas.MouseEnter += (s, e) => _canvas.Focus();
 
-            _status = new Label { Dock = DockStyle.Bottom, Height = 24, ForeColor = Theme.Dim, BackColor = Theme.Panel, TextAlign = ContentAlignment.MiddleLeft };
-            Controls.Add(_status);
-
-            KeyDown += EditorKeys;
-            _catBox.SelectedIndex = 0;
-            UpdateProps();
+            KeyDown += Keys_;
+            SetMode(Mode.Build);
         }
 
-        void FillObjects()
+        void SetMode(Mode m)
         {
-            _objList.Items.Clear();
-            string cat = _catBox.Text;
-            foreach (var d in ObjectCatalog.All.Values)
-                if (d.Category == cat) _objList.Items.Add(d);
-            _objList.DisplayMember = "Name";
-            if (_objList.Items.Count > 0) _objList.SelectedIndex = 0;
+            _mode = m;
+            Sfx.Play("click");
+            _content.Controls.Clear();
+            if (m == Mode.Build) BuildPalette();
+            else if (m == Mode.Edit) BuildEditPanel();
+            else BuildDeletePanel();
+            _canvas.Invalidate();
+            UpdateStatus();
         }
 
-        // ------------------------------------------------------------ свойства
+        // ---------------------------------------------------- палитра (BUILD)
 
-        void UpdateProps()
+        FlowLayoutPanel _palette;
+
+        void BuildPalette()
         {
-            _props.Controls.Clear();
-            int y = 8;
-            void Add(Control c) { _props.Controls.Add(c); y = c.Bottom + 6; }
+            var tabs = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top, Height = 42, BackColor = Color.FromArgb(24, 22, 56),
+                WrapContents = false, AutoScroll = false, Padding = new Padding(6, 4, 6, 0)
+            };
+            _content.Controls.Add(tabs);
 
-            Add(Theme.Lbl("Свойства", 8, y, 240, Theme.H2));
+            _palette = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill, BackColor = Color.FromArgb(18, 16, 44),
+                AutoScroll = true, Padding = new Padding(8, 6, 8, 6)
+            };
+            _content.Controls.Add(_palette);
+            _palette.BringToFront();
 
-            var def = ObjectCatalog.Get(_selectedType);
-            Add(Theme.Lbl("Объект: " + def.Name, 8, y, 250, Theme.Body, Theme.Accent));
+            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное" })
+            {
+                string c = cat;
+                var b = new GdButton
+                {
+                    Text = cat, Width = 118, Height = 34, FontSize = 8.5f,
+                    Color1 = cat == _category ? Color.FromArgb(120, 220, 255) : Color.FromArgb(70, 76, 125),
+                    Color2 = cat == _category ? Color.FromArgb(20, 110, 180) : Color.FromArgb(34, 38, 70),
+                    Margin = new Padding(0, 0, 6, 0)
+                };
+                b.Click += (s, e) => { _category = c; SetMode(Mode.Build); };
+                tabs.Controls.Add(b);
+            }
 
-            if (def.Kind == ObjKind.Portal)
+            ShowCategory(_category);
+        }
+
+        void ShowCategory(string cat)
+        {
+            if (_palette == null) return;
+            _palette.Controls.Clear();
+
+            void AddItem(LevelObject model, string caption)
             {
-                Add(Theme.Lbl("Тип портала", 8, y, 240));
-                var cb = Theme.Cb(8, y, 250);
-                foreach (PortalKind k in Enum.GetValues<PortalKind>())
-                    if (k != PortalKind.None) cb.Items.Add(k);
-                cb.SelectedItem = _portalKind;
-                cb.SelectedIndexChanged += (s, e) => { _portalKind = (PortalKind)cb.SelectedItem; ApplyToSelection(o => o.Portal = _portalKind); };
-                Add(cb);
-            }
-            if (def.Kind == ObjKind.Orb)
-            {
-                Add(Theme.Lbl("Тип шара", 8, y, 240));
-                var cb = Theme.Cb(8, y, 250);
-                foreach (OrbKind k in Enum.GetValues<OrbKind>()) cb.Items.Add(k);
-                cb.SelectedItem = _orbKind;
-                cb.SelectedIndexChanged += (s, e) => { _orbKind = (OrbKind)cb.SelectedItem; ApplyToSelection(o => o.Orb = _orbKind); };
-                Add(cb);
-            }
-            if (def.Kind == ObjKind.Pad)
-            {
-                Add(Theme.Lbl("Тип пада", 8, y, 240));
-                var cb = Theme.Cb(8, y, 250);
-                foreach (PadKind k in Enum.GetValues<PadKind>()) cb.Items.Add(k);
-                cb.SelectedItem = _padKind;
-                cb.SelectedIndexChanged += (s, e) => { _padKind = (PadKind)cb.SelectedItem; ApplyToSelection(o => o.Pad = _padKind); };
-                Add(cb);
-            }
-            if (def.Kind == ObjKind.Trigger)
-            {
-                var b = Theme.Btn("Настроить триггер…", 8, y, 250, 34, Theme.Accent);
+                var b = new ObjButton
+                {
+                    Model = model, Caption = caption, Size = new Size(64, 68),
+                    Margin = new Padding(4), Selected = SameBrush(model)
+                };
                 b.Click += (s, e) =>
                 {
-                    using var f = new TriggerEditForm(_trigTemplate);
-                    if (f.ShowDialog(this) == DialogResult.OK)
+                    _brush = model.Clone();
+                    foreach (var c in _palette.Controls) if (c is ObjButton ob) ob.Selected = ob == b;
+                    _palette.Invalidate(true);
+                    UpdateStatus();
+                };
+                _palette.Controls.Add(b);
+            }
+
+            switch (cat)
+            {
+                case "Порталы":
+                    foreach (PortalKind k in Enum.GetValues<PortalKind>())
                     {
-                        _trigTemplate = f.Data;
-                        ApplyToSelection(o => o.Trigger = _trigTemplate.Clone());
+                        if (k == PortalKind.None) continue;
+                        AddItem(new LevelObject { TypeId = 60, Portal = k }, PortalName(k));
                     }
-                };
-                Add(b);
-                Add(Theme.Lbl("Текущий: " + TriggerEngine.Label(_trigTemplate.Type), 8, y, 250, Theme.Body, Theme.Dim));
-            }
+                    break;
 
-            Add(Theme.Lbl("— Выделение (" + _sel.Count + ") —", 8, y + 6, 250, Theme.H2));
+                case "Шары и пады":
+                    foreach (OrbKind k in Enum.GetValues<OrbKind>())
+                        AddItem(new LevelObject { TypeId = 40, Orb = k }, OrbName(k));
+                    foreach (PadKind k in Enum.GetValues<PadKind>())
+                        AddItem(new LevelObject { TypeId = 50, Pad = k }, "пад " + PadName(k));
+                    break;
 
-            if (_sel.Count > 0)
-            {
-                var first = _lv.Objects[_sel[0]];
+                case "Триггеры":
+                    foreach (TriggerType t in Enum.GetValues<TriggerType>())
+                        AddItem(new LevelObject { TypeId = 100, Trigger = new TriggerData { Type = t } },
+                            ObjButton.ShortTrigger(t));
+                    break;
 
-                Add(Theme.Lbl("Группы (через запятую)", 8, y, 250));
-                var tbG = Theme.Tb(8, y, 250, string.Join(",", first.Groups));
-                tbG.TextChanged += (s, e) =>
-                {
-                    var gs = tbG.Text.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                     .Select(t => int.TryParse(t.Trim(), out var g) ? g : 0)
-                                     .Where(g => g > 0).Distinct().ToList();
-                    ApplyToSelection(o => o.Groups = new List<int>(gs));
-                };
-                Add(tbG);
-
-                Add(Theme.Lbl("Поворот", 8, y, 120));
-                var nRot = Theme.Num(8, y, -360, 360, first.Rotation, 0, 110);
-                nRot.ValueChanged += (s, e) => ApplyToSelection(o => o.Rotation = (double)nRot.Value);
-                Add(nRot);
-
-                Add(Theme.Lbl("Масштаб X / Y", 8, y, 150));
-                var nSx = Theme.Num(8, y, 0.1, 10, first.ScaleX, 1, 110);
-                var nSy = Theme.Num(130, y, 0.1, 10, first.ScaleY, 1, 110);
-                nSx.ValueChanged += (s, e) => ApplyToSelection(o => o.ScaleX = (double)nSx.Value);
-                nSy.ValueChanged += (s, e) => ApplyToSelection(o => o.ScaleY = (double)nSy.Value);
-                _props.Controls.Add(nSy);
-                Add(nSx);
-
-                Add(Theme.Lbl("Канал цвета / деталей", 8, y, 200));
-                var nC1 = Theme.Num(8, y, 1, 999, first.BaseColorChannel, 0, 110);
-                var nC2 = Theme.Num(130, y, 1, 999, first.DetailColorChannel, 0, 110);
-                nC1.ValueChanged += (s, e) => ApplyToSelection(o => o.BaseColorChannel = (int)nC1.Value);
-                nC2.ValueChanged += (s, e) => ApplyToSelection(o => o.DetailColorChannel = (int)nC2.Value);
-                _props.Controls.Add(nC2);
-                Add(nC1);
-
-                Add(Theme.Lbl("Прозрачность", 8, y, 150));
-                var nA = Theme.Num(8, y, 0, 1, first.Opacity, 2, 110);
-                nA.ValueChanged += (s, e) => ApplyToSelection(o => o.Opacity = (double)nA.Value);
-                Add(nA);
-
-                Add(Theme.Lbl("Z-порядок", 8, y, 150));
-                var nZ = Theme.Num(8, y, -20, 20, first.ZOrder, 0, 110);
-                nZ.ValueChanged += (s, e) => ApplyToSelection(o => o.ZOrder = (int)nZ.Value);
-                Add(nZ);
-
-                if (ObjectCatalog.Get(first.TypeId).Kind == ObjKind.Text)
-                {
-                    Add(Theme.Lbl("Текст", 8, y, 250));
-                    var tbT = Theme.Tb(8, y, 250, first.Text);
-                    tbT.TextChanged += (s, e) => ApplyToSelection(o => o.Text = tbT.Text);
-                    Add(tbT);
-                }
-
-                if (first.Trigger != null)
-                {
-                    var b = Theme.Btn("Править триггер выделенного…", 8, y, 250, 34, Theme.Accent);
-                    b.Click += (s, e) =>
-                    {
-                        using var f = new TriggerEditForm(first.Trigger);
-                        if (f.ShowDialog(this) == DialogResult.OK)
-                            ApplyToSelection(o => { if (o.Trigger != null) o.Trigger = f.Data.Clone(); });
-                    };
-                    Add(b);
-                }
-
-                var bd = Theme.Btn("Удалить выделенное", 8, y, 250, 32, Theme.Bad);
-                bd.Click += (s, e) => DeleteSelection();
-                Add(bd);
-            }
-            else
-            {
-                Add(Theme.Lbl("Ничего не выделено.\nSHIFT+ЛКМ — выделить объект\nSHIFT+рамка — выделить область",
-                    8, y, 250, Theme.Body, Theme.Dim));
+                default:
+                    foreach (var d in ObjectCatalog.All.Values)
+                        if (d.Category == cat && d.Kind is not (ObjKind.Portal or ObjKind.Orb or ObjKind.Pad or ObjKind.Trigger))
+                            AddItem(new LevelObject { TypeId = d.Id }, d.Name);
+                    break;
             }
         }
 
-        void ApplyToSelection(Action<LevelObject> f)
+        bool SameBrush(LevelObject m) =>
+            m.TypeId == _brush.TypeId && m.Portal == _brush.Portal && m.Orb == _brush.Orb && m.Pad == _brush.Pad
+            && (m.Trigger?.Type ?? TriggerType.Move) == (_brush.Trigger?.Type ?? TriggerType.Move);
+
+        static string PortalName(PortalKind k) => k switch
+        {
+            PortalKind.ModeCube => "куб",
+            PortalKind.ModeShip => "корабль",
+            PortalKind.ModeBall => "шар",
+            PortalKind.ModeUfo => "НЛО",
+            PortalKind.ModeWave => "волна",
+            PortalKind.ModeRobot => "робот",
+            PortalKind.ModeSpider => "паук",
+            PortalKind.ModeWorm => "червяк",
+            PortalKind.GravityUp => "грав ↑",
+            PortalKind.GravityDown => "грав ↓",
+            PortalKind.GravityToggle => "грав ⇅",
+            PortalKind.Mini => "мини",
+            PortalKind.Big => "обычный",
+            PortalKind.Dual => "дуал",
+            PortalKind.Single => "один",
+            PortalKind.Mirror => "зеркало",
+            PortalKind.Unmirror => "норм",
+            PortalKind.SpeedSlow => "0.5x",
+            PortalKind.SpeedNormal => "1x",
+            PortalKind.SpeedFast => "2x",
+            PortalKind.SpeedFaster => "3x",
+            PortalKind.SpeedFastest => "4x",
+            PortalKind.SpeedHyper => "5x",
+            PortalKind.SpeedUltra => "6x",
+            PortalKind.Teleport => "телепорт",
+            _ => k.ToString()
+        };
+
+        static string OrbName(OrbKind k) => k switch
+        {
+            OrbKind.Yellow => "жёлтый",
+            OrbKind.Pink => "розовый",
+            OrbKind.Blue => "синий",
+            OrbKind.Green => "зелёный",
+            OrbKind.Red => "красный",
+            OrbKind.Black => "чёрный",
+            OrbKind.Dash => "рывок",
+            OrbKind.GravityDash => "гр-рывок",
+            OrbKind.Spider => "паук",
+            _ => "перекл."
+        };
+
+        static string PadName(PadKind k) => k switch
+        {
+            PadKind.Yellow => "жёлт",
+            PadKind.Pink => "роз",
+            PadKind.Blue => "син",
+            PadKind.Red => "красн",
+            _ => "паук"
+        };
+
+        // ---------------------------------------------------- панель правки (EDIT)
+
+        void BuildEditPanel()
+        {
+            var p = _content;
+
+            void B(string text, GdIcon ic, int x, int y, int w, int h, Color c1, Color c2, Action act)
+            {
+                var b = new GdButton
+                {
+                    Text = text, Icon = ic, Left = x, Top = y, Width = w, Height = h,
+                    Color1 = c1, Color2 = c2, FontSize = 9f
+                };
+                b.Click += (s, e) => { act(); _canvas.Invalidate(); UpdateStatus(); };
+                p.Controls.Add(b);
+            }
+
+            var gray1 = Color.FromArgb(150, 158, 200);
+            var gray2 = Color.FromArgb(60, 66, 110);
+
+            // стрелки
+            B("", GdIcon.Back, 70, 70, 56, 56, gray1, gray2, () => MoveSel(-_step, 0));
+            B("", GdIcon.Play, 198, 70, 56, 56, gray1, gray2, () => MoveSel(_step, 0));
+            B("", GdIcon.Upload, 134, 12, 56, 56, gray1, gray2, () => MoveSel(0, _step));
+            B("", GdIcon.Download, 134, 128, 56, 56, gray1, gray2, () => MoveSel(0, -_step));
+
+            // шаг
+            int sx = 272;
+            foreach (var pair in new[] { ("0.5", 15.0), ("1", 30.0), ("5", 150.0) })
+            {
+                double v = pair.Item2;
+                bool on = Math.Abs(_step - v) < 0.01;
+                B(pair.Item1, GdIcon.None, sx, 12, 56, 46,
+                    on ? Color.FromArgb(120, 220, 255) : gray1,
+                    on ? Color.FromArgb(20, 110, 180) : gray2,
+                    () => { _step = v; SetMode(Mode.Edit); });
+                sx += 62;
+            }
+            p.Controls.Add(new Label
+            {
+                Text = "шаг, клеток", Left = 272, Top = 62, Width = 180, Height = 18,
+                ForeColor = Theme.Dim, BackColor = Color.Transparent
+            });
+
+            // поворот и отражение
+            B("↺", GdIcon.None, 272, 86, 56, 56, gray1, gray2, () => RotateSel(-90));
+            B("↻", GdIcon.None, 334, 86, 56, 56, gray1, gray2, () => RotateSel(90));
+            B("⇄", GdIcon.None, 396, 86, 56, 56, gray1, gray2, () => FlipSel(true));
+            B("⇅", GdIcon.None, 458, 86, 56, 56, gray1, gray2, () => FlipSel(false));
+
+            // операции
+            B("КОПИЯ", GdIcon.Copy, 540, 12, 118, 50, Color.FromArgb(200, 170, 255), Color.FromArgb(100, 60, 180), CopySel);
+            B("ВСТАВИТЬ", GdIcon.Plus, 540, 68, 118, 50, Color.FromArgb(160, 200, 255), Color.FromArgb(50, 90, 180), PasteSel);
+            B("УДАЛИТЬ", GdIcon.Trash, 540, 124, 118, 50, Color.FromArgb(240, 120, 120), Color.FromArgb(150, 40, 50), DeleteSel);
+
+            B("ПРАВИТЬ ОБЪЕКТ", GdIcon.Settings, 668, 12, 190, 50,
+                Color.FromArgb(255, 200, 90), Color.FromArgb(170, 110, 10), EditObject);
+            B("ТРИГГЕР", GdIcon.Admin, 668, 68, 190, 50,
+                Color.FromArgb(120, 190, 255), Color.FromArgb(30, 90, 190), EditTrigger);
+            B("СНЯТЬ ВЫДЕЛЕНИЕ", GdIcon.Cross, 668, 124, 190, 50, gray1, gray2, () => _sel.Clear());
+
+            B("ВЫДЕЛИТЬ ВСЁ", GdIcon.Check, 868, 12, 180, 50, gray1, gray2, () =>
+            {
+                _sel.Clear();
+                for (int i = 0; i < _lv.Objects.Count; i++) _sel.Add(i);
+            });
+            B("ПО СЕТКЕ", GdIcon.Check, 868, 68, 180, 50, gray1, gray2, () =>
+            {
+                PushUndo();
+                foreach (var i in _sel)
+                {
+                    _lv.Objects[i].X = Math.Round(_lv.Objects[i].X / 30) * 30;
+                    _lv.Objects[i].Y = Math.Round(_lv.Objects[i].Y / 30) * 30;
+                }
+                RebuildPreview();
+            });
+
+            p.Controls.Add(new Label
+            {
+                Text = "ЛКМ — выделить, ЛКМ по выделенному — тащить, ЛКМ по пустому — рамка,\n" +
+                       "СКМ или Alt — двигать вид, стрелки клавиатуры — двигать выделенное",
+                Left = 70, Top = 192, Width = 980, Height = 36,
+                ForeColor = Theme.Dim, BackColor = Color.Transparent
+            });
+        }
+
+        void BuildDeletePanel()
+        {
+            var p = _content;
+            void B(string text, GdIcon ic, int x, int y, int w, Action act)
+            {
+                var b = new GdButton
+                {
+                    Text = text, Icon = ic, Left = x, Top = y, Width = w, Height = 54,
+                    Color1 = Color.FromArgb(240, 130, 130), Color2 = Color.FromArgb(150, 45, 55), FontSize = 9.5f
+                };
+                b.Click += (s, e) => { act(); _canvas.Invalidate(); UpdateStatus(); };
+                p.Controls.Add(b);
+            }
+
+            B("УДАЛИТЬ ВЫДЕЛЕННОЕ", GdIcon.Trash, 40, 20, 250, DeleteSel);
+            B("УДАЛИТЬ ТАКИЕ ЖЕ", GdIcon.Trash, 40, 86, 250, () =>
+            {
+                if (_sel.Count == 0) return;
+                int type = _lv.Objects[_sel[0]].TypeId;
+                PushUndo();
+                _lv.Objects.RemoveAll(o => o.TypeId == type);
+                _sel.Clear();
+                RebuildPreview();
+            });
+            B("ОЧИСТИТЬ УРОВЕНЬ", GdIcon.Cross, 40, 152, 250, () =>
+            {
+                if (!GdDialog.Confirm(this, "Очистка", "Удалить все объекты уровня?")) return;
+                PushUndo();
+                _lv.Objects.Clear();
+                _sel.Clear();
+                RebuildPreview();
+            });
+
+            p.Controls.Add(new Label
+            {
+                Text = "В режиме DELETE клик по объекту удаляет его.\n" +
+                       "Стирания свайпом нет — объекты удаляются по одному.",
+                Left = 310, Top = 28, Width = 560, Height = 44,
+                ForeColor = Theme.Dim, BackColor = Color.Transparent
+            });
+        }
+
+        // ---------------------------------------------------- действия правки
+
+        void MoveSel(double dx, double dy)
         {
             if (_sel.Count == 0) return;
             PushUndo();
-            foreach (var i in _sel) if (i >= 0 && i < _lv.Objects.Count) f(_lv.Objects[i]);
+            foreach (var i in _sel) { _lv.Objects[i].X += dx; _lv.Objects[i].Y += dy; }
             RebuildPreview();
         }
 
-        // ------------------------------------------------------------ канва
+        void RotateSel(double deg)
+        {
+            if (_sel.Count == 0) return;
+            PushUndo();
+            foreach (var i in _sel) _lv.Objects[i].Rotation = (_lv.Objects[i].Rotation + deg) % 360;
+            RebuildPreview();
+        }
+
+        void FlipSel(bool horizontal)
+        {
+            if (_sel.Count == 0) return;
+            PushUndo();
+            foreach (var i in _sel)
+            {
+                var o = _lv.Objects[i];
+                if (horizontal) { o.FlipX = !o.FlipX; o.ScaleX = -o.ScaleX; }
+                else { o.FlipY = !o.FlipY; o.ScaleY = -o.ScaleY; }
+            }
+            RebuildPreview();
+        }
+
+        void CopySel()
+        {
+            _clipboard = _sel.Where(i => i < _lv.Objects.Count).Select(i => _lv.Objects[i].Clone()).ToList();
+            Status("Скопировано: " + _clipboard.Count);
+        }
+
+        void PasteSel()
+        {
+            if (_clipboard.Count == 0) return;
+            PushUndo();
+            _sel.Clear();
+            foreach (var o in _clipboard)
+            {
+                var c = o.Clone();
+                c.Id = 0; c.X += 30;
+                _lv.Add(c);
+                _sel.Add(_lv.Objects.Count - 1);
+            }
+            RebuildPreview();
+        }
+
+        void DeleteSel()
+        {
+            if (_sel.Count == 0) return;
+            PushUndo();
+            foreach (var i in _sel.OrderByDescending(v => v))
+                if (i >= 0 && i < _lv.Objects.Count) _lv.Objects.RemoveAt(i);
+            _sel.Clear();
+            RebuildPreview();
+        }
+
+        void EditObject()
+        {
+            if (_sel.Count == 0) { Status("Сначала выдели объект"); return; }
+            var first = _lv.Objects[_sel[0]];
+            using var f = new ObjectEditForm(first);
+            if (f.ShowDialog(this) == DialogResult.OK)
+            {
+                PushUndo();
+                foreach (var i in _sel) f.ApplyTo(_lv.Objects[i]);
+                RebuildPreview();
+            }
+        }
+
+        void EditTrigger()
+        {
+            if (_sel.Count == 0) { Status("Сначала выдели триггер"); return; }
+            var first = _lv.Objects[_sel[0]];
+            var data = first.Trigger ?? new TriggerData();
+            using var f = new TriggerEditForm(data);
+            if (f.ShowDialog(this) == DialogResult.OK)
+            {
+                PushUndo();
+                foreach (var i in _sel)
+                {
+                    var o = _lv.Objects[i];
+                    if (ObjectCatalog.Get(o.TypeId).Kind == ObjKind.Trigger) o.Trigger = f.Data.Clone();
+                }
+                RebuildPreview();
+            }
+        }
+
+        // ---------------------------------------------------- канва
 
         void CanvasPaint(object s, PaintEventArgs e)
         {
@@ -306,13 +557,12 @@ namespace GEO_DASH.UI
             Renderer.Draw(g, _preview, _v, true);
             DrawGrid(g);
 
-            // выделение
             foreach (var i in _sel)
             {
                 if (i < 0 || i >= _lv.Objects.Count) continue;
                 var b = ObjectCatalog.Bounds(_lv.Objects[i]);
                 var r = _v.WorldRect(b.X, b.Y, b.Width, b.Height);
-                using var pen = new Pen(Theme.Accent2, 2f);
+                using var pen = new Pen(Gd.Gold, 2.5f);
                 g.DrawRectangle(pen, r.X - 1, r.Y - 1, r.Width + 2, r.Height + 2);
             }
 
@@ -321,14 +571,27 @@ namespace GEO_DASH.UI
                 var a = _v.W2S(_selBox.Left, _selBox.Top);
                 var b2 = _v.W2S(_selBox.Right, _selBox.Bottom);
                 var r = RectangleF.FromLTRB(Math.Min(a.X, b2.X), Math.Min(a.Y, b2.Y), Math.Max(a.X, b2.X), Math.Max(a.Y, b2.Y));
-                using var pen = new Pen(Theme.Accent, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                using var pen = new Pen(Gd.Neon, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
                 g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
             }
 
-            _status.Text = $"объектов: {_lv.Objects.Count}   выделено: {_sel.Count}   зум: {_zoom:0.00}   " +
-                           $"камера: {_camX:0}/{_camY:0}   длина уровня: {_lv.RightEdge() / 30:0} клеток   " +
-                           $"музыка: {(_lv.Settings.SongId > 0 ? "#" + _lv.Settings.SongId : "нет")}   " +
-                           $"сложность: {Difficulties.Label(_lv.Settings.Difficulty)}";
+            var sr = _v.WorldRect(0, 0, 30, 30);
+            using (var pen = new Pen(Gd.Lime, 2f)) g.DrawRectangle(pen, sr.X, sr.Y, sr.Width, sr.Height);
+            using (var f = Gd.Bold(8f))
+                Gd.Outlined(g, "СТАРТ", f, new RectangleF(sr.X - 20, sr.Y - 20, sr.Width + 40, 18), Gd.Lime, thick: 2f);
+
+            if (_mode == Mode.Build)
+            {
+                var p = _canvas.PointToClient(Cursor.Position);
+                if (_canvas.ClientRectangle.Contains(p))
+                {
+                    var w = WorldOf(p);
+                    var d = ObjectCatalog.Get(_brush.TypeId);
+                    var r = _v.WorldRect(w.X, w.Y, d.W, d.H);
+                    using var pen = new Pen(Color.FromArgb(160, Gd.Neon), 2f);
+                    g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
+                }
+            }
         }
 
         void DrawGrid(Graphics g)
@@ -336,16 +599,14 @@ namespace GEO_DASH.UI
             float sc = _v.Scale;
             if (sc * _grid < 5) return;
             var vis = _v.VisibleWorld();
-            using var pen = new Pen(Color.FromArgb(40, 255, 255, 255), 1);
+            using var pen = new Pen(Color.FromArgb(38, 255, 255, 255), 1);
             using var pen2 = new Pen(Color.FromArgb(80, 255, 255, 255), 1);
-            double x0 = Math.Floor(vis.Left / _grid) * _grid;
-            for (double x = x0; x < vis.Right; x += _grid)
+            for (double x = Math.Floor(vis.Left / _grid) * _grid; x < vis.Right; x += _grid)
             {
                 var p1 = _v.W2S(x, vis.Top); var p2 = _v.W2S(x, vis.Bottom);
                 g.DrawLine(Math.Abs(x % (_grid * 8)) < 0.01 ? pen2 : pen, p1.X, p1.Y, p2.X, p2.Y);
             }
-            double y0 = Math.Floor(vis.Top / _grid) * _grid;
-            for (double y = y0; y < vis.Bottom; y += _grid)
+            for (double y = Math.Floor(vis.Top / _grid) * _grid; y < vis.Bottom; y += _grid)
             {
                 var p1 = _v.W2S(vis.Left, y); var p2 = _v.W2S(vis.Right, y);
                 g.DrawLine(Math.Abs(y % (_grid * 8)) < 0.01 ? pen2 : pen, p1.X, p1.Y, p2.X, p2.Y);
@@ -364,45 +625,11 @@ namespace GEO_DASH.UI
         {
             _canvas.Focus();
             _lastMouse = e.Location;
-            bool shift = (ModifierKeys & Keys.Shift) != 0;
-
-            if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Left && (ModifierKeys & Keys.Alt) != 0))
-            {
-                _panning = true;
-                return;
-            }
-
             var w = _v.S2W(e.X, e.Y);
 
-            if (e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Middle || (ModifierKeys & Keys.Alt) != 0)
             {
-                if (shift)
-                {
-                    int hit = HitTest(w);
-                    if (hit >= 0)
-                    {
-                        if (_sel.Contains(hit)) _sel.Remove(hit); else _sel.Add(hit);
-                        UpdateProps();
-                    }
-                    else
-                    {
-                        _boxSelect = true;
-                        _dragStart = w;
-                        _selBox = new RectangleF(w.X, w.Y, 0, 0);
-                    }
-                    _canvas.Invalidate();
-                    return;
-                }
-
-                int under = HitTest(w);
-                if (under >= 0 && _sel.Contains(under))
-                {
-                    _dragging = true;
-                    _dragStart = w;
-                    return;
-                }
-
-                PlaceObject(WorldOf(e.Location));
+                _panning = true;
                 return;
             }
 
@@ -415,9 +642,61 @@ namespace GEO_DASH.UI
                     _lv.Objects.RemoveAt(hit);
                     _sel.Clear();
                     RebuildPreview();
-                    UpdateProps();
                 }
+                return;
             }
+
+            if (e.Button != MouseButtons.Left) return;
+
+            switch (_mode)
+            {
+                case Mode.Build:
+                    PlaceObject(WorldOf(e.Location));   // один клик — один объект
+                    break;
+
+                case Mode.Edit:
+                    {
+                        int hit = HitTest(w);
+                        if (hit >= 0)
+                        {
+                            if ((ModifierKeys & Keys.Shift) != 0)
+                            {
+                                if (_sel.Contains(hit)) _sel.Remove(hit); else _sel.Add(hit);
+                            }
+                            else if (!_sel.Contains(hit))
+                            {
+                                _sel.Clear();
+                                _sel.Add(hit);
+                            }
+                            _movingSel = true;
+                            _dragStart = w;
+                        }
+                        else
+                        {
+                            _boxSelect = true;
+                            _dragStart = w;
+                            _selBox = new RectangleF(w.X, w.Y, 0, 0);
+                            if ((ModifierKeys & Keys.Shift) == 0) _sel.Clear();
+                        }
+                        break;
+                    }
+
+                case Mode.Delete:
+                    {
+                        int hit = HitTest(w);
+                        if (hit >= 0)
+                        {
+                            PushUndo();
+                            _lv.Objects.RemoveAt(hit);
+                            _sel.Clear();
+                            RebuildPreview();
+                        }
+                        else _panning = true;
+                        break;
+                    }
+            }
+            UpdateStatus();
+            _canvas.Invalidate();
         }
 
         void CanvasMove(object s, MouseEventArgs e)
@@ -443,25 +722,28 @@ namespace GEO_DASH.UI
                 return;
             }
 
-            if (_dragging && _sel.Count > 0 && e.Button == MouseButtons.Left)
+            if (_movingSel && e.Button == MouseButtons.Left && _sel.Count > 0)
             {
                 double dx = w.X - _dragStart.X, dy = w.Y - _dragStart.Y;
                 if (_snap) { dx = Math.Round(dx / _grid) * _grid; dy = Math.Round(dy / _grid) * _grid; }
-                if (Math.Abs(dx) >= _grid || Math.Abs(dy) >= _grid || !_snap)
+                if (Math.Abs(dx) >= (_snap ? _grid : 1) || Math.Abs(dy) >= (_snap ? _grid : 1))
                 {
                     foreach (var i in _sel) { _lv.Objects[i].X += dx; _lv.Objects[i].Y += dy; }
                     _dragStart = new PointF((float)(_dragStart.X + dx), (float)(_dragStart.Y + dy));
                     RebuildPreview();
                 }
+                return;
             }
 
-            // рисование «кистью» при зажатой ЛКМ без выделения
-            if (e.Button == MouseButtons.Left && !_dragging && !_boxSelect && (ModifierKeys & Keys.Shift) == 0)
+            // в режиме BUILD перетаскивание двигает вид, а не ставит объекты
+            if (_mode == Mode.Build && e.Button == MouseButtons.Left)
             {
-                var gp = WorldOf(e.Location);
-                if (!_lv.Objects.Any(o => Math.Abs(o.X - gp.X) < 1 && Math.Abs(o.Y - gp.Y) < 1 && o.TypeId == _selectedType))
-                    PlaceObject(gp, false);
+                float sc = _v.Scale;
+                _camX -= (e.X - _lastMouse.X) / sc;
+                _camY += (e.Y - _lastMouse.Y) / sc;
+                _lastMouse = e.Location;
             }
+            _canvas.Invalidate();
         }
 
         void CanvasUp(object s, MouseEventArgs e)
@@ -469,17 +751,17 @@ namespace GEO_DASH.UI
             if (_boxSelect)
             {
                 _boxSelect = false;
-                _sel.Clear();
                 for (int i = 0; i < _lv.Objects.Count; i++)
                 {
                     var b = ObjectCatalog.Bounds(_lv.Objects[i]);
-                    if (_selBox.IntersectsWith(new RectangleF(b.X, b.Y, Math.Max(1, b.Width), Math.Max(1, b.Height))))
-                        _sel.Add(i);
+                    if (_selBox.IntersectsWith(new RectangleF(b.X, b.Y, Math.Max(1, b.Width), Math.Max(1, b.Height)))
+                        && !_sel.Contains(i)) _sel.Add(i);
                 }
-                UpdateProps();
             }
+            if (_movingSel) PushUndo();
             _panning = false;
-            _dragging = false;
+            _movingSel = false;
+            UpdateStatus();
             _canvas.Invalidate();
         }
 
@@ -493,86 +775,53 @@ namespace GEO_DASH.UI
             return -1;
         }
 
-        void PlaceObject(PointF p, bool undo = true)
+        void PlaceObject(PointF p)
         {
-            if (undo) PushUndo();
-            var def = ObjectCatalog.Get(_selectedType);
-            var o = new LevelObject { TypeId = _selectedType, X = p.X, Y = p.Y };
-            if (def.Kind == ObjKind.Portal) o.Portal = _portalKind;
-            if (def.Kind == ObjKind.Orb) o.Orb = _orbKind;
-            if (def.Kind == ObjKind.Pad) o.Pad = _padKind;
-            if (def.Kind == ObjKind.Trigger) o.Trigger = _trigTemplate.Clone();
-            if (def.Kind == ObjKind.Text) o.Text = "Текст";
-            _lv.Add(o);
-            RebuildPreview();
-        }
+            var def = ObjectCatalog.Get(_brush.TypeId);
+            foreach (var o in _lv.Objects)
+                if (Math.Abs(o.X - p.X) < 1 && Math.Abs(o.Y - p.Y) < 1 && o.TypeId == _brush.TypeId) return;
 
-        void DeleteSelection()
-        {
-            if (_sel.Count == 0) return;
             PushUndo();
-            foreach (var i in _sel.OrderByDescending(v => v))
-                if (i >= 0 && i < _lv.Objects.Count) _lv.Objects.RemoveAt(i);
-            _sel.Clear();
+            var n = _brush.Clone();
+            n.Id = 0;
+            n.X = p.X; n.Y = p.Y;
+            if (def.Kind == ObjKind.Text) n.Text = "Текст";
+            _lv.Add(n);
+            Sfx.Play("click");
             RebuildPreview();
-            UpdateProps();
         }
 
-        List<LevelObject> _clipboard = new();
+        // ---------------------------------------------------- прочее
 
-        void EditorKeys(object s, KeyEventArgs e)
+        void Keys_(object s, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Delete) { DeleteSelection(); e.Handled = true; }
-            else if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; }
+            if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; }
             else if (e.Control && e.KeyCode == Keys.Y) { Redo(); e.Handled = true; }
-            else if (e.Control && e.KeyCode == Keys.S) { Save(); e.Handled = true; }
-            else if (e.Control && e.KeyCode == Keys.C)
-            {
-                _clipboard = _sel.Where(i => i < _lv.Objects.Count).Select(i => _lv.Objects[i].Clone()).ToList();
-                e.Handled = true;
-            }
-            else if (e.Control && e.KeyCode == Keys.V)
-            {
-                if (_clipboard.Count > 0)
-                {
-                    PushUndo();
-                    _sel.Clear();
-                    foreach (var o in _clipboard)
-                    {
-                        var c = o.Clone(); c.Id = 0; c.X += 30;
-                        _lv.Add(c);
-                        _sel.Add(_lv.Objects.Count - 1);
-                    }
-                    RebuildPreview(); UpdateProps();
-                }
-                e.Handled = true;
-            }
-            else if (e.Control && e.KeyCode == Keys.D)
-            {
-                if (_sel.Count > 0)
-                {
-                    PushUndo();
-                    var copies = _sel.Select(i => _lv.Objects[i].Clone()).ToList();
-                    _sel.Clear();
-                    foreach (var c in copies) { c.Id = 0; c.X += 30; _lv.Add(c); _sel.Add(_lv.Objects.Count - 1); }
-                    RebuildPreview(); UpdateProps();
-                }
-                e.Handled = true;
-            }
+            else if (e.Control && e.KeyCode == Keys.S) { Save(); Status("Сохранено"); e.Handled = true; }
+            else if (e.Control && e.KeyCode == Keys.C) { CopySel(); e.Handled = true; }
+            else if (e.Control && e.KeyCode == Keys.V) { PasteSel(); e.Handled = true; }
+            else if (e.KeyCode == Keys.Delete) { DeleteSel(); e.Handled = true; }
             else if (e.KeyCode == Keys.F5) { Playtest(false); e.Handled = true; }
-            else if (e.KeyCode == Keys.Space) { _panning = false; }
+            else if (e.KeyCode == Keys.D1) SetMode(Mode.Build);
+            else if (e.KeyCode == Keys.D2) SetMode(Mode.Edit);
+            else if (e.KeyCode == Keys.D3) SetMode(Mode.Delete);
+            else if (e.KeyCode == Keys.Left) { MoveSel(-_step, 0); e.Handled = true; }
+            else if (e.KeyCode == Keys.Right) { MoveSel(_step, 0); e.Handled = true; }
+            else if (e.KeyCode == Keys.Up) { MoveSel(0, _step); e.Handled = true; }
+            else if (e.KeyCode == Keys.Down) { MoveSel(0, -_step); e.Handled = true; }
         }
 
         void RebuildPreview()
         {
             _preview.Init(_lv);
             _canvas.Invalidate();
+            UpdateStatus();
         }
 
         void PushUndo()
         {
             _undo.Add(_lv.ToJson());
-            if (_undo.Count > 60) _undo.RemoveAt(0);
+            if (_undo.Count > 80) _undo.RemoveAt(0);
             _redo.Clear();
         }
 
@@ -583,7 +832,7 @@ namespace GEO_DASH.UI
             _undo.RemoveAt(_undo.Count - 1);
             _lv = LevelData.FromJson(_undo[^1]);
             _sel.Clear();
-            RebuildPreview(); UpdateProps();
+            RebuildPreview();
         }
 
         void Redo()
@@ -593,16 +842,10 @@ namespace GEO_DASH.UI
             _lv = LevelData.FromJson(_redo[^1]);
             _redo.RemoveAt(_redo.Count - 1);
             _sel.Clear();
-            RebuildPreview(); UpdateProps();
+            RebuildPreview();
         }
 
-        // ------------------------------------------------------------ действия
-
-        void Save()
-        {
-            LocalStore.SaveMyLevel(_lv);
-            _status.Text = "Сохранено: " + LocalStore.MyLevelPath(_lv);
-        }
+        void Save() => LocalStore.SaveMyLevel(_lv);
 
         void Playtest(bool practice)
         {
@@ -629,33 +872,45 @@ namespace GEO_DASH.UI
                 _lv.Settings.SongId = f.SongId;
                 _lv.Settings.SongName = f.SongName;
                 _lv.Settings.SongArtist = f.SongArtist;
-                _canvas.Invalidate();
+                UpdateStatus();
             }
         }
 
-        async void Upload()
+        async Task Upload()
         {
             Save();
             if (!AppConfig.LoggedIn)
             {
-                GdDialog.Info(this, "GEO DASH", "Сначала войди в аккаунт (меню → Аккаунт).");
+                GdDialog.Info(this, "Загрузка", "Сначала войди в аккаунт (меню → ПРОФИЛЬ).");
                 return;
             }
-            _status.Text = "Загружаю на сервер…";
+            Status("Загружаю на сервер…");
             var r = await ApiClient.UploadLevelAsync(_lv, _lv.Settings.ServerId, _lv.Settings.Password);
             if (r.Ok && r.Data != null)
             {
                 _lv.Settings.ServerId = r.Data.Id;
                 _lv.Settings.Version++;
                 Save();
-                _status.Text = $"Загружено. ID уровня на сервере: {r.Data.Id}";
-                GdDialog.Info(this, "GEO DASH", $"Уровень на сервере под ID {r.Data.Id}.\nСсылка: {AppConfig.Settings.SiteUrl}levels/view.php?id={r.Data.Id}");
+                GdDialog.Info(this, "Готово", $"Уровень на сервере под ID {r.Data.Id}.");
             }
-            else
-            {
-                _status.Text = "Не вышло: " + r.Error;
-                GdDialog.Info(this, "Загрузка", r.Error + "\n\nЕсли нет сети — уровень уедет на сервер сам, когда сеть появится.");
-            }
+            else GdDialog.Info(this, "Загрузка", r.Error + "\n\nЕсли нет сети — уровень уедет сам, когда связь появится.");
+            UpdateStatus();
+        }
+
+        void Status(string s) { _status.Text = s; }
+
+        void UpdateStatus()
+        {
+            string brush = ObjectCatalog.Get(_brush.TypeId).Name;
+            if (_brush.TypeId == 60) brush = "портал " + PortalName(_brush.Portal);
+            if (_brush.TypeId == 40) brush = "орб " + OrbName(_brush.Orb);
+            if (_brush.TypeId == 50) brush = "пад " + PadName(_brush.Pad);
+            if (_brush.TypeId == 100 && _brush.Trigger != null) brush = "триггер " + _brush.Trigger.Type;
+
+            _status.Text = $"режим: {_mode}   объект: {brush}   выделено: {_sel.Count}   " +
+                           $"объектов: {_lv.Objects.Count}   длина: {_lv.RightEdge() / 30:0} клеток   " +
+                           $"зум: {_zoom:0.00}   шаг: {_step / 30:0.##}   " +
+                           $"музыка: {(_lv.Settings.SongId == 0 ? "нет" : _lv.Settings.SongId < 0 ? "встроенная" : "#" + _lv.Settings.SongId)}";
         }
     }
 }
