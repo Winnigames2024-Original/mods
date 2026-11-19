@@ -54,6 +54,14 @@ namespace GEO_DASH.UI
             }
             else
             {
+                B("КОММЕНТАРИИ", GdIcon.Info, Color.FromArgb(140, 200, 255), Color.FromArgb(30, 95, 190),
+                    (s, e) =>
+                    {
+                        var lv = Sel;
+                        if (lv == null || lv.Settings.ServerId <= 0) { _msg = "Уровень не с сервера"; Content.Invalidate(); return; }
+                        using var f = new CommentsForm(lv.Settings.ServerId, lv.Settings.Name);
+                        f.ShowDialog(this);
+                    });
                 B("КОПИЯ В МОИ", GdIcon.Copy, Color.FromArgb(160, 170, 210), Color.FromArgb(70, 80, 130), (s, e) => CopyToMine());
                 B("ОБНОВИТЬ С СЕРВЕРА", GdIcon.Refresh, Color.FromArgb(120, 220, 255), Color.FromArgb(20, 110, 180), async (s, e) => await Redownload());
                 B("УДАЛИТЬ ИЗ SAVED", GdIcon.Trash, Color.FromArgb(230, 110, 110), Color.FromArgb(140, 40, 50), (s, e) => Delete());

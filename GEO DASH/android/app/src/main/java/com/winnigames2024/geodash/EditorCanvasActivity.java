@@ -44,6 +44,8 @@ public class EditorCanvasActivity extends Activity {
     /** Свайп-выделение: ведёшь пальцем — выделяется всё, по чему провёл. */
     boolean swipe = true;
     Builds.Piece piece;
+    /** ID картинок с сайта, которые уже можно ставить. */
+    final java.util.List<Integer> imageIds = new ArrayList<>();
     double step = 30;
     final List<Integer> sel = new ArrayList<>();
     final List<Level.Obj> clipboard = new ArrayList<>();
@@ -180,7 +182,7 @@ public class EditorCanvasActivity extends Activity {
         panel.addView(tabsScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.10f)));
 
-        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Сбор", "Триггеры", "Служебное", "Конструкции"};
+        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Картинки", "Сбор", "Триггеры", "Служебное", "Конструкции"};
         for (String c : cats) {
             final String cc = c;
             Ui.GdBtn b = new Ui.GdBtn(this).set(c, Ui.I_NONE,
@@ -201,6 +203,25 @@ public class EditorCanvasActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         int size = (int) (H * 0.17f);
+        if (category.equals("Картинки")) {
+            Ui.GdBtn add = new Ui.GdBtn(this).set("С САЙТА", Ui.I_DOWNLOAD,
+                    Color.rgb(255, 150, 215), Color.rgb(160, 40, 120));
+            add.setOnClickListener(v -> pickImage());
+            LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams((int) (size * 1.6f), size);
+            alp.setMargins(6, 8, 6, 8);
+            items.addView(add, alp);
+
+            for (final int id : imageIds) {
+                Palette.Item it = new Palette.Item(98, "#" + id, "Картинки");
+                it.imageId = id;
+                ObjBtn b = new ObjBtn(this, it);
+                b.setOnClickListener(v -> { brush = it; piece = null; setMode(BUILD); });
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                lp.setMargins(6, 8, 6, 8);
+                items.addView(b, lp);
+            }
+            return;
+        }
         if (category.equals("Конструкции")) {
             for (final Builds.Piece p : Builds.all()) {
                 PieceBtn b = new PieceBtn(this, p);
@@ -365,6 +386,16 @@ public class EditorCanvasActivity extends Activity {
                 p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.centerX(), box.top);
                 p.close();
                 c.drawPath(p, Gd.fill(Color.rgb(150, 160, 230)));
+                break;
+            }
+            case Catalog.ST_IMAGE: {
+                android.graphics.Bitmap bm = Images.get(o.imageId);
+                if (bm != null) c.drawBitmap(bm, null, box, new Paint(Paint.FILTER_BITMAP_FLAG));
+                else {
+                    c.drawRect(box, Gd.fill(Color.rgb(90, 110, 200)));
+                    Gd.outlined(c, "IMG", box.centerX(), box.centerY() + box.height() * 0.1f,
+                            box.height() * 0.4f, Gd.PAPER, Paint.Align.CENTER);
+                }
                 break;
             }
             case Catalog.ST_WATER:
@@ -541,6 +572,45 @@ public class EditorCanvasActivity extends Activity {
     }
 
     /** Сохранить выделенное как свою конструкцию. */
+    /** Взять список картинок с сайта и выбрать нужную. */
+    void pickImage() {
+        toast("Беру список картинок…");
+        Api.async(() -> {
+            org.json.JSONArray list = Api.images();
+            if (list == null || list.length() == 0) {
+                runOnUiThread(() -> GdDialog.input(this, "ID картинки с сайта", "", "1", false, t -> {
+                    int id;
+                    try { id = Integer.parseInt(t.trim()); } catch (Exception e) { return; }
+                    if (id <= 0) return;
+                    useImage(id);
+                }));
+                return;
+            }
+            final String[] names = new String[list.length()];
+            final int[] ids = new int[list.length()];
+            for (int i = 0; i < list.length(); i++) {
+                org.json.JSONObject o = list.optJSONObject(i);
+                ids[i] = o == null ? 0 : o.optInt("id");
+                names[i] = "#" + ids[i] + "  " + (o == null ? "" : o.optString("name"));
+            }
+            runOnUiThread(() -> GdDialog.items(this, "КАРТИНКИ С САЙТА", names, i -> {
+                if (i >= 0 && i < ids.length) useImage(ids[i]);
+            }));
+        });
+    }
+
+    void useImage(int id) {
+        if (!imageIds.contains(id)) imageIds.add(id);
+        Images.download(id);
+        Palette.Item it = new Palette.Item(98, "#" + id, "Картинки");
+        it.imageId = id;
+        brush = it;
+        piece = null;
+        category = "Картинки";
+        setMode(BUILD);
+        toast("Картинка #" + id + " выбрана — коснись поля");
+    }
+
     void savePiece() {
         if (sel.isEmpty()) { toast("Сначала выдели объекты — свайпом"); return; }
         final java.util.List<Level.Obj> objs = new ArrayList<>();
@@ -902,7 +972,7 @@ public class EditorCanvasActivity extends Activity {
 
     static class Palette {
         static class Item {
-            int typeId, portal, orb, pad, trigType = -1;
+            int typeId, portal, orb, pad, trigType = -1, imageId;
             String label, category;
 
             Item(int t, String l, String cat) { typeId = t; label = l; category = cat; }
@@ -913,7 +983,7 @@ public class EditorCanvasActivity extends Activity {
 
             Level.Obj make() {
                 Level.Obj o = new Level.Obj();
-                o.typeId = typeId; o.portal = portal; o.orb = orb; o.pad = pad;
+                o.typeId = typeId; o.portal = portal; o.orb = orb; o.pad = pad; o.imageId = imageId;
                 if (typeId == 75) o.text = "Текст";
                 if (trigType >= 0) { o.trig = new Level.Trig(); o.trig.type = trigType; }
                 return o;

@@ -238,6 +238,76 @@ namespace GEO_DASH.Net
 
         // ------------------------------------------------------------ музыка
 
+        /// <summary>Треки, залитые на сервер.</summary>
+        public static Task<ApiReply<List<SongDto>>> SongsAsync() =>
+            GetAsync<List<SongDto>>("/api/music", "songs");
+
+        /// <summary>Комментарии к уровню.</summary>
+        public static Task<ApiReply<List<CommentDto>>> CommentsAsync(int levelId) =>
+            GetAsync<List<CommentDto>>($"/api/levels/{levelId}/comments", "comments_" + levelId);
+
+        public static Task<ApiReply<CommentDto>> AddCommentAsync(int levelId, string text) =>
+            PostAsync<CommentDto>($"/api/levels/{levelId}/comments", new { text });
+
+        public static Task<ApiReply<object>> DeleteCommentAsync(int levelId, string commentId) =>
+            PostAsync<object>($"/api/levels/{levelId}/comments/delete", new { commentId });
+
+        /// <summary>Список картинок toolbox с сайта.</summary>
+        public static Task<ApiReply<List<ImageInfo>>> ImagesAsync() =>
+            GetAsync<List<ImageInfo>>("/api/images", "images");
+
+        /// <summary>Скачать картинку по ID: сначала через API, потом прямо с сайта.</summary>
+        public static async Task<byte[]> DownloadImageAsync(int id)
+        {
+            try
+            {
+                using var r = await Http.GetAsync($"{AppConfig.ApiBase}/api/images/{id}/file");
+                if (r.IsSuccessStatusCode) { Online = true; return await r.Content.ReadAsByteArrayAsync(); }
+            }
+            catch { Online = false; }
+            try
+            {
+                var site = AppConfig.Settings.SiteUrl.TrimEnd('/');
+                using var r2 = await Http.GetAsync($"{site}/api/images/{id}/file");
+                if (r2.IsSuccessStatusCode) return await r2.Content.ReadAsByteArrayAsync();
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>Залить свой трек на сервер — вернётся его ID.</summary>
+        public static async Task<ApiReply<JsonElement>> UploadSongAsync(byte[] mp3, string name)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Post, AppConfig.ApiBase + "/api/music/upload")
+                { Content = new ByteArrayContent(mp3) };
+                if (!string.IsNullOrEmpty(AppConfig.Settings.Token))
+                    req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + AppConfig.Settings.Token);
+                req.Headers.TryAddWithoutValidation("X-Song-Name", Uri.EscapeDataString(name ?? ""));
+                using var resp = await Http.SendAsync(req);
+                var text = await resp.Content.ReadAsStringAsync();
+                if (!resp.IsSuccessStatusCode)
+                    return new ApiReply<JsonElement> { Ok = false, Error = "Сервер: " + (int)resp.StatusCode };
+                Online = true;
+                return new ApiReply<JsonElement> { Ok = true, Data = JsonDocument.Parse(text).RootElement };
+            }
+            catch (Exception ex) { Online = false; return new ApiReply<JsonElement> { Ok = false, Error = ex.Message }; }
+        }
+
+        // ------------------------------------------------------------ мультиплеер
+
+        public static Task<ApiReply<MpJoinDto>> MpJoinAsync(int levelId, int maxPlayers) =>
+            PostAsync<MpJoinDto>("/api/mp/join", new { levelId, maxPlayers });
+
+        public static Task<ApiReply<MpStateDto>> MpStateAsync(string room, double x, double y,
+                                                              int mode, int dir, bool mini, bool dead,
+                                                              double percent, int color) =>
+            PostAsync<MpStateDto>("/api/mp/state", new { room, x, y, mode, dir, mini, dead, percent, color });
+
+        public static Task<ApiReply<object>> MpLeaveAsync(string room) =>
+            PostAsync<object>("/api/mp/leave", new { room });
+
         public static Task<ApiReply<SongDto>> SongInfoAsync(int id) =>
             GetAsync<SongDto>("/api/music/" + id, "song_" + id);
 

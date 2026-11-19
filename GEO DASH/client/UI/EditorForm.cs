@@ -33,6 +33,8 @@ namespace GEO_DASH.UI
         readonly List<string> _redo = new();
 
         LevelObject _brush = new() { TypeId = 1 };
+        /// <summary>Картинки с сайта, доступные в палитре.</summary>
+        readonly List<Net.ImageInfo> _images = new();
         string _category = "Блоки";
         double _step = 30;            // шаг стрелок: 15 / 30 / 150
 
@@ -204,7 +206,7 @@ namespace GEO_DASH.UI
             _content.Controls.Add(_palette);
             _palette.BringToFront();
 
-            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Сбор", "Триггеры", "Служебное", "Конструкции" })
+            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Картинки", "Сбор", "Триггеры", "Служебное", "Конструкции" })
             {
                 string c = cat;
                 var b = new GdButton
@@ -265,6 +267,31 @@ namespace GEO_DASH.UI
                         AddItem(new LevelObject { TypeId = 100, Trigger = new TriggerData { Type = t } },
                             ObjButton.ShortTrigger(t));
                     break;
+
+                case "Картинки":
+                    {
+                        var addBtn = new GdButton
+                        {
+                            Text = "КАРТИНКА С САЙТА", Icon = GdIcon.Download, Width = 230, Height = 46,
+                            FontSize = 8.5f, Margin = new Padding(4),
+                            Color1 = Color.FromArgb(255, 150, 215), Color2 = Color.FromArgb(160, 40, 120)
+                        };
+                        addBtn.Click += async (s2, e2) => await PickImage();
+                        _palette.Controls.Add(addBtn);
+
+                        foreach (var img in _images)
+                        {
+                            var model = new LevelObject { TypeId = 98, ImageId = img.Id };
+                            AddItem(model, "#" + img.Id);
+                        }
+                        if (_images.Count == 0)
+                            _palette.Controls.Add(new Label
+                            {
+                                Text = "Залей картинку на сайте в разделе «Картинки»,\nпотом нажми «КАРТИНКА С САЙТА».",
+                                Width = 420, Height = 44, ForeColor = Theme.Dim, BackColor = Color.Transparent
+                            });
+                        break;
+                    }
 
                 case "Конструкции":
                     {
@@ -862,6 +889,36 @@ namespace GEO_DASH.UI
                 if (w.X >= b.X && w.X <= b.Right && w.Y >= b.Y && w.Y <= b.Bottom) return i;
             }
             return -1;
+        }
+
+        /// <summary>Список картинок с сайта и выбор нужной по ID.</summary>
+        async Task PickImage()
+        {
+            Status("Беру список картинок с сайта…");
+            var r = await Net.ApiClient.ImagesAsync();
+            if (r.Ok && r.Data != null)
+            {
+                _images.Clear();
+                _images.AddRange(r.Data);
+            }
+            if (_images.Count == 0)
+            {
+                string idTxt = GdDialog.Prompt(this, "Картинка",
+                    "Список не загрузился. Введи ID картинки с сайта:", "1");
+                if (!int.TryParse((idTxt ?? "").Trim(), out int manual) || manual <= 0) return;
+                _images.Add(new Net.ImageInfo { Id = manual, Name = "Картинка " + manual });
+            }
+
+            var names = _images.Select(i => $"#{i.Id}  {i.Name}  ({i.Author})").ToArray();
+            int pick = GdDialog.Choose(this, "Картинки с сайта", names);
+            if (pick < 0 || pick >= _images.Count) { ShowCategory("Картинки"); return; }
+
+            var img = _images[pick];
+            await Net.ImageLibrary.DownloadAsync(img.Id);
+            _brush = new LevelObject { TypeId = 98, ImageId = img.Id };
+            _category = "Картинки";
+            SetMode(Mode.Build);
+            Status($"Картинка #{img.Id} выбрана — ставь кликом по полю");
         }
 
         void PlaceObject(PointF p)

@@ -50,7 +50,7 @@ gd_head('Главная', 'home');
           </div>
           <p class="muted">автор <a href="/profile/?user=<?= urlencode($lv['author']) ?>"><?= h($lv['author']) ?></a>
             · ★ <?= (int)$lv['stars'] ?> · ♥ <?= (int)$lv['likes'] ?> · ↓ <?= (int)$lv['downloads'] ?></p>
-          <p style="margin-top:12px"><a class="btn small" href="/levels/view.php?id=<?= (int)$lv['id'] ?>">Открыть уровень</a></p>
+          <p style="margin-top:12px"><a class="btn small" href="/level/?id=<?= (int)$lv['id'] ?>">Открыть уровень</a></p>
         <?php else: ?>
           <p class="muted">Пока не назначен.</p>
         <?php endif; ?>
@@ -78,7 +78,7 @@ gd_head('Главная', 'home');
     <?php foreach (array_slice($levels ?: [], 0, 10) as $l): ?>
       <tr>
         <td class="muted">#<?= (int)$l['id'] ?></td>
-        <td class="lvname"><a href="/levels/view.php?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
+        <td class="lvname"><a href="/level/?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
         <td><a href="/profile/?user=<?= urlencode($l['author']) ?>"><?= h($l['author']) ?></a></td>
         <td><span class="diff <?= gd_diff_class((int)$l['difficulty']) ?>"><?= h(gd_diff_name((int)$l['difficulty'])) ?></span></td>
         <td><?= (int)$l['stars'] ?></td><td><?= (int)$l['likes'] ?></td><td><?= (int)$l['downloads'] ?></td>

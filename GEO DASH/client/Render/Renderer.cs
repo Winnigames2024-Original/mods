@@ -56,6 +56,15 @@ namespace GEO_DASH.Render
             var bg = w.Colors.Eff(ColorSystem.ChBg);
             DrawBackground(g, v, bg, w.Cam.CamX, w.Cam.CamY, w.Level.Settings);
 
+            // градиент поверх фона (триггер Gradient из 2.2)
+            if (w.Fx.GradientOn)
+            {
+                var rect = new Rectangle(0, 0, Math.Max(1, v.Client.Width), Math.Max(1, v.Client.Height));
+                using var gb = new LinearGradientBrush(new Rectangle(rect.X, rect.Y - 1, rect.Width, rect.Height + 2),
+                    w.Fx.GradTop, w.Fx.GradBottom, LinearGradientMode.Vertical);
+                g.FillRectangle(gb, rect);
+            }
+
             DrawGroundAndRoof(g, w, v);
 
             var vis = v.VisibleWorld();
@@ -86,6 +95,8 @@ namespace GEO_DASH.Render
             // игроки
             if (!w.P1.Hidden) DrawPlayer(g, v, w.P1, w.Colors.Eff(ColorSystem.ChP1), w);
             if (w.DualMode && !w.P2.Hidden) DrawPlayer(g, v, w.P2, w.Colors.Eff(ColorSystem.ChP2), w);
+
+            DrawFx(g, w, v);
         }
 
         static Color ObjColor(GameWorld w, LevelObject o, ObjState st)
@@ -287,6 +298,35 @@ namespace GEO_DASH.Render
                 case DrawStyle.Glow:
                     using (var br = new SolidBrush(Color.FromArgb(Math.Min(90, a), col))) g.FillEllipse(br, r);
                     break;
+
+                case DrawStyle.Image:
+                    {
+                        var img = Net.ImageLibrary.Get(o.ImageId);
+                        if (img != null)
+                        {
+                            var at = new System.Drawing.Imaging.ImageAttributes();
+                            var cm = new System.Drawing.Imaging.ColorMatrix { Matrix33 = (float)Math.Clamp(a / 255.0, 0, 1) };
+                            at.SetColorMatrix(cm);
+                            g.DrawImage(img, new[]
+                            {
+                                new PointF(r.X, r.Y),
+                                new PointF(r.Right, r.Y),
+                                new PointF(r.X, r.Bottom)
+                            }, new RectangleF(0, 0, img.Width, img.Height), GraphicsUnit.Pixel, at);
+                            at.Dispose();
+                        }
+                        else
+                        {
+                            using var br = new SolidBrush(Color.FromArgb(Math.Min(120, a), 120, 140, 220));
+                            g.FillRectangle(br, r);
+                            using var pen = new Pen(Color.FromArgb(a, 200, 215, 255), 2f) { DashStyle = DashStyle.Dash };
+                            g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
+                            using var f = Gd_Font();
+                            using var tb = new SolidBrush(Color.FromArgb(a, 230, 240, 255));
+                            g.DrawString("IMG #" + o.ImageId, f, tb, r.X + 4, r.Y + 4);
+                        }
+                        break;
+                    }
 
                 case DrawStyle.Water:
                 case DrawStyle.Lava:
@@ -609,6 +649,57 @@ namespace GEO_DASH.Render
         public static RectangleF Inflate(RectangleF r, float d)
         {
             var c = r; c.Inflate(d, d); return c;
+        }
+
+        static Font Gd_Font() => new("Segoe UI", 8f, FontStyle.Bold);
+
+        /// <summary>Частицы, ударная волна, виньетка и вспышка — поверх мира.</summary>
+        static void DrawFx(Graphics g, GameWorld w, ViewTransform v)
+        {
+            var fx = w.Fx;
+
+            // частицы
+            foreach (var p in fx.Particles)
+            {
+                var sp = v.W2S(p.X, p.Y);
+                float sz = (float)(p.Size * Math.Max(0.4, v.Scale));
+                int a = (int)Math.Clamp(255 * (p.Life / Math.Max(0.1, p.MaxLife)), 0, 255);
+                using var br = new SolidBrush(Color.FromArgb(a, p.Color));
+                g.FillEllipse(br, sp.X - sz / 2, sp.Y - sz / 2, sz, sz);
+            }
+
+            // ударная волна — расходящееся кольцо
+            if (fx.Shock.On)
+            {
+                double k = 1 - fx.Shock.K / Math.Max(0.001, fx.Shock.Str);
+                var c = v.W2S(fx.ShockX, fx.ShockY);
+                float rad = (float)(40 + k * 900 * v.Scale);
+                int a = (int)Math.Clamp(200 * fx.Shock.K / Math.Max(0.001, fx.Shock.Str), 0, 200);
+                using var pen = new Pen(Color.FromArgb(a, 255, 255, 255), (float)(14 * fx.Shock.Str * (1 - k) + 2));
+                g.DrawEllipse(pen, c.X - rad, c.Y - rad, rad * 2, rad * 2);
+            }
+
+            // виньетка
+            if (fx.Vignette.On)
+            {
+                var r = new Rectangle(0, 0, Math.Max(1, v.Client.Width), Math.Max(1, v.Client.Height));
+                using var path = new GraphicsPath();
+                path.AddEllipse(-r.Width * 0.25f, -r.Height * 0.25f, r.Width * 1.5f, r.Height * 1.5f);
+                using var br = new PathGradientBrush(path)
+                {
+                    CenterColor = Color.FromArgb(0, 0, 0, 0),
+                    SurroundColors = new[] { Color.FromArgb((int)(220 * fx.Vignette.K), 0, 0, 0) }
+                };
+                g.FillRectangle(br, r);
+            }
+
+            // вспышка на весь экран
+            if (fx.Flash.On)
+            {
+                var r = new Rectangle(0, 0, Math.Max(1, v.Client.Width), Math.Max(1, v.Client.Height));
+                using var br = new SolidBrush(Color.FromArgb((int)Math.Clamp(255 * fx.Flash.K, 0, 255), fx.FlashColor));
+                g.FillRectangle(br, r);
+            }
         }
 
         /// <summary>Вода и лава: заливка, волна по поверхности и пузырьки.</summary>

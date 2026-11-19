@@ -191,6 +191,51 @@ public class Api {
         } catch (Exception ignored) { }
     }
 
+    /** Список картинок toolbox. */
+    public static JSONArray images() { return arr(cachedGet("/api/images", "images")); }
+
+    /** Список треков, залитых на сервер. */
+    public static JSONArray songs() { return arr(cachedGet("/api/music", "songs")); }
+
+    /** Комментарии к уровню. */
+    public static JSONArray comments(int levelId) {
+        return arr(rawGet("/api/levels/" + levelId + "/comments"));
+    }
+
+    public static boolean addComment(int levelId, String text) {
+        try {
+            JSONObject b = new JSONObject().put("text", text);
+            return rawPost("/api/levels/" + levelId + "/comments", b.toString()) != null;
+        } catch (Exception e) { return false; }
+    }
+
+    // ---------------------------------------------------------- мультиплеер
+
+    /** Зайти в комнату уровня: вернётся её id или null. */
+    public static String mpJoin(int levelId, int maxPlayers) {
+        try {
+            JSONObject b = new JSONObject().put("levelId", levelId).put("maxPlayers", maxPlayers);
+            JSONObject r = obj(rawPost("/api/mp/join", b.toString()));
+            return r != null && r.optBoolean("ok") ? r.optString("room") : null;
+        } catch (Exception e) { return null; }
+    }
+
+    /** Отправить свои координаты, получить остальных. */
+    public static JSONObject mpState(String room, double x, double y, int mode, int dir,
+                                     boolean mini, boolean dead, double percent, int color) {
+        try {
+            JSONObject b = new JSONObject()
+                    .put("room", room).put("x", x).put("y", y).put("mode", mode).put("dir", dir)
+                    .put("mini", mini).put("dead", dead).put("percent", percent).put("color", color);
+            return obj(rawPost("/api/mp/state", b.toString()));
+        } catch (Exception e) { return null; }
+    }
+
+    public static void mpLeave(String room) {
+        try { rawPost("/api/mp/leave", new JSONObject().put("room", room).toString()); }
+        catch (Exception ignored) { }
+    }
+
     /** Название и исполнитель трека: {name, artist} или null. */
     public static String[] songInfo(int id) {
         try {

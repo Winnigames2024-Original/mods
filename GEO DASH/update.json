@@ -1,7 +1,7 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Вода, в которой плаваешь, и лава: больше пяти секунд в ней — сгораешь. Сайт в стиле игры, HTTPS в install.sh, иконка сайта.",
+  "notes": "Музыка и картинки с сайта, 36 новых триггеров и эффектов из 2.2, мультиплеер с типом уровня и лимитом игроков, комментарии к уровням, аватарки, страница уровня и живые комнаты на сайте, geodash-update для сервера.",
   "date": "2026-11-19"
 }

@@ -54,7 +54,8 @@ public class GameActivity extends Activity {
 
         gv = new GameView(this, lv, pendingPractice);
         gv.testMode = pendingTest;
-        gv.onExit = v -> { v.stop(); finish(); };
+        gv.onExit = v -> { v.mpStop(); v.stop(); finish(); };
+        gv.mpStart();   // мультиплеерный уровень — заходим в общую карту
         root.addView(gv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -95,6 +96,7 @@ public class GameActivity extends Activity {
 
     @Override protected void onDestroy() {
         super.onDestroy();
+        if (gv != null) gv.mpStop();
         if (gv != null) gv.stop();
         pending = null;
     }

@@ -107,7 +107,7 @@ gd_head('Админка', 'admin');
       <?php foreach (array_slice($levels ?: [], 0, 60) as $l): ?>
         <tr>
           <td class="muted">#<?= (int)$l['id'] ?></td>
-          <td class="lvname"><a href="/levels/view.php?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
+          <td class="lvname"><a href="/level/?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
           <td><?= h($l['author']) ?></td>
           <td>
             <form method="post" class="flex" style="gap:6px">

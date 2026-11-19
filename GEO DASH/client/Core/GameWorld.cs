@@ -36,6 +36,14 @@ namespace GEO_DASH.Core
         public bool Reverse;
         /// <summary>Платформер: игрок сам ходит влево-вправо.</summary>
         public bool Platformer;
+        /// <summary>Экранные эффекты 2.2.</summary>
+        public readonly ScreenFx Fx = new();
+        /// <summary>События, включённые триггером Event.</summary>
+        public readonly HashSet<int> Events = new();
+        /// <summary>Счётчики, которые не сбрасываются при смерти (2.2).</summary>
+        public readonly HashSet<int> PersistentItems = new();
+        /// <summary>Сдвиг точки игрока по экрану и поворот поля (2.2).</summary>
+        public double GameplayOffsetX, GameplayOffsetY, GameplayAngle;
         public ColorSystem Colors = new();
         public Camera Cam = new();
         public TriggerEngine Trig;
@@ -148,7 +156,14 @@ namespace GEO_DASH.Core
                 s.Enabled = true; s.Fired = false; s.PulseColor = null; s.PulseScale = 1;
                 s.Collected = false;
             }
+            var keep = new Dictionary<int, int>();
+            foreach (var id in PersistentItems)
+                if (Items.TryGetValue(id, out var v)) keep[id] = v;
             Items.Clear();
+            foreach (var kv in keep) Items[kv.Key] = kv.Value;
+            Fx.Reset();
+            Events.Clear();
+            GameplayOffsetX = GameplayOffsetY = GameplayAngle = 0;
             Colors.Init(Level);
             Trig.Reset();
             _trigPtr = 0;
@@ -205,6 +220,9 @@ namespace GEO_DASH.Core
 
         public void Update(double dt, PlayerInput i1, PlayerInput i2)
         {
+            // TimeWarp: ускоряем или замедляем всё, кроме эффектов
+            Fx.Update(dt);
+            dt *= Math.Clamp(Fx.TimeScale, 0.1, 4.0);
             if (Dead) { DeathTimer += dt; return; }
             if (Finished) { Time += dt; return; }
 

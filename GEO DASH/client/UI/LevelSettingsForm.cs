@@ -72,7 +72,8 @@ namespace GEO_DASH.UI
         TextBox _name, _desc, _copyPass, _pass, _songName;
         NumericUpDown _songId, _offset, _gravity;
         ComboBox _mode, _speed, _diff, _copyMode;
-        CheckBox _mini, _dual, _mirror, _gravUp, _two, _reverse, _fadeIn;
+        CheckBox _mini, _dual, _mirror, _gravUp, _two, _reverse, _fadeIn, _platformer, _mp;
+        NumericUpDown _maxPlayers;
         Button _bg, _ground, _obj;
         int _bgCol, _groundCol, _objCol;
 
@@ -103,6 +104,12 @@ namespace GEO_DASH.UI
             _gravUp = Ctl(new CheckBox { Text = "старт с перевёрнутой гравитацией", Checked = _s.StartGravityUp, Width = 300, ForeColor = Gd.Paper, BackColor = Color.Transparent });
             _two = Ctl(new CheckBox { Text = "режим на двоих (вторая кнопка — второй игрок)", Checked = _s.TwoPlayer, Width = 340, ForeColor = Gd.Paper, BackColor = Color.Transparent });
             _reverse = Ctl(new CheckBox { Text = "обратный ход уровня", Checked = _s.ReverseGameplay, Width = 300, ForeColor = Gd.Paper, BackColor = Color.Transparent });
+            _platformer = Ctl(new CheckBox { Text = "платформер (ходишь влево-вправо сам)", Checked = _s.PlatformerFreeMove, Width = 340, ForeColor = Gd.Paper, BackColor = Color.Transparent });
+
+            Section("Мультиплеер");
+            _mp = Ctl(new CheckBox { Text = "тип уровня: мультиплеер (все на одной карте)", Checked = _s.Multiplayer, Width = 380, ForeColor = Gd.Paper, BackColor = Color.Transparent });
+            L("Максимум игроков в одной карте");
+            _maxPlayers = Ctl(new NumericUpDown { Width = 120, Minimum = 2, Maximum = 50, Value = Math.Clamp(_s.MaxPlayers, 2, 50), BorderStyle = BorderStyle.FixedSingle });
 
             L("Множитель гравитации");
             _gravity = Ctl(new NumericUpDown { Width = 120, DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.2m, Maximum = 3m, Value = (decimal)_s.GravityScale, BorderStyle = BorderStyle.FixedSingle });
@@ -182,6 +189,9 @@ namespace GEO_DASH.UI
             _s.StartGravityUp = _gravUp.Checked;
             _s.TwoPlayer = _two.Checked;
             _s.ReverseGameplay = _reverse.Checked;
+            _s.PlatformerFreeMove = _platformer.Checked;
+            _s.Multiplayer = _mp.Checked;
+            _s.MaxPlayers = (int)_maxPlayers.Value;
             _s.GravityScale = (double)_gravity.Value;
             _s.SongId = (int)_songId.Value;
             _s.SongName = _songName.Text.Trim();

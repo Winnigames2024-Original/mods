@@ -1,3 +1,4 @@
+using System.Drawing.Imaging;
 using System.Drawing.Drawing2D;
 using GEO_DASH.Audio;
 using GEO_DASH.Core;
@@ -26,6 +27,13 @@ namespace GEO_DASH.UI
 
         public bool PlayFromEditor;
         public double StartAtProgress;
+
+        // мультиплеер: все в одной карте уровня
+        string _mpRoom;
+        int _mpMax;
+        List<MpPlayerDto> _mpPlayers = new();
+        readonly System.Windows.Forms.Timer _mpTimer = new() { Interval = 110 };
+        bool _mpBusy;
 
         // настраиваемый интерфейс: кнопка «=», полоса, кнопки платформера
         static GuiLayout Gui => AppConfig.Settings.Gui;
@@ -61,7 +69,14 @@ namespace GEO_DASH.UI
             _loop.Render += () => { try { Invalidate(); } catch { } };
 
             Load += (s, e) => StartMusic();
-            FormClosed += (s, e) => { _loop.Dispose(); MusicPlayer.Stop(); SaveRun(); };
+            Shown += async (s, e) => await MpJoin();
+            _mpTimer.Tick += async (s, e) => await MpTick();
+            FormClosed += (s, e) =>
+            {
+                _loop.Dispose(); MusicPlayer.Stop(); SaveRun(); _buf?.Dispose();
+                _mpTimer.Stop();
+                if (_mpRoom != null) _ = ApiClient.MpLeaveAsync(_mpRoom);
+            };
             Shown += (s, e) => _loop.Start();
         }
 
@@ -335,19 +350,209 @@ namespace GEO_DASH.UI
 
         // ------------------------------------------------------------- рендер
 
+        Bitmap _buf;
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             _v.Client = ClientSize;
-            _v.CamX = _w.Cam.CamX;
-            _v.CamY = _w.Cam.CamY;
+            _v.CamX = _w.Cam.CamX + _w.GameplayOffsetX;
+            _v.CamY = _w.Cam.CamY + _w.GameplayOffsetY;
             _v.Zoom = _w.Cam.Zoom;
 
-            Renderer.Draw(g, _w, _v, false);
+            if (_w.Fx.AnyPost) DrawWithFx(g);
+            else Renderer.Draw(g, _w, _v, false);
+            DrawOthers(g);
             DrawHud(g);
             if (_paused) DrawPause(g);
             if (_w.Dead) DrawDeath(g);
             if (_w.Finished) DrawWin(g);
+        }
+
+        /// <summary>Экранные эффекты 2.2: сначала рисуем мир в картинку, потом портим её как надо.</summary>
+        void DrawWithFx(Graphics g)
+        {
+            int w = Math.Max(1, ClientSize.Width), h = Math.Max(1, ClientSize.Height);
+            if (_buf == null || _buf.Width != w || _buf.Height != h)
+            {
+                _buf?.Dispose();
+                _buf = new Bitmap(w, h);
+            }
+
+            using (var bg = Graphics.FromImage(_buf))
+            {
+                bg.Clear(Color.Black);
+                Renderer.Draw(bg, _w, _v, false);
+            }
+
+            var fx = _w.Fx;
+            Image img = _buf;
+
+            // крупные пиксели
+            if (fx.Pixelate.On)
+            {
+                int k = (int)Math.Clamp(2 + fx.Pixelate.K * 26, 2, 40);
+                using var small = new Bitmap(Math.Max(1, w / k), Math.Max(1, h / k));
+                using (var sg = Graphics.FromImage(small))
+                {
+                    sg.InterpolationMode = InterpolationMode.Bilinear;
+                    sg.DrawImage(img, 0, 0, small.Width, small.Height);
+                }
+                g.InterpolationMode = InterpolationMode.NearestNeighbor;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
+                DrawColored(g, small, new Rectangle(0, 0, w, h), fx);
+                g.InterpolationMode = InterpolationMode.Default;
+                return;
+            }
+
+            // размытие — уменьшили и вернули обратно
+            if (fx.Blur.On)
+            {
+                int k = (int)Math.Clamp(2 + fx.Blur.K * 10, 2, 14);
+                using var small = new Bitmap(Math.Max(1, w / k), Math.Max(1, h / k));
+                using (var sg = Graphics.FromImage(small))
+                {
+                    sg.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                    sg.DrawImage(img, 0, 0, small.Width, small.Height);
+                }
+                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                DrawColored(g, small, new Rectangle(0, 0, w, h), fx);
+                g.InterpolationMode = InterpolationMode.Default;
+                return;
+            }
+
+            // глюк — полосы со сдвигом
+            if (fx.Glitch.On)
+            {
+                var rnd = new Random((int)(Environment.TickCount64 / 60));
+                int slices = 14;
+                for (int i = 0; i < slices; i++)
+                {
+                    int y = h * i / slices, hh = h / slices + 1;
+                    int off = (int)((rnd.NextDouble() * 2 - 1) * 40 * fx.Glitch.K);
+                    var dst = new Rectangle(off, y, w, hh);
+                    var src = new Rectangle(0, y, w, hh);
+                    g.DrawImage(img, dst, src.X, src.Y, src.Width, src.Height, GraphicsUnit.Pixel);
+                }
+                return;
+            }
+
+            DrawColored(g, img, new Rectangle(0, 0, w, h), fx);
+        }
+
+        /// <summary>Инверсия, ч/б и хроматика — через цветовую матрицу.</summary>
+        static void DrawColored(Graphics g, Image img, Rectangle dst, ScreenFx fx)
+        {
+            if (fx.Chromatic.On)
+            {
+                int off = (int)Math.Clamp(fx.Chromatic.K * 18, 1, 24);
+                DrawChannel(g, img, new Rectangle(dst.X - off, dst.Y, dst.Width, dst.Height), 1, 0, 0);
+                DrawChannel(g, img, dst, 0, 1, 0);
+                DrawChannel(g, img, new Rectangle(dst.X + off, dst.Y, dst.Width, dst.Height), 0, 0, 1);
+                return;
+            }
+
+            float inv = (float)fx.Invert.K, gray = (float)fx.Gray.K;
+            if (inv < 0.001f && gray < 0.001f)
+            {
+                g.DrawImage(img, dst);
+                return;
+            }
+
+            // смешиваем обычные цвета с инверсией и серым
+            float r = 1 - inv * 2, gr = 0.299f * gray, gg = 0.587f * gray, gb = 0.114f * gray;
+            var m = new ColorMatrix(new[]
+            {
+                new[] { r * (1 - gray) + gr, gr, gr, 0f, 0f },
+                new[] { gg, r * (1 - gray) + gg, gg, 0f, 0f },
+                new[] { gb, gb, r * (1 - gray) + gb, 0f, 0f },
+                new[] { 0f, 0f, 0f, 1f, 0f },
+                new[] { inv, inv, inv, 0f, 1f }
+            });
+            using var attr = new ImageAttributes();
+            attr.SetColorMatrix(m);
+            g.DrawImage(img, dst, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, attr);
+        }
+
+        static void DrawChannel(Graphics g, Image img, Rectangle dst, float r, float gg, float b)
+        {
+            var m = new ColorMatrix(new[]
+            {
+                new[] { r, 0f, 0f, 0f, 0f },
+                new[] { 0f, gg, 0f, 0f, 0f },
+                new[] { 0f, 0f, b, 0f, 0f },
+                new[] { 0f, 0f, 0f, 1f, 0f },
+                new[] { 0f, 0f, 0f, 0f, 1f }
+            });
+            using var attr = new ImageAttributes();
+            attr.SetColorMatrix(m);
+            var old = g.CompositingMode;
+            g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+            g.DrawImage(img, dst, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, attr);
+            g.CompositingMode = old;
+        }
+
+        // ------------------------------------------------------------- мультиплеер
+
+        async Task MpJoin()
+        {
+            if (!_level.Settings.Multiplayer || _testMode) return;
+            if (!AppConfig.LoggedIn) { Toast("Мультиплеер — только с аккаунтом"); return; }
+
+            int id = _level.Settings.ServerId;
+            if (id <= 0) { Toast("Залей уровень на сервер, тогда будет мультиплеер"); return; }
+
+            var r = await ApiClient.MpJoinAsync(id, Math.Clamp(_level.Settings.MaxPlayers, 2, 50));
+            if (!r.Ok || r.Data == null || string.IsNullOrEmpty(r.Data.Room))
+            {
+                Toast("Мультиплеер недоступен: " + (r.Error ?? "нет связи"));
+                return;
+            }
+            _mpRoom = r.Data.Room;
+            _mpMax = r.Data.Max;
+            Toast($"Мультиплеер: комната на {r.Data.Max} игроков");
+            _mpTimer.Start();
+        }
+
+        async Task MpTick()
+        {
+            if (_mpRoom == null || _mpBusy) return;
+            _mpBusy = true;
+            try
+            {
+                var p = _w.P1;
+                var r = await ApiClient.MpStateAsync(_mpRoom, p.X, p.Y, (int)p.Mode,
+                    p.GravityDir, p.Mini, _w.Dead, _w.Progress * 100,
+                    _w.Colors.Eff(ColorSystem.ChP1).ToArgb());
+                if (r.Ok && r.Data != null)
+                {
+                    _mpPlayers = r.Data.Players ?? new List<MpPlayerDto>();
+                    _mpMax = r.Data.Max;
+                }
+            }
+            catch { }
+            finally { _mpBusy = false; }
+        }
+
+        /// <summary>Другие игроки — полупрозрачные кубики с именами.</summary>
+        void DrawOthers(Graphics g)
+        {
+            if (_mpRoom == null || _mpPlayers.Count == 0) return;
+            foreach (var o in _mpPlayers)
+            {
+                double size = o.Mini ? 22 : 30;
+                var r = _v.WorldRect(o.X - size / 2, o.Y - size / 2, size, size);
+                if (r.Right < -60 || r.X > ClientSize.Width + 60) continue;
+
+                var col = Color.FromArgb(o.Color == 0 ? unchecked((int)0xFF66CCFF) : o.Color);
+                using (var br = new SolidBrush(Color.FromArgb(o.Dead ? 70 : 150, col)))
+                    g.FillRectangle(br, r);
+                using (var pen = new Pen(Color.FromArgb(o.Dead ? 90 : 200, 10, 10, 25), 2.5f))
+                    g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
+                using var f = Gd.Bold(8.5f);
+                Gd.Outlined(g, o.Name, f, new RectangleF(r.X - 50, r.Y - 22, r.Width + 100, 18),
+                    Color.FromArgb(230, 235, 245, 255), thick: 2f);
+            }
         }
 
         void DrawHud(Graphics g)
@@ -430,6 +635,9 @@ namespace GEO_DASH.UI
                         Color.FromArgb(220, 200, 215, 255), StringAlignment.Far, thick: 2f);
                 if (!ApiClient.Online)
                     Gd.Outlined(g, "ОФЛАЙН", f, new RectangleF(w - 120, 32, 110, 22), Gd.Gold, StringAlignment.Far, thick: 2f);
+                if (_mpRoom != null)
+                    Gd.Outlined(g, $"В КАРТЕ: {_mpPlayers.Count + 1} / {_mpMax}", f,
+                        new RectangleF(w - 260, 54, 250, 22), Gd.Lime, StringAlignment.Far, thick: 2f);
             }
 
             // в лаве — обратный отсчёт до смерти

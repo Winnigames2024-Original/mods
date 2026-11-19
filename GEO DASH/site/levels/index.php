@@ -36,7 +36,7 @@ gd_head('Уровни', 'levels');
       <tr>
         <td class="muted">#<?= (int)$l['id'] ?></td>
         <td class="lvname">
-          <a href="/levels/view.php?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a>
+          <a href="/level/?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a>
           <?php if (!empty($l['daily'])): ?> <span class="badge">DAILY</span><?php endif; ?>
           <?php if (!empty($l['weekly'])): ?> <span class="badge">WEEKLY</span><?php endif; ?>
           <?php if (!empty($l['epic'])): ?> <span class="badge" style="background:#5c1d4d">EPIC</span>
@@ -46,7 +46,7 @@ gd_head('Уровни', 'levels');
         <td><a href="/profile/?user=<?= urlencode($l['author']) ?>"><?= h($l['author']) ?></a></td>
         <td><span class="diff <?= gd_diff_class((int)$l['difficulty']) ?>"><?= h(gd_diff_name((int)$l['difficulty'])) ?></span></td>
         <td><?= (int)$l['stars'] ?></td><td><?= (int)$l['likes'] ?></td><td><?= (int)$l['downloads'] ?></td>
-        <td><a class="btn small ghost" href="/levels/view.php?id=<?= (int)$l['id'] ?>">Открыть</a></td>
+        <td><a class="btn small ghost" href="/level/?id=<?= (int)$l['id'] ?>">Открыть</a></td>
       </tr>
     <?php endforeach; ?>
     <?php if (!$levels): ?><tr><td colspan="8" class="muted">Ничего не найдено.</td></tr><?php endif; ?>

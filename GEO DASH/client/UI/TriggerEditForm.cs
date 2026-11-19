@@ -84,6 +84,21 @@ namespace GEO_DASH.UI
         void NumI(string label, Func<int> get, Action<int> set, int min, int max)
             => NumF(label, () => get(), v => set((int)v), min, max, 0);
 
+        /// <summary>Текстовое поле (например имя звука).</summary>
+        void Txt(string label, Func<string> get, Action<string> set)
+        {
+            Label(label);
+            var t = new TextBox
+            {
+                Left = 276, Top = _y, Width = 250, Text = get() ?? "",
+                BackColor = Color.FromArgb(22, 20, 52), ForeColor = Gd.Paper,
+                BorderStyle = BorderStyle.FixedSingle, Font = Gd.Bold(10f)
+            };
+            _p.Controls.Add(t);
+            _apply.Add(() => set(t.Text.Trim()));
+            _y += 34;
+        }
+
         void Chk(string label, Func<bool> get, Action<bool> set)
         {
             var c = new CheckBox
@@ -274,6 +289,157 @@ namespace GEO_DASH.UI
 
                 case TriggerType.SpeedChange:
                     Enum2("Скорость", () => d.Speed, v => d.Speed = v);
+                    break;
+
+                // ---------------- 2.2 ----------------
+                case TriggerType.Gradient:
+                    ColorPick("Цвет сверху", () => d.Color, v => d.Color = v);
+                    ColorPick("Цвет снизу", () => d.Color2, v => d.Color2 = v);
+                    Chk("включить (иначе убрать)", () => d.Activate, v => d.Activate = v);
+                    break;
+
+                case TriggerType.Particles:
+                    NumI("Сколько частиц", () => d.Count, v => d.Count = v, 1, 120);
+                    ColorPick("Цвет", () => d.Color, v => d.Color = v);
+                    NumF("Сила разлёта (0..1)", () => d.FxStrength, v => d.FxStrength = v, 0, 1);
+                    break;
+
+                case TriggerType.Shockwave:
+                case TriggerType.Chromatic:
+                case TriggerType.Pixelate:
+                case TriggerType.Glitch:
+                case TriggerType.InvertColor:
+                case TriggerType.Grayscale:
+                case TriggerType.Blur:
+                case TriggerType.Vignette:
+                    NumF("Сила (0..1)", () => d.FxStrength, v => d.FxStrength = v, 0, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    break;
+
+                case TriggerType.Flash:
+                    ColorPick("Цвет вспышки", () => d.Color, v => d.Color = v);
+                    NumF("Сила (0..1)", () => d.FxStrength, v => d.FxStrength = v, 0, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 10);
+                    break;
+
+                case TriggerType.Bump:
+                    NumF("Сила тряски", () => d.ShakeStrength, v => d.ShakeStrength = v, 0, 200, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 10);
+                    break;
+
+                case TriggerType.TimeWarp:
+                    NumF("Скорость времени (1 = обычная)", () => d.TimeScale, v => d.TimeScale = v, 0.1, 4);
+                    break;
+
+                case TriggerType.AreaMove:
+                    NumF("Радиус, единиц", () => d.AreaRadius, v => d.AreaRadius = v, 30, 3000, 0);
+                    NumF("Сдвиг X", () => d.MoveX, v => d.MoveX = v, -2000, 2000, 1);
+                    NumF("Сдвиг Y", () => d.MoveY, v => d.MoveY = v, -2000, 2000, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    Enum2("Плавность", () => d.Easing, v => d.Easing = v);
+                    break;
+
+                case TriggerType.AreaRotate:
+                    NumF("Радиус, единиц", () => d.AreaRadius, v => d.AreaRadius = v, 30, 3000, 0);
+                    NumF("Градусы", () => d.Degrees, v => d.Degrees = v, -3600, 3600, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    break;
+
+                case TriggerType.AreaScale:
+                    NumF("Радиус, единиц", () => d.AreaRadius, v => d.AreaRadius = v, 30, 3000, 0);
+                    NumF("Масштаб X", () => d.ScaleX, v => d.ScaleX = v, 0.05, 20);
+                    NumF("Масштаб Y", () => d.ScaleY, v => d.ScaleY = v, 0.05, 20);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    break;
+
+                case TriggerType.AreaFade:
+                    NumF("Радиус, единиц", () => d.AreaRadius, v => d.AreaRadius = v, 30, 3000, 0);
+                    NumF("Прозрачность (0..1)", () => d.Opacity, v => d.Opacity = v, 0, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    break;
+
+                case TriggerType.AreaTint:
+                    NumF("Радиус, единиц", () => d.AreaRadius, v => d.AreaRadius = v, 30, 3000, 0);
+                    ColorPick("Цвет", () => d.Color, v => d.Color = v);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0.05, 60);
+                    break;
+
+                case TriggerType.Sequence:
+                    NumI("Группа 2", () => d.GroupB, v => d.GroupB = v, 0, 9999);
+                    NumI("Группа 3", () => d.CenterGroup, v => d.CenterGroup = v, 0, 9999);
+                    NumI("Группа 4", () => d.SecondaryGroup, v => d.SecondaryGroup = v, 0, 9999);
+                    NumF("Пауза между шагами, сек", () => d.StepDelay, v => d.StepDelay = v, 0.02, 10);
+                    break;
+
+                case TriggerType.AdvancedFollow:
+                    NumF("Коэффициент X", () => d.FollowXMod, v => d.FollowXMod = v, -10, 10);
+                    NumF("Коэффициент Y", () => d.FollowYMod, v => d.FollowYMod = v, -10, 10);
+                    NumF("Задержка, сек", () => d.FollowDelay, v => d.FollowDelay = v, 0, 5);
+                    NumF("Макс. скорость", () => d.FollowMaxSpeed, v => d.FollowMaxSpeed = v, 0, 5000, 0);
+                    NumF("Длительность, сек (0 = всегда)", () => d.Duration, v => d.Duration = v, 0, 600);
+                    break;
+
+                case TriggerType.CameraEdge:
+                case TriggerType.CameraGuide:
+                    NumF("Смещение X", () => d.CamOffsetX, v => d.CamOffsetX = v, -2000, 2000, 1);
+                    NumF("Смещение Y", () => d.CamOffsetY, v => d.CamOffsetY = v, -2000, 2000, 1);
+                    NumF("Длительность, сек", () => d.Duration, v => d.Duration = v, 0, 30);
+                    break;
+
+                case TriggerType.CameraStatic:
+                    Chk("камера стоит на месте", () => d.CamStatic, v => d.CamStatic = v);
+                    break;
+
+                case TriggerType.CameraRotate:
+                case TriggerType.RotateGameplay:
+                    NumF("Градусы", () => d.Degrees, v => d.Degrees = v, -180, 180, 1);
+                    break;
+
+                case TriggerType.GameplayOffset:
+                    NumF("Сдвиг X", () => d.MoveX, v => d.MoveX = v, -600, 600, 1);
+                    NumF("Сдвиг Y", () => d.MoveY, v => d.MoveY = v, -600, 600, 1);
+                    break;
+
+                case TriggerType.Event:
+                case TriggerType.Reset:
+                    NumI("Номер события", () => d.EventId, v => d.EventId = v, 0, 9999);
+                    break;
+
+                case TriggerType.ItemEdit:
+                    NumI("ID счётчика", () => d.ItemId, v => d.ItemId = v, 1, 9999);
+                    NumI("Изменить на", () => d.Count, v => d.Count = v, -9999, 9999);
+                    break;
+
+                case TriggerType.PersistentItem:
+                    NumI("ID счётчика", () => d.ItemId, v => d.ItemId = v, 1, 9999);
+                    break;
+
+                case TriggerType.ItemCompare:
+                    NumI("ID счётчика", () => d.ItemId, v => d.ItemId = v, 1, 9999);
+                    NumI("Сравнение: 0 ==, 1 >, 2 <, 3 >=, 4 <=, 5 !=", () => d.Compare, v => d.Compare = v, 0, 5);
+                    NumI("Значение", () => d.TargetCount, v => d.TargetCount = v, -9999, 9999);
+                    NumI("Группа «верно»", () => d.TrueGroup, v => d.TrueGroup = v, 0, 9999);
+                    NumI("Группа «неверно»", () => d.FalseGroup, v => d.FalseGroup = v, 0, 9999);
+                    break;
+
+                case TriggerType.ToggleBlock:
+                case TriggerType.LinkVisible:
+                    Chk("включить (иначе выключить)", () => d.Activate, v => d.Activate = v);
+                    break;
+
+                case TriggerType.EnterEffect:
+                    NumF("Прозрачность появления", () => d.Opacity, v => d.Opacity = v, 0, 1);
+                    break;
+
+                case TriggerType.Sfx:
+                    Txt("Звук (click, jump, orb, coin, death)", () => d.SfxName, v => d.SfxName = v);
+                    break;
+
+                case TriggerType.EditSong:
+                    NumI("ID трека (0 — текущий)", () => d.SongId, v => d.SongId = v, -99, 99999999);
+                    NumF("Громкость", () => d.SongVolume, v => d.SongVolume = v, 0, 1);
+                    NumF("Старт, сек", () => d.SongStartSec, v => d.SongStartSec = v, 0, 600);
+                    Chk("зациклить", () => d.SongLoop, v => d.SongLoop = v);
                     break;
 
                 case TriggerType.Options:

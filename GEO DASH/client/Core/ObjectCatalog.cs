@@ -5,7 +5,7 @@ namespace GEO_DASH.Core
         Block, Slab, Platform, Brick, Glass, SlopeUp, SlopeDown,
         Spike, SpikeSmall, SpikeHalf, Saw, SawBig, SpikeRow, HazardBlock,
         Orb, Pad, Portal, Deco, DecoCircle, DecoTri, Glow, Text,
-        Coin, Pickup, Finish, Checkpoint, Trigger, Teleport, Water, Lava
+        Coin, Pickup, Finish, Checkpoint, Trigger, Teleport, Water, Lava, Image
     }
 
     public class ObjectDef
@@ -79,6 +79,10 @@ namespace GEO_DASH.Core
             Add(new ObjectDef { Id = 82, Name = "Пикап (предмет)", Category = "Сбор", Kind = ObjKind.Coin, Style = DrawStyle.Pickup, Hx = -2, Hy = -2, Hw = 34, Hh = 34 });
 
             // ---------- служебное ----------
+            // ---------- картинки с сайта ----------
+            Add(new ObjectDef { Id = 98, Name = "Картинка", Category = "Картинки", Kind = ObjKind.Deco,
+                Style = DrawStyle.Image, W = 120, H = 120, Hw = 120, Hh = 120 });
+
             // ---------- жидкости ----------
             Add(new ObjectDef { Id = 94, Name = "Вода", Category = "Жидкости", Kind = ObjKind.Liquid, Style = DrawStyle.Water,
                 W = 30, H = 30, Hw = 30, Hh = 30, WormPhase = true });

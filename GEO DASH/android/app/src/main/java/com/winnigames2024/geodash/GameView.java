@@ -19,6 +19,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     volatile boolean running;
     boolean hold1, pressed1, hold2, pressed2, paused;
     // настраиваемый интерфейс
+    // мультиплеер
+    String mpRoom;
+    int mpMax;
+    org.json.JSONArray mpPlayers;
+    long mpLast;
+
     final GuiLayout gui = GuiLayout.load();
     boolean guiEdit;
     GuiLayout.Item dragItem;
@@ -85,6 +91,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
             if (!paused) {
                 eng.moveX = (btnRight ? 1 : 0) - (btnLeft ? 1 : 0);
+                mpTick();
                 acc += dt;
                 int guard = 0;
                 while (acc >= FIXED && guard++ < 400) {
@@ -219,6 +226,45 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         gui.save();
     }
 
+    /** Зайти в мультиплеерную комнату уровня. */
+    public void mpStart() {
+        if (!level.settings.multiplayer || level.settings.serverId <= 0 || !Store.loggedIn()) return;
+        final int id = level.settings.serverId;
+        final int max = Math.max(2, Math.min(50, level.settings.maxPlayers));
+        Api.async(() -> {
+            String room = Api.mpJoin(id, max);
+            if (room != null) {
+                mpRoom = room;
+                mpMax = max;
+                say("Мультиплеер: комната на " + max);
+            }
+        });
+    }
+
+    public void mpStop() {
+        final String r = mpRoom;
+        mpRoom = null;
+        if (r != null) Api.async(() -> Api.mpLeave(r));
+    }
+
+    /** Раз в ~120 мс отправляем себя и забираем остальных. */
+    void mpTick() {
+        if (mpRoom == null) return;
+        long now = System.currentTimeMillis();
+        if (now - mpLast < 120) return;
+        mpLast = now;
+        final String room = mpRoom;
+        Api.async(() -> {
+            org.json.JSONObject r = Api.mpState(room, eng.p1.x, eng.p1.y, eng.p1.mode,
+                    eng.p1.gravityDir, eng.p1.mini, eng.dead, eng.progress * 100,
+                    eng.color(Engine.CH_P1));
+            if (r != null) {
+                mpPlayers = r.optJSONArray("players");
+                mpMax = r.optInt("max", mpMax);
+            }
+        });
+    }
+
     public void exit() { if (onExit != null) onExit.onExit(this); }
 
     public void togglePause() {
@@ -262,6 +308,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         Backdrop.background(c, new RectF(0, 0, W, H), level.settings.bgId, bg,
                 eng.camX * scale() * 0.26, eng.camY * scale() * 0.16, tex);
 
+        if (eng.fx.gradientOn) {
+            Paint gp = new Paint();
+            gp.setShader(new LinearGradient(0, 0, 0, H, eng.fx.gradTop, eng.fx.gradBottom, Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, W, H, gp);
+        }
+
         drawGround(c, W, H);
 
         float visLeft = (float) ((0 - W / 2.0) / scale() + eng.camX) - 120;
@@ -281,6 +333,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (!eng.p1.hidden) drawPlayer(c, eng.p1, eng.color(Engine.CH_P1));
         if (eng.dual && !eng.p2.hidden) drawPlayer(c, eng.p2, eng.color(Engine.CH_P2));
 
+        drawFx(c, W, H);
+        drawOthers(c);
         drawHud(c, W, H);
         if (eng.dead) c.drawColor(Color.argb(70, 160, 20, 30));
         if (eng.finished) drawOverlay(c, W, H, "УРОВЕНЬ ПРОЙДЕН", new String[]{
@@ -442,6 +496,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             case Catalog.ST_GLOW:
                 c.drawOval(r, Gd.fill(Color.argb(Math.min(90, alpha), Color.red(col), Color.green(col), Color.blue(col))));
                 break;
+            case Catalog.ST_IMAGE: {
+                android.graphics.Bitmap bm = Images.get(o.imageId);
+                if (bm != null) {
+                    Paint ip = new Paint(Paint.FILTER_BITMAP_FLAG);
+                    ip.setAlpha(Math.max(0, Math.min(255, alpha)));
+                    c.drawBitmap(bm, null, r, ip);
+                } else {
+                    c.drawRect(r, Gd.fill(Color.argb(Math.min(120, alpha), 120, 140, 220)));
+                    Gd.outlined(c, "IMG #" + o.imageId, r.centerX(), r.centerY(),
+                            Math.max(10f, r.height() * 0.2f), Gd.PAPER, Paint.Align.CENTER);
+                }
+                break;
+            }
             case Catalog.ST_WATER:
             case Catalog.ST_LAVA:
                 drawLiquid(c, r, d.style == Catalog.ST_LAVA, alpha);
@@ -692,6 +759,57 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
     }
 
+    /** Частицы, ударная волна, виньетка и вспышка. */
+    void drawFx(Canvas c, int W, int H) {
+        Fx fx = eng.fx;
+
+        for (Fx.Particle p : fx.particles) {
+            float x = sx(p.x), y = sy(p.y);
+            float sz = (float) (p.size * Math.max(0.4f, scale()));
+            int a = (int) Math.max(0, Math.min(255, 255 * (p.life / Math.max(0.1, p.maxLife))));
+            c.drawCircle(x, y, sz / 2, Gd.fill(Color.argb(a,
+                    Color.red(p.color), Color.green(p.color), Color.blue(p.color))));
+        }
+
+        if (fx.shock.on()) {
+            double k = 1 - fx.shock.k() / Math.max(0.001, fx.shock.str);
+            float cx = sx(fx.shockX), cy = sy(fx.shockY);
+            float rad = (float) (40 + k * 900 * scale());
+            int a = (int) Math.max(0, Math.min(200, 200 * fx.shock.k() / Math.max(0.001, fx.shock.str)));
+            c.drawCircle(cx, cy, rad, Gd.stroke(Color.argb(a, 255, 255, 255),
+                    (float) (14 * fx.shock.str * (1 - k) + 2)));
+        }
+
+        if (fx.vignette.on()) {
+            Paint vp = new Paint();
+            vp.setShader(new RadialGradient(W / 2f, H / 2f, Math.max(W, H) * 0.75f,
+                    Color.TRANSPARENT, Color.argb((int) (220 * fx.vignette.k()), 0, 0, 0), Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, W, H, vp);
+        }
+
+        if (fx.flash.on())
+            c.drawColor(Color.argb((int) Math.max(0, Math.min(255, 255 * fx.flash.k())),
+                    Color.red(fx.flashColor), Color.green(fx.flashColor), Color.blue(fx.flashColor)));
+    }
+
+    /** Другие игроки в мультиплеере. */
+    void drawOthers(Canvas c) {
+        if (mpPlayers == null || mpPlayers.length() == 0) return;
+        for (int i = 0; i < mpPlayers.length(); i++) {
+            org.json.JSONObject o = mpPlayers.optJSONObject(i);
+            if (o == null) continue;
+            double size = o.optBoolean("mini") ? 22 : 30;
+            RectF r = worldRect(o.optDouble("x", 0) - size / 2, o.optDouble("y", 0) - size / 2, size, size);
+            if (r.right < -60 || r.left > getWidth() + 60) continue;
+            int col = o.optInt("color", Color.rgb(102, 204, 255));
+            boolean dead = o.optBoolean("dead");
+            c.drawRect(r, Gd.fill(Color.argb(dead ? 70 : 150, Color.red(col), Color.green(col), Color.blue(col))));
+            c.drawRect(r, Gd.stroke(Color.argb(dead ? 90 : 200, 10, 10, 25), 2.5f));
+            Gd.outlined(c, o.optString("name"), r.centerX(), r.top - 8,
+                    Math.max(10f, r.height() * 0.42f), Color.argb(230, 235, 245, 255), Paint.Align.CENTER);
+        }
+    }
+
     void drawHud(Canvas c, int W, int H) {
         hit.clear();
 
@@ -751,6 +869,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                         mr.right + 12 + i * fs * 1.1f + fs * 0.9f, mr.bottom + fs * 1.9f), true);
         if (!Api.online)
             Gd.outlined(c, "ОФЛАЙН", W - 16, fs * 1.4f, fs * 0.62f, Gd.GOLD, Paint.Align.RIGHT);
+        if (mpRoom != null)
+            Gd.outlined(c, "В КАРТЕ: " + ((mpPlayers == null ? 0 : mpPlayers.length()) + 1) + " / " + mpMax,
+                    W - 16, fs * 2.3f, fs * 0.62f, Gd.LIME, Paint.Align.RIGHT);
 
         // в лаве — обратный отсчёт до смерти
         if (eng.p1.lavaTime > 0.05) {

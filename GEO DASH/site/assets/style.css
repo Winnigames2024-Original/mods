@@ -172,3 +172,15 @@ footer a{color:var(--gold)}
   h1{font-size:30px}
   .card,.panel{padding:16px}
 }
+
+/* ---------- классы со старых страниц ---------- */
+.section{padding:26px 0}
+.muted{color:var(--dim);text-shadow:2px 2px 0 rgba(0,0,0,.45)}
+.alert{padding:13px 16px;border-radius:12px;border:3px solid #000;font-weight:800;margin:14px 0;
+  box-shadow:0 4px 0 #000;background:linear-gradient(180deg,#4b4890,#2a2560)}
+.alert.err{background:linear-gradient(180deg,#ff8a99,#c3324a)}
+.alert.ok{background:linear-gradient(180deg,#8cffb4,#17a563);color:#06261a}
+.lv{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:2px solid rgba(0,0,0,.45)}
+.lv:first-child{border-top:none}
+.lvname{font-weight:900;font-size:17px;text-shadow:2px 2px 0 #000}
+.form.card{max-width:460px;margin:26px auto}

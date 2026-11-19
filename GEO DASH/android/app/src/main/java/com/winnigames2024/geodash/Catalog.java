@@ -13,7 +13,7 @@ public final class Catalog {
             ST_SAW = 10, ST_SAW_BIG = 11, ST_SPIKE_ROW = 12, ST_HAZARD_BLOCK = 13, ST_ORB = 14,
             ST_PAD = 15, ST_PORTAL = 16, ST_DECO = 17, ST_CIRCLE = 18, ST_TRI = 19, ST_GLOW = 20,
             ST_TEXT = 21, ST_COIN = 22, ST_PICKUP = 23, ST_FINISH = 24, ST_CHECKPOINT = 25, ST_TRIGGER = 26,
-            ST_WATER = 27, ST_LAVA = 28;
+            ST_WATER = 27, ST_LAVA = 28, ST_IMAGE = 29;
 
     public static class Def {
         public int id, kind, style;
@@ -65,6 +65,9 @@ public final class Catalog {
 
         add(new Def(80, COIN, ST_COIN).hit(-2, -2, 34, 34));
         add(new Def(82, COIN, ST_PICKUP).hit(-2, -2, 34, 34));
+
+        // картинка с сайта
+        add(new Def(98, DECO, ST_IMAGE).size(120, 120).hit(0, 0, 120, 120));
 
         // вода и лава: в них плавают, в лаве горят
         add(new Def(94, LIQUID, ST_WATER));

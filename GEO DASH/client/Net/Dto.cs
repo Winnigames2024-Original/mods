@@ -82,6 +82,47 @@ namespace GEO_DASH.Net
         [JsonPropertyName("cached")] public bool Cached { get; set; }
     }
 
+    /// <summary>Комментарий к уровню.</summary>
+    public class CommentDto
+    {
+        [JsonPropertyName("id")] public string Id { get; set; } = "";
+        [JsonPropertyName("author")] public string Author { get; set; } = "";
+        [JsonPropertyName("text")] public string Text { get; set; } = "";
+        [JsonPropertyName("created")] public string Created { get; set; } = "";
+        [JsonPropertyName("avatar")] public int Avatar { get; set; }
+    }
+
+    /// <summary>Ответ на вход в комнату мультиплеера.</summary>
+    public class MpJoinDto
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; set; }
+        [JsonPropertyName("room")] public string Room { get; set; } = "";
+        [JsonPropertyName("max")] public int Max { get; set; }
+        [JsonPropertyName("players")] public int Players { get; set; }
+    }
+
+    /// <summary>Другой игрок в комнате.</summary>
+    public class MpPlayerDto
+    {
+        [JsonPropertyName("name")] public string Name { get; set; } = "";
+        [JsonPropertyName("x")] public double X { get; set; }
+        [JsonPropertyName("y")] public double Y { get; set; }
+        [JsonPropertyName("mode")] public int Mode { get; set; }
+        [JsonPropertyName("dir")] public int Dir { get; set; } = 1;
+        [JsonPropertyName("mini")] public bool Mini { get; set; }
+        [JsonPropertyName("dead")] public bool Dead { get; set; }
+        [JsonPropertyName("percent")] public double Percent { get; set; }
+        [JsonPropertyName("color")] public int Color { get; set; }
+    }
+
+    public class MpStateDto
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; set; }
+        [JsonPropertyName("room")] public string Room { get; set; } = "";
+        [JsonPropertyName("max")] public int Max { get; set; }
+        [JsonPropertyName("players")] public List<MpPlayerDto> Players { get; set; } = new();
+    }
+
     public class DailyDto
     {
         [JsonPropertyName("date")] public string Date { get; set; } = "";

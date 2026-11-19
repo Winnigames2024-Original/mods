@@ -27,12 +27,25 @@ public class Level {
             "BgColor","GroundColor","Shake","Follow","FollowPlayerY","Animate","Touch","Count","InstantCount",
             "Pickup","Collision","InstantCollision","Random","Timer","Camera","CameraZoom","Song","Gravity",
             "Teleport","OnDeath","Trail","HidePlayer","ShowPlayer","Options","Checkpoint","End","Reverse",
-            "Keyframe","SpeedChange"};
+            "Keyframe","SpeedChange",
+            // 2.2
+            "Gradient","Particles","Shockwave","Chromatic","Pixelate","Glitch","InvertColor","Grayscale",
+            "Blur","Vignette","TimeWarp","AreaMove","AreaRotate","AreaScale","AreaFade","AreaTint",
+            "Sequence","AdvancedFollow","CameraEdge","CameraGuide","CameraStatic","CameraRotate",
+            "Event","Reset","ItemEdit","ItemCompare","PersistentItem","ToggleBlock","LinkVisible",
+            "Sfx","EditSong","GameplayOffset","RotateGameplay","EnterEffect","Flash","Bump"};
     public static final int T_MOVE=0,T_ROTATE=1,T_SCALE=2,T_ALPHA=3,T_TOGGLE=4,T_SPAWN=5,T_STOP=6,T_PULSE=7,
             T_COLOR=8,T_BG=9,T_GROUND=10,T_SHAKE=11,T_FOLLOW=12,T_FOLLOWY=13,T_ANIMATE=14,T_TOUCH=15,T_COUNT=16,
             T_ICOUNT=17,T_PICKUP=18,T_COLLISION=19,T_ICOLLISION=20,T_RANDOM=21,T_TIMER=22,T_CAMERA=23,T_ZOOM=24,
             T_SONG=25,T_GRAVITY=26,T_TELEPORT=27,T_ONDEATH=28,T_TRAIL=29,T_HIDE=30,T_SHOW=31,T_OPTIONS=32,
-            T_CHECKPOINT=33,T_END=34,T_REVERSE=35,T_KEYFRAME=36,T_SPEED=37;
+            T_CHECKPOINT=33,T_END=34,T_REVERSE=35,T_KEYFRAME=36,T_SPEED=37,
+            // 2.2
+            T_GRADIENT=38,T_PARTICLES=39,T_SHOCK=40,T_CHROMATIC=41,T_PIXELATE=42,T_GLITCH=43,
+            T_INVERT=44,T_GRAY=45,T_BLUR=46,T_VIGNETTE=47,T_TIMEWARP=48,T_AREAMOVE=49,T_AREAROT=50,
+            T_AREASCALE=51,T_AREAFADE=52,T_AREATINT=53,T_SEQUENCE=54,T_ADVFOLLOW=55,T_CAMEDGE=56,
+            T_CAMGUIDE=57,T_CAMSTATIC=58,T_CAMROTATE=59,T_EVENT=60,T_RESET=61,T_ITEMEDIT=62,
+            T_ITEMCMP=63,T_PERSIST=64,T_TOGGLEBLOCK=65,T_LINKVIS=66,T_SFX=67,T_EDITSONG=68,
+            T_GPOFFSET=69,T_ROTGAMEPLAY=70,T_ENTER=71,T_FLASH=72,T_BUMP=73;
 
     static int indexOf(String[] arr, String v, int def) {
         if (v == null) return def;
@@ -47,6 +60,9 @@ public class Level {
         public int startMode = Gd.CUBE, startSpeed = 1, difficulty = 0;
         public boolean startMini, startDual, startMirror, startGravityUp, twoPlayer, reverse;
         public boolean platformerFreeMove;
+        /** Тип уровня: мультиплеер, и сколько игроков в одной карте. */
+        public boolean multiplayer;
+        public int maxPlayers = 4;
         public int songId = 0;
         public double songOffset = 0, gravityScale = 1, lengthUnits = 0;
         public int bgColor = 0xFF2040A0, groundColor = 0xFF1A2E80, lineColor = 0xFFFFFFFF,
@@ -70,6 +86,10 @@ public class Level {
         public boolean activate = true, touchTriggered, spawnTriggered, multiTrigger, pulseToGroup = true,
                 camStatic, songLoop, countMulti, blending, optChangeMode, optMini, optDual, optMirror;
         public int optMode = Gd.CUBE;
+        // 2.2
+        public double fxStrength = 0.6, areaRadius = 300, timeScale = 1, stepDelay = 0.25;
+        public int color2 = 0xFF000000, eventId, compare, trueGroup, falseGroup;
+        public String sfxName = "click";
     }
 
     public static class Obj {
@@ -80,6 +100,8 @@ public class Level {
         public int[] groups = new int[0];
         public Trig trig;
         public String text = "";
+        /** ID картинки с сайта для объекта «картинка». */
+        public int imageId;
     }
 
     public Settings settings = new Settings();
@@ -124,6 +146,8 @@ public class Level {
             s.put("TwoPlayer", t.twoPlayer);
             s.put("ReverseGameplay", t.reverse);
             s.put("PlatformerFreeMove", t.platformerFreeMove);
+            s.put("Multiplayer", t.multiplayer);
+            s.put("MaxPlayers", t.maxPlayers);
             s.put("GravityScale", t.gravityScale);
             s.put("LengthUnits", rightEdge());
             s.put("Version", t.version);
@@ -214,6 +238,8 @@ public class Level {
                 t.twoPlayer = s.optBoolean("TwoPlayer");
                 t.reverse = s.optBoolean("ReverseGameplay");
                 t.platformerFreeMove = s.optBoolean("PlatformerFreeMove", false);
+                t.multiplayer = s.optBoolean("Multiplayer", false);
+                t.maxPlayers = s.optInt("MaxPlayers", 4);
                 t.songId = s.optInt("SongId", 0);
                 t.songName = s.optString("SongName", "");
                 t.songArtist = s.optString("SongArtist", "");
@@ -275,6 +301,7 @@ public class Level {
             if (o.coinIndex != 0) j.put("CoinIndex", o.coinIndex);
             if (o.teleportTargetY != 0) j.put("TeleportTargetY", o.teleportTargetY);
             if (o.text != null && !o.text.isEmpty()) j.put("Text", o.text);
+            if (o.imageId != 0) j.put("ImageId", o.imageId);
             if (o.trig != null) j.put("Trigger", trigJson(o.trig));
         } catch (Exception ignored) { }
         return j;
@@ -303,6 +330,7 @@ public class Level {
         r.coinIndex = o.optInt("CoinIndex", 0);
         r.teleportTargetY = o.optDouble("TeleportTargetY", 0);
         r.text = o.optString("Text", "");
+        r.imageId = o.optInt("ImageId", 0);
 
         JSONArray g = o.optJSONArray("Groups");
         if (g != null) {
@@ -318,6 +346,16 @@ public class Level {
     static Trig parseTrig(JSONObject t) {
         Trig x = new Trig();
         x.type = indexOf(TRIGS, t.optString("Type", "Move"), 0);
+        x.fxStrength = t.optDouble("FxStrength", 0.6);
+        x.areaRadius = t.optDouble("AreaRadius", 300);
+        x.timeScale = t.optDouble("TimeScale", 1);
+        x.stepDelay = t.optDouble("StepDelay", 0.25);
+        x.color2 = t.optInt("Color2", 0xFF000000);
+        x.eventId = t.optInt("EventId", 0);
+        x.compare = t.optInt("Compare", 0);
+        x.trueGroup = t.optInt("TrueGroup", 0);
+        x.falseGroup = t.optInt("FalseGroup", 0);
+        x.sfxName = t.optString("SfxName", "click");
         x.targetGroup = t.optInt("TargetGroup", 0);
         x.centerGroup = t.optInt("CenterGroup", 0);
         x.moveX = t.optDouble("MoveX", 0);

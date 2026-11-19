@@ -113,6 +113,12 @@ if [ "$before" != "$after" ]; then
     log "unit обновлён"
   fi
 
+  # ---- ручной апдейтер ----
+  if [ -f "$SRC/$SUBDIR/update.sh" ]; then
+    install -m 0755 "$SRC/$SUBDIR/update.sh" /usr/local/bin/geodash-update 2>/dev/null || true
+    cp -f "$SRC/$SUBDIR/update.sh" "$WEB/update.sh" 2>/dev/null || true
+  fi
+
   # ---- скрипт автообновления обновляет сам себя ----
   if [ -f "$SRC/$SUBDIR/autoupdatefor5minutes.sh" ] && \
      ! cmp -s "$SRC/$SUBDIR/autoupdatefor5minutes.sh" /usr/local/bin/geodash-autoupdate; then
@@ -120,6 +126,19 @@ if [ "$before" != "$after" ]; then
     log "скрипт автообновления обновлён"
   fi
 fi
+
+# ---- сторож: API должен быть включён в автозапуск и работать ----
+systemctl is-enabled geodash >/dev/null 2>&1 || systemctl enable geodash >/dev/null 2>&1 || true
+if ! systemctl is-active --quiet geodash; then
+  systemctl restart geodash || true
+  log "сервис лежал — поднял"
+fi
+if ! curl -fsS --max-time 5 "http://127.0.0.1:${GEODASH_PORT:-37534}/api/ping" >/dev/null 2>&1; then
+  systemctl restart geodash || true
+  log "API не отвечал — перезапустил"
+fi
+systemctl is-enabled geodash-update.timer >/dev/null 2>&1 || \
+  systemctl enable --now geodash-update.timer >/dev/null 2>&1 || true
 
 # ---- свежие сборки игры ----
 fetch_builds

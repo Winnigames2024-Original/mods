@@ -64,7 +64,7 @@ namespace GEO_DASH
         public static string MusicDir => Ensure(Path.Combine(DataDir, "songs"));
         public static string OfficialDir => Ensure(Path.Combine(DataDir, "official"));
 
-        static string Ensure(string p) { Directory.CreateDirectory(p); return p; }
+        public static string Ensure(string p) { Directory.CreateDirectory(p); return p; }
 
         static AppSettings _settings;
         public static AppSettings Settings

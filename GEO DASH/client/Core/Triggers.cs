@@ -50,6 +50,16 @@ namespace GEO_DASH.Core
             public double Delay, MaxSpeed;
             public int TargetGroup;
         }
+        class ActArea
+        {
+            public TriggerType Type;
+            public List<int> Targets;
+            public double[] FromX, FromY, Power;
+            public double Dx, Dy, Deg, ScaleX, ScaleY, Alpha;
+            public Color Tint;
+            public double Dur, T, Rate;
+            public EasingType Ease;
+        }
         class ActSpawn
         {
             public int Group;
@@ -71,6 +81,7 @@ namespace GEO_DASH.Core
         readonly List<ActScale> _scales = new();
         readonly List<ActAlpha> _alphas = new();
         readonly List<ActFollow> _follows = new();
+        readonly List<ActArea> _areas = new();
         readonly List<ActSpawn> _spawns = new();
         readonly List<ActTimer> _timers = new();
         readonly List<TriggerData> _onDeath = new();
@@ -82,6 +93,7 @@ namespace GEO_DASH.Core
         {
             _moves.Clear(); _rots.Clear(); _scales.Clear(); _alphas.Clear();
             _follows.Clear(); _spawns.Clear(); _timers.Clear(); _onDeath.Clear(); _counts.Clear();
+            _areas.Clear();
         }
 
         // ------------------------------------------------------------- запуск
@@ -398,7 +410,205 @@ namespace GEO_DASH.Core
                     W.P1.Speed = t.Speed;
                     if (W.DualMode) W.P2.Speed = t.Speed;
                     break;
+
+                // ======================= эффекты и возможности 2.2 =======================
+
+                case TriggerType.Gradient:
+                    W.Fx.GradientOn = t.Activate;
+                    W.Fx.GradTop = Color.FromArgb(t.Color);
+                    W.Fx.GradBottom = Color.FromArgb(t.Color2);
+                    break;
+
+                case TriggerType.Particles:
+                    W.Fx.Burst(src?.X + 15 ?? W.P1.X, src?.Y + 15 ?? W.P1.Y,
+                               Math.Clamp(t.Count, 1, 120), Color.FromArgb(t.Color), 120 + t.FxStrength * 400);
+                    break;
+
+                case TriggerType.Shockwave:
+                    W.Fx.Shock.Set(Math.Max(0.15, t.Duration), Math.Clamp(t.FxStrength, 0, 1));
+                    W.Fx.ShockX = src?.X ?? W.P1.X;
+                    W.Fx.ShockY = src?.Y ?? W.P1.Y;
+                    break;
+
+                case TriggerType.Chromatic: W.Fx.Chromatic.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.Pixelate:  W.Fx.Pixelate.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.Glitch:    W.Fx.Glitch.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.InvertColor: W.Fx.Invert.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.Grayscale: W.Fx.Gray.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.Blur:      W.Fx.Blur.Set(t.Duration, t.FxStrength); break;
+                case TriggerType.Vignette:  W.Fx.Vignette.Set(t.Duration, t.FxStrength); break;
+
+                case TriggerType.Flash:
+                    W.Fx.Flash.Set(Math.Max(0.1, t.Duration), Math.Clamp(t.FxStrength, 0, 1));
+                    W.Fx.FlashColor = Color.FromArgb(t.Color);
+                    break;
+
+                case TriggerType.Bump:
+                    W.Cam.Shake(t.ShakeStrength, t.ShakeInterval, Math.Max(0.12, t.Duration));
+                    W.Fx.Shock.Set(Math.Max(0.2, t.Duration), 0.5);
+                    W.Fx.ShockX = W.P1.X; W.Fx.ShockY = W.P1.Y;
+                    break;
+
+                case TriggerType.TimeWarp:
+                    W.Fx.TimeScale = Math.Clamp(t.TimeScale <= 0 ? 1 : t.TimeScale, 0.1, 4);
+                    break;
+
+                // ---- площадные: действуют на всё вокруг себя, чем ближе — тем сильнее
+                case TriggerType.AreaMove:
+                case TriggerType.AreaRotate:
+                case TriggerType.AreaScale:
+                case TriggerType.AreaFade:
+                case TriggerType.AreaTint:
+                    Area(t, src);
+                    break;
+
+                case TriggerType.Sequence:
+                    {
+                        // по очереди включаем группы: цель, вторая, третья…
+                        int[] groups = { t.TargetGroup, t.GroupB, t.CenterGroup, t.SecondaryGroup };
+                        double delay = 0;
+                        foreach (var g in groups)
+                        {
+                            if (g == 0) continue;
+                            _spawns.Add(new ActSpawn { Group = g, Delay = delay });
+                            delay += Math.Max(0.02, t.StepDelay);
+                        }
+                        break;
+                    }
+
+                case TriggerType.AdvancedFollow:
+                    _follows.Add(new ActFollow
+                    {
+                        Targets = W.GroupIndices(t.TargetGroup) ?? new List<int>(),
+                        Xm = t.FollowXMod, Ym = t.FollowYMod,
+                        Dur = t.Duration <= 0 ? 9999 : t.Duration,
+                        Delay = t.FollowDelay, MaxSpeed = t.FollowMaxSpeed,
+                        LastPx = W.P1.X, LastPy = W.P1.Y,
+                        TargetGroup = t.TargetGroup
+                    });
+                    break;
+
+                case TriggerType.CameraEdge:
+                case TriggerType.CameraGuide:
+                    W.Cam.SetOffset(t.CamOffsetX, t.CamOffsetY, Math.Max(0.05, t.Duration));
+                    break;
+
+                case TriggerType.CameraStatic:
+                    W.Cam.Static = t.CamStatic;
+                    break;
+
+                case TriggerType.CameraRotate:
+                    W.GameplayAngle = t.Degrees;
+                    break;
+
+                case TriggerType.GameplayOffset:
+                    W.GameplayOffsetX = t.MoveX;
+                    W.GameplayOffsetY = t.MoveY;
+                    break;
+
+                case TriggerType.RotateGameplay:
+                    W.GameplayAngle = t.Degrees;
+                    break;
+
+                case TriggerType.Event:
+                    W.Events.Add(t.EventId);
+                    if (t.TargetGroup != 0) FireGroup(t.TargetGroup);
+                    break;
+
+                case TriggerType.Reset:
+                    W.Events.Remove(t.EventId);
+                    if (t.TargetGroup != 0) StopGroup(t.TargetGroup);
+                    break;
+
+                case TriggerType.ItemEdit:
+                    W.AddItem(t.ItemId, t.Count);
+                    break;
+
+                case TriggerType.PersistentItem:
+                    // значение остаётся между попытками
+                    W.PersistentItems.Add(t.ItemId);
+                    break;
+
+                case TriggerType.ItemCompare:
+                    {
+                        int have = W.Items.TryGetValue(t.ItemId, out var v) ? v : 0;
+                        bool okCmp = t.Compare switch
+                        {
+                            1 => have > t.TargetCount,
+                            2 => have < t.TargetCount,
+                            3 => have >= t.TargetCount,
+                            4 => have <= t.TargetCount,
+                            5 => have != t.TargetCount,
+                            _ => have == t.TargetCount
+                        };
+                        int g = okCmp ? t.TrueGroup : t.FalseGroup;
+                        if (g != 0) FireGroup(g);
+                        break;
+                    }
+
+                case TriggerType.ToggleBlock:
+                    foreach (var i in W.GroupIndices(t.TargetGroup) ?? new List<int>())
+                        W.St[i].Enabled = !W.St[i].Enabled;
+                    break;
+
+                case TriggerType.LinkVisible:
+                    foreach (var i in W.GroupIndices(t.TargetGroup) ?? new List<int>())
+                        W.St[i].Alpha = t.Activate ? 1 : 0;
+                    break;
+
+                case TriggerType.EnterEffect:
+                    foreach (var i in W.GroupIndices(t.TargetGroup) ?? new List<int>())
+                        W.St[i].Alpha = Math.Clamp(t.Opacity, 0, 1);
+                    break;
+
+                case TriggerType.Sfx:
+                    W.Sfx?.Invoke(string.IsNullOrEmpty(t.SfxName) ? "click" : t.SfxName);
+                    break;
+
+                case TriggerType.EditSong:
+                    W.OnSongTrigger?.Invoke(t.SongId != 0 ? t.SongId : W.Level.Settings.SongId,
+                                            t.SongVolume, t.SongStartSec, t.SongLoop);
+                    break;
             }
+        }
+
+        /// <summary>Площадной триггер: берём всё в радиусе и тянем тем сильнее, чем ближе.</summary>
+        void Area(TriggerData t, LevelObject src)
+        {
+            if (src == null) return;
+            double cx = src.X + 15, cy = src.Y + 15;
+            double rad = Math.Max(30, t.AreaRadius);
+            double dur = Math.Max(0.05, t.Duration);
+
+            var targets = new List<int>();
+            var fromX = new List<double>();
+            var fromY = new List<double>();
+            var power = new List<double>();
+
+            for (int i = 0; i < W.Level.Objects.Count; i++)
+            {
+                var o = W.Level.Objects[i];
+                if (o.Trigger != null) continue;
+                double dx = o.X + 15 - cx, dy = o.Y + 15 - cy;
+                double d = Math.Sqrt(dx * dx + dy * dy);
+                if (d > rad) continue;
+                targets.Add(i);
+                fromX.Add(W.St[i].Dx);
+                fromY.Add(W.St[i].Dy);
+                power.Add(1 - d / rad);          // в центре сильнее
+            }
+            if (targets.Count == 0) return;
+
+            _areas.Add(new ActArea
+            {
+                Type = t.Type,
+                Targets = targets,
+                FromX = fromX.ToArray(), FromY = fromY.ToArray(), Power = power.ToArray(),
+                Dx = t.MoveX, Dy = t.MoveY, Deg = t.Degrees,
+                ScaleX = t.ScaleX, ScaleY = t.ScaleY, Alpha = t.Opacity,
+                Tint = Color.FromArgb(t.Color),
+                Dur = dur, Ease = t.Easing, Rate = t.EaseRate
+            });
         }
 
         void StopGroup(int group)
@@ -416,6 +626,41 @@ namespace GEO_DASH.Core
 
         public void Update(double dt)
         {
+            // площадные триггеры 2.2
+            for (int i = _areas.Count - 1; i >= 0; i--)
+            {
+                var a = _areas[i];
+                a.T += dt;
+                double k = Ease(Math.Clamp(a.T / a.Dur, 0, 1), a.Ease, a.Rate);
+                for (int j = 0; j < a.Targets.Count; j++)
+                {
+                    var st = W.St[a.Targets[j]];
+                    double pw = a.Power[j];
+                    switch (a.Type)
+                    {
+                        case TriggerType.AreaMove:
+                            st.Dx = a.FromX[j] + a.Dx * k * pw;
+                            st.Dy = a.FromY[j] + a.Dy * k * pw;
+                            break;
+                        case TriggerType.AreaRotate:
+                            st.Rot = a.Deg * k * pw;
+                            break;
+                        case TriggerType.AreaScale:
+                            st.SX = 1 + (a.ScaleX - 1) * k * pw;
+                            st.SY = 1 + (a.ScaleY - 1) * k * pw;
+                            break;
+                        case TriggerType.AreaFade:
+                            st.Alpha = 1 + (a.Alpha - 1) * k * pw;
+                            break;
+                        case TriggerType.AreaTint:
+                            st.PulseColor = a.Tint;
+                            st.PulseT = Math.Max(st.PulseT, a.Dur - a.T + 0.1);
+                            break;
+                    }
+                }
+                if (a.T >= a.Dur) _areas.RemoveAt(i);
+            }
+
             for (int i = _moves.Count - 1; i >= 0; i--)
             {
                 var a = _moves[i];
@@ -631,6 +876,42 @@ namespace GEO_DASH.Core
             TriggerType.Reverse => "Reverse — обратный ход",
             TriggerType.Keyframe => "Keyframe",
             TriggerType.SpeedChange => "Speed — сменить скорость",
+            TriggerType.Gradient => "Gradient — градиент на фоне",
+            TriggerType.Particles => "Particles — частицы",
+            TriggerType.Shockwave => "Shock Wave — ударная волна",
+            TriggerType.Chromatic => "Chromatic — цветные края",
+            TriggerType.Pixelate => "Pixelate — крупные пиксели",
+            TriggerType.Glitch => "Glitch — глюк картинки",
+            TriggerType.InvertColor => "Invert — инверсия цветов",
+            TriggerType.Grayscale => "Grayscale — чёрно-белое",
+            TriggerType.Blur => "Blur — размытие",
+            TriggerType.Vignette => "Vignette — тёмные края",
+            TriggerType.Flash => "Flash — вспышка",
+            TriggerType.Bump => "Bump — толчок камеры",
+            TriggerType.TimeWarp => "Time Warp — скорость времени",
+            TriggerType.AreaMove => "Area Move — двигать всё вокруг",
+            TriggerType.AreaRotate => "Area Rotate — вращать вокруг",
+            TriggerType.AreaScale => "Area Scale — масштаб вокруг",
+            TriggerType.AreaFade => "Area Fade — прозрачность вокруг",
+            TriggerType.AreaTint => "Area Tint — подкрасить вокруг",
+            TriggerType.Sequence => "Sequence — цепочка групп",
+            TriggerType.AdvancedFollow => "Adv. Follow — умное следование",
+            TriggerType.CameraEdge => "Camera Edge — край камеры",
+            TriggerType.CameraGuide => "Camera Guide — подсказка камере",
+            TriggerType.CameraStatic => "Camera Static — камера стоит",
+            TriggerType.CameraRotate => "Camera Rotate — поворот камеры",
+            TriggerType.Event => "Event — событие",
+            TriggerType.Reset => "Reset — сброс события",
+            TriggerType.ItemEdit => "Item Edit — изменить счётчик",
+            TriggerType.ItemCompare => "Item Compare — сравнить счётчик",
+            TriggerType.PersistentItem => "Persistent — счётчик не сбрасывать",
+            TriggerType.ToggleBlock => "Toggle Block — переключить блоки",
+            TriggerType.LinkVisible => "Link Visible — показать связку",
+            TriggerType.EnterEffect => "Enter Effect — появление",
+            TriggerType.Sfx => "SFX — звук",
+            TriggerType.EditSong => "Edit Song — правка музыки",
+            TriggerType.GameplayOffset => "Gameplay Offset — сдвиг поля",
+            TriggerType.RotateGameplay => "Rotate Gameplay — поворот поля",
             _ => t.ToString()
         };
     }

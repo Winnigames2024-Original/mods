@@ -104,6 +104,7 @@ server {
     # установка сервера одной командой: curl -fsSL http://$DOMAIN/install.sh | sudo bash
     location = /install.sh { default_type text/x-shellscript; }
     location = /autoupdatefor5minutes.sh { default_type text/x-shellscript; }
+    location = /update.sh { default_type text/x-shellscript; }
 
     # API игры
     location /api/ {
@@ -174,6 +175,8 @@ fi
 # ---------------------------------------------------------------- автообновление
 say "Включаю автообновление каждые 5 минут…"
 install -m 0755 "$SRC/$SUBDIR/autoupdatefor5minutes.sh" /usr/local/bin/geodash-autoupdate
+install -m 0755 "$SRC/$SUBDIR/update.sh" /usr/local/bin/geodash-update 2>/dev/null || true
+cp -f "$SRC/$SUBDIR/update.sh" "$WEB/update.sh" 2>/dev/null || true
 
 cat > /etc/systemd/system/geodash-update.service <<UNIT
 [Unit]
@@ -219,6 +222,7 @@ echo
 echo "  Сервис:      systemctl status geodash"
 echo "  Логи:        journalctl -u geodash -f"
 echo "  Обновление:  каждые 5 минут (systemctl status geodash-update.timer)"
+echo "  Вручную:     sudo geodash-update   (или curl -fsSL $SCHEME://$DOMAIN/update.sh | sudo bash)"
 echo
 if [ "$SCHEME" = "https" ]; then
 echo "  HTTPS:       включён, сертификат продлевается сам (certbot.timer)"

@@ -92,6 +92,12 @@ public class Engine {
     public double camX, camY, camZoom = 1, camOffX, camOffY, shakeX, shakeY;
     double shakeStrength, shakeInterval, shakeTimer, shakeT;
     boolean camStatic;
+    /** Экранные эффекты и прочее из 2.2. */
+    public final Fx fx = new Fx();
+    public final java.util.Set<Integer> events = new java.util.HashSet<>();
+    public final java.util.Set<Integer> persistentItems = new java.util.HashSet<>();
+    public double gameplayOffX, gameplayOffY, gameplayAngle;
+
     public double groundY = 0, roofY = 900, rightEdge = 1200;
     public final Map<Integer, Integer> items = new HashMap<>();
     public final List<double[]> checkpoints = new ArrayList<>();   // x,y,vy,gravityDir,mode,speed,mini,time
@@ -121,6 +127,10 @@ public class Engine {
         int easing, group;
         double lastPx, lastPy, maxSpeed;
         boolean playerY;
+        // площадные триггеры 2.2
+        int areaType, tint;
+        double deg, sx = 1, sy = 1, alpha = 1;
+        double[] power;
     }
     final List<Act> acts = new ArrayList<>();
     static class Spawn { int group; double delay; int selfIdx = -1; }
@@ -224,6 +234,8 @@ public class Engine {
 
         camX = p1.x + 180; camY = p1.y; camZoom = 1; camOffX = camOffY = 0;
         shakeTimer = 0; shakeX = shakeY = 0; camStatic = false;
+        fx.reset(); events.clear();
+        gameplayOffX = gameplayOffY = gameplayAngle = 0;
     }
 
     void setColor(int id, int argb) { colors.put(id, new int[]{argb, argb, argb}); }
@@ -242,6 +254,8 @@ public class Engine {
     public int moveX;
 
     public void update(double dt, boolean hold1, boolean pressed1, boolean hold2, boolean pressed2) {
+        fx.update(dt);
+        dt *= Math.max(0.1, Math.min(4, fx.timeScale));
         if (dead) { deathTimer += dt; return; }
         if (finished) { time += dt; return; }
 
@@ -684,7 +698,7 @@ public class Engine {
             st[i].fired = true;
             if (o.trig.spawnDelay > 0.0001) {
                 Spawn s = new Spawn(); s.selfIdx = i; s.delay = o.trig.spawnDelay; spawns.add(s);
-            } else execute(o.trig);
+            } else execute(o.trig, o);
         }
     }
 
@@ -693,10 +707,12 @@ public class Engine {
             Spawn s = new Spawn(); s.selfIdx = selfIdx; s.delay = t.spawnDelay; spawns.add(s);
             return;
         }
-        execute(t);
+        execute(t, selfIdx >= 0 && selfIdx < level.objects.size() ? level.objects.get(selfIdx) : null);
     }
 
-    void execute(Level.Trig t) {
+    void execute(Level.Trig t) { execute(t, null); }
+
+    void execute(Level.Trig t, Level.Obj src) {
         List<Integer> list = groups.get(t.targetGroup);
         switch (t.type) {
             case Level.T_MOVE: case Level.T_KEYFRAME: {
@@ -824,7 +840,152 @@ public class Engine {
             case Level.T_END: finish(); break;
             case Level.T_REVERSE: reverse = t.activate; break;
             case Level.T_SPEED: p1.speed = t.speed; if (dual) p2.speed = t.speed; break;
+
+            // ======================= 2.2 =======================
+            case Level.T_GRADIENT:
+                fx.gradientOn = t.activate;
+                fx.gradTop = t.color;
+                fx.gradBottom = t.color2;
+                break;
+            case Level.T_PARTICLES:
+                fx.burst(src != null ? src.x + 15 : p1.x, src != null ? src.y + 15 : p1.y,
+                        Math.max(1, Math.min(120, t.count)), t.color, 120 + t.fxStrength * 400);
+                break;
+            case Level.T_SHOCK:
+                fx.shock.set(Math.max(0.15, t.duration), t.fxStrength);
+                fx.shockX = src != null ? src.x + 15 : p1.x;
+                fx.shockY = src != null ? src.y + 15 : p1.y;
+                break;
+            case Level.T_CHROMATIC: fx.chromatic.set(t.duration, t.fxStrength); break;
+            case Level.T_PIXELATE: fx.pixelate.set(t.duration, t.fxStrength); break;
+            case Level.T_GLITCH: fx.glitch.set(t.duration, t.fxStrength); break;
+            case Level.T_INVERT: fx.invert.set(t.duration, t.fxStrength); break;
+            case Level.T_GRAY: fx.gray.set(t.duration, t.fxStrength); break;
+            case Level.T_BLUR: fx.blur.set(t.duration, t.fxStrength); break;
+            case Level.T_VIGNETTE: fx.vignette.set(t.duration, t.fxStrength); break;
+            case Level.T_FLASH:
+                fx.flash.set(Math.max(0.1, t.duration), t.fxStrength);
+                fx.flashColor = t.color;
+                break;
+            case Level.T_BUMP:
+                shakeStrength = t.shakeStrength; shakeInterval = Math.max(0.01, t.shakeInterval);
+                shakeTimer = Math.max(0.12, t.duration); shakeT = 0;
+                fx.shock.set(Math.max(0.2, t.duration), 0.5);
+                fx.shockX = p1.x; fx.shockY = p1.y;
+                break;
+            case Level.T_TIMEWARP:
+                fx.timeScale = Math.max(0.1, Math.min(4, t.timeScale <= 0 ? 1 : t.timeScale));
+                break;
+
+            case Level.T_AREAMOVE: case Level.T_AREAROT: case Level.T_AREASCALE:
+            case Level.T_AREAFADE: case Level.T_AREATINT:
+                area(t, src);
+                break;
+
+            case Level.T_SEQUENCE: {
+                int[] gs = {t.targetGroup, t.groupB, t.centerGroup, 0};
+                double delay = 0;
+                for (int g : gs) {
+                    if (g == 0) continue;
+                    Spawn sp = new Spawn(); sp.selfIdx = -1; sp.group = g; sp.delay = delay;
+                    spawns.add(sp);
+                    delay += Math.max(0.02, t.stepDelay);
+                }
+                break;
+            }
+
+            case Level.T_ADVFOLLOW: {
+                if (list == null) break;
+                Act a = act(4, list, t.targetGroup, t.duration <= 0 ? 9999 : t.duration, t.easing);
+                a.a = t.followX; a.b = t.followY;
+                a.lastPx = p1.x; a.lastPy = p1.y;
+                acts.add(a);
+                break;
+            }
+
+            case Level.T_CAMEDGE: case Level.T_CAMGUIDE:
+                camOffX = t.camOffX; camOffY = t.camOffY;
+                break;
+            case Level.T_CAMSTATIC: camStatic = t.camStatic; break;
+            case Level.T_CAMROTATE: case Level.T_ROTGAMEPLAY: gameplayAngle = t.degrees; break;
+            case Level.T_GPOFFSET: gameplayOffX = t.moveX; gameplayOffY = t.moveY; break;
+
+            case Level.T_EVENT:
+                events.add(t.eventId);
+                if (t.targetGroup != 0) fireGroup(t.targetGroup);
+                break;
+            case Level.T_RESET:
+                events.remove(t.eventId);
+                break;
+
+            case Level.T_ITEMEDIT: addItem(t.itemId, t.count); break;
+            case Level.T_PERSIST: persistentItems.add(t.itemId); break;
+            case Level.T_ITEMCMP: {
+                Integer have = items.get(t.itemId);
+                int v = have == null ? 0 : have;
+                boolean okCmp;
+                switch (t.compare) {
+                    case 1: okCmp = v > t.targetCount; break;
+                    case 2: okCmp = v < t.targetCount; break;
+                    case 3: okCmp = v >= t.targetCount; break;
+                    case 4: okCmp = v <= t.targetCount; break;
+                    case 5: okCmp = v != t.targetCount; break;
+                    default: okCmp = v == t.targetCount;
+                }
+                int g = okCmp ? t.trueGroup : t.falseGroup;
+                if (g != 0) fireGroup(g);
+                break;
+            }
+
+            case Level.T_TOGGLEBLOCK:
+                if (list != null) for (int i : list) st[i].enabled = !st[i].enabled;
+                break;
+            case Level.T_LINKVIS:
+                if (list != null) for (int i : list) st[i].alpha = t.activate ? 1 : 0;
+                break;
+            case Level.T_ENTER:
+                if (list != null) for (int i : list) st[i].alpha = Math.max(0, Math.min(1, t.opacity));
+                break;
+
+            case Level.T_SFX: sfx(t.sfxName == null || t.sfxName.isEmpty() ? "click" : t.sfxName); break;
+            case Level.T_EDITSONG:
+                if (listener != null) listener.song(t.songId != 0 ? t.songId : level.settings.songId,
+                        t.songVolume, t.songStart, t.songLoop);
+                break;
         }
+    }
+
+    /** Площадной триггер 2.2: действует на всё вокруг, в центре сильнее. */
+    void area(Level.Trig t, Level.Obj src) {
+        if (src == null) return;
+        double cx = src.x + 15, cy = src.y + 15, rad = Math.max(30, t.areaRadius);
+        List<Integer> targets = new ArrayList<>();
+        List<Double> power = new ArrayList<>();
+        for (int i = 0; i < level.objects.size(); i++) {
+            Level.Obj o = level.objects.get(i);
+            if (o.trig != null) continue;
+            double dx = o.x + 15 - cx, dy = o.y + 15 - cy;
+            double d = Math.sqrt(dx * dx + dy * dy);
+            if (d > rad) continue;
+            targets.add(i);
+            power.add(1 - d / rad);
+        }
+        if (targets.isEmpty()) return;
+
+        Act a = act(5, targets, 0, Math.max(0.05, t.duration), t.easing);
+        a.areaType = t.type;
+        a.a = t.moveX; a.b = t.moveY;
+        a.deg = t.degrees; a.sx = t.scaleX; a.sy = t.scaleY; a.alpha = t.opacity;
+        a.tint = t.color;
+        a.fromA = new double[targets.size()];
+        a.fromB = new double[targets.size()];
+        a.power = new double[targets.size()];
+        for (int k = 0; k < targets.size(); k++) {
+            a.fromA[k] = st[targets.get(k)].dx;
+            a.fromB[k] = st[targets.get(k)].dy;
+            a.power[k] = power.get(k);
+        }
+        acts.add(a);
     }
 
     Act act(int kind, List<Integer> targets, int group, double dur, int easing) {
@@ -839,6 +1000,28 @@ public class Engine {
             Act a = acts.get(i);
             a.t += dt;
             double k = ease(Math.max(0, Math.min(1, a.dur <= 0 ? 1 : a.t / a.dur)), a.easing);
+            if (a.kind == 5) {
+                for (int j = 0; j < a.targets.size(); j++) {
+                    ObjState s2 = st[a.targets.get(j)];
+                    double pw = a.power[j];
+                    if (a.areaType == Level.T_AREAMOVE) {
+                        s2.dx = a.fromA[j] + a.a * k * pw;
+                        s2.dy = a.fromB[j] + a.b * k * pw;
+                    } else if (a.areaType == Level.T_AREAROT) {
+                        s2.rot = a.deg * k * pw;
+                    } else if (a.areaType == Level.T_AREASCALE) {
+                        s2.sx = 1 + (a.sx - 1) * k * pw;
+                        s2.sy = 1 + (a.sy - 1) * k * pw;
+                    } else if (a.areaType == Level.T_AREAFADE) {
+                        s2.alpha = 1 + (a.alpha - 1) * k * pw;
+                    } else if (a.areaType == Level.T_AREATINT) {
+                        s2.hasPulse = true; s2.pulseColor = a.tint;
+                        s2.pulseT = Math.max(s2.pulseT, a.dur - a.t + 0.1);
+                    }
+                }
+                if (a.t >= a.dur) acts.remove(i);
+                continue;
+            }
             switch (a.kind) {
                 case 0:
                     for (int j = 0; j < a.targets.size(); j++) {
@@ -889,7 +1072,7 @@ public class Engine {
                     Level.Obj o = level.objects.get(s.selfIdx);
                     if (o.trig != null) {
                         double d = o.trig.spawnDelay; o.trig.spawnDelay = 0;
-                        execute(o.trig);
+                        execute(o.trig, o);
                         o.trig.spawnDelay = d;
                     }
                 } else fireGroup(s.group);

@@ -120,7 +120,70 @@ namespace GEO_DASH.Core
         End,
         Reverse,
         Keyframe,
-        SpeedChange
+        SpeedChange,
+
+        // ---------------- то, что появилось в 2.2 ----------------
+        /// <summary>Градиент поверх фона.</summary>
+        Gradient,
+        /// <summary>Вспышка частиц.</summary>
+        Particles,
+        /// <summary>Ударная волна по экрану.</summary>
+        Shockwave,
+        /// <summary>Цветные края (хроматика).</summary>
+        Chromatic,
+        /// <summary>Пиксели крупнее.</summary>
+        Pixelate,
+        /// <summary>Глюк картинки.</summary>
+        Glitch,
+        /// <summary>Инверсия цветов.</summary>
+        InvertColor,
+        /// <summary>Чёрно-белое.</summary>
+        Grayscale,
+        /// <summary>Размытие.</summary>
+        Blur,
+        /// <summary>Засветка по краям.</summary>
+        Vignette,
+        /// <summary>Замедление или ускорение времени.</summary>
+        TimeWarp,
+        /// <summary>Площадной сдвиг: двигает всё вокруг себя.</summary>
+        AreaMove,
+        AreaRotate,
+        AreaScale,
+        AreaFade,
+        AreaTint,
+        /// <summary>Цепочка: по очереди запускает группы.</summary>
+        Sequence,
+        /// <summary>Умное следование за игроком.</summary>
+        AdvancedFollow,
+        /// <summary>Границы камеры.</summary>
+        CameraEdge,
+        CameraGuide,
+        CameraStatic,
+        CameraRotate,
+        /// <summary>Событие и сброс события.</summary>
+        Event,
+        Reset,
+        /// <summary>Счётчики: изменить, сравнить, сохранить между попытками.</summary>
+        ItemEdit,
+        ItemCompare,
+        PersistentItem,
+        /// <summary>Блок-переключатель и видимость связки.</summary>
+        ToggleBlock,
+        LinkVisible,
+        /// <summary>Звук.</summary>
+        Sfx,
+        /// <summary>Смена громкости и позиции текущего трека.</summary>
+        EditSong,
+        /// <summary>Сдвиг точки игрока по экрану.</summary>
+        GameplayOffset,
+        /// <summary>Поворот всего поля.</summary>
+        RotateGameplay,
+        /// <summary>Эффект появления объектов.</summary>
+        EnterEffect,
+        /// <summary>Вспышка на весь экран.</summary>
+        Flash,
+        /// <summary>Тряска камеры затухающая.</summary>
+        Bump
     }
 
     public enum EasingType

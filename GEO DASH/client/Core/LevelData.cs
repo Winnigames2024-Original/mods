@@ -39,6 +39,10 @@ namespace GEO_DASH.Core
         public int Obj2Color { get; set; } = unchecked((int)0xFFFFFFFF);
 
         public bool TwoPlayer { get; set; }
+        /// <summary>Тип уровня: обычный или мультиплеер (все на одной карте).</summary>
+        public bool Multiplayer { get; set; }
+        /// <summary>Сколько игроков пускать в одну карту уровня.</summary>
+        public int MaxPlayers { get; set; } = 4;
         public bool AllowMultiJump { get; set; }
         public bool ReverseGameplay { get; set; }
         public bool PlatformerFreeMove { get; set; }
@@ -152,6 +156,28 @@ namespace GEO_DASH.Core
 
         public SpeedTier Speed { get; set; } = SpeedTier.Normal;
 
+        // ---------------- параметры триггеров 2.2 ----------------
+        /// <summary>Сила эффекта (0..1 для экранных, иначе своё значение).</summary>
+        public double FxStrength { get; set; } = 0.6;
+        /// <summary>Радиус действия площадного триггера, в юнитах.</summary>
+        public double AreaRadius { get; set; } = 300;
+        /// <summary>Множитель времени для TimeWarp.</summary>
+        public double TimeScale { get; set; } = 1;
+        /// <summary>Второй цвет (градиент, подкраска).</summary>
+        public int Color2 { get; set; } = unchecked((int)0xFF000000);
+        /// <summary>Номер события / счётчика, с которым работает триггер.</summary>
+        public int EventId { get; set; }
+        /// <summary>Сравнение: 0 ==, 1 >, 2 <, 3 >=, 4 <=, 5 !=.</summary>
+        public int Compare { get; set; }
+        /// <summary>Группа, которая сработает, если сравнение верное.</summary>
+        public int TrueGroup { get; set; }
+        /// <summary>Группа, которая сработает, если сравнение ложное.</summary>
+        public int FalseGroup { get; set; }
+        /// <summary>Шаг последовательности, пауза между группами.</summary>
+        public double StepDelay { get; set; } = 0.25;
+        /// <summary>Имя звука для триггера Sfx.</summary>
+        public string SfxName { get; set; } = "click";
+
         public GameMode OptMode { get; set; } = GameMode.Cube;
         public bool OptMini { get; set; }
         public bool OptDual { get; set; }
@@ -187,6 +213,8 @@ namespace GEO_DASH.Core
         public GameMode PortalMode { get; set; } = GameMode.Cube;
         public TriggerData Trigger { get; set; }
         public string Text { get; set; } = "";
+        /// <summary>ID картинки с сайта для объекта «картинка».</summary>
+        public int ImageId { get; set; }
         public int CoinIndex { get; set; }
         public double TeleportTargetY { get; set; }
 

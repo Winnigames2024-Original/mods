@@ -5,10 +5,27 @@ $me = gd_me();
 if (!$me) { session_destroy(); header('Location: /login/'); exit; }
 [$okL, $levels] = gd_get('/api/levels?author=' . urlencode(gd_user()));
 [$okF, $friends] = gd_get('/api/friends', gd_token());
+// смена аватарки
+$avMsg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['avatar'])) {
+    [$aok, $ares] = gd_post('/api/me/avatar', ['imageId' => (int)$_POST['avatar']], gd_token());
+    $avMsg = $aok ? 'Аватарка обновлена' : ($ares['error'] ?? 'Не вышло');
+    if ($aok) { $me = null; $me = gd_me(); }
+}
+[$imok, $imgs] = gd_get('/api/images');
+if (!$imok || !is_array($imgs)) $imgs = [];
+
 gd_head('Мой аккаунт', 'account');
 ?>
 <section class="section"><div class="container">
-  <h2><?= h($me['name']) ?><?php if (!empty($me['admin'])): ?> <span class="badge">админ</span><?php endif; ?></h2>
+  <div class="flex">
+    <?php if (!empty($me['avatar'])): ?>
+      <img src="/api/images/<?= (int)$me['avatar'] ?>/file" alt=""
+           style="width:84px;height:84px;object-fit:cover;border:4px solid #000;border-radius:16px">
+    <?php endif; ?>
+    <h2 style="margin:0"><?= h($me['name']) ?><?php if (!empty($me['admin'])): ?> <span class="badge">админ</span><?php endif; ?></h2>
+  </div>
+  <?php if ($avMsg): ?><div class="msg ok"><?= h($avMsg) ?></div><?php endif; ?>
 
   <div class="stats" style="margin:18px 0 26px">
     <div class="stat"><b><?= (int)$me['stars'] ?></b><span>звёзды</span></div>
@@ -27,7 +44,7 @@ gd_head('Мой аккаунт', 'account');
         <?php foreach ($levels ?: [] as $l): ?>
           <tr>
             <td class="muted">#<?= (int)$l['id'] ?></td>
-            <td class="lvname"><a href="/levels/view.php?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
+            <td class="lvname"><a href="/level/?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
             <td><span class="diff <?= gd_diff_class((int)$l['difficulty']) ?>"><?= h(gd_diff_name((int)$l['difficulty'])) ?></span></td>
             <td><?= (int)$l['likes'] ?></td><td><?= (int)$l['downloads'] ?></td>
           </tr>

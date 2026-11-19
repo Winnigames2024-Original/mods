@@ -32,9 +32,10 @@ public class LevelSettingsDialog {
 
     public static void show(Activity a, Level lv, Runnable onSaved) {
         Level.Settings s = lv.settings;
-        final EditText[] f = new EditText[5];
+        final EditText[] f = new EditText[6];
         final Picker[] p = new Picker[4];
-        final boolean[] flags = {s.startMini, s.startDual, s.startMirror, s.startGravityUp, s.twoPlayer};
+        final boolean[] flags = {s.startMini, s.startDual, s.startMirror, s.startGravityUp,
+                s.twoPlayer, s.platformerFreeMove, s.multiplayer};
 
         LinearLayout box = GdDialog.custom(a, "НАСТРОЙКИ УРОВНЯ", "СОХРАНИТЬ", () -> {
             s.name = f[0].getText().toString().trim();
@@ -51,6 +52,10 @@ public class LevelSettingsDialog {
             s.startMirror = flags[2];
             s.startGravityUp = flags[3];
             s.twoPlayer = flags[4];
+            s.platformerFreeMove = flags[5];
+            s.multiplayer = flags[6];
+            try { s.maxPlayers = Math.max(2, Math.min(50,
+                    Integer.parseInt(f[5].getText().toString().trim()))); } catch (Exception ignored) { }
             if (s.songId != 0) Api.async(() -> Music.ensureSong(s.songId));
             if (onSaved != null) onSaved.run();
         });
@@ -67,9 +72,41 @@ public class LevelSettingsDialog {
         toggle(a, box, "зеркально", flags, 2);
         toggle(a, box, "гравитация вверх", flags, 3);
         toggle(a, box, "на двоих", flags, 4);
+        toggle(a, box, "платформер (ходишь сам)", flags, 5);
+        toggle(a, box, "тип уровня: мультиплеер", flags, 6);
+        f[5] = field(a, box, "максимум игроков в карте", String.valueOf(Math.max(2, s.maxPlayers)), true);
 
         f[2] = field(a, box, "ID трека (минус — встроенный)", String.valueOf(s.songId), true);
         f[3] = field(a, box, "название трека", s.songName, false);
+
+        // выбор трека, залитого на сайт
+        final EditText songField = f[2], songName = f[3];
+        Ui.GdBtn pickSong = new Ui.GdBtn(a).set("ТРЕК С САЙТА", Ui.I_MUSIC,
+                Color.rgb(255, 150, 215), Color.rgb(160, 40, 120));
+        pickSong.setOnClickListener(v -> Api.async(() -> {
+            org.json.JSONArray list = Api.songs();
+            if (list == null || list.length() == 0) {
+                a.runOnUiThread(() -> GdDialog.info(a, "МУЗЫКА",
+                        "На сайте пока нет треков. Залей свой на странице «Музыка»."));
+                return;
+            }
+            final String[] names = new String[list.length()];
+            final int[] ids = new int[list.length()];
+            for (int i = 0; i < list.length(); i++) {
+                org.json.JSONObject o = list.optJSONObject(i);
+                ids[i] = o == null ? 0 : o.optInt("id");
+                names[i] = "#" + ids[i] + "  " + (o == null ? "" : o.optString("name"));
+            }
+            a.runOnUiThread(() -> GdDialog.items(a, "ТРЕКИ С САЙТА", names, i -> {
+                if (i < 0 || i >= ids.length) return;
+                songField.setText(String.valueOf(ids[i]));
+                songName.setText(names[i].substring(names[i].indexOf("  ") + 2));
+                final int sid = ids[i];
+                Api.async(() -> Music.ensureSong(sid));
+            }));
+        }));
+        box.addView(pickSong, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (a.getResources().getDisplayMetrics().density * 48)));
 
         p[3] = picker(a, box, "Копирование уровня",
                 new String[]{"Запрещено", "По паролю", "Свободно"}, Math.max(0, Math.min(2, s.copyMode)));

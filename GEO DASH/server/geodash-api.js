@@ -28,8 +28,9 @@ const VERSION_FILE = process.env.GEODASH_VERSION_FILE || '/opt/geodash/update.js
 
 const DATA_DIR = path.join(DIR, 'leveldata');
 const MUSIC_DIR = path.join(DIR, 'music');
+const IMAGE_DIR = path.join(DIR, 'images');
 
-for (const d of [DIR, DATA_DIR, MUSIC_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [DIR, DATA_DIR, MUSIC_DIR, IMAGE_DIR]) fs.mkdirSync(d, { recursive: true });
 
 // ----------------------------------------------------------------- хранилище
 
@@ -61,7 +62,10 @@ const db = {
   levels: loadJson('levels.json', {}),
   scores: loadJson('scores.json', {}),
   tokens: loadJson('tokens.json', {}),
-  state: loadJson('state.json', { nextId: 1, daily: null, weekly: null, news: [], songs: {} })
+  state: loadJson('state.json', { nextId: 1, daily: null, weekly: null, news: [], songs: {},
+                                  nextSongId: 2000001, nextImageId: 1 }),
+  images: loadJson('images.json', {}),
+  comments: loadJson('comments.json', {})
 };
 
 const save = {
@@ -69,7 +73,9 @@ const save = {
   levels: () => saveJson('levels.json', db.levels),
   scores: () => saveJson('scores.json', db.scores),
   tokens: () => saveJson('tokens.json', db.tokens),
-  state: () => saveJson('state.json', db.state)
+  state: () => saveJson('state.json', db.state),
+  images: () => saveJson('images.json', db.images),
+  comments: () => saveJson('comments.json', db.comments)
 };
 
 // ------------------------------------------------------------------ утилиты
@@ -102,7 +108,8 @@ function userOf(req) {
 function pub(u) {
   if (!u) return null;
   return {
-    name: u.name, stars: u.stars | 0, coins: u.coins | 0, demons: u.demons | 0,
+    name: u.name, avatar: u.avatar | 0,
+    stars: u.stars | 0, coins: u.coins | 0, demons: u.demons | 0,
     levels: Object.values(db.levels).filter(l => key(l.author) === key(u.name)).length,
     attempts: u.attempts | 0, jumps: u.jumps | 0, about: u.about || '',
     admin: !!u.admin, banned: !!u.banned, created: u.created,
@@ -413,6 +420,24 @@ route('GET', '/api/levels/:id', (req, res, p) => {
   ok(res, Object.assign(levelPub(l), { data }));
 });
 
+/** Скачать .gdl файлом — для кнопки на сайте. */
+route('GET', '/api/levels/:id/data', (req, res, p) => {
+  const l = db.levels[p.id];
+  if (!l) return bad(res, 'Уровень не найден', 404);
+  let data = '';
+  try { data = fs.readFileSync(path.join(DATA_DIR, l.id + '.gdl'), 'utf8'); } catch {}
+  if (!data) return bad(res, 'Файл уровня пропал', 404);
+  const name = String(l.name || ('level' + l.id)).replace(/[^\w\-. ]+/g, '_').slice(0, 60);
+  const buf = Buffer.from(data, 'utf8');
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': buf.length,
+    'Content-Disposition': 'attachment; filename="' + name + '.gdl"',
+    'Access-Control-Allow-Origin': '*'
+  });
+  res.end(buf);
+});
+
 route('POST', '/api/levels', async (req, res) => {
   const u = userOf(req);
   if (!u) return bad(res, 'Нужен вход', 401);
@@ -683,6 +708,284 @@ route('POST', '/api/music/:id/upload', async (req, res, p) => {
     ok(res, { ok: true, id, size: buf.length });
   });
   req.on('error', () => bad(res, 'Ошибка загрузки'));
+});
+
+// ================================================================ своя музыка с сайта
+
+/** Принять тело запроса как бинарник (для mp3 и картинок). */
+function readRaw(req, limitMb) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0, tooBig = false;
+    req.on('data', c => {
+      size += c.length;
+      if (size > limitMb * 1024 * 1024) { tooBig = true; req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(tooBig ? null : Buffer.concat(chunks)));
+    req.on('error', () => resolve(null));
+  });
+}
+
+function headerText(req, name) {
+  try { return decodeURIComponent(String(req.headers[name] || '')).slice(0, 120); }
+  catch { return ''; }
+}
+
+/** Залить свой трек: ID выдаётся сам, трек сразу виден всем в игре. */
+route('POST', '/api/music/upload', async (req, res) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  if (u.banned) return bad(res, 'Аккаунт заблокирован', 403);
+
+  const buf = await readRaw(req, 40);
+  if (!buf) return bad(res, 'Файл больше 40 МБ');
+  if (buf.length < 8192) return bad(res, 'Файл слишком маленький');
+
+  const id = db.state.nextSongId++ || 2000001;
+  db.state.nextSongId = id + 1;
+  save.state();
+
+  fs.writeFileSync(songFilePath(id), buf);
+  fs.writeFileSync(songMetaPath(id), JSON.stringify({
+    id,
+    name: headerText(req, 'x-song-name') || ('Трек ' + id),
+    artist: headerText(req, 'x-song-artist') || u.name,
+    author: u.name, url: 'local', local: true,
+    size: buf.length, resolved: now()
+  }));
+  ok(res, { ok: true, id, size: buf.length });
+});
+
+// ================================================================ картинки (toolbox)
+
+function imageFile(id, ext) { return path.join(IMAGE_DIR, id + (ext || '.png')); }
+
+/** Залить картинку: png или jpg, вернётся ID для объекта «картинка». */
+route('POST', '/api/images/upload', async (req, res) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  if (u.banned) return bad(res, 'Аккаунт заблокирован', 403);
+
+  const buf = await readRaw(req, 8);
+  if (!buf) return bad(res, 'Картинка больше 8 МБ');
+  if (buf.length < 64) return bad(res, 'Файл слишком маленький');
+
+  // по сигнатуре понимаем формат
+  let ext = null;
+  if (buf[0] === 0x89 && buf[1] === 0x50) ext = '.png';
+  else if (buf[0] === 0xFF && buf[1] === 0xD8) ext = '.jpg';
+  else if (buf.slice(0, 3).toString() === 'GIF') ext = '.gif';
+  if (!ext) return bad(res, 'Нужен png, jpg или gif');
+
+  const id = db.state.nextImageId++ || 1;
+  db.state.nextImageId = id + 1;
+  fs.writeFileSync(imageFile(id, ext), buf);
+  db.images[id] = {
+    id, ext,
+    name: headerText(req, 'x-image-name') || ('Картинка ' + id),
+    author: u.name, size: buf.length, created: now()
+  };
+  save.images(); save.state();
+  ok(res, { ok: true, id, ext, size: buf.length });
+});
+
+/** Список картинок: id, название, автор, размер. */
+route('GET', '/api/images', (req, res) => {
+  const list = Object.values(db.images)
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 500)
+    .map(i => ({ id: i.id, name: i.name, author: i.author, size: i.size, ext: i.ext,
+                 url: '/api/images/' + i.id + '/file' }));
+  ok(res, list);
+});
+
+route('GET', '/api/images/:id', (req, res, p) => {
+  const i = db.images[parseInt(p.id, 10)];
+  if (!i) return bad(res, 'Картинка не найдена', 404);
+  ok(res, i);
+});
+
+route('GET', '/api/images/:id/file', (req, res, p) => {
+  const i = db.images[parseInt(p.id, 10)];
+  if (!i) return bad(res, 'Картинка не найдена', 404);
+  const f = imageFile(i.id, i.ext);
+  if (!fs.existsSync(f)) return bad(res, 'Файл пропал', 404);
+  const type = i.ext === '.jpg' ? 'image/jpeg' : i.ext === '.gif' ? 'image/gif' : 'image/png';
+  const data = fs.readFileSync(f);
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': data.length,
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'public, max-age=604800'
+  });
+  res.end(data);
+});
+
+route('POST', '/api/images/:id/delete', (req, res, p) => {
+  const u = userOf(req);
+  const i = db.images[parseInt(p.id, 10)];
+  if (!i) return bad(res, 'Картинка не найдена', 404);
+  if (!u || (key(u.name) !== key(i.author) && !u.admin && key(u.name) !== key(ADMIN)))
+    return bad(res, 'Это не твоя картинка', 403);
+  try { fs.unlinkSync(imageFile(i.id, i.ext)); } catch {}
+  delete db.images[i.id];
+  save.images();
+  ok(res);
+});
+
+// ================================================================ комментарии
+
+/** Комментарии к уровню: свежие сверху. */
+route('GET', '/api/levels/:id/comments', (req, res, p) => {
+  const id = parseInt(p.id, 10);
+  const list = (db.comments[id] || []).slice(-200).reverse()
+    .map(c => ({ id: c.id, author: c.author, text: c.text, created: c.created,
+                 avatar: (db.users[key(c.author)] || {}).avatar | 0 }));
+  ok(res, list);
+});
+
+/** Написать комментарий. */
+route('POST', '/api/levels/:id/comments', async (req, res, p) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  if (u.banned) return bad(res, 'Аккаунт заблокирован', 403);
+
+  const id = parseInt(p.id, 10);
+  if (!db.levels[id]) return bad(res, 'Уровень не найден', 404);
+
+  const b = await readBody(req);
+  const text = String(b.text || '').trim().slice(0, 300);
+  if (text.length < 1) return bad(res, 'Пустой комментарий');
+
+  const arr = db.comments[id] || (db.comments[id] = []);
+  const last = arr.filter(c => key(c.author) === key(u.name)).pop();
+  if (last && Date.now() - new Date(last.created).getTime() < 5000)
+    return bad(res, 'Слишком часто, подожди пару секунд');
+
+  const c = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+              author: u.name, text, created: now() };
+  arr.push(c);
+  if (arr.length > 500) arr.splice(0, arr.length - 500);
+  save.comments();
+  ok(res, c);
+});
+
+/** Удалить комментарий: свой, свой уровень или админ. */
+route('POST', '/api/levels/:id/comments/delete', async (req, res, p) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  const id = parseInt(p.id, 10);
+  const b = await readBody(req);
+  const arr = db.comments[id] || [];
+  const idx = arr.findIndex(c => c.id === String(b.commentId || ''));
+  if (idx < 0) return bad(res, 'Комментарий не найден', 404);
+
+  const lvl = db.levels[id] || {};
+  const mine = key(arr[idx].author) === key(u.name);
+  const owner = key(lvl.author || '') === key(u.name);
+  if (!mine && !owner && !u.admin && key(u.name) !== key(ADMIN))
+    return bad(res, 'Нельзя удалить чужой комментарий', 403);
+
+  arr.splice(idx, 1);
+  save.comments();
+  ok(res);
+});
+
+// ================================================================ аватарка
+
+/** Поставить себе аватарку из картинок toolbox. */
+route('POST', '/api/me/avatar', async (req, res) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  const b = await readBody(req);
+  const img = parseInt(b.imageId || '0', 10);
+  if (img && !db.images[img]) return bad(res, 'Такой картинки нет', 404);
+  u.avatar = img || 0;
+  save.users();
+  ok(res, pub(u));
+});
+
+// ================================================================ мультиплеер
+
+/** Комнаты в памяти: ключ — уровень + номер комнаты. */
+const mpRooms = new Map();
+
+function mpCleanup() {
+  const t = Date.now();
+  for (const [key2, room] of mpRooms) {
+    for (const [name, pl] of Object.entries(room.players))
+      if (t - pl.t > 12000) delete room.players[name];
+    if (!Object.keys(room.players).length && t - room.touched > 60000) mpRooms.delete(key2);
+  }
+}
+setInterval(mpCleanup, 5000).unref?.();
+
+/** Зайти в комнату уровня: сервер сам находит свободную по вместимости. */
+route('POST', '/api/mp/join', async (req, res) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  const b = await readBody(req);
+  const levelId = parseInt(b.levelId || '0', 10);
+  const max = Math.max(2, Math.min(50, parseInt(b.maxPlayers || '4', 10)));
+  if (!levelId) return bad(res, 'Нужен ID уровня');
+
+  mpCleanup();
+  let room = null;
+  for (const [k, r] of mpRooms)
+    if (r.levelId === levelId && Object.keys(r.players).length < r.max) { room = r; break; }
+  if (!room) {
+    room = { id: levelId + '-' + Math.random().toString(36).slice(2, 8),
+             levelId, max, players: {}, touched: Date.now() };
+    mpRooms.set(room.id, room);
+  }
+  room.players[key(u.name)] = { name: u.name, x: 0, y: 0, mode: 0, dir: 1, dead: false,
+                                percent: 0, t: Date.now() };
+  room.touched = Date.now();
+  ok(res, { ok: true, room: room.id, max: room.max, players: Object.keys(room.players).length });
+});
+
+/** Отправить свои координаты и получить всех остальных. */
+route('POST', '/api/mp/state', async (req, res) => {
+  const u = userOf(req);
+  if (!u) return bad(res, 'Нужен вход', 401);
+  const b = await readBody(req);
+  const room = mpRooms.get(String(b.room || ''));
+  if (!room) return bad(res, 'Комната закрыта', 404);
+
+  room.touched = Date.now();
+  room.players[key(u.name)] = {
+    name: u.name,
+    x: +b.x || 0, y: +b.y || 0,
+    mode: parseInt(b.mode || '0', 10) | 0,
+    dir: parseInt(b.dir || '1', 10) | 0,
+    mini: !!b.mini, dead: !!b.dead,
+    percent: Math.max(0, Math.min(100, +b.percent || 0)),
+    color: parseInt(b.color || '0', 10) | 0,
+    t: Date.now()
+  };
+  const others = Object.values(room.players)
+    .filter(p => key(p.name) !== key(u.name) && Date.now() - p.t < 6000)
+    .map(p => ({ name: p.name, x: p.x, y: p.y, mode: p.mode, dir: p.dir,
+                 mini: !!p.mini, dead: !!p.dead, percent: p.percent, color: p.color }));
+  ok(res, { ok: true, players: others, room: room.id, max: room.max });
+});
+
+route('POST', '/api/mp/leave', async (req, res) => {
+  const u = userOf(req);
+  const b = await readBody(req);
+  const room = mpRooms.get(String(b.room || ''));
+  if (room && u) { delete room.players[key(u.name)]; }
+  ok(res);
+});
+
+/** Сколько народу сейчас в уровне. */
+route('GET', '/api/mp/rooms', (req, res) => {
+  mpCleanup();
+  const list = [];
+  for (const r of mpRooms.values())
+    list.push({ room: r.id, levelId: r.levelId, max: r.max, players: Object.keys(r.players).length });
+  ok(res, list);
 });
 
 /** Список треков, которые уже лежат на сервере. */

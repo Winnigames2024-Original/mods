@@ -42,7 +42,7 @@ gd_head('Профиль ' . $user, 'profile');
       <?php foreach ($levels ?: [] as $l): ?>
         <tr>
           <td class="muted">#<?= (int)$l['id'] ?></td>
-          <td class="lvname"><a href="/levels/view.php?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
+          <td class="lvname"><a href="/level/?id=<?= (int)$l['id'] ?>"><?= h($l['name']) ?></a></td>
           <td><span class="diff <?= gd_diff_class((int)$l['difficulty']) ?>"><?= h(gd_diff_name((int)$l['difficulty'])) ?></span></td>
           <td><?= (int)$l['stars'] ?></td><td><?= (int)$l['likes'] ?></td><td><?= (int)$l['downloads'] ?></td>
         </tr>

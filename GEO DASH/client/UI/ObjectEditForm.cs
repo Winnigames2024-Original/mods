@@ -9,6 +9,7 @@ namespace GEO_DASH.UI
         int _y = 12;
 
         readonly TextBox _groups, _text;
+        NumericUpDown _imageId;
         readonly NumericUpDown _rot, _sx, _sy, _z, _alpha, _c1, _c2, _tpY;
         readonly ComboBox _portal, _orb, _pad;
         readonly LevelObject _src;
@@ -100,6 +101,11 @@ namespace GEO_DASH.UI
                 Label("Текст");
                 _text = Tb(src.Text);
             }
+            if (def.Style == DrawStyle.Image)
+            {
+                Label("ID картинки с сайта");
+                _imageId = Num(0, 999999, src.ImageId, 0);
+            }
         }
 
         void Label(string t)
@@ -170,6 +176,12 @@ namespace GEO_DASH.UI
             if (_pad != null) o.Pad = (PadKind)_pad.SelectedIndex;
             if (_tpY != null) o.TeleportTargetY = (double)_tpY.Value;
             if (_text != null) o.Text = _text.Text;
+            if (_imageId != null)
+            {
+                o.ImageId = (int)_imageId.Value;
+                if (o.ImageId > 0 && !Net.ImageLibrary.IsCached(o.ImageId))
+                    _ = Net.ImageLibrary.DownloadAsync(o.ImageId);
+            }
         }
     }
 }

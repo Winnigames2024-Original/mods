@@ -107,10 +107,39 @@ public class LevelListActivity extends GdActivity {
         });
     }
 
+    /** Комментарии к уровню: читаем и пишем прямо из игры. */
+    void comments(final Level lv) {
+        final int id = lv.settings.serverId;
+        if (id <= 0) { toast("Уровень не с сервера"); return; }
+        toast("Загружаю комментарии…");
+        Api.async(() -> {
+            org.json.JSONArray list = Api.comments(id);
+            final StringBuilder sb = new StringBuilder();
+            if (list != null) for (int i = 0; i < Math.min(12, list.length()); i++) {
+                org.json.JSONObject o = list.optJSONObject(i);
+                if (o == null) continue;
+                sb.append(o.optString("author")).append(": ").append(o.optString("text")).append("\n");
+            }
+            if (sb.length() == 0) sb.append("Комментариев пока нет — будь первым.");
+            runOnUiThread(() -> GdDialog.message(this, "КОММЕНТАРИИ", sb.toString(),
+                    new String[]{"НАПИСАТЬ", "ЗАКРЫТЬ"}, pick -> {
+                        if (pick != 0) return;
+                        if (!Store.loggedIn()) { toast("Нужен вход в аккаунт"); return; }
+                        GdDialog.input(this, "Комментарий", "что скажешь об уровне?", "", false, t -> {
+                            if (t == null || t.trim().isEmpty()) return;
+                            Api.async(() -> {
+                                boolean ok = Api.addComment(id, t.trim());
+                                runOnUiThread(() -> toast(ok ? "Отправлено" : "Не отправилось"));
+                            });
+                        });
+                    }));
+        });
+    }
+
     void localMenu(Level lv) {
         String[] items = mode.equals("my")
-                ? new String[]{"Играть", "Тренировка", "Редактировать", "Залить на сервер", "Удалить"}
-                : new String[]{"Играть", "Тренировка", "Копировать в мои", "Удалить из SAVED"};
+                ? new String[]{"Играть", "Тренировка", "Редактировать", "Залить на сервер", "Удалить", "Комментарии"}
+                : new String[]{"Играть", "Тренировка", "Копировать в мои", "Удалить из SAVED", "Комментарии"};
         menu(lv.settings.name, items, i -> {
                     if (i == 0) GameActivity.play(this, lv, false);
                     else if (i == 1) GameActivity.play(this, lv, true);
@@ -123,6 +152,8 @@ public class LevelListActivity extends GdActivity {
                             Store.savedFile(lv.settings.serverId).delete();
                             load();
                         });
+                    } else if (i == (mode.equals("my") ? 5 : 4)) {
+                        comments(lv);
                     } else if (i == 4) {
                         confirm("Удалить уровень?", () -> {
                             new java.io.File(Store.levels(), Store.safe(lv.settings.localId) + ".gdl").delete();
