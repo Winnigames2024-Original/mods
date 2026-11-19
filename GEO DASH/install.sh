@@ -168,11 +168,14 @@ NGINX
 
 # длинные доменные имена не влезают в стандартную таблицу nginx
 mkdir -p /etc/nginx/conf.d
-cat > /etc/nginx/conf.d/00-geodash-tuning.conf <<'NGTUNE'
-server_names_hash_bucket_size 128;
-server_names_hash_max_size 2048;
-types_hash_max_size 4096;
-NGTUNE
+: > /etc/nginx/conf.d/00-geodash-tuning.conf
+for DIRECTIVE in "server_names_hash_bucket_size 128" "server_names_hash_max_size 2048" "types_hash_max_size 4096"; do
+  KEY="${DIRECTIVE%% *}"
+  # если директива уже есть в nginx.conf — второй раз её писать нельзя (duplicate)
+  if ! grep -Eq "^[[:space:]]*$KEY[[:space:]]" /etc/nginx/nginx.conf 2>/dev/null; then
+    echo "$DIRECTIVE;" >> /etc/nginx/conf.d/00-geodash-tuning.conf
+  fi
+done
 
 ln -sf /etc/nginx/sites-available/geodash /etc/nginx/sites-enabled/geodash
 
