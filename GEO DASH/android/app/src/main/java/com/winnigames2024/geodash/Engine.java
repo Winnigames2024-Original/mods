@@ -98,7 +98,7 @@ public class Engine {
     public final java.util.Set<Integer> persistentItems = new java.util.HashSet<>();
     public double gameplayOffX, gameplayOffY, gameplayAngle;
 
-    public double groundY = 0, roofY = 900, rightEdge = 1200;
+    public double groundY = 0, roofY = 1e7, rightEdge = 1200;   // потолка у уровня нет
     public final Map<Integer, Integer> items = new HashMap<>();
     public final List<double[]> checkpoints = new ArrayList<>();   // x,y,vy,gravityDir,mode,speed,mini,time
 
@@ -468,6 +468,34 @@ public class Engine {
             if (!hit(r, box)) continue;
 
             if (worm && d.wormPhase) { p.noClipWorm = true; continue; }
+
+            // склон не убивает: по нему заезжают наверх, как в игре
+            if (d.kind == Catalog.SLOPE) {
+                double lo = Math.min(r.top, r.bottom), hi = Math.max(r.top, r.bottom);
+                double left = Math.min(rBottomX(r), rTopX(r));
+                double wide = Math.max(1, Math.abs(rTopX(r) - rBottomX(r)));
+                double t = Math.max(0, Math.min(1, (p.x - left) / wide));
+                double frac = d.style == Catalog.ST_SLOPE_UP ? t : 1 - t;
+                double surf = lo + (hi - lo) * frac;
+                double halfS = p.size() / 2;
+
+                if (p.gravityDir > 0) {
+                    double want = surf + halfS;
+                    if (p.y <= want + 4) {
+                        p.y = want;
+                        if (p.vy < 0) p.vy = 0;
+                        p.onGround = true; p.robotJumping = false;
+                    }
+                } else {
+                    double want = hi - (surf - lo) - halfS;
+                    if (p.y >= want - 4) {
+                        p.y = want;
+                        if (p.vy > 0) p.vy = 0;
+                        p.onGround = true; p.robotJumping = false;
+                    }
+                }
+                continue;
+            }
 
             double half = p.size() / 2;
             double prevBottom = prevY - half, prevTop = prevY + half;

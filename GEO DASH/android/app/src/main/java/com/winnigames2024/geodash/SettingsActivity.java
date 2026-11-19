@@ -1,14 +1,11 @@
 package com.winnigames2024.geodash;
 
 import android.graphics.Color;
-import android.text.InputType;
-import android.widget.EditText;
 import android.widget.SeekBar;
 
 /** Настройки: сервер, громкость, синхронизация, папка данных. */
 public class SettingsActivity extends GdActivity {
 
-    EditText host, port, site;
     SeekBar music, sfx;
 
     @Override protected int bgA() { return Color.rgb(70, 75, 205); }
@@ -18,15 +15,8 @@ public class SettingsActivity extends GdActivity {
     @Override protected String headSub() { return Store.assets().getAbsolutePath(); }
 
     @Override protected void build() {
-        text("Сервер (IP)", 0.06f, 0.20f, 0.22f, 0.06f, Gd.NEON, 15);
-        host = input("IP", Store.host(), 0.28f, 0.19f, 0.30f, 0.08f);
-
-        text("Порт", 0.06f, 0.30f, 0.22f, 0.06f, Gd.NEON, 15);
-        port = input("порт", String.valueOf(Store.port()), 0.28f, 0.29f, 0.18f, 0.08f);
-        port.setInputType(InputType.TYPE_CLASS_NUMBER);
-
-        text("Сайт", 0.06f, 0.40f, 0.22f, 0.06f, Gd.NEON, 15);
-        site = input("сайт", Store.site(), 0.28f, 0.39f, 0.46f, 0.08f);
+        text("Сервер", 0.06f, 0.20f, 0.22f, 0.06f, Gd.NEON, 15);
+        text(Store.SERVER_LABEL, 0.28f, 0.20f, 0.46f, 0.06f, Gd.PAPER, 15);
 
         text("Громкость музыки", 0.06f, 0.50f, 0.22f, 0.06f, Gd.NEON, 15);
         music = new SeekBar(this);
@@ -65,9 +55,6 @@ public class SettingsActivity extends GdActivity {
     }
 
     void save() {
-        int p = 37534;
-        try { p = Integer.parseInt(port.getText().toString().trim()); } catch (Exception ignored) { }
-        Store.setServer(host.getText().toString().trim(), p, site.getText().toString().trim());
         Store.setVolumes(music.getProgress() / 100f, sfx.getProgress() / 100f);
         toast("Сохранено");
     }

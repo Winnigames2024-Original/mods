@@ -39,9 +39,16 @@ public class Store {
 
     // ------------------------------------------------------------ настройки
 
-    public static String host() { return prefs.getString("host", "166.1.161.200"); }
-    public static int port() { return prefs.getInt("port", 37534); }
-    public static String site() { return prefs.getString("site", "https://geodash.winnigames2024.ru"); }
+    // ---- адрес сервера живёт только здесь, в коде: на экранах его не видно ----
+    private static final String HOST = "166.1.161.200";
+    private static final int PORT = 37534;
+    private static final String SITE = "https://geodash.winnigames2024.ru";
+    /** Как сервер подписан в интерфейсе — без адреса. */
+    public static final String SERVER_LABEL = "сервер Winnigames2024";
+
+    public static String host() { return HOST; }
+    public static int port() { return PORT; }
+    public static String site() { return SITE; }
     public static String token() { return prefs.getString("token", ""); }
     public static String user() { return prefs.getString("user", ""); }
     public static boolean admin() { return user().equalsIgnoreCase("Winnigames2024") || prefs.getBoolean("admin", false); }
@@ -51,8 +58,9 @@ public class Store {
         prefs.edit().putString("token", token).putString("user", user).putBoolean("admin", admin).apply();
     }
 
+    /** Адрес сервера менять нельзя — он зашит в код. Метод оставлен для совместимости. */
     public static void setServer(String host, int port, String site) {
-        prefs.edit().putString("host", host).putInt("port", port).putString("site", site).apply();
+        // ничего не делаем
     }
 
     public static float musicVolume() { return prefs.getFloat("music", 0.8f); }

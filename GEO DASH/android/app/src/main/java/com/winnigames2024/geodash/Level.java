@@ -108,11 +108,23 @@ public class Level {
     public List<Obj> objects = new ArrayList<>();
     public String raw = "";
 
+    /** Скорость обычного режима — по ней считаем время уровня. */
+    public static final double NORMAL_SPEED = 311.0;
+    /** Дальше 20 минут уровень не тянется. */
+    public static final double MAX_LENGTH = 20 * 60 * NORMAL_SPEED;
+
+    /** Конец уровня: последний объект плюс 10 блоков, но не длиннее 20 минут. */
     public double rightEdge() {
-        double max = 30 * 40;
-        for (Obj o : objects) if (o.x + 30 > max) max = o.x + 30;
+        double max = 0;
+        for (Obj o : objects) if (o.x > max) max = o.x;
+        max += 10 * 30;
+        if (max < 30 * 40) max = 30 * 40;
+        if (max > MAX_LENGTH) max = MAX_LENGTH;
         return max;
     }
+
+    /** Сколько минут занимает уровень на обычной скорости. */
+    public double minutes() { return rightEdge() / NORMAL_SPEED / 60.0; }
 
     // ------------------------------------------------------------ запись
 

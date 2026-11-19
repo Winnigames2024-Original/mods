@@ -78,7 +78,7 @@ public class ProfileActivity extends GdActivity {
                         + "   демонов пройдено: " + Store.demonsBeaten()
                         + "   своих уровней: " + Store.myLevels().size(), "", -1, null);
                 card(box, "Папка данных", Store.assets().getAbsolutePath(), "", -1, null);
-                card(box, "Сервер", Store.host() + ":" + Store.port()
+                card(box, "Сервер", Store.SERVER_LABEL
                         + (Api.online ? "   (онлайн)" : "   (офлайн)"), "", -1, null);
             });
         });
