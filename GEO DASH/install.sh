@@ -21,7 +21,7 @@ DATA="/var/lib/geodash"
 SUBDIR="GEO DASH"
 # HTTPS: ставится сам сертификат Let's Encrypt. Выключить: GEODASH_SSL=off
 SSL="${GEODASH_SSL:-on}"
-SSL_EMAIL="${GEODASH_EMAIL:-admin@winnigames2024.ru}"
+SSL_EMAIL="${GEODASH_EMAIL:-winnigames2024@gmail.com}"
 
 say() { echo -e "\033[1;36m==>\033[0m $*"; }
 
