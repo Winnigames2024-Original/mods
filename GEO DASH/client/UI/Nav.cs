@@ -12,6 +12,9 @@ namespace GEO_DASH.UI
     /// Если оболочка ещё не готова (запуск, вход в аккаунт) — экран просто
     /// открывается обычным окном, так что код работает в обоих случаях.
     /// </summary>
+    /// <summary>Экран, который должен занимать всю панель (игра, редактор).</summary>
+    public interface IFillScreen { }
+
     public static class Nav
     {
         static Panel _host;
@@ -162,7 +165,7 @@ namespace GEO_DASH.UI
                 _designed[f] = want;
             }
 
-            if (want.Width >= host.Width - 8 && want.Height >= host.Height - 8)
+            if (f is IFillScreen || (want.Width >= host.Width - 8 && want.Height >= host.Height - 8))
             {
                 f.Bounds = new Rectangle(0, 0, host.Width, host.Height);
                 return;

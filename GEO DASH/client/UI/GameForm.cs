@@ -7,7 +7,7 @@ using GEO_DASH.Render;
 
 namespace GEO_DASH.UI
 {
-    public class GameForm : Form
+    public class GameForm : Form, IFillScreen
     {
         readonly GameWorld _w = new();
         readonly ViewTransform _v = new();

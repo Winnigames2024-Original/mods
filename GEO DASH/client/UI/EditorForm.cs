@@ -10,7 +10,7 @@ namespace GEO_DASH.UI
     /// палитра объектов по вкладкам внизу, панель правки со стрелками.
     /// Объекты ставятся по одному клику — постановки свайпом нет.
     /// </summary>
-    public class EditorForm : Form
+    public class EditorForm : Form, IFillScreen
     {
         enum Mode { Build, Edit, Delete }
 
