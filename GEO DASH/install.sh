@@ -25,6 +25,29 @@ SSL_EMAIL="${GEODASH_EMAIL:-admin@winnigames2024.ru}"
 
 say() { echo -e "\033[1;36m==>\033[0m $*"; }
 
+export DEBIAN_FRONTEND=noninteractive
+# apt сам подождёт, если система в этот момент ставит обновления
+APT=(apt-get -y -o DPkg::Lock::Timeout=600)
+
+# ждём, пока освободится блокировка dpkg (автообновления Debian и т.п.)
+wait_apt() {
+  local waited=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+     || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+     || pgrep -x unattended-upgr >/dev/null 2>&1; do
+    if [ "$waited" = "0" ]; then
+      say "Система сейчас ставит свои обновления — жду, пока освободится apt (до 10 минут)"
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    if [ "$waited" -ge 600 ]; then
+      say "apt занят слишком долго. Посмотри, кто держит:  ps aux | grep -E 'apt|dpkg'"
+      say "и повтори установку этой же командой."
+      exit 1
+    fi
+  done
+}
+
 if [ "$(id -u)" != "0" ]; then
   echo "Запусти под root:  curl -fsSL .../install.sh | sudo bash"
   exit 1
@@ -34,14 +57,17 @@ say "GEO DASH — установка на $(. /etc/os-release && echo "$PRETTY_N
 
 export DEBIAN_FRONTEND=noninteractive
 say "Ставлю пакеты (nginx, php-fpm, git, curl, unzip)…"
-apt-get update -y
-apt-get install -y nginx php-fpm php-curl php-mbstring git curl ca-certificates unzip jq >/dev/null
+wait_apt
+"${APT[@]}" update
+wait_apt
+"${APT[@]}" install nginx php-fpm php-curl php-mbstring git curl ca-certificates unzip jq psmisc >/dev/null
 
 # ---------------------------------------------------------------- node
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
   say "Ставлю Node.js 20…"
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
-  apt-get install -y nodejs >/dev/null
+  wait_apt
+  "${APT[@]}" install nodejs >/dev/null
 fi
 say "node $(node -v)"
 
@@ -158,7 +184,8 @@ systemctl enable nginx >/dev/null 2>&1 || true
 SCHEME="http"
 if [ "$SSL" = "on" ]; then
   say "Включаю HTTPS (Let's Encrypt) для $DOMAIN…"
-  apt-get install -y certbot python3-certbot-nginx >/dev/null 2>&1 || true
+  wait_apt
+  "${APT[@]}" install certbot python3-certbot-nginx >/dev/null 2>&1 || true
   if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect \
        -m "$SSL_EMAIL" >/tmp/geodash-certbot.log 2>&1; then
     SCHEME="https"
