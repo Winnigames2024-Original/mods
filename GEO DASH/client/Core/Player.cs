@@ -90,6 +90,10 @@ namespace GEO_DASH.Core
         public bool RobotJumping;
         public double LastJumpTime;
         public double SpiderFlash;      // анимация прыжка паука
+        /// <summary>След телепорта: откуда шёл и сколько ещё рисовать.</summary>
+        public double TeleFromY, TeleT;
+        /// <summary>Червяк просит прорыться сквозь блок (обрабатывает мир).</summary>
+        public bool WormDigRequest;
         public double WormBurrow;       // 0..1 — насколько «в земле»
         public List<PointF> WaveTrail = new();
 
@@ -126,6 +130,7 @@ namespace GEO_DASH.Core
             GravityMul = st.GravityScale <= 0 ? 1 : st.GravityScale;
             Rotation = 0; OnGround = false; OnCeiling = false;
             RobotHold = 0; RobotJumping = false; WormBurrow = 0;
+            TeleT = 0; WormDigRequest = false;
             WaveTrail.Clear();
             Hidden = false;
         }
@@ -245,14 +250,10 @@ namespace GEO_DASH.Core
                     break;
 
                 case GameMode.Worm:
-                    // червяк: клик 1 — мгновенно переворачивает гравитацию,
-                    // сквозь блоки проходит (burrow), шипы убивают
-                    if (inp.Pressed)
-                    {
-                        GravityDir = -GravityDir;
-                        VY = 0;
-                        OnGround = OnCeiling = false;
-                    }
+                    // червяк — перевёрнутый паук: едет по поверхности, а по клику
+                    // прорывается сквозь блок на другую его сторону и переворачивается
+                    if (inp.Pressed && (OnGround || OnCeiling)) WormDigRequest = true;
+
                     if (NoClipWorm)
                     {
                         VY = 0;             // внутри блока ползём строго вперёд

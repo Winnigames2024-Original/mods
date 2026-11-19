@@ -102,6 +102,12 @@ public class Level {
         public String text = "";
         /** ID картинки с сайта для объекта «картинка». */
         public int imageId;
+        /** Скрытый блок: виден только в редакторе. */
+        public boolean hideInGame;
+        /** Без касания: игрок проходит насквозь. */
+        public boolean noTouch;
+        /** Слой редактора (0 — основной). */
+        public int editorLayer;
     }
 
     public Settings settings = new Settings();
@@ -314,6 +320,9 @@ public class Level {
             if (o.teleportTargetY != 0) j.put("TeleportTargetY", o.teleportTargetY);
             if (o.text != null && !o.text.isEmpty()) j.put("Text", o.text);
             if (o.imageId != 0) j.put("ImageId", o.imageId);
+            if (o.hideInGame) j.put("HideInGame", true);
+            if (o.noTouch) j.put("NoTouch", true);
+            if (o.editorLayer != 0) j.put("EditorLayer", o.editorLayer);
             if (o.trig != null) j.put("Trigger", trigJson(o.trig));
         } catch (Exception ignored) { }
         return j;
@@ -343,6 +352,9 @@ public class Level {
         r.teleportTargetY = o.optDouble("TeleportTargetY", 0);
         r.text = o.optString("Text", "");
         r.imageId = o.optInt("ImageId", 0);
+        r.hideInGame = o.optBoolean("HideInGame", false);
+        r.noTouch = o.optBoolean("NoTouch", false);
+        r.editorLayer = o.optInt("EditorLayer", 0);
 
         JSONArray g = o.optJSONArray("Groups");
         if (g != null) {

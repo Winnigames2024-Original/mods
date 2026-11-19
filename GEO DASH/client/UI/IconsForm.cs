@@ -35,6 +35,7 @@ namespace GEO_DASH.UI
                     AppConfig.Settings.IconImage = "";
                     AppConfig.Save();
                     IconKit.ClearCustom();
+                    Render.PlayerIcons.Clear();
                     _msg = "Картинка убрана — снова встроенный рисунок";
                     Content.Invalidate();
                 });
@@ -49,6 +50,7 @@ namespace GEO_DASH.UI
                     if (!_cells[i].Contains(e.Location)) continue;
                     AppConfig.Settings.IconShape = i + 1;
                     AppConfig.Save();
+                    Render.PlayerIcons.Clear();
                     _msg = "Рисунок: " + IconKit.Name(i + 1);
                     Content.Invalidate();
                     return;
@@ -76,6 +78,7 @@ namespace GEO_DASH.UI
             if (main) AppConfig.Settings.IconColor1 = d.Color.ToArgb();
             else AppConfig.Settings.IconColor2 = d.Color.ToArgb();
             AppConfig.Save();
+            Render.PlayerIcons.Clear();
             Content.Invalidate();
         }
 
@@ -98,6 +101,7 @@ namespace GEO_DASH.UI
                 AppConfig.Save();
                 IconKit.ClearCustom();
                 IconKit.SetCustom(dst, Image.FromFile(dst));
+                Render.PlayerIcons.Clear();
                 _msg = "Картинка поставлена на кубик";
             }
             catch (Exception ex) { _msg = "Не получилось: " + ex.Message; }

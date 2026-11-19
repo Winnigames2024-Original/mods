@@ -68,7 +68,7 @@ namespace GEO_DASH.UI
             _loop.Step += OnStep;
             _loop.Render += () => { try { Invalidate(); } catch { } };
 
-            Load += (s, e) => StartMusic();
+            Shown += (s, e) => StartMusic();
             Shown += async (s, e) => await MpJoin();
             _mpTimer.Tick += async (s, e) => await MpTick();
             FormClosed += (s, e) =>
@@ -88,10 +88,17 @@ namespace GEO_DASH.UI
             if (id == 0) return;
 
             // id < 0 — встроенный саундтрек, он всегда рядом и играет без интернета
-            if (id < 0 || MusicPlayer.IsCached(id) || ApiClient.Online)
-                await MusicPlayer.PlayAsync(id, _level.Settings.SongOffsetSec, 1, true);
+            bool ok = await MusicPlayer.PlayAsync(id, _level.Settings.SongOffsetSec, 1, true);
+            if (ok) return;
+
+            // не пошла — говорим прямо, что не так
+            if (id > 0 && !MusicPlayer.IsCached(id))
+                Toast(ApiClient.Online
+                    ? "Трек #" + id + " не скачался с сервера — открой «Музыка» и нажми «Скачать»"
+                    : "Трек #" + id + " не скачан, а сети нет — играем без музыки");
             else
-                Toast("Трек #" + id + " не скачан — играем без музыки");
+                Toast("Музыка не пошла: " + (string.IsNullOrEmpty(MusicPlayer.LastError)
+                                             ? "трек не готов" : MusicPlayer.LastError));
         }
 
         // ------------------------------------------------------------- цикл

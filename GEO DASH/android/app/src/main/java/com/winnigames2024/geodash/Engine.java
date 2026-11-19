@@ -27,6 +27,10 @@ public class Engine {
 
     public static class Player {
         public double x, y, vy, rotation, gravityMul = 1, wormBurrow, spiderFlash, robotHold;
+        /** След телепорта: откуда шёл и сколько ещё рисовать. */
+        public double teleFromY, teleT;
+        /** Червяк просит прорыться сквозь блок. */
+        public boolean wormDig;
         public int gravityDir = 1, mode = Gd.CUBE, speed = 1, index;
         public boolean mini, mirror, onGround, onCeiling, hidden, noClipWorm, robotJumping, trailOn = true;
         /** В воде или лаве — плавает; в лаве ещё и горит. */
@@ -287,6 +291,10 @@ public class Engine {
         integrate(p, dt, hold, pressed);
         p.y += p.vy * dt;
 
+        if (p.wormDig) { p.wormDig = false; wormDig(p); }
+        if (p.teleT > 0) p.teleT = Math.max(0, p.teleT - dt);
+        if (p.spiderFlash > 0) p.spiderFlash = Math.max(0, p.spiderFlash - dt);
+
         resolveSolids(p, prevY);
         resolveBounds(p);
         touchObjects(p, pressed);
@@ -332,7 +340,7 @@ public class Engine {
         switch (p.mode) {
             case Gd.CUBE:
                 p.vy += g * dt;
-                if (hold && p.onGround) { p.jump(CUBE_JUMP); sfx("jump"); }
+                if (hold && p.onGround) p.jump(CUBE_JUMP);
                 break;
             case Gd.SHIP:
                 p.vy += (hold ? SHIP_THRUST * p.gravityDir : g) * dt;
@@ -341,11 +349,11 @@ public class Engine {
             case Gd.BALL:
                 p.vy += g * dt;
                 p.vy = clamp(p.vy, -BALL_MAX, BALL_MAX);
-                if (pressed && (p.onGround || p.onCeiling)) { p.flip(); p.vy = 0; sfx("jump"); }
+                if (pressed && (p.onGround || p.onCeiling)) { p.flip(); p.vy = 0; }
                 break;
             case Gd.UFO:
                 p.vy += g * dt;
-                if (pressed) { p.jump(UFO_JUMP); sfx("jump"); }
+                if (pressed) p.jump(UFO_JUMP);
                 break;
             case Gd.WAVE: {
                 double slope = p.mini ? WAVE_SLOPE_MINI : WAVE_SLOPE;
@@ -357,7 +365,6 @@ public class Engine {
                 if (pressed && p.onGround) {
                     p.robotJumping = true; p.robotHold = 0;
                     p.vy = ROBOT_JUMP * p.gravityDir; p.onGround = false;
-                    sfx("jump");
                 }
                 if (p.robotJumping) {
                     if (hold && p.robotHold < ROBOT_HOLD) {
@@ -371,7 +378,8 @@ public class Engine {
                 if (pressed) spiderTeleport(p);
                 break;
             case Gd.WORM:
-                if (pressed) { p.gravityDir = -p.gravityDir; p.vy = 0; p.onGround = p.onCeiling = false; sfx("jump"); }
+                // червяк — перевёрнутый паук: по клику прорывается сквозь блок на другую сторону
+                if (pressed && (p.onGround || p.onCeiling)) p.wormDig = true;
                 if (p.noClipWorm) {
                     p.vy = 0;
                     p.wormBurrow = Math.min(1, p.wormBurrow + dt * 6);
@@ -461,6 +469,7 @@ public class Engine {
         List<Integer> list = new ArrayList<>(candidates(p.box()));
 
         for (int i : list) {
+            if (level.objects.get(i).noTouch) continue;   // «без касания» — проходим насквозь
             Catalog.Def d = Catalog.get(level.objects.get(i).typeId);
             if (!d.solid) continue;
             RectF r = objHit(i);
@@ -570,10 +579,77 @@ public class Engine {
                 if (y < from - 1 && y > best) best = y;
             }
         }
+        p.teleFromY = p.y;
+        p.teleT = 0.2;
         p.y = best; p.vy = 0;
         p.gravityDir = -p.gravityDir;
         p.spiderFlash = 0.18;
         sfx("orb");
+    }
+
+    /**
+     * Червяк прорывается сквозь блок, на котором стоит: проходит всю сплошную толщу
+     * и выходит с другой стороны, гравитация переворачивается. Нет места — остаёмся.
+     */
+    void wormDig(Player p) {
+        double half = p.size() / 2;
+        int dir = p.gravityDir > 0 ? -1 : 1;
+        double face = p.gravityDir > 0 ? p.y - half : p.y + half;
+
+        RectF probe = new RectF((float) (p.x - half + 2), (float) (face - 4000),
+                (float) (p.x + half - 2), (float) (face + 4000));
+        List<double[]> spans = new ArrayList<>();
+        for (int i : new ArrayList<>(candidates(probe))) {
+            Level.Obj o = level.objects.get(i);
+            if (o.noTouch) continue;
+            Catalog.Def d = Catalog.get(o.typeId);
+            if (!d.solid) continue;
+            RectF r = objHit(i);
+            if (r.right <= p.x - half + 1 || r.left >= p.x + half - 1) continue;
+            spans.add(new double[]{Math.min(r.top, r.bottom), Math.max(r.top, r.bottom)});
+        }
+        if (spans.isEmpty()) return;
+
+        double edge = face;
+        boolean moved = true;
+        int guard = 0;
+        while (moved && guard++ < 64) {
+            moved = false;
+            for (double[] sp : spans) {
+                if (dir < 0) {
+                    if (sp[1] >= edge - 1.5 && sp[0] < edge) { edge = sp[0]; moved = true; }
+                } else {
+                    if (sp[0] <= edge + 1.5 && sp[1] > edge) { edge = sp[1]; moved = true; }
+                }
+            }
+        }
+        if (Math.abs(edge - face) < 1) return;
+
+        double targetY = dir < 0 ? edge - half : edge + half;
+        if (targetY - half < groundY || targetY + half > roofY) return;
+
+        RectF test = new RectF((float) (p.x - half + 2), (float) (targetY - half + 2),
+                (float) (p.x + half - 2), (float) (targetY + half - 2));
+        for (int i : new ArrayList<>(candidates(test))) {
+            Level.Obj o = level.objects.get(i);
+            if (o.noTouch) continue;
+            Catalog.Def d = Catalog.get(o.typeId);
+            if (!d.solid) continue;
+            RectF r = objHit(i);
+            if (r.right <= test.left || r.left >= test.right) continue;
+            double lo = Math.min(r.top, r.bottom), hi = Math.max(r.top, r.bottom);
+            if (hi > targetY - half + 1 && lo < targetY + half - 1) return;
+        }
+
+        p.teleFromY = p.y;
+        p.teleT = 0.22;
+        p.y = targetY;
+        p.vy = 0;
+        p.gravityDir = -p.gravityDir;
+        p.onGround = true;
+        p.onCeiling = false;
+        p.wormBurrow = 1;
+        sfx("portal");
     }
 
     void touchObjects(Player p, boolean pressed) {

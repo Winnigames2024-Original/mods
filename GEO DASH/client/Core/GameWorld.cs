@@ -289,6 +289,11 @@ namespace GEO_DASH.Core
             p.Y += p.VY * dt;
 
             if (sreq.Requested) SpiderTeleport(p);
+            if (p.WormDigRequest) { p.WormDigRequest = false; WormDig(p); }
+
+            // след телепорта гаснет сам
+            if (p.TeleT > 0) p.TeleT = Math.Max(0, p.TeleT - dt);
+            if (p.SpiderFlash > 0) p.SpiderFlash = Math.Max(0, p.SpiderFlash - dt);
 
             ResolveSolids(p, prevX, prevY);
             ResolveBounds(p);
@@ -512,11 +517,92 @@ namespace GEO_DASH.Core
                     if (y < from - 1 && y > best) best = y;
                 }
             }
+            p.TeleFromY = p.Y;
+            p.TeleT = 0.2;
             p.Y = best;
             p.VY = 0;
             p.GravityDir = -p.GravityDir;
             p.SpiderFlash = 0.18;
             Sfx?.Invoke("orb");
+        }
+
+        /// <summary>
+        /// Червяк прорывается сквозь блок, на котором стоит: проходит всю сплошную
+        /// толщу и выходит с другой стороны, гравитация переворачивается.
+        /// Если с той стороны нет места — остаёмся на месте.
+        /// </summary>
+        void WormDig(Player p)
+        {
+            double half = p.Size / 2;
+            // роем в сторону притяжения: стоим сверху — уходим вниз, и наоборот
+            int dir = p.GravityDir > 0 ? -1 : 1;
+            double face = p.GravityDir > 0 ? p.Y - half : p.Y + half;   // грань, на которой стоим
+
+            // собираем сплошную толщу блоков под игроком
+            var probe = new RectangleF((float)(p.X - half + 2), (float)(face - 4000),
+                                       (float)(p.Size - 4), 8000f);
+            var spans = new List<(double lo, double hi)>();
+            foreach (var i in Candidates(probe))
+            {
+                var o = Level.Objects[i];
+                if (o.NoTouch) continue;
+                var d = ObjectCatalog.Get(o.TypeId);
+                if (!d.Solid) continue;
+                var r = ObjHit(i);
+                if (r.Right <= p.X - half + 1 || r.Left >= p.X + half - 1) continue;
+                spans.Add((Math.Min(r.Top, r.Bottom), Math.Max(r.Top, r.Bottom)));
+            }
+            if (spans.Count == 0) return;
+
+            // идём от грани вглубь, склеивая блоки, стоящие вплотную
+            double edge = face;
+            bool moved = true;
+            int guard = 0;
+            while (moved && guard++ < 64)
+            {
+                moved = false;
+                foreach (var (lo, hi) in spans)
+                {
+                    if (dir < 0)
+                    {
+                        // роем вниз: блок должен начинаться у самой грани
+                        if (hi >= edge - 1.5 && lo < edge) { edge = lo; moved = true; }
+                    }
+                    else
+                    {
+                        if (lo <= edge + 1.5 && hi > edge) { edge = hi; moved = true; }
+                    }
+                }
+            }
+            if (Math.Abs(edge - face) < 1) return;        // под нами ничего нет
+
+            double targetY = dir < 0 ? edge - half : edge + half;
+
+            // за блоком должно быть место: иначе никуда не лезем
+            if (targetY - half < GroundY || targetY + half > RoofY) return;
+            var test = new RectangleF((float)(p.X - half + 2), (float)(targetY - half + 2),
+                                      (float)(p.Size - 4), (float)(p.Size - 4));
+            foreach (var i in Candidates(test))
+            {
+                var o = Level.Objects[i];
+                if (o.NoTouch) continue;
+                var d = ObjectCatalog.Get(o.TypeId);
+                if (!d.Solid) continue;
+                var r = ObjHit(i);
+                if (r.Right <= test.Left || r.Left >= test.Right) continue;
+                double lo = Math.Min(r.Top, r.Bottom), hi = Math.Max(r.Top, r.Bottom);
+                if (hi > targetY - half + 1 && lo < targetY + half - 1) return;   // занято
+            }
+
+            p.TeleFromY = p.Y;
+            p.TeleT = 0.22;
+            p.Y = targetY;
+            p.VY = 0;
+            p.GravityDir = -p.GravityDir;
+            p.OnGround = true;
+            p.OnCeiling = false;
+            p.WormBurrow = 1;
+            Sfx?.Invoke("portal");
         }
 
         void TouchObjects(Player p, PlayerInput inp)

@@ -1,8 +1,8 @@
 {
-  "version": "1.8.1",
+  "version": "1.8.2",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Новый демон Night Ride под трек BIKE (Newgrounds #1191782): скорости, режимы и экранные эффекты расставлены по самой песне. Есть и на ПК, и на Android.",
+  "notes": "Режим «Червяк» переделан: по клику прорывается сквозь блок на другую сторону и переворачивается, со следом. Иконки всех восьми режимов рисуются один раз и кэшируются. Свой портал червяка. Убраны звуки на нажатие в игре. Встроенные треки больше не портятся при генерации, музыка уровня честно сообщает, если не пошла; трек можно скачать прямо с карточки уровня.",
   "date": "2026-11-19"
 }

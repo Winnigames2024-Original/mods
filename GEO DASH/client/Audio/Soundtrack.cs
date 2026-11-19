@@ -77,17 +77,39 @@ namespace GEO_DASH.Audio
 
         public static bool IsBuiltIn(int id) => id < 0 && Get(id) != null;
 
-        /// <summary>Генерирует трек, если его ещё нет на диске. Возвращает путь к wav.</summary>
+        static readonly object MakeLock = new();
+
+        /// <summary>
+        /// Генерирует трек, если его ещё нет на диске. Возвращает путь к wav.
+        /// Пишем через временный файл и под замком: иначе два потока могли
+        /// начать писать один и тот же wav, и трек оставался битым навсегда.
+        /// </summary>
         public static string Ensure(int id, IProgress<string> prog = null)
         {
             var def = Get(id);
             if (def == null) return null;
             var path = PathOf(id);
-            if (File.Exists(path) && new FileInfo(path).Length > 200_000) return path;
-            prog?.Report("Готовлю трек «" + def.Name + "»…");
-            var pcm = Render(def);
-            WriteWav(path, pcm);
-            return path;
+
+            lock (MakeLock)
+            {
+                if (File.Exists(path) && new FileInfo(path).Length > 200_000) return path;
+                prog?.Report("Готовлю трек «" + def.Name + "»…");
+                try
+                {
+                    var pcm = Render(def);
+                    var tmp = path + ".tmp";
+                    WriteWav(tmp, pcm);
+                    if (new FileInfo(tmp).Length < 200_000) { File.Delete(tmp); return null; }
+                    if (File.Exists(path)) File.Delete(path);
+                    File.Move(tmp, path);
+                    return path;
+                }
+                catch
+                {
+                    try { if (File.Exists(path + ".tmp")) File.Delete(path + ".tmp"); } catch { }
+                    return File.Exists(path) ? path : null;
+                }
+            }
         }
 
         public static void EnsureAll(IProgress<string> prog = null)

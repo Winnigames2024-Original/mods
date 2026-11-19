@@ -441,6 +441,13 @@ namespace GEO_DASH.Render
 
         static void DrawPortal(Graphics g, RectangleF r, LevelObject o, int a)
         {
+            // у червяка свой портал — фиолетово-оранжевый, с зубцами бура
+            if (o.Portal == PortalKind.ModeWorm && a > 200)
+            {
+                PlayerIcons.DrawWormPortal(g, r);
+                return;
+            }
+
             var (c1, label) = PortalLook(o.Portal);
             using (var br = new LinearGradientBrush(
                        new RectangleF(r.X, r.Y, Math.Max(2, r.Width), Math.Max(2, r.Height)),
@@ -467,7 +474,7 @@ namespace GEO_DASH.Render
             PortalKind.ModeWave => (Color.FromArgb(90, 220, 255), "WAV"),
             PortalKind.ModeRobot => (Color.FromArgb(170, 170, 190), "ROB"),
             PortalKind.ModeSpider => (Color.FromArgb(180, 80, 255), "SPD"),
-            PortalKind.ModeWorm => (Color.FromArgb(120, 255, 170), "WRM"),
+            PortalKind.ModeWorm => (Color.FromArgb(180, 110, 255), "WRM"),
             PortalKind.GravityUp => (Color.FromArgb(90, 150, 255), "↑"),
             PortalKind.GravityDown => (Color.FromArgb(255, 240, 120), "↓"),
             PortalKind.GravityToggle => (Color.FromArgb(200, 120, 255), "⇅"),
@@ -527,106 +534,29 @@ namespace GEO_DASH.Render
                 if (pts.Length > 1) g.DrawLines(pen, pts);
             }
 
-            var box = p.Box;
-            var r = v.WorldRect(box.X, box.Y, box.Width, box.Height);
-            var state = g.Save();
-            g.TranslateTransform(r.X + r.Width / 2, r.Y + r.Height / 2);
-            g.RotateTransform((float)p.Rotation);
-            if (p.Mirror) g.ScaleTransform(-1, 1);
-            var rr = new RectangleF(-r.Width / 2, -r.Height / 2, r.Width, r.Height);
-            Color dark = Blend(col, Color.Black, 0.55);
-            Color light = Blend(col, Color.White, 0.55);
-
-            switch (p.Mode)
+            // след телепорта паука и червяка — полупрозрачный луч
+            if (p.TeleT > 0)
             {
-                case GameMode.Cube:
-                    // внешний вид кубика берётся из набора иконок (и своей картинки)
-                    IconKit.Draw(g, rr, AppConfig.Settings.IconShape, col,
-                                 Color.FromArgb(AppConfig.Settings.IconColor2));
-                    break;
-
-                case GameMode.Ship:
-                    using (var br = new SolidBrush(Blend(col, Color.White, 0.2)))
-                        g.FillPolygon(br, new[]
-                        {
-                            new PointF(rr.X - rr.Width * 0.45f, rr.Bottom),
-                            new PointF(rr.Right + rr.Width * 0.5f, rr.Y + rr.Height * 0.5f),
-                            new PointF(rr.X - rr.Width * 0.45f, rr.Y)
-                        });
-                    using (var br = new SolidBrush(col)) g.FillRectangle(br, Inflate(rr, -rr.Width * 0.22f));
-                    break;
-
-                case GameMode.Ball:
-                    IconKit.Draw(g, rr, AppConfig.Settings.IconShape, col,
-                                 Color.FromArgb(AppConfig.Settings.IconColor2), round: true);
-                    break;
-
-                case GameMode.Ufo:
-                    using (var br = new SolidBrush(Color.FromArgb(180, light)))
-                        g.FillEllipse(br, rr.X + rr.Width * 0.18f, rr.Y, rr.Width * 0.64f, rr.Height * 0.62f);
-                    using (var br = new SolidBrush(col))
-                        g.FillEllipse(br, rr.X - rr.Width * 0.15f, rr.Y + rr.Height * 0.45f, rr.Width * 1.3f, rr.Height * 0.45f);
-                    break;
-
-                case GameMode.Wave:
-                    using (var br = new SolidBrush(col)) g.FillPolygon(br, Diamond(rr));
-                    using (var pen = new Pen(dark, 2f)) g.DrawPolygon(pen, Diamond(rr));
-                    break;
-
-                case GameMode.Robot:
-                    using (var br = new SolidBrush(col))
-                        g.FillRectangle(br, rr.X, rr.Y, rr.Width, rr.Height * 0.62f);
-                    using (var br = new SolidBrush(dark))
-                    {
-                        g.FillRectangle(br, rr.X + rr.Width * 0.12f, rr.Y + rr.Height * 0.62f, rr.Width * 0.24f, rr.Height * 0.38f);
-                        g.FillRectangle(br, rr.X + rr.Width * 0.64f, rr.Y + rr.Height * 0.62f, rr.Width * 0.24f, rr.Height * 0.38f);
-                    }
-                    using (var br = new SolidBrush(light))
-                        g.FillRectangle(br, rr.X + rr.Width * 0.2f, rr.Y + rr.Height * 0.15f, rr.Width * 0.6f, rr.Height * 0.25f);
-                    break;
-
-                case GameMode.Spider:
-                    using (var br = new SolidBrush(col)) g.FillRectangle(br, Inflate(rr, -rr.Width * 0.1f));
-                    using (var pen = new Pen(dark, Math.Max(1.6f, rr.Width * 0.09f)))
-                    {
-                        for (int i = -1; i <= 1; i += 2)
-                            for (int k = 0; k < 3; k++)
-                            {
-                                float y = rr.Y + rr.Height * (0.2f + k * 0.3f);
-                                g.DrawLine(pen, rr.X + rr.Width / 2, y,
-                                                rr.X + rr.Width / 2 + i * rr.Width * 0.75f, y + rr.Height * 0.25f);
-                            }
-                    }
-                    break;
-
-                case GameMode.Worm:
-                    {
-                        // червяк: голова + сегменты, при «бурении» внутри блока темнее
-                        float seg = rr.Width * 0.46f;
-                        for (int i = 3; i >= 0; i--)
-                        {
-                            float k = 1f - i * 0.16f;
-                            var c2 = Blend(col, p.NoClipWorm ? Color.Black : Color.White, i * 0.12);
-                            using var br = new SolidBrush(Color.FromArgb(i == 0 ? 255 : 210, c2));
-                            float cx = rr.X + rr.Width / 2 - i * seg * 0.62f;
-                            float cy = rr.Y + rr.Height / 2 + (float)Math.Sin(Environment.TickCount / 90.0 + i) * rr.Height * 0.08f;
-                            g.FillEllipse(br, cx - seg * k / 2, cy - seg * k / 2, seg * k, seg * k);
-                        }
-                        using (var br = new SolidBrush(Color.White))
-                        {
-                            float ex = rr.X + rr.Width * 0.62f, ey = rr.Y + rr.Height * 0.38f;
-                            g.FillEllipse(br, ex, ey, rr.Width * 0.14f, rr.Width * 0.14f);
-                        }
-                        if (p.NoClipWorm)
-                        {
-                            using var pen = new Pen(Color.FromArgb(120, 255, 255, 255), 1.5f) { DashStyle = DashStyle.Dot };
-                            g.DrawEllipse(pen, Inflate(rr, rr.Width * 0.12f));
-                        }
-                        break;
-                    }
+                var a = v.W2S(p.X, p.TeleFromY);
+                var b2 = v.W2S(p.X, p.Y);
+                float wgt = (float)(p.Size * v.Scale * 0.6);
+                using var tb = new LinearGradientBrush(
+                    new PointF(a.X - wgt, a.Y), new PointF(a.X + wgt, a.Y),
+                    Color.FromArgb(0, col), Color.FromArgb((int)(170 * p.TeleT / 0.22), col));
+                g.FillRectangle(tb, Math.Min(a.X, b2.X) - wgt / 2, Math.Min(a.Y, b2.Y),
+                                wgt, Math.Abs(b2.Y - a.Y) + 1);
             }
 
-            g.Restore(state);
+            var box = p.Box;
+            var r = v.WorldRect(box.X, box.Y, box.Width, box.Height);
+
+            // кубик, шар и остальные режимы берём из кэша иконок
+            PlayerIcons.DrawPlayer(g, p.Mode, r, (float)p.Rotation, p.GravityDir < 0,
+                                   col, Color.FromArgb(AppConfig.Settings.IconColor2),
+                                   AppConfig.Settings.IconShape);
+            if (ShowHitboxes)
+                using (var pen = new Pen(Color.FromArgb(180, 255, 80, 80), 1.5f))
+                    g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
 
             if (ShowHitboxes)
             {

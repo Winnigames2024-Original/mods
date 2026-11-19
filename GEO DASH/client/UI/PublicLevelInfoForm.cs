@@ -38,6 +38,12 @@ namespace GEO_DASH.UI
             Add("КОММЕНТАРИИ", GdIcon.Online, bx + (bw + 16) * 2, by, bw, bh,
                 Color.FromArgb(200, 170, 255), Color.FromArgb(100, 60, 180), (s, e) => Comments());
 
+            // трек уровня можно скачать прямо отсюда
+            if (lv.Settings.SongId > 0)
+                Add("СКАЧАТЬ ТРЕК #" + lv.Settings.SongId, GdIcon.Music, bx, by + bh + 76, bw * 2 + 16, 50,
+                    Color.FromArgb(255, 180, 230), Color.FromArgb(150, 60, 130),
+                    async (s, e) => await GetSong());
+
             by += bh + 14;
             if (_mine)
             {
@@ -107,6 +113,40 @@ namespace GEO_DASH.UI
         {
             if (!Published) { _msg = "Комментарии появятся после публикации"; Content.Invalidate(); return; }
             Nav.Go(new CommentsForm(_lv.Settings.ServerId, _lv.Settings.Name));
+        }
+
+        /// <summary>Скачать трек уровня по ID через сервер.</summary>
+        async Task GetSong()
+        {
+            int id = _lv.Settings.SongId;
+            if (id <= 0) { _msg = "У уровня встроенный трек — качать нечего"; Content.Invalidate(); return; }
+            if (MusicPlayer.IsCached(id))
+            {
+                _msg = "Трек #" + id + " уже скачан";
+                _ = MusicPlayer.PlayAsync(id, 0, 0.6, true);
+                Content.Invalidate();
+                return;
+            }
+
+            _busy = true; _msg = "Качаю трек #" + id + "…"; Content.Invalidate();
+            var path = await MusicPlayer.EnsureAsync(id, new Progress<string>(t =>
+            {
+                _msg = t; Content.Invalidate();
+            }));
+            _busy = false;
+
+            if (path != null)
+            {
+                _msg = "Трек #" + id + " скачан — играет";
+                _ = MusicPlayer.PlayAsync(id, 0, 0.6, true);
+            }
+            else if (!ApiClient.Online)
+                _msg = "Нет связи с сервером — трек скачается, когда появится сеть";
+            else
+                _msg = "Сервер не отдал трек #" + id +
+                       (string.IsNullOrEmpty(MusicPlayer.LastError) ? "" : " (" + MusicPlayer.LastError + ")") +
+                       ". Залей mp3 на сайте в разделе «Музыка» под этим ID.";
+            Content.Invalidate();
         }
 
         async Task Publish()
