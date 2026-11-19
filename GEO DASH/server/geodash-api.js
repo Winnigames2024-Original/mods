@@ -117,8 +117,8 @@ function levelPub(l) {
     difficulty: l.difficulty | 0, stars: l.stars | 0,
     likes: l.likes | 0, downloads: l.downloads | 0, plays: l.plays | 0,
     featured: !!l.featured, epic: !!l.epic, offline: !!l.offline,
-    daily: db.state.daily && db.state.daily.id === l.id,
-    weekly: db.state.weekly && db.state.weekly.id === l.id,
+    daily: !!(db.state.daily && db.state.daily.id === l.id),
+    weekly: !!(db.state.weekly && db.state.weekly.id === l.id),
     version: l.version | 0, length: l.length || 0,
     created: l.created, updated: l.updated
   };
@@ -228,8 +228,32 @@ async function resolveSong(id) {
   const cachedMeta = fs.existsSync(songMetaPath(id)) ? JSON.parse(fs.readFileSync(songMetaPath(id), 'utf8')) : null;
   if (cachedMeta && cachedMeta.url) return cachedMeta;
 
-  const page = await httpsGet('https://www.newgrounds.com/audio/listen/' + id);
-  if (page.status !== 200) throw new Error('Newgrounds вернул ' + page.status);
+  // если трек уже загружен вручную через админку — отдаём его
+  if (fs.existsSync(songFilePath(id)) && fs.statSync(songFilePath(id)).size > 8192) {
+    const meta = { id, name: 'Track ' + id, artist: '', url: 'local', resolved: now(), local: true };
+    fs.writeFileSync(songMetaPath(id), JSON.stringify(meta));
+    return meta;
+  }
+
+  const pages = [
+    'https://www.newgrounds.com/audio/listen/' + id,
+    'https://www.newgrounds.com/audio/listen/' + id + '/'
+  ];
+  let page = null, lastStatus = 0;
+  for (const u of pages) {
+    try {
+      page = await httpsGet(u, {
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.newgrounds.com/audio'
+      });
+      lastStatus = page.status;
+      if (page.status === 200) break;
+    } catch (e) { lastStatus = 0; }
+  }
+  if (!page || page.status !== 200)
+    throw new Error('Newgrounds вернул ' + lastStatus +
+      ' — загрузи mp3 вручную: админка сайта → «Музыка по ID»');
   const html = page.body.toString('utf8');
 
   let url = null;
@@ -257,6 +281,7 @@ async function ensureSongFile(id) {
   const f = songFilePath(id);
   if (fs.existsSync(f) && fs.statSync(f).size > 8192) return f;
   const meta = await resolveSong(id);
+  if (meta.local) return f;
   const r = await httpsGet(meta.url, { Referer: 'https://www.newgrounds.com/audio/listen/' + id });
   if (r.status !== 200 || r.body.length < 8192) throw new Error('не скачалось (' + r.status + ')');
   fs.writeFileSync(f, r.body);
@@ -628,6 +653,51 @@ route('GET', '/api/music/:id/file', async (req, res, p) => {
     });
     fs.createReadStream(f).pipe(res);
   } catch (e) { bad(res, 'Трек недоступен: ' + e.message, 502); }
+});
+
+/** Загрузка mp3 вручную (админ): raw-тело запроса = файл. Нужна, если Newgrounds недоступен с сервера. */
+route('POST', '/api/music/:id/upload', async (req, res, p) => {
+  const u = userOf(req);
+  if (!u || (!u.admin && key(u.name) !== key(ADMIN))) return bad(res, 'Только для админа', 403);
+  const id = parseInt(p.id, 10);
+  if (!id || id < 0) return bad(res, 'Нужен положительный ID трека');
+
+  const chunks = [];
+  let size = 0, tooBig = false;
+  req.on('data', c => {
+    size += c.length;
+    if (size > 40 * 1024 * 1024) { tooBig = true; req.destroy(); return; }
+    chunks.push(c);
+  });
+  req.on('end', () => {
+    if (tooBig) return bad(res, 'Файл больше 40 МБ');
+    const buf = Buffer.concat(chunks);
+    if (buf.length < 8192) return bad(res, 'Файл слишком маленький');
+    fs.writeFileSync(songFilePath(id), buf);
+    fs.writeFileSync(songMetaPath(id), JSON.stringify({
+      id, name: 'Track ' + id, artist: '', url: 'local', local: true,
+      size: buf.length, resolved: now()
+    }));
+    ok(res, { ok: true, id, size: buf.length });
+  });
+  req.on('error', () => bad(res, 'Ошибка загрузки'));
+});
+
+/** Список треков, которые уже лежат на сервере. */
+route('GET', '/api/music', (req, res) => {
+  const list = fs.readdirSync(MUSIC_DIR)
+    .filter(f => f.endsWith('.mp3'))
+    .map(f => {
+      const id = parseInt(f, 10);
+      let meta = {};
+      try { meta = JSON.parse(fs.readFileSync(songMetaPath(id), 'utf8')); } catch {}
+      return {
+        id, name: meta.name || ('Track ' + id), artist: meta.artist || '',
+        size: fs.statSync(path.join(MUSIC_DIR, f)).size, url: '/songs/' + f, cached: true
+      };
+    })
+    .sort((a, b) => a.id - b.id);
+  ok(res, list);
 });
 
 // ---------- админка ----------

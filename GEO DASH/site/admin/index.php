@@ -4,7 +4,30 @@ gd_login_required();
 if (!gd_is_admin()) { http_response_code(403); gd_head('Админка'); echo '<section class="section"><div class="container"><h2>Только для ' . h(GD_ADMIN) . '</h2></div></section>'; gd_foot(); exit; }
 
 $msg = ''; $err = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+// загрузка mp3 для ID (если Newgrounds не отдаёт трек серверу)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'song' && !empty($_FILES['song']['tmp_name'])) {
+    $sid = (int)($_POST['songid'] ?? 0);
+    if ($sid <= 0) $err = 'Укажи ID трека';
+    else {
+        $bin = file_get_contents($_FILES['song']['tmp_name']);
+        $ch = curl_init(GD_API . "/api/music/$sid/upload");
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $bin,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_HTTPHEADER => ['Content-Type: audio/mpeg', 'Authorization: Bearer ' . gd_token()],
+        ]);
+        $raw = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code >= 200 && $code < 300) $msg = "Трек #$sid загружен (" . number_format(strlen($bin) / 1048576, 1) . " МБ)";
+        else $err = 'Не вышло загрузить трек: ' . h((string)$raw);
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') !== 'song') {
     $act = $_POST['act'] ?? '';
     $id  = (int)($_POST['id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
@@ -54,6 +77,27 @@ gd_head('Админка', 'admin');
       <input type="text" name="text" placeholder="объявление для всех игроков">
       <button class="btn small" type="submit">ОТПРАВИТЬ</button>
     </form>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <h3>Музыка по ID</h3>
+    <p class="muted">Сервер сам качает треки с Newgrounds по ID. Если он их не отдаёт (403 с серверных IP) —
+      загрузи mp3 вручную: он ляжет в библиотеку сервера и будет раздаваться игре как <code>/songs/&lt;id&gt;.mp3</code>.</p>
+    <form method="post" enctype="multipart/form-data" class="flex" style="gap:10px;margin-top:10px;max-width:640px">
+      <input type="hidden" name="act" value="song">
+      <input type="number" name="songid" placeholder="ID трека" style="max-width:160px" required>
+      <input type="file" name="song" accept="audio/mpeg,.mp3" required>
+      <button class="btn small gold" type="submit">ЗАГРУЗИТЬ</button>
+    </form>
+    <?php
+    [$okM, $songs] = gd_get('/api/music');
+    if ($okM && $songs): ?>
+      <p class="muted" style="margin-top:12px">В библиотеке: <?= count($songs) ?> шт. —
+        <?php foreach (array_slice($songs, 0, 20) as $s): ?>
+          <a href="/songs/<?= (int)$s['id'] ?>.mp3">#<?= (int)$s['id'] ?></a>
+        <?php endforeach; ?>
+      </p>
+    <?php endif; ?>
   </div>
 
   <div class="card" style="margin-bottom:18px">
