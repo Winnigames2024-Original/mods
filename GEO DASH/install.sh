@@ -241,8 +241,31 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 
+# заявка с сайта (/api.php?action=updateserver) — проверяем каждую минуту
+cat > /etc/systemd/system/geodash-request.service <<UNIT
+[Unit]
+Description=GEO DASH: обновление по заявке с сайта
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '[ -f $WEB/.update-request ] && /usr/local/bin/geodash-autoupdate || true'
+UNIT
+
+cat > /etc/systemd/system/geodash-request.timer <<UNIT
+[Unit]
+Description=GEO DASH: смотреть заявки на обновление каждую минуту
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl daemon-reload
 systemctl enable --now geodash-update.timer >/dev/null 2>&1 || true
+systemctl enable --now geodash-request.timer >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------- итог
 sleep 1
@@ -263,6 +286,7 @@ echo "  Сервис:      systemctl status geodash"
 echo "  Логи:        journalctl -u geodash -f"
 echo "  Обновление:  каждые 5 минут (systemctl status geodash-update.timer)"
 echo "  Вручную:     sudo geodash-update   (или curl -fsSL $SCHEME://$DOMAIN/update.sh | sudo bash)"
+echo "  По ссылке:   $SCHEME://$DOMAIN/api.php?action=updateserver&value=КЛЮЧ"
 echo
 if [ "$SCHEME" = "https" ]; then
 echo "  HTTPS:       включён, сертификат продлевается сам (certbot.timer)"

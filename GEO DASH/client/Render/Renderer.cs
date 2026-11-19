@@ -209,8 +209,14 @@ namespace GEO_DASH.Render
             Color c = Color.FromArgb(a, col);
             Color detail = Color.FromArgb(a, Blend(col, Color.White, 0.75));
 
+            // частые объекты берём готовой картинкой — в кадре ничего не рисуем заново
+            bool rotated = Math.Abs(o.Rotation + (st?.Rot ?? 0)) > 0.01;
+            if (!rotated && !o.FlipX && !o.FlipY && !editor
+                && TileCache.Draw(g, def.Style, c, detail, r))
+                return;
+
             var state = g.Save();
-            if (Math.Abs(o.Rotation + (st?.Rot ?? 0)) > 0.01)
+            if (rotated)
             {
                 g.TranslateTransform(r.X + r.Width / 2, r.Y + r.Height / 2);
                 g.RotateTransform((float)-(o.Rotation + (st?.Rot ?? 0)));

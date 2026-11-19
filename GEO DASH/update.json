@@ -1,8 +1,8 @@
 {
-  "version": "1.9.0",
+  "version": "1.9.1",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Пять новых уровней: Neon Tunnel, Subterranean Pulse, Phase Shift, Core Overload и демон iSpyWithMyLittleEye под трек BIKE с глазами на фоне. Везде задействован режим Червяка. Уведомления слева снизу как в Steam, системных окон больше нет, отсечение невидимых объектов по обеим осям.",
+  "notes": "Блоки и шипы рисуются из готовых картинок — кадр больше ничего не создаёт, игра тянет 120+ FPS. В редакторе появилась полоса перемотки по уровню, поворот Q/E и сдвиг WASD. На сайте заработала ссылка обновления сервера /api.php?action=updateserver.",
   "date": "2026-11-19"
 }

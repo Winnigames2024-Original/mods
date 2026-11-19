@@ -90,6 +90,15 @@ fi
 
 fix_download_location
 
+# заявка с сайта: /api.php?action=updateserver&value=КЛЮЧ
+REQ="$WEB/.update-request"
+FORCED=0
+if [ -f "$REQ" ]; then
+  log "пришла заявка на обновление с сайта"
+  rm -f "$REQ"
+  FORCED=1
+fi
+
 [ -d "$SRC/.git" ] || exit 0
 cd "$SRC"
 
@@ -100,7 +109,7 @@ after="$(git rev-parse HEAD 2>/dev/null || echo none)"
 
 changed=0
 
-if [ "$before" != "$after" ]; then
+if [ "$before" != "$after" ] || [ "$FORCED" = "1" ]; then
   # ---- сайт ----
   if [ -d "$SRC/$SUBDIR/site" ]; then
     cp -r "$SRC/$SUBDIR/site/." "$WEB/"
@@ -108,6 +117,7 @@ if [ "$before" != "$after" ]; then
     cp -f "$SRC/$SUBDIR/autoupdatefor5minutes.sh" "$WEB/autoupdatefor5minutes.sh" 2>/dev/null || true
     chmod +x "$WEB/install.sh" "$WEB/autoupdatefor5minutes.sh" 2>/dev/null || true
     git rev-parse --short HEAD > "$WEB/.sitever" 2>/dev/null || true
+    date '+%Y-%m-%d %H:%M:%S' > "$WEB/.update-log" 2>/dev/null || true
     chown -R www-data:www-data "$WEB"
     changed=1
   fi

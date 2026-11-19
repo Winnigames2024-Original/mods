@@ -48,6 +48,9 @@ namespace GEO_DASH.UI
         /// <summary>Выбранная в палитре конструкция (ставится целиком).</summary>
         BuildPiece _piece;
 
+        HScrollBar _scroll;
+        bool _scrollLock;
+
         /// <summary>Холст перерисовывается по таймеру — так редактор двигается плавно.</summary>
         bool _dirty = true;
         readonly System.Windows.Forms.Timer _paint = new() { Interval = 16 };
@@ -67,7 +70,25 @@ namespace GEO_DASH.UI
             _preview.Init(_lv);
             PushUndo();
 
-            _paint.Tick += (s, e) => { if (_dirty) { _dirty = false; _canvas.Invalidate(); } };
+            _paint.Tick += (s, e) =>
+            {
+                if (!_dirty) return;
+                _dirty = false;
+                _canvas.Invalidate();
+
+                // полоса идёт за камерой, но не дёргает камеру сама
+                if (_scroll != null)
+                {
+                    double len = Math.Max(600, _lv.RightEdge());
+                    int v = (int)Math.Clamp(_camX / len * 10000, 0, 10000 - _scroll.LargeChange);
+                    if (Math.Abs(v - _scroll.Value) > 2)
+                    {
+                        _scrollLock = true;
+                        _scroll.Value = v;
+                        _scrollLock = false;
+                    }
+                }
+            };
             Shown += (s, e) => _paint.Start();
             FormClosing += (s, e) => Save();
             FormClosed += (s, e) => _paint.Stop();
@@ -95,6 +116,17 @@ namespace GEO_DASH.UI
 
             var top = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.FromArgb(18, 16, 44) };
             Controls.Add(top);
+
+            // полоса перемотки по уровню — как в редакторе игры
+            _scroll = new HScrollBar { Dock = DockStyle.Top, Height = 20, Minimum = 0, Maximum = 10000, LargeChange = 400 };
+            _scroll.Scroll += (s2, e2) =>
+            {
+                if (_scrollLock) return;
+                double len = Math.Max(600, _lv.RightEdge());
+                _camX = _scroll.Value / 10000.0 * len;
+                Repaint();
+            };
+            Controls.Add(_scroll);
 
             _canvas = new GdPanel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(16, 14, 40) };
             Controls.Add(_canvas);
@@ -982,6 +1014,19 @@ namespace GEO_DASH.UI
             else if (e.KeyCode == Keys.Right) { MoveSel(_step, 0); e.Handled = true; }
             else if (e.KeyCode == Keys.Up) { MoveSel(0, _step); e.Handled = true; }
             else if (e.KeyCode == Keys.Down) { MoveSel(0, -_step); e.Handled = true; }
+            else if (e.KeyCode == Keys.A) { MoveSel(-_step, 0); e.Handled = true; }
+            else if (e.KeyCode == Keys.D) { MoveSel(_step, 0); e.Handled = true; }
+            else if (e.KeyCode == Keys.W) { MoveSel(0, _step); e.Handled = true; }
+            else if (e.KeyCode == Keys.S && !e.Control) { MoveSel(0, -_step); e.Handled = true; }
+            else if (e.KeyCode == Keys.Q) { RotateSel(-90); e.Handled = true; }
+            else if (e.KeyCode == Keys.E) { RotateSel(90); e.Handled = true; }
+            else if (e.KeyCode == Keys.H)
+            {
+                // шаг: клетка / половина клетки / пять клеток
+                _step = _step >= 150 ? 15 : (_step >= 30 ? 150 : 30);
+                Status("Шаг: " + _step + " (клетка 30)");
+                e.Handled = true;
+            }
         }
 
         /// <summary>Сохранить выделенное как свою конструкцию — потом ставится одним кликом.</summary>
