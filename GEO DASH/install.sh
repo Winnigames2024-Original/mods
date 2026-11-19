@@ -58,6 +58,7 @@ mkdir -p "$APP" "$DATA/leveldata" "$DATA/music"
 cp -f "$SRC/$SUBDIR/server/geodash-api.js" "$APP/geodash-api.js"
 cp -f "$SRC/$SUBDIR/update.json" "$APP/update.json" 2>/dev/null || true
 chown -R geodash:geodash "$DATA" "$APP"
+chmod 755 "$DATA" "$DATA/music"        # чтобы nginx отдавал /songs/<id>.mp3
 
 cp -f "$SRC/$SUBDIR/server/geodash.service" /etc/systemd/system/geodash.service
 sed -i "s/GEODASH_PORT=.*/GEODASH_PORT=$API_PORT/" /etc/systemd/system/geodash.service
@@ -114,6 +115,13 @@ server {
     location /download/ {
         add_header Content-Disposition "attachment";
         try_files \$uri =404;
+    }
+
+    # песни: скачанные по ID лежат рядом с данными сервера и раздаются как /songs/<id>.mp3
+    location /songs/ {
+        alias $DATA/music/;
+        add_header Access-Control-Allow-Origin *;
+        expires 7d;
     }
 
     location / { try_files \$uri \$uri/ /index.php?\$query_string; }

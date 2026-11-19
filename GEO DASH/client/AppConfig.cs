@@ -38,31 +38,19 @@ namespace GEO_DASH
         static string _dataDir;
 
         /// <summary>
-        /// Всё хранится в папке assets рядом с игрой: уровни, сохранённые уровни и песни (mp3/wav).
-        /// Если папка рядом с exe недоступна для записи (например, Program Files) —
-        /// используем assets в LocalAppData.
+        /// Все данные игры: %APPDATA%\Winnigames2024\Geo Dash\assets\
+        /// (уровни, сохранённые уровни, песни, кэш). Папка создаётся сама.
         /// </summary>
         public static string DataDir
         {
             get
             {
                 if (_dataDir != null) return _dataDir;
-                string exeDir = AppContext.BaseDirectory;
-                try
-                {
-                    var p = Path.Combine(exeDir, "assets");
-                    Directory.CreateDirectory(p);
-                    var probe = Path.Combine(p, ".write-test");
-                    File.WriteAllText(probe, "ok");
-                    File.Delete(probe);
-                    _dataDir = p;
-                }
-                catch
-                {
-                    var p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppName, "assets");
-                    Directory.CreateDirectory(p);
-                    _dataDir = p;
-                }
+                var p = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    Brand, "Geo Dash", "assets");
+                Directory.CreateDirectory(p);
+                _dataDir = p;
                 return _dataDir;
             }
         }
@@ -70,7 +58,8 @@ namespace GEO_DASH
         public static string LevelsDir => Ensure(Path.Combine(DataDir, "levels"));
         public static string SavedDir => Ensure(Path.Combine(DataDir, "saved"));
         public static string CacheDir => Ensure(Path.Combine(DataDir, "cache"));
-        public static string MusicDir => Ensure(Path.Combine(DataDir, "music"));
+        /// <summary>Песни: assets/songs — и скачанные с сайта, и встроенные.</summary>
+        public static string MusicDir => Ensure(Path.Combine(DataDir, "songs"));
         public static string OfficialDir => Ensure(Path.Combine(DataDir, "official"));
 
         static string Ensure(string p) { Directory.CreateDirectory(p); return p; }

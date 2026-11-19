@@ -1,0 +1,31 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.winnigames2024.geodash'
+    compileSdk 34
+
+    defaultConfig {
+        // данные игры: /Android/data/com.winnigames2024.geodash/files/assets/
+        applicationId "com.winnigames2024.geodash"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug      // подписываем debug-ключом, чтобы apk ставился
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint { abortOnError false }
+}
+
+dependencies { }

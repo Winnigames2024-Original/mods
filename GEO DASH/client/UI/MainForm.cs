@@ -184,18 +184,23 @@ namespace GEO_DASH.UI
             Invalidate();
         }
 
+        /// <summary>Проверка обновления — только когда сервер онлайн; показывает диалог обновления.</summary>
         async Task CheckUpdateAsync()
         {
+            if (!ApiClient.Online && !await ApiClient.PingAsync()) return;
+
             var info = await Updater.CheckAsync();
             if (info == null) return;
-            if (!Updater.IsNewer(info.version, Updater.CurrentVersion)) return;
-            var ask = MessageBox.Show(
-                $"Есть новая версия {info.version} (у тебя {Updater.CurrentVersion}).\n\n{info.notes}\n\nОбновить сейчас?",
-                "Обновление GEO DASH", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-            if (ask != DialogResult.Yes) return;
-            Status("Скачиваю обновление…");
-            if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(Status)))
-                Application.Exit();
+            if (!Updater.IsNewer(info.version, Updater.CurrentVersion))
+            {
+                Status("Версия последняя: " + Updater.CurrentVersion);
+                return;
+            }
+
+            Status($"Доступно обновление {info.version}");
+            using var f = new UpdateForm(info);
+            f.ShowDialog(this);
+            Invalidate();
         }
 
         void Status(string s)

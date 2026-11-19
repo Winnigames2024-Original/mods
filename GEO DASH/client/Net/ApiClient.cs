@@ -241,6 +241,7 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<SongDto>> SongInfoAsync(int id) =>
             GetAsync<SongDto>("/api/music/" + id, "song_" + id);
 
+        /// <summary>Качает песню: сначала через API сервера, если не вышло — прямо с сайта (/songs/&lt;id&gt;.mp3).</summary>
         public static async Task<byte[]> DownloadSongAsync(int id)
         {
             try
@@ -248,10 +249,18 @@ namespace GEO_DASH.Net
                 using var resp = await Http.SendAsync(Req(HttpMethod.Get, $"/api/music/{id}/file"),
                                                       HttpCompletionOption.ResponseHeadersRead);
                 SetOnline(true);
-                if (!resp.IsSuccessStatusCode) return null;
-                return await resp.Content.ReadAsByteArrayAsync();
+                if (resp.IsSuccessStatusCode) return await resp.Content.ReadAsByteArrayAsync();
             }
-            catch { SetOnline(false); return null; }
+            catch { SetOnline(false); }
+
+            try
+            {
+                var site = AppConfig.Settings.SiteUrl.TrimEnd('/');
+                using var r2 = await Http.GetAsync($"{site}/songs/{id}.mp3", HttpCompletionOption.ResponseHeadersRead);
+                if (r2.IsSuccessStatusCode) return await r2.Content.ReadAsByteArrayAsync();
+            }
+            catch { }
+            return null;
         }
 
         // ------------------------------------------------------------ админка

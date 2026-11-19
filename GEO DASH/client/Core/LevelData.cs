@@ -239,17 +239,19 @@ namespace GEO_DASH.Core
             return def;
         }
 
+        // Пишем все поля (кроме null): формат .gdl читает и Android-клиент,
+        // поэтому пропуски значений по умолчанию недопустимы.
         static readonly JsonSerializerOptions Opt = new()
         {
             WriteIndented = false,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             Converters = { new JsonStringEnumConverter() }
         };
 
         static readonly JsonSerializerOptions OptPretty = new()
         {
             WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             Converters = { new JsonStringEnumConverter() }
         };
 

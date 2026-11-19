@@ -1,0 +1,238 @@
+package com.winnigames2024.geodash;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/** Сеть: тот же API, что у игры на Windows. Без интернета отдаём кэш. */
+public class Api {
+
+    public static boolean online = false;
+    public static String lastError = "";
+    static final ExecutorService POOL = Executors.newFixedThreadPool(3);
+
+    public static void async(Runnable r) { POOL.execute(r); }
+
+    static String base() { return "http://" + Store.host() + ":" + Store.port(); }
+
+    // ------------------------------------------------------------ низкий уровень
+
+    static HttpURLConnection open(String path, String method) throws Exception {
+        URL url = new URL(path.startsWith("http") ? path : base() + path);
+        HttpURLConnection c = (HttpURLConnection) url.openConnection();
+        c.setRequestMethod(method);
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(20000);
+        c.setRequestProperty("Accept", "application/json");
+        c.setRequestProperty("X-Client", "geodash-android/1.0");
+        String t = Store.token();
+        if (!t.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + t);
+        return c;
+    }
+
+    static String read(HttpURLConnection c) throws Exception {
+        InputStream in = c.getResponseCode() >= 400 ? c.getErrorStream() : c.getInputStream();
+        if (in == null) return null;
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+        in.close();
+        return new String(bo.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    public static String rawGet(String path) {
+        try {
+            HttpURLConnection c = open(path, "GET");
+            String s = read(c);
+            online = c.getResponseCode() < 500;
+            return c.getResponseCode() < 400 ? s : null;
+        } catch (Exception e) { lastError = e.getMessage(); online = false; return null; }
+    }
+
+    public static String rawPost(String path, String body) {
+        try {
+            HttpURLConnection c = open(path, "POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            try (OutputStream o = c.getOutputStream()) { o.write(body.getBytes(StandardCharsets.UTF_8)); }
+            String s = read(c);
+            online = true;
+            return c.getResponseCode() < 400 ? s : null;
+        } catch (Exception e) { lastError = e.getMessage(); online = false; return null; }
+    }
+
+    /** GET с кэшем: офлайн вернёт последний скачанный ответ. */
+    public static String cachedGet(String path, String cacheKey) {
+        String s = rawGet(path);
+        if (s != null) { Store.putCache(cacheKey, s); return s; }
+        return Store.getCache(cacheKey);
+    }
+
+    static String enc(String s) {
+        try { return URLEncoder.encode(s == null ? "" : s, "UTF-8"); } catch (Exception e) { return ""; }
+    }
+
+    // ------------------------------------------------------------ методы
+
+    public static boolean ping() {
+        String s = rawGet("/api/ping");
+        online = s != null;
+        return online;
+    }
+
+    public static JSONObject login(String name, String pass) {
+        try {
+            JSONObject b = new JSONObject().put("name", name).put("pass", pass);
+            String s = rawPost("/api/login", b.toString());
+            return s == null ? null : new JSONObject(s);
+        } catch (Exception e) { return null; }
+    }
+
+    public static JSONObject register(String name, String pass) {
+        try {
+            JSONObject b = new JSONObject().put("name", name).put("pass", pass);
+            String s = rawPost("/api/register", b.toString());
+            return s == null ? null : new JSONObject(s);
+        } catch (Exception e) { return null; }
+    }
+
+    public static JSONObject me() {
+        String s = cachedGet("/api/me", "me");
+        try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
+    }
+
+    public static JSONArray levels(String q, String sort, int diff) {
+        String path = "/api/levels?q=" + enc(q) + "&sort=" + enc(sort) + "&diff=" + diff;
+        String s = cachedGet(path, "levels_" + sort + "_" + diff + "_" + q);
+        try { return s == null ? new JSONArray() : new JSONArray(s); } catch (Exception e) { return new JSONArray(); }
+    }
+
+    public static JSONObject level(int id) {
+        String s = cachedGet("/api/levels/" + id, "level_" + id);
+        try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
+    }
+
+    public static JSONObject daily() { return obj(cachedGet("/api/daily", "daily")); }
+    public static JSONObject weekly() { return obj(cachedGet("/api/weekly", "weekly")); }
+    public static JSONArray offlinePacks() { return arr(cachedGet("/api/offline", "offlinepacks")); }
+    public static JSONArray friends() { return arr(cachedGet("/api/friends", "friends")); }
+    public static JSONArray friendRequests() { return arr(cachedGet("/api/friends/requests", "friendreq")); }
+    public static JSONArray top() { return arr(cachedGet("/api/top", "top")); }
+
+    public static boolean friendAction(String action, String name) {
+        try {
+            String body = new JSONObject().put("name", name).toString();
+            String path = "/api/friends/" + action;
+            String r = rawPost(path, body);
+            if (r == null) { Store.enqueue(path, body, action + ":" + name); return false; }
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    public static void complete(int levelId, double percent, int attempts, int coins) {
+        try {
+            String body = new JSONObject()
+                    .put("percent", percent).put("attempts", attempts).put("coins", coins).toString();
+            String path = "/api/levels/" + levelId + "/complete";
+            if (rawPost(path, body) == null) Store.enqueue(path, body, "complete:" + levelId);
+        } catch (Exception ignored) { }
+    }
+
+    public static void like(int levelId) {
+        try {
+            String body = new JSONObject().put("like", true).toString();
+            String path = "/api/levels/" + levelId + "/like";
+            if (rawPost(path, body) == null) Store.enqueue(path, body, "like:" + levelId);
+        } catch (Exception ignored) { }
+    }
+
+    /** Качает песню по ID: сначала через API, потом прямо с сайта /songs/<id>.mp3 */
+    public static byte[] downloadSong(int id) {
+        byte[] b = fetchBytes(base() + "/api/music/" + id + "/file");
+        if (b != null && b.length > 8192) return b;
+        b = fetchBytes(Store.site().replaceAll("/+$", "") + "/songs/" + id + ".mp3");
+        return (b != null && b.length > 8192) ? b : null;
+    }
+
+    public static byte[] fetchBytes(String url) {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(60000);
+            if (c.getResponseCode() >= 400) return null;
+            InputStream in = c.getInputStream();
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            in.close();
+            online = true;
+            return bo.toByteArray();
+        } catch (Exception e) { lastError = e.getMessage(); return null; }
+    }
+
+    static JSONObject obj(String s) {
+        try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
+    }
+
+    static JSONArray arr(String s) {
+        try { return s == null ? new JSONArray() : new JSONArray(s); } catch (Exception e) { return new JSONArray(); }
+    }
+
+    /** Полная синхронизация: очередь → daily/weekly → офлайн-паки → музыка. */
+    public static void sync(Runnable onStep) {
+        if (!ping()) return;
+        Store.flushQueue();
+        me();
+        JSONObject d = daily(), w = weekly();
+        levels("", "recent", -1);
+        levels("", "top", -1);
+        top();
+        friends();
+        friendRequests();
+
+        downloadLevelOffline(d);
+        downloadLevelOffline(w);
+
+        JSONArray packs = offlinePacks();
+        for (int i = 0; i < packs.length(); i++) {
+            JSONObject l = packs.optJSONObject(i);
+            if (l == null) continue;
+            int id = l.optInt("id");
+            if (!Store.isSaved(id)) downloadLevel(id);
+            else Music.ensureSong(l.optInt("songId"));
+            if (onStep != null) onStep.run();
+        }
+
+        for (Level lv : Store.savedLevels()) Music.ensureSong(lv.settings.songId);
+    }
+
+    static void downloadLevelOffline(JSONObject daily) {
+        if (daily == null) return;
+        JSONObject l = daily.optJSONObject("level");
+        if (l != null) downloadLevel(l.optInt("id"));
+    }
+
+    /** Скачать уровень вместе с музыкой в assets/saved. */
+    public static Level downloadLevel(int id) {
+        JSONObject o = level(id);
+        if (o == null) return Store.isSaved(id) ? Store.loadSaved(id) : null;
+        String data = o.optString("data", "");
+        if (data.length() < 20) return Store.isSaved(id) ? Store.loadSaved(id) : null;
+        Store.saveDownloaded(id, data);
+        Level lv = Level.parse(data);
+        lv.settings.serverId = id;
+        if (lv.settings.songId != 0) Music.ensureSong(lv.settings.songId);
+        return lv;
+    }
+}
