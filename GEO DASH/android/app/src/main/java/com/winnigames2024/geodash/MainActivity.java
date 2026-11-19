@@ -120,7 +120,12 @@ public class MainActivity extends GdActivity {
                     Math.min(20f, w * 0.017f), Gd.GOLD, Paint.Align.LEFT);
 
             c.drawRect(0, h - h * 0.06f, w, h, Gd.fill(Color.argb(170, 8, 6, 22)));
-            Gd.outlined(c, status, 14, h - h * 0.018f, Math.min(18f, w * 0.016f), Gd.PAPER, Paint.Align.LEFT);
+            // версия игры — мелким текстом в самом углу слева снизу
+            float vs = Math.min(15f, w * 0.013f);
+            String ver = "v" + BuildConfig.VERSION_NAME;
+            Gd.outlined(c, ver, 12, h - h * 0.018f, vs, Color.argb(225, 200, 215, 250), Paint.Align.LEFT);
+            float off = Gd.textWidth(ver, vs) + 22;
+            Gd.outlined(c, status, off, h - h * 0.018f, Math.min(18f, w * 0.016f), Gd.PAPER, Paint.Align.LEFT);
             Gd.outlined(c, Api.online ? "● ОНЛАЙН" : "● ОФЛАЙН", w - 14, h - h * 0.018f,
                     Math.min(18f, w * 0.016f), Api.online ? Gd.LIME : Gd.GOLD, Paint.Align.RIGHT);
         }

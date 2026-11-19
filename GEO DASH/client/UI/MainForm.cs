@@ -97,7 +97,7 @@ namespace GEO_DASH.UI
                         using (var f = Gd.Title(44f))
                 Gd.Outlined(g, "GEO DASH", f, new RectangleF(0, 28, ClientSize.Width, 60), Gd.Paper, thick: 5f);
             using (var f = Gd.Bold(11f))
-                Gd.Outlined(g, "by " + AppConfig.Brand + "   ·   v" + Updater.CurrentVersion, f,
+                Gd.Outlined(g, "by " + AppConfig.Brand, f,
                     new RectangleF(0, 90, ClientSize.Width, 22), Gd.Neon, thick: 2.4f);
 
             // карточка аккаунта
@@ -133,12 +133,18 @@ namespace GEO_DASH.UI
             using (var br = new SolidBrush(Color.FromArgb(170, 8, 6, 22))) g.FillRectangle(br, bar);
             using (var f = Gd.Bold(9f))
             {
-                Gd.Outlined(g, _status, f, new RectangleF(10, bar.Y, ClientSize.Width - 240, 24), Gd.Paper, StringAlignment.Near, thick: 2f);
+                Gd.Outlined(g, _status, f, new RectangleF(84, bar.Y, ClientSize.Width - 320, 24), Gd.Paper, StringAlignment.Near, thick: 2f);
                 var (txt, col) = ApiClient.Online
                     ? ("● ОНЛАЙН  " + AppConfig.Settings.ServerHost + ":" + AppConfig.Settings.ServerPort, Gd.Lime)
                     : ("● ОФЛАЙН — играем на локальных данных", Gd.Gold);
                 Gd.Outlined(g, txt, f, new RectangleF(ClientSize.Width - 420, bar.Y, 410, 24), col, StringAlignment.Far, thick: 2f);
             }
+
+            // версия игры — мелким текстом в самом углу слева снизу
+            using (var fv = Gd.Bold(8f))
+                Gd.Outlined(g, "v" + Updater.CurrentVersion, fv,
+                    new RectangleF(10, ClientSize.Height - 25, 80, 24),
+                    Color.FromArgb(220, 190, 205, 240), StringAlignment.Near, thick: 1.8f);
 
             if (LocalStore.Queue.Count > 0)
             {

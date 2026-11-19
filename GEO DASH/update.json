@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Фон и дизайн как в Geometry Dash, меню EDITOR с публикацией и копиями, свои песни, обязательный вход с авто-входом, кнопка = и настройка GUI, платформер-кнопки, конструкции из выделения свайпом, карточки с картинками, новый саундтрек, расширенная админка",
+  "notes": "Версия игры мелким текстом снизу слева в главном меню; всё из 1.4.0",
   "date": "2026-11-19"
 }
