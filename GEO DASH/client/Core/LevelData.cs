@@ -215,6 +215,12 @@ namespace GEO_DASH.Core
         public string Text { get; set; } = "";
         /// <summary>ID картинки с сайта для объекта «картинка».</summary>
         public int ImageId { get; set; }
+        /// <summary>Не рисуется в игре (виден только в редакторе).</summary>
+        public bool HideInGame { get; set; }
+        /// <summary>Не трогает игрока: ни столкновений, ни шипов, ни порталов.</summary>
+        public bool NoTouch { get; set; }
+        /// <summary>Слой редактора: можно показывать и прятать по одному.</summary>
+        public int EditorLayer { get; set; }
         public int CoinIndex { get; set; }
         public double TeleportTargetY { get; set; }
 

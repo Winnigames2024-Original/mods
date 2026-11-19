@@ -9,7 +9,20 @@ namespace GEO_DASH.UI
         int _y = 12;
 
         readonly TextBox _groups, _text;
-        NumericUpDown _imageId;
+        NumericUpDown _imageId, _layer;
+        CheckBox _hide, _noTouch;
+
+        CheckBox Chk(string text, bool val)
+        {
+            var c = new CheckBox
+            {
+                Left = 16, Top = _y, Width = 470, Text = text, Checked = val,
+                ForeColor = Gd.Paper, BackColor = Color.Transparent, Font = Gd.Bold(9.5f)
+            };
+            _p.Controls.Add(c);
+            _y += 28;
+            return c;
+        }
         readonly NumericUpDown _rot, _sx, _sy, _z, _alpha, _c1, _c2, _tpY;
         readonly ComboBox _portal, _orb, _pad;
         readonly LevelObject _src;
@@ -101,6 +114,11 @@ namespace GEO_DASH.UI
                 Label("Текст");
                 _text = Tb(src.Text);
             }
+            Label("Слой редактора (0 — основной)");
+            _layer = Num(0, 99, src.EditorLayer, 0);
+            _hide = Chk("скрытый: не виден в игре", src.HideInGame);
+            _noTouch = Chk("без касания: игрок проходит насквозь", src.NoTouch);
+
             if (def.Style == DrawStyle.Image)
             {
                 Label("ID картинки с сайта");
@@ -176,6 +194,9 @@ namespace GEO_DASH.UI
             if (_pad != null) o.Pad = (PadKind)_pad.SelectedIndex;
             if (_tpY != null) o.TeleportTargetY = (double)_tpY.Value;
             if (_text != null) o.Text = _text.Text;
+            if (_layer != null) o.EditorLayer = (int)_layer.Value;
+            if (_hide != null) o.HideInGame = _hide.Checked;
+            if (_noTouch != null) o.NoTouch = _noTouch.Checked;
             if (_imageId != null)
             {
                 o.ImageId = (int)_imageId.Value;

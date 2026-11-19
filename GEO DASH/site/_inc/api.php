@@ -83,7 +83,7 @@ function gd_head(string $title, string $active = '') {
   <a class="link<?= $active==='top'?' active':'' ?>" href="/top/">Топ</a>
   <a class="link<?= $active==='mp'?' active':'' ?>" href="/mp/">Мультиплеер</a>
   <a class="link<?= $active==='music'?' active':'' ?>" href="/music/">Музыка</a>
-  <a class="link<?= $active==='images'?' active':'' ?>" href="/images/">Картинки</a>
+  <a class="link<?= $active==='images'?' active':'' ?>" href="/images/">Toolbox</a>
   <a class="link<?= $active==='download'?' active':'' ?>" href="/download/">Скачать</a>
   <?php if ($user): ?>
     <a class="link<?= $active==='friends'?' active':'' ?>" href="/friends/">Друзья</a>

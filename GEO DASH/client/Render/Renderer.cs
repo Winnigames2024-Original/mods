@@ -84,6 +84,7 @@ namespace GEO_DASH.Render
                 if (r.Right < vis.Left || r.Left > vis.Right) continue;
 
                 if (def.Invisible && !editor && !ShowTriggers) continue;
+                if (o.HideInGame && !editor) continue;          // «скрытый» блок — только в редакторе
 
                 double alpha = (st?.Alpha ?? 1) * o.Opacity;
                 if (alpha <= 0.01 && !editor) continue;

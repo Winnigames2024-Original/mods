@@ -348,6 +348,7 @@ namespace GEO_DASH.Core
             foreach (var i in list)
             {
                 var o = Level.Objects[i];
+                if (o.NoTouch) continue;                        // «без касания» — игрок проходит насквозь
                 var d = ObjectCatalog.Get(o.TypeId);
                 if (!d.Solid) continue;
                 var r = ObjHit(i);
@@ -472,6 +473,7 @@ namespace GEO_DASH.Core
                 var o = Level.Objects[i];
                 var s = St[i];
                 if (!s.Enabled || s.Collected) continue;
+                if (o.NoTouch) continue;
                 var d = ObjectCatalog.Get(o.TypeId);
                 var r = ObjHit(i);
 

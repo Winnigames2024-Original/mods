@@ -784,20 +784,56 @@ route('POST', '/api/images/upload', async (req, res) => {
   db.images[id] = {
     id, ext,
     name: headerText(req, 'x-image-name') || ('Картинка ' + id),
+    category: (headerText(req, 'x-image-category') || 'прочее').toLowerCase().slice(0, 40),
     author: u.name, size: buf.length, created: now()
   };
   save.images(); save.state();
   ok(res, { ok: true, id, ext, size: buf.length });
 });
 
-/** Список картинок: id, название, автор, размер. */
-route('GET', '/api/images', (req, res) => {
+/** Список картинок с поиском: ?q=слово&category=фон&limit=100 */
+route('GET', '/api/images', (req, res, p, q) => {
+  const term = String((q && q.q) || '').trim().toLowerCase();
+  const cat = String((q && q.category) || '').trim().toLowerCase();
+  const limit = Math.max(1, Math.min(500, parseInt((q && q.limit) || '200', 10)));
+
   const list = Object.values(db.images)
+    .filter(i => !cat || String(i.category || 'прочее').toLowerCase() === cat)
+    .filter(i => !term
+      || String(i.name || '').toLowerCase().includes(term)
+      || String(i.author || '').toLowerCase().includes(term)
+      || String(i.category || '').toLowerCase().includes(term)
+      || String(i.id) === term)
     .sort((a, b) => b.id - a.id)
-    .slice(0, 500)
+    .slice(0, limit)
     .map(i => ({ id: i.id, name: i.name, author: i.author, size: i.size, ext: i.ext,
+                 category: i.category || 'прочее',
                  url: '/api/images/' + i.id + '/file' }));
   ok(res, list);
+});
+
+/** Категории картинок со счётчиками — для вкладок toolbox. */
+route('GET', '/api/images/categories', (req, res) => {
+  const map = {};
+  for (const i of Object.values(db.images)) {
+    const c = String(i.category || 'прочее').toLowerCase();
+    map[c] = (map[c] | 0) + 1;
+  }
+  ok(res, Object.entries(map).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })));
+});
+
+/** Сменить категорию или имя своей картинки. */
+route('POST', '/api/images/:id/edit', async (req, res, p) => {
+  const u = userOf(req);
+  const i = db.images[parseInt(p.id, 10)];
+  if (!i) return bad(res, 'Картинка не найдена', 404);
+  if (!u || (key(u.name) !== key(i.author) && !u.admin && key(u.name) !== key(ADMIN)))
+    return bad(res, 'Это не твоя картинка', 403);
+  const b = await readBody(req);
+  if (b.name) i.name = String(b.name).slice(0, 80);
+  if (b.category) i.category = String(b.category).toLowerCase().slice(0, 40);
+  save.images();
+  ok(res, i);
 });
 
 route('GET', '/api/images/:id', (req, res, p) => {
