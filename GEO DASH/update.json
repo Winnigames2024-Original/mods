@@ -1,8 +1,8 @@
 {
-  "version": "1.7.0",
+  "version": "1.8.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Починен игровой цикл (FPS и запуск уровней), музыка основных уровней, четыре разных основных уровня, экраны внутри одного окна, полный экран, карточка уровня с публикацией, чаты и поддержка, рекорды по демонам/монеткам/шарам, иконки со своей картинкой, триггер двойного прыжка, склоны не убивают, установщик для ПК со службой автообновления и файлами .gdl.",
+  "notes": "Пять основных уровней: Neon Start, Static Rush, Hyperdrive, Oko и большой демон Eye Spy. На Android тоже оба уровня про глаза, склоны не убивают, потолка нет, адрес сервера убран с экранов.",
   "date": "2026-11-19"
 }

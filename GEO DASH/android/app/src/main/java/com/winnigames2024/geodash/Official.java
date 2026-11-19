@@ -198,9 +198,151 @@ public class Official {
         return b.build();
     }
 
+
+    /** «Oko» — наш демон про глаза: кольца-зрачки и постоянная смена режимов. */
+    public static Level oko() {
+        B b = new B("Oko", 9, -4, "Violet Sky");
+        b.lv.settings.bgColor = 0xFF101A52;
+        b.lv.settings.groundColor = 0xFF070B28;
+        b.lv.settings.startSpeed = 2;
+        b.lv.settings.desc = "Смотри в оба: зрачки следят за тобой.";
+        b.text(6, 6, "OKO");
+
+        for (int i = 0; i < 6; i++) { b.spike(16 + i * 9); b.small(18 + i * 9); }
+        b.block(72, 0, 4); b.block(78, 2, 4); b.block(84, 4, 4);
+        b.spike(76); b.spike(82, 2);
+        b.coin(88, 8, 1);
+
+        b.portal(96, 1, Level.P_SHIP);
+        b.corridor(98, 52, -1, 13);
+        eye(b, 112, 6, 3); eye(b, 132, 8, 3); eye(b, 152, 5, 3);
+        b.coin(142, 11, 2);
+        b.portal(152, 1, Level.P_CUBE);
+
+        b.portal(160, 1, Level.P_WAVE);
+        b.portal(160, 4, Level.P_MINI);
+        b.corridor(162, 46, -1, 9);
+        for (int i = 0; i < 14; i++) {
+            b.obj(1, 166 + i * 3, i % 2 == 0 ? 0 : 7);
+            b.obj(1, 166 + i * 3, i % 2 == 0 ? 1 : 8);
+        }
+        b.portal(208, 1, Level.P_CUBE);
+        b.portal(208, 4, Level.P_BIG);
+
+        b.portal(216, 1, Level.P_SPIDER);
+        b.corridor(218, 44, -1, 10);
+        for (int i = 0; i < 9; i++) b.obj(20, 224 + i * 5, i % 2 == 0 ? 0 : 9);
+        for (int i = 0; i < 4; i++) b.saw(230 + i * 11, 5);
+        b.coin(252, 5, 3);
+        b.portal(262, 1, Level.P_CUBE);
+
+        b.portal(270, 1, Level.P_UFO);
+        b.corridor(272, 42, -1, 12);
+        for (int i = 0; i < 10; i++) {
+            for (int k = 0; k < 3; k++) b.obj(1, 278 + i * 4, 1 + k);
+            for (int k = 0; k < 3; k++) b.obj(1, 280 + i * 4, 8 + k);
+        }
+        b.portal(314, 1, Level.P_CUBE);
+
+        b.portal(322, 1, Level.P_S3);
+        b.orb(330, 4, 0);
+        b.spike(332); b.spike(333);
+        b.orb(340, 5, 1);
+        b.orb(348, 6, 4);
+        for (int i = 0; i < 6; i++) { b.spike(356 + i * 7); b.ceil(359 + i * 7, 6); }
+        b.text(400, 7, "OKO");
+        b.finish(406);
+        return b.build();
+    }
+
+    /** «Eye Spy» — большой демон про глаза. Уровень наш собственный. */
+    public static Level eyeSpy() {
+        B b = new B("Eye Spy", 10, -5, "Afterburner");
+        b.lv.settings.bgColor = 0xFF0B1038;
+        b.lv.settings.groundColor = 0xFF050722;
+        b.lv.settings.startSpeed = 3;
+        b.lv.settings.desc = "Глаза повсюду. Смотри в оба и не моргай.";
+        b.text(6, 7, "EYE SPY");
+
+        for (int i = 0; i < 7; i++) { b.spike(14 + i * 8); b.spike(15 + i * 8); b.small(18 + i * 8); }
+        b.orb(72, 4, 0);
+        b.spike(74); b.spike(75); b.spike(76);
+        b.orb(82, 5, 1);
+        b.block(88, 0, 6);
+        b.coin(94, 8, 1);
+        b.pad(96, 1, 1);
+        for (int i = 0; i < 4; i++) b.spike(100 + i * 7);
+
+        b.portal(132, 1, Level.P_SHIP);
+        b.corridor(134, 60, -1, 14);
+        eye(b, 146, 7, 4); eye(b, 168, 5, 3); eye(b, 188, 9, 3);
+        for (int i = 0; i < 6; i++) b.saw(152 + i * 8, 1 + (i * 3) % 10);
+        b.portal(194, 1, Level.P_CUBE);
+
+        b.portal(202, 1, Level.P_WAVE);
+        b.portal(202, 4, Level.P_MINI);
+        b.portal(202, 7, Level.P_S5);
+        b.corridor(204, 54, -1, 8);
+        for (int i = 0; i < 17; i++) {
+            b.obj(1, 208 + i * 3, i % 2 == 0 ? 0 : 6);
+            b.obj(1, 208 + i * 3, i % 2 == 0 ? 1 : 7);
+        }
+        b.coin(232, 4, 2);
+        b.portal(258, 1, Level.P_CUBE);
+        b.portal(258, 4, Level.P_BIG);
+        b.portal(258, 7, Level.P_S3);
+
+        b.portal(266, 1, Level.P_UFO);
+        b.corridor(268, 48, -1, 13);
+        for (int i = 0; i < 11; i++) {
+            for (int k = 0; k < 4; k++) b.obj(1, 274 + i * 4, 1 + k);
+            for (int k = 0; k < 4; k++) b.obj(1, 276 + i * 4, 8 + k);
+        }
+        eye(b, 300, 6, 2);
+        b.portal(316, 1, Level.P_CUBE);
+
+        b.portal(324, 1, Level.P_DUAL);
+        b.corridor(326, 46, -1, 15);
+        for (int i = 0; i < 11; i++) {
+            b.obj(20, 330 + i * 4, 0);
+            b.obj(22, 332 + i * 4, 14);
+        }
+        b.coin(352, 7, 3);
+        b.portal(372, 1, Level.P_SINGLE);
+
+        b.portal(380, 1, Level.P_SPIDER);
+        b.corridor(382, 42, -1, 10);
+        for (int i = 0; i < 9; i++) b.obj(20, 388 + i * 5, i % 2 == 0 ? 0 : 9);
+        for (int i = 0; i < 4; i++) b.saw(392 + i * 10, 5);
+        b.portal(424, 1, Level.P_CUBE);
+
+        b.portal(432, 1, Level.P_ROBOT);
+        b.block(438, 0, 5); b.block(446, 2, 5); b.block(456, 4, 5);
+        b.spike(444); b.spike(454, 2);
+        b.orb(466, 7, 4);
+        b.portal(472, 1, Level.P_CUBE);
+        b.portal(472, 4, Level.P_S6);
+        for (int i = 0; i < 8; i++) { b.spike(478 + i * 6); b.ceil(481 + i * 6, 7); }
+        eye(b, 532, 6, 4);
+        b.text(544, 8, "I SEE YOU");
+        b.finish(552);
+        return b.build();
+    }
+
+    /** Глаз: кольцо из блоков, пила вместо зрачка и пара шипов-ресниц. */
+    static void eye(B b, double gx, int cy, int rad) {
+        for (int a = 0; a < 20; a++) {
+            double ang = a * Math.PI * 2 / 20;
+            b.obj(1, Math.round(gx + Math.cos(ang) * rad), Math.round(cy + Math.sin(ang) * rad));
+        }
+        b.saw(gx, cy);
+        b.obj(20, gx - 1, cy + rad + 1);
+        b.obj(20, gx + 1, cy + rad + 1);
+    }
+
     public static List<Level> all() {
         List<Level> l = new ArrayList<>();
-        l.add(easy()); l.add(hard()); l.add(insane());
+        l.add(easy()); l.add(hard()); l.add(insane()); l.add(oko()); l.add(eyeSpy());
         return l;
     }
 }

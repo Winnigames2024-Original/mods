@@ -326,7 +326,113 @@ namespace GEO_DASH.Core
             return b.Build();
         }
 
-        public static LevelData[] All() => new[] { Easy(), Hard(), Insane(), Eye() };
+
+        /// <summary>
+        /// «Eye Spy» — большой демон про глаза: кольца-зрачки, узкие проходы,
+        /// постоянная смена режимов и финальный рывок. Уровень наш собственный.
+        /// </summary>
+        public static LevelData EyeSpy()
+        {
+            var b = new Builder("Eye Spy", Difficulty.InsaneDemon, -5, "Afterburner");
+            b.L.Settings.BgColor = unchecked((int)0xFF0B1038);
+            b.L.Settings.GroundColor = unchecked((int)0xFF050722);
+            b.L.Settings.StartSpeed = SpeedTier.Faster;
+            b.L.Settings.Description = "Глаза повсюду. Смотри в оба и не моргай.";
+
+            // глаз: кольцо из блоков, пила вместо зрачка и шипы-ресницы
+            void Eye(double gx, int cy, int rad, bool lashes = true)
+            {
+                for (int a = 0; a < 20; a++)
+                {
+                    double ang = a * Math.PI * 2 / 20;
+                    b.Obj(1, Math.Round(gx + Math.Cos(ang) * rad), Math.Round(cy + Math.Sin(ang) * rad));
+                }
+                b.Saw(gx, cy);
+                if (!lashes) return;
+                b.Obj(20, gx - 1, cy + rad + 1);
+                b.Obj(20, gx + 1, cy + rad + 1);
+            }
+
+            b.Text(6, 7, "EYE SPY");
+
+            // 1. куб: зрачки между шипами
+            for (int i = 0; i < 7; i++) { b.Spike(14 + i * 8); b.Spike(15 + i * 8); b.SmallSpike(18 + i * 8); }
+            b.Orb(72, 4, OrbKind.Yellow);
+            b.Spike(74); b.Spike(75); b.Spike(76);
+            b.Orb(82, 5, OrbKind.Pink);
+            b.Block(88, 0, 6);
+            b.Coin(94, 8, 1);
+            b.Pad(96, 1, PadKind.Pink);
+            for (int i = 0; i < 4; i++) b.Spike(100 + i * 7);
+
+            // 2. корабль сквозь зрачки
+            b.Portal(132, 1, PortalKind.ModeShip);
+            b.Corridor(134, 60, -1, 14);
+            Eye(146, 7, 4);
+            Eye(168, 5, 3);
+            Eye(188, 9, 3);
+            for (int i = 0; i < 6; i++) b.Saw(152 + i * 8, 1 + (i * 3) % 10);
+            b.Portal(194, 1, PortalKind.ModeCube);
+
+            // 3. мини-волна в узком глазу
+            b.Portal(202, 1, PortalKind.ModeWave);
+            b.Portal(202, 4, PortalKind.Mini);
+            b.Portal(202, 7, PortalKind.SpeedFastest);
+            b.Corridor(204, 54, -1, 8);
+            for (int i = 0; i < 17; i++)
+            {
+                b.Obj(1, 208 + i * 3, i % 2 == 0 ? 0 : 6);
+                b.Obj(1, 208 + i * 3, i % 2 == 0 ? 1 : 7);
+            }
+            b.Coin(232, 4, 2);
+            b.Portal(258, 1, PortalKind.ModeCube);
+            b.Portal(258, 4, PortalKind.Big);
+            b.Portal(258, 7, PortalKind.SpeedFaster);
+
+            // 4. НЛО между ресницами
+            b.Portal(266, 1, PortalKind.ModeUfo);
+            b.Corridor(268, 48, -1, 13);
+            for (int i = 0; i < 11; i++)
+            {
+                b.Column(274 + i * 4, 1, 4);
+                b.Column(276 + i * 4, 8, 4);
+            }
+            Eye(300, 6, 2, false);
+            b.Portal(316, 1, PortalKind.ModeCube);
+
+            // 5. дуал: два глаза сразу
+            b.Portal(324, 1, PortalKind.Dual);
+            b.Corridor(326, 46, -1, 15);
+            for (int i = 0; i < 11; i++)
+            {
+                b.Obj(20, 330 + i * 4, 0);
+                b.Obj(22, 332 + i * 4, 14);
+            }
+            b.Coin(352, 7, 3);
+            b.Portal(372, 1, PortalKind.Single);
+
+            // 6. паук по стенам
+            b.Portal(380, 1, PortalKind.ModeSpider);
+            b.Corridor(382, 42, -1, 10);
+            for (int i = 0; i < 9; i++) b.Obj(20, 388 + i * 5, i % 2 == 0 ? 0 : 9);
+            for (int i = 0; i < 4; i++) b.Saw(392 + i * 10, 5);
+            b.Portal(424, 1, PortalKind.ModeCube);
+
+            // 7. робот и финальный рывок
+            b.Portal(432, 1, PortalKind.ModeRobot);
+            b.Block(438, 0, 5); b.Block(446, 2, 5); b.Block(456, 4, 5);
+            b.Spike(444); b.Spike(454, 2);
+            b.Orb(466, 7, OrbKind.Red);
+            b.Portal(472, 1, PortalKind.ModeCube);
+            b.Portal(472, 4, PortalKind.SpeedHyper);
+            for (int i = 0; i < 8; i++) { b.Spike(478 + i * 6); b.CeilSpike(481 + i * 6, 7); }
+            Eye(532, 6, 4);
+            b.Text(544, 8, "I SEE YOU");
+            b.Finish(552);
+            return b.Build();
+        }
+
+        public static LevelData[] All() => new[] { Easy(), Hard(), Insane(), Eye(), EyeSpy() };
 
         /// <summary>
         /// Кладёт файлы основных уровней в assets/official. Уровни собираются кодом,
