@@ -561,6 +561,18 @@ namespace GEO_DASH.Core
                         W.St[i].Alpha = Math.Clamp(t.Opacity, 0, 1);
                     break;
 
+                case TriggerType.DoubleJump:
+                    // Count — сколько прыжков в воздухе разрешено (0 — выключить)
+                    {
+                        int extra = t.Count > 0 ? t.Count : 1;
+                        if (t.Activate == false) extra = 0;
+                        W.P1.ExtraJumps = extra;
+                        W.P2.ExtraJumps = extra;
+                        W.P1.AirJumpsLeft = Math.Min(W.P1.AirJumpsLeft, extra);
+                        W.P2.AirJumpsLeft = Math.Min(W.P2.AirJumpsLeft, extra);
+                    }
+                    break;
+
                 case TriggerType.Sfx:
                     W.Sfx?.Invoke(string.IsNullOrEmpty(t.SfxName) ? "click" : t.SfxName);
                     break;
@@ -909,6 +921,7 @@ namespace GEO_DASH.Core
             TriggerType.LinkVisible => "Link Visible — показать связку",
             TriggerType.EnterEffect => "Enter Effect — появление",
             TriggerType.Sfx => "SFX — звук",
+            TriggerType.DoubleJump => "x2 прыжок — прыжок в воздухе",
             TriggerType.EditSong => "Edit Song — правка музыки",
             TriggerType.GameplayOffset => "Gameplay Offset — сдвиг поля",
             TriggerType.RotateGameplay => "Rotate Gameplay — поворот поля",

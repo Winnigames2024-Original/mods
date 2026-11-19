@@ -6,7 +6,6 @@ namespace GEO_DASH.UI
 {
     public class SettingsForm : GdForm
     {
-        readonly TextBox _host, _port, _site;
         readonly TrackBar _music, _sfx;
         readonly CheckBox _fps, _hit, _auto, _offline, _full;
         readonly ComboBox _fpsCap;
@@ -50,9 +49,6 @@ namespace GEO_DASH.UI
                 return t;
             }
 
-            _host = Tb(110, s.ServerHost);
-            _port = Tb(150, s.ServerPort.ToString(), 120);
-            _site = Tb(190, s.SiteUrl, 380);
             _music = Tr(230, s.MusicVolume);
             _sfx = Tr(286, s.SfxVolume);
 
@@ -83,9 +79,6 @@ namespace GEO_DASH.UI
         void Save()
         {
             var s = AppConfig.Settings;
-            s.ServerHost = _host.Text.Trim();
-            s.ServerPort = int.TryParse(_port.Text.Trim(), out var p) ? p : 37534;
-            s.SiteUrl = _site.Text.Trim();
             s.MusicVolume = _music.Value / 100.0;
             s.SfxVolume = _sfx.Value / 100.0;
             s.Fps = int.TryParse(_fpsCap.Text, out var f) ? f : 60;
@@ -124,9 +117,7 @@ namespace GEO_DASH.UI
                         Header(g, "НАСТРОЙКИ", "данные игры: " + AppConfig.DataDir);
             using var f = Gd.Bold(11f);
             void L(string t, int y) => Gd.Outlined(g, t, f, new RectangleF(40, y, 230, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
-            L("Сервер (IP)", 112);
-            L("Порт API", 152);
-            L("Сайт", 192);
+            L("Сайт игры", 152);
             L("Громкость музыки", 236);
             L("Громкость звуков", 292);
             L("Лимит FPS", 346);

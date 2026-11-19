@@ -267,9 +267,17 @@ namespace GEO_DASH.UI
 
         // ------------------------------------------------------------ тиражирование
 
-        static void FillTiled(Graphics g, RectangleF area, Bitmap mask, Color tint, float offX, float offY, float scale)
+        /// <summary>
+        /// Готовые кисти узоров. Раньше кисть собиралась заново каждый кадр —
+        /// именно на этом игра и проседала, узоров всего несколько десятков.
+        /// </summary>
+        static readonly Dictionary<(Bitmap, int), TextureBrush> _tiles = new();
+
+        static TextureBrush TileBrush(Bitmap mask, Color tint)
         {
-            if (area.Width <= 0 || area.Height <= 0 || tint.A <= 2) return;
+            var k = (mask, tint.ToArgb());
+            if (_tiles.TryGetValue(k, out var b)) return b;
+
             var m = new ColorMatrix(new[]
             {
                 new[] { 0f, 0f, 0f, 0f, 0f },
@@ -281,10 +289,22 @@ namespace GEO_DASH.UI
             using var attr = new ImageAttributes();
             attr.SetColorMatrix(m);
             attr.SetWrapMode(WrapMode.Tile);
-            using var brush = new TextureBrush(mask, new Rectangle(0, 0, mask.Width, mask.Height), attr)
+            b = new TextureBrush(mask, new Rectangle(0, 0, mask.Width, mask.Height), attr) { WrapMode = WrapMode.Tile };
+
+            if (_tiles.Count > 96)
             {
-                WrapMode = WrapMode.Tile
-            };
+                foreach (var v in _tiles.Values) v.Dispose();
+                _tiles.Clear();
+            }
+            _tiles[k] = b;
+            return b;
+        }
+
+        static void FillTiled(Graphics g, RectangleF area, Bitmap mask, Color tint, float offX, float offY, float scale)
+        {
+            if (area.Width <= 0 || area.Height <= 0 || tint.A <= 2) return;
+            var brush = TileBrush(mask, tint);
+            brush.ResetTransform();
             brush.ScaleTransform(scale, scale);
             brush.TranslateTransform(offX, offY);
             var old = g.PixelOffsetMode;

@@ -76,6 +76,10 @@ namespace GEO_DASH.Core
         /// <summary>Сколько секунд уже в лаве.</summary>
         public double LavaTime;
         public bool OnGround;
+        /// <summary>Сколько прыжков в воздухе разрешено (триггер «x2 прыжок»).</summary>
+        public int ExtraJumps;
+        /// <summary>Сколько прыжков в воздухе осталось в этом полёте.</summary>
+        public int AirJumpsLeft;
         public bool OnCeiling;
         public double Rotation;
         public double GravityMul = 1.0;
@@ -174,7 +178,14 @@ namespace GEO_DASH.Core
             {
                 case GameMode.Cube:
                     VY += g * dt;
-                    if (inp.Hold && OnGround) Jump(Phys.CubeJump);
+                    if (inp.Hold && OnGround) { Jump(Phys.CubeJump); AirJumpsLeft = ExtraJumps; }
+                    // двойной прыжок — открывается триггером «x2 прыжок»
+                    else if (inp.Pressed && !OnGround && AirJumpsLeft > 0)
+                    {
+                        AirJumpsLeft--;
+                        VY = 0;
+                        Jump(Phys.CubeJump);
+                    }
                     break;
 
                 case GameMode.Ship:

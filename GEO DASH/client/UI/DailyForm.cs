@@ -50,7 +50,7 @@ namespace GEO_DASH.UI
             var lv = await LocalStore.DownloadAsync(l.Id, true, new Progress<string>(s => { _msg = s; Content.Invalidate(); }));
             if (lv == null) { _msg = "Нет сети и уровень не сохранён офлайн"; Content.Invalidate(); return; }
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone())) f.ShowDialog(this);
+            Nav.Go(new GameForm(lv.DeepClone()));
             _msg = ""; Content.Invalidate();
         }
 

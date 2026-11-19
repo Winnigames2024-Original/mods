@@ -164,7 +164,7 @@ namespace GEO_DASH.Net
             return p;
         }
 
-        public static void RecordRun(LevelData lv, double percent, int attempts, int coins, bool completed)
+        public static void RecordRun(LevelData lv, double percent, int attempts, int coins, bool completed, int orbs = 0)
         {
             var p = GetProgress(lv);
             p.Attempts += attempts;
@@ -177,7 +177,7 @@ namespace GEO_DASH.Net
             if (lv.Settings.ServerId > 0)
             {
                 // онлайн — уйдёт сразу, офлайн — встанет в очередь
-                _ = ApiClient.CompleteAsync(lv.Settings.ServerId, percent, attempts, coins);
+                _ = ApiClient.CompleteAsync(lv.Settings.ServerId, percent, attempts, coins, orbs);
             }
         }
 

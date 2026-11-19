@@ -137,7 +137,7 @@ namespace GEO_DASH.UI
             var lv = await Fetch(Sel);
             if (lv == null) return;
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone())) f.ShowDialog(this);
+            Nav.Go(new GameForm(lv.DeepClone()));
             _msg = "";
             Content.Invalidate();
         }
@@ -198,13 +198,12 @@ namespace GEO_DASH.UI
         {
             var d = Sel;
             if (d == null) return;
-            using var f = new ProfileForm(d.Author);
-            f.ShowDialog(this);
+            Nav.Go(new ProfileForm(d.Author));
         }
 
         protected override void OnRender(Graphics g)
         {
-                        Header(g, "ОНЛАЙН-УРОВНИ", ApiClient.Online ? "сервер " + AppConfig.Settings.ServerHost : "офлайн — только кэш");
+                        Header(g, "ОНЛАЙН-УРОВНИ", ApiClient.Online ? AppConfig.ServerLabel : "офлайн — только кэш");
             using var f = Gd.Bold(10f);
             if (!string.IsNullOrEmpty(_msg))
                 Gd.Outlined(g, _msg, f, new RectangleF(24, ClientSize.Height - 40, 760, 24),

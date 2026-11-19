@@ -257,7 +257,7 @@ namespace GEO_DASH.UI
             var lv = await Fetch();
             if (lv == null) return;
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone())) f.ShowDialog(this);
+            Nav.Go(new GameForm(lv.DeepClone()));
             _msg = ""; Content.Invalidate();
         }
 
@@ -313,8 +313,7 @@ namespace GEO_DASH.UI
         {
             string name = _mode is SearchMode.Users or SearchMode.Top ? SelUser?.Name : SelLevel?.Author;
             if (string.IsNullOrEmpty(name)) return;
-            using var f = new ProfileForm(name);
-            f.ShowDialog(this);
+            Nav.Go(new ProfileForm(name));
         }
 
         async Task AddFriend()

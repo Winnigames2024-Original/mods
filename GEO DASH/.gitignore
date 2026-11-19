@@ -1,0 +1,10 @@
+# сборочный мусор — в репозиторий не кладём
+client/bin/
+client/obj/
+client/publish/
+installer/bin/
+installer/obj/
+installer/publish/
+android/build/
+android/.gradle/
+android/app/build/

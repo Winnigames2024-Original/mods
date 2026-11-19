@@ -83,7 +83,7 @@ namespace GEO_DASH.UI
             Reload();
             _index = _levels.FindIndex(l => l.Settings.LocalId == lv.Settings.LocalId);
             if (_index < 0) _index = 0;
-            using (var f = new EditorForm(lv)) f.ShowDialog(this);
+            Nav.Go(new EditorForm(lv));
             Reload();
         }
 
@@ -91,7 +91,7 @@ namespace GEO_DASH.UI
         {
             var lv = Cur;
             if (lv == null) { _msg = "Сначала создай уровень"; Content.Invalidate(); return; }
-            using (var f = new EditorForm(lv)) f.ShowDialog(this);
+            Nav.Go(new EditorForm(lv));
             Reload();
         }
 
@@ -100,7 +100,7 @@ namespace GEO_DASH.UI
             var lv = Cur;
             if (lv == null) return;
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone(), practice)) f.ShowDialog(this);
+            Nav.Go(new GameForm(lv.DeepClone(), practice));
             Reload();
         }
 

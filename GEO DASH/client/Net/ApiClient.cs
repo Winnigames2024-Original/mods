@@ -161,6 +161,10 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<List<AccountDto>>> SearchUsersAsync(string q) =>
             GetAsync<List<AccountDto>>("/api/users?q=" + Uri.EscapeDataString(q ?? ""), "usersearch");
 
+        /// <summary>Таблица рекордов: stars, coins, demons, orbs, created, completed.</summary>
+        public static Task<ApiReply<List<AccountDto>>> TopAsync(string by) =>
+            GetAsync<List<AccountDto>>("/api/top?by=" + Uri.EscapeDataString(by ?? "stars"), "top_" + by);
+
         public static Task<ApiReply<List<AccountDto>>> TopAsync() =>
             GetAsync<List<AccountDto>>("/api/top", "top");
 
@@ -178,9 +182,14 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<LevelFullDto>> LevelAsync(int id) =>
             GetAsync<LevelFullDto>("/api/levels/" + id, "level_" + id);
 
+        /// <summary>
+        /// Публикация уровня. Сервер пускает только пройденный уровень со всеми
+        /// собранными монетками — их число берётся из местного прогресса.
+        /// </summary>
         public static Task<ApiReply<LevelDto>> UploadLevelAsync(Core.LevelData lv, int serverId, string password)
         {
             var s = lv.Settings;
+            var pr = LocalStore.GetProgress(lv);
             var body = new
             {
                 id = serverId,
@@ -192,16 +201,23 @@ namespace GEO_DASH.Net
                 difficulty = (int)s.Difficulty,
                 length = lv.RightEdge(),
                 localId = s.LocalId,
+                completed = pr.Completed,
+                coins = pr.Coins,
+                coinsTotal = lv.Objects.Count(o => o.TypeId == 80),
                 data = lv.ToJson()
             };
             return PostAsync<LevelDto>("/api/levels", body, true, "upload:" + s.LocalId);
         }
 
+        /// <summary>Снять свой уровень с публикации.</summary>
+        public static Task<ApiReply<OkDto>> UnpublishAsync(int id) =>
+            PostAsync<OkDto>($"/api/levels/{id}/unpublish", new { }, true);
+
         public static Task<ApiReply<LevelDto>> LikeAsync(int id, bool like) =>
             PostAsync<LevelDto>($"/api/levels/{id}/like", new { like }, true, $"like:{id}");
 
-        public static Task<ApiReply<LevelDto>> CompleteAsync(int id, double percent, int attempts, int coins) =>
-            PostAsync<LevelDto>($"/api/levels/{id}/complete", new { percent, attempts, coins }, true, $"complete:{id}");
+        public static Task<ApiReply<LevelDto>> CompleteAsync(int id, double percent, int attempts, int coins, int orbs = 0) =>
+            PostAsync<LevelDto>($"/api/levels/{id}/complete", new { percent, attempts, coins, orbs }, true, $"complete:{id}");
 
         public static Task<ApiReply<List<ScoreDto>>> ScoresAsync(int id) =>
             GetAsync<List<ScoreDto>>($"/api/levels/{id}/scores", "scores_" + id);
@@ -267,7 +283,7 @@ namespace GEO_DASH.Net
             catch { Online = false; }
             try
             {
-                var site = AppConfig.Settings.SiteUrl.TrimEnd('/');
+                var site = AppConfig.SiteUrl.TrimEnd('/');
                 using var r2 = await Http.GetAsync($"{site}/api/images/{id}/file");
                 if (r2.IsSuccessStatusCode) return await r2.Content.ReadAsByteArrayAsync();
             }
@@ -325,7 +341,7 @@ namespace GEO_DASH.Net
 
             try
             {
-                var site = AppConfig.Settings.SiteUrl.TrimEnd('/');
+                var site = AppConfig.SiteUrl.TrimEnd('/');
                 using var r2 = await Http.GetAsync($"{site}/songs/{id}.mp3", HttpCompletionOption.ResponseHeadersRead);
                 if (r2.IsSuccessStatusCode) return await r2.Content.ReadAsByteArrayAsync();
             }
@@ -409,5 +425,25 @@ namespace GEO_DASH.Net
 
         public static Task<ApiReply<VersionDto>> VersionAsync() =>
             GetAsync<VersionDto>("/api/version", "version");
+
+        // ------------------------------------------------------------ чаты
+
+        /// <summary>Мои переписки: игроки, друзья и поддержка.</summary>
+        public static Task<ApiReply<List<ChatHeadDto>>> ChatsAsync() =>
+            GetAsync<List<ChatHeadDto>>("/api/chats", "chats");
+
+        /// <summary>Переписка с игроком; SUPPORT — переписка с поддержкой.</summary>
+        public static Task<ApiReply<ChatDto>> ChatAsync(string peer) =>
+            GetAsync<ChatDto>("/api/chats/" + Uri.EscapeDataString(peer), "chat_" + peer);
+
+        /// <summary>Написать игроку или в поддержку.</summary>
+        public static Task<ApiReply<OkDto>> ChatSendAsync(string peer, string text, bool asSupport = false) =>
+            PostAsync<OkDto>("/api/chats/" + Uri.EscapeDataString(peer),
+                             new { text, asSupport }, true);
+
+        /// <summary>Все обращения в поддержку (админка).</summary>
+        public static Task<ApiReply<List<SupportHeadDto>>> SupportListAsync() =>
+            GetAsync<List<SupportHeadDto>>("/api/admin/support", "support");
+
     }
 }

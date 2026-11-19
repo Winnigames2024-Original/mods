@@ -75,13 +75,13 @@ namespace GEO_DASH.UI
             lv.Settings.Name = "Уровень " + (LocalStore.MyLevels(false).Count + 1);
             lv.Settings.Author = AppConfig.Settings.UserName;
             LocalStore.SaveMyLevel(lv);
-            using (var f = new EditorForm(lv)) f.ShowDialog(this);
+            Nav.Go(new EditorForm(lv));
             Reload();
         }
 
         void Open(Form f)
         {
-            using (f) f.ShowDialog(this);
+            Nav.Go(f);
             Reload();
         }
 

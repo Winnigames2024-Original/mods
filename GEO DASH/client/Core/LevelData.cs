@@ -265,12 +265,27 @@ namespace GEO_DASH.Core
             Objects.Add(o);
         }
 
+        /// <summary>Скорость обычного режима, пикселей в секунду — по ней считаем время уровня.</summary>
+        public const double NormalSpeed = 311.0;
+        /// <summary>Дальше 20 минут уровень не тянется.</summary>
+        public const double MaxLengthUnits = 20 * 60 * NormalSpeed;
+
+        /// <summary>
+        /// Конец уровня: последний объект плюс 10 блоков. Не короче 40 блоков
+        /// и не длиннее 20 минут игры.
+        /// </summary>
         public double RightEdge()
         {
-            double max = 30 * 40;
-            foreach (var o in Objects) if (o.X + 30 > max) max = o.X + 30;
+            double max = 0;
+            foreach (var o in Objects) if (o.X > max) max = o.X;
+            max += 10 * 30;                       // ещё десять блоков после последнего
+            if (max < 30 * 40) max = 30 * 40;
+            if (max > MaxLengthUnits) max = MaxLengthUnits;
             return max;
         }
+
+        /// <summary>Сколько минут занимает уровень на обычной скорости.</summary>
+        public double Minutes() => RightEdge() / NormalSpeed / 60.0;
 
         public ColorChannelDef GetChannel(int id)
         {

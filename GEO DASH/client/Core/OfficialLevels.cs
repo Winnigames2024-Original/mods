@@ -17,6 +17,9 @@ namespace GEO_DASH.Core
                 L.Settings.SongName = songName;
                 L.Settings.SongArtist = AppConfig.Brand;
                 L.Settings.LocalId = "official_" + Math.Abs(songId);
+                L.Settings.PlatformerFreeMove = false;   // основные уровни — обычный режим, прыжок пробелом и мышью
+                L.Settings.BgId = 1 + (Math.Abs(songId) * 6) % 20;
+                L.Settings.GroundId = 1 + (Math.Abs(songId) * 3) % 10;
                 L.Settings.Password = "";
             }
 
@@ -241,21 +244,104 @@ namespace GEO_DASH.Core
             return b.Build();
         }
 
-        public static LevelData[] All() => new[] { Easy(), Hard(), Insane() };
 
-        /// <summary>Создаёт файлы основных уровней в assets/official, если их нет.</summary>
+        /// <summary>
+        /// «Око» — наш собственный демон-уровень в духе глазастых уровней игры:
+        /// узкие коридоры, зрачки-пилы и много смены режимов.
+        /// </summary>
+        public static LevelData Eye()
+        {
+            var b = new Builder("Oko", Difficulty.HardDemon, -4, "Violet Sky");
+            b.L.Settings.BgColor = unchecked((int)0xFF101A52);
+            b.L.Settings.GroundColor = unchecked((int)0xFF070B28);
+            b.L.Settings.StartSpeed = SpeedTier.Fast;
+            b.L.Settings.Description = "Смотри в оба: зрачки следят за тобой.";
+
+            b.Text(6, 6, "OKO");
+
+            // 1. разминка: шипы парами и ступеньки
+            for (int i = 0; i < 6; i++) { b.Spike(16 + i * 9); b.SmallSpike(18 + i * 9); }
+            b.Block(72, 0, 4); b.Block(78, 2, 4); b.Block(84, 4, 4);
+            b.Spike(76); b.Spike(82, 2);
+            b.Coin(88, 8, 1);
+
+            // 2. первый «глаз»: кольцо из блоков с пилой-зрачком
+            void Eye(double gx, int cy2, int rad)
+            {
+                for (int a = 0; a < 16; a++)
+                {
+                    double ang = a * Math.PI * 2 / 16;
+                    b.Obj(1, Math.Round(gx + Math.Cos(ang) * rad), Math.Round(cy2 + Math.Sin(ang) * rad));
+                }
+                b.Saw(gx, cy2);
+            }
+
+            b.Portal(96, 1, PortalKind.ModeShip);
+            b.Corridor(98, 52, -1, 13);
+            Eye(112, 6, 3);
+            Eye(132, 8, 3);
+            Eye(152, 5, 3);
+            b.Coin(142, 11, 2);
+            b.Portal(152, 1, PortalKind.ModeCube);
+
+            // 3. мини-волна между зрачками
+            b.Portal(160, 1, PortalKind.ModeWave);
+            b.Portal(160, 4, PortalKind.Mini);
+            b.Corridor(162, 46, -1, 9);
+            for (int i = 0; i < 14; i++)
+            {
+                b.Obj(1, 166 + i * 3, i % 2 == 0 ? 0 : 7);
+                b.Obj(1, 166 + i * 3, i % 2 == 0 ? 1 : 8);
+            }
+            b.Portal(208, 1, PortalKind.ModeCube);
+            b.Portal(208, 4, PortalKind.Big);
+
+            // 4. паук по стенам, зрачки сверху и снизу
+            b.Portal(216, 1, PortalKind.ModeSpider);
+            b.Corridor(218, 44, -1, 10);
+            for (int i = 0; i < 9; i++) b.Obj(20, 224 + i * 5, i % 2 == 0 ? 0 : 9);
+            for (int i = 0; i < 4; i++) b.Saw(230 + i * 11, 5);
+            b.Coin(252, 5, 3);
+            b.Portal(262, 1, PortalKind.ModeCube);
+
+            // 5. НЛО сквозь «ресницы»
+            b.Portal(270, 1, PortalKind.ModeUfo);
+            b.Corridor(272, 42, -1, 12);
+            for (int i = 0; i < 10; i++)
+            {
+                b.Column(278 + i * 4, 1, 3);
+                b.Column(280 + i * 4, 8, 3);
+            }
+            b.Portal(314, 1, PortalKind.ModeCube);
+
+            // 6. финальный рывок с шарами
+            b.Portal(322, 1, PortalKind.SpeedFaster);
+            b.Orb(330, 4, OrbKind.Yellow);
+            b.Spike(332); b.Spike(333);
+            b.Orb(340, 5, OrbKind.Pink);
+            b.Orb(348, 6, OrbKind.Red);
+            for (int i = 0; i < 6; i++) { b.Spike(356 + i * 7); b.CeilSpike(359 + i * 7, 6); }
+            b.Text(400, 7, "OKO");
+            b.Finish(406);
+            return b.Build();
+        }
+
+        public static LevelData[] All() => new[] { Easy(), Hard(), Insane(), Eye() };
+
+        /// <summary>
+        /// Кладёт файлы основных уровней в assets/official. Уровни собираются кодом,
+        /// поэтому файл всегда переписывается — иначе старая версия игры оставляла
+        /// на диске свои уровни и все три выглядели одинаково. Прогресс хранится
+        /// отдельно и не теряется.
+        /// </summary>
         public static List<LevelData> EnsureFiles()
         {
             var res = new List<LevelData>();
             foreach (var lv in All())
             {
                 var path = Path.Combine(AppConfig.OfficialDir, lv.Settings.LocalId + ".gdl");
-                try
-                {
-                    if (!File.Exists(path)) lv.Save(path);
-                    res.Add(LevelData.Load(path));
-                }
-                catch { res.Add(lv); }
+                try { lv.Save(path); } catch { }
+                res.Add(lv);
             }
             return res;
         }

@@ -85,13 +85,13 @@ namespace GEO_DASH.UI
             MusicPlayer.SetVolume(AppConfig.Settings.MusicVolume);
             Sfx.Volume = (float)AppConfig.Settings.SfxVolume;
             int id = _level.Settings.SongId;
-            if (id > 0)
-            {
-                if (!MusicPlayer.IsCached(id) && !ApiClient.Online)
-                    Toast("Трек #" + id + " не скачан — играем без музыки");
-                else
-                    await MusicPlayer.PlayAsync(id, _level.Settings.SongOffsetSec, 1, true);
-            }
+            if (id == 0) return;
+
+            // id < 0 — встроенный саундтрек, он всегда рядом и играет без интернета
+            if (id < 0 || MusicPlayer.IsCached(id) || ApiClient.Online)
+                await MusicPlayer.PlayAsync(id, _level.Settings.SongOffsetSec, 1, true);
+            else
+                Toast("Трек #" + id + " не скачан — играем без музыки");
         }
 
         // ------------------------------------------------------------- цикл
@@ -129,10 +129,13 @@ namespace GEO_DASH.UI
             _w.Attempts = _attempts;
             _w.Restart();
             _deathDelay = 0;
-            if (_level.Settings.SongId > 0 && !_practice)
-                MusicPlayer.Seek(_level.Settings.SongOffsetSec);
-            else if (_practice && _w.Checkpoints.Count > 0)
-                MusicPlayer.Seek(_level.Settings.SongOffsetSec + _w.Checkpoints[^1].Time);
+            // музыка не обрывается: просто перематывается к началу попытки
+            if (_level.Settings.SongId == 0) return;
+            double to = _level.Settings.SongOffsetSec;
+            if (_practice && _w.Checkpoints.Count > 0) to += _w.Checkpoints[^1].Time;
+
+            if (MusicPlayer.Playing) MusicPlayer.Seek(to);
+            else _ = MusicPlayer.PlayAsync(_level.Settings.SongId, to, 1, true);
         }
 
         void OnFinish()
@@ -146,7 +149,7 @@ namespace GEO_DASH.UI
         {
             if (_testMode) return;
             double pct = Math.Max(_bestPercent, _w.Progress) * 100;
-            LocalStore.RecordRun(_level, pct, _attempts, _w.CoinsGot, _w.Finished);
+            LocalStore.RecordRun(_level, pct, _attempts, _w.CoinsGot, _w.Finished, _w.OrbsUsed);
         }
 
         void Toast(string s) { _toast = s; _toastT = 2.5; }

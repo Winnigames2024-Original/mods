@@ -38,7 +38,7 @@ namespace GEO_DASH.UI
                 (s, e) =>
                 {
                     if (_friends.SelectedIndices.Count > 0)
-                        using (var f = new ProfileForm(_f[_friends.SelectedIndices[0]].Name)) f.ShowDialog(this);
+                        Nav.Go(new ProfileForm(_f[_friends.SelectedIndices[0]].Name));
                 });
             Add("УДАЛИТЬ ИЗ ДРУЗЕЙ", GdIcon.Trash, 264, 532, 220, 48, Color.FromArgb(230, 110, 110), Color.FromArgb(140, 40, 50),
                 async (s, e) => await Remove());

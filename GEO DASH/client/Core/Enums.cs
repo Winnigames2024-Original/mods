@@ -172,6 +172,8 @@ namespace GEO_DASH.Core
         LinkVisible,
         /// <summary>Звук.</summary>
         Sfx,
+        /// <summary>Двойной прыжок: разрешает прыжок в воздухе.</summary>
+        DoubleJump,
         /// <summary>Смена громкости и позиции текущего трека.</summary>
         EditSong,
         /// <summary>Сдвиг точки игрока по экрану.</summary>

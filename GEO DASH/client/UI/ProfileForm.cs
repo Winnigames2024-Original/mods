@@ -37,7 +37,7 @@ namespace GEO_DASH.UI
 
             if (string.IsNullOrEmpty(_user) || _user == AppConfig.Settings.UserName)
                 B("ВОЙТИ / СМЕНИТЬ АККАУНТ", GdIcon.Profile, Color.FromArgb(120, 190, 255), Color.FromArgb(30, 90, 190),
-                    async (s, e) => { using (var f = new LoginForm()) f.ShowDialog(this); await Reload(); });
+                    (s, e) => Nav.Go(new LoginForm(), async () => await Reload()));
             else
                 B("ДОБАВИТЬ В ДРУЗЬЯ", GdIcon.Friends, Color.FromArgb(255, 150, 200), Color.FromArgb(160, 50, 110),
                     async (s, e) => { var r = await ApiClient.FriendRequestAsync(_user); _msg = r.Ok ? "Запрос отправлен" : r.Error; Content.Invalidate(); });

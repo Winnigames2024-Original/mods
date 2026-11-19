@@ -48,6 +48,10 @@ namespace GEO_DASH.UI
         /// <summary>Выбранная в палитре конструкция (ставится целиком).</summary>
         BuildPiece _piece;
 
+        /// <summary>Холст перерисовывается по таймеру — так редактор двигается плавно.</summary>
+        bool _dirty = true;
+        readonly System.Windows.Forms.Timer _paint = new() { Interval = 16 };
+
         public EditorForm(LevelData lv)
         {
             _lv = lv;
@@ -62,7 +66,17 @@ namespace GEO_DASH.UI
             BuildUi();
             _preview.Init(_lv);
             PushUndo();
+
+            _paint.Tick += (s, e) => { if (_dirty) { _dirty = false; _canvas.Invalidate(); } };
+            Shown += (s, e) => _paint.Start();
             FormClosing += (s, e) => Save();
+            FormClosed += (s, e) => _paint.Stop();
+        }
+
+        /// <summary>Слоёная отрисовка — палитра и кнопки редактора перестают мигать.</summary>
+        protected override CreateParams CreateParams
+        {
+            get { var cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; }
         }
 
         // ------------------------------------------------------------ интерфейс
@@ -115,9 +129,9 @@ namespace GEO_DASH.UI
 
             x += 14;
             T("", GdIcon.Plus, 48, Color.FromArgb(140, 150, 190), Color.FromArgb(60, 66, 105),
-                (s, e) => { _zoom = Math.Min(4, _zoom * 1.25); _canvas.Invalidate(); });
+                (s, e) => { _zoom = Math.Min(4, _zoom * 1.25); Repaint(); });
             T("", GdIcon.Cross, 48, Color.FromArgb(140, 150, 190), Color.FromArgb(60, 66, 105),
-                (s, e) => { _zoom = Math.Max(0.2, _zoom / 1.25); _canvas.Invalidate(); });
+                (s, e) => { _zoom = Math.Max(0.2, _zoom / 1.25); Repaint(); });
 
             var snap = new CheckBox
             {
@@ -132,7 +146,7 @@ namespace GEO_DASH.UI
                 Text = "хитбоксы", Left = x + 102, Top = 16, Width = 92,
                 ForeColor = Gd.Paper, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat
             };
-            hb.CheckedChanged += (s, e) => { Renderer.ShowHitboxes = hb.Checked; _canvas.Invalidate(); };
+            hb.CheckedChanged += (s, e) => { Renderer.ShowHitboxes = hb.Checked; Repaint(); };
             top.Controls.Add(hb);
 
             // ---------- режимы ----------
@@ -165,7 +179,7 @@ namespace GEO_DASH.UI
             _canvas.MouseWheel += (s, e) =>
             {
                 _zoom = Math.Clamp(_zoom * (e.Delta > 0 ? 1.12 : 1 / 1.12), 0.2, 4);
-                _canvas.Invalidate();
+                Repaint();
             };
             _canvas.MouseEnter += (s, e) => _canvas.Focus();
 
@@ -181,7 +195,7 @@ namespace GEO_DASH.UI
             if (m == Mode.Build) BuildPalette();
             else if (m == Mode.Edit) BuildEditPanel();
             else BuildDeletePanel();
-            _canvas.Invalidate();
+            Repaint();
             UpdateStatus();
         }
 
@@ -411,7 +425,7 @@ namespace GEO_DASH.UI
                     Text = text, Icon = ic, Left = x, Top = y, Width = w, Height = h,
                     Color1 = c1, Color2 = c2, FontSize = 9f
                 };
-                b.Click += (s, e) => { act(); _canvas.Invalidate(); UpdateStatus(); };
+                b.Click += (s, e) => { act(); Repaint(); UpdateStatus(); };
                 p.Controls.Add(b);
             }
 
@@ -516,7 +530,7 @@ namespace GEO_DASH.UI
                     Text = text, Icon = ic, Left = x, Top = y, Width = w, Height = 54,
                     Color1 = Color.FromArgb(240, 130, 130), Color2 = Color.FromArgb(150, 45, 55), FontSize = 9.5f
                 };
-                b.Click += (s, e) => { act(); _canvas.Invalidate(); UpdateStatus(); };
+                b.Click += (s, e) => { act(); Repaint(); UpdateStatus(); };
                 p.Controls.Add(b);
             }
 
@@ -798,7 +812,7 @@ namespace GEO_DASH.UI
                     }
             }
             UpdateStatus();
-            _canvas.Invalidate();
+            Repaint();
         }
 
         void CanvasMove(object s, MouseEventArgs e)
@@ -809,7 +823,7 @@ namespace GEO_DASH.UI
                 _camX -= (e.X - _lastMouse.X) / sc;
                 _camY += (e.Y - _lastMouse.Y) / sc;
                 _lastMouse = e.Location;
-                _canvas.Invalidate();
+                Repaint();
                 return;
             }
 
@@ -819,7 +833,7 @@ namespace GEO_DASH.UI
             {
                 int under = HitTest(w);
                 if (under >= 0 && !_sel.Contains(under)) { _sel.Add(under); UpdateStatus(); }
-                _canvas.Invalidate();
+                Repaint();
                 return;
             }
 
@@ -828,7 +842,7 @@ namespace GEO_DASH.UI
                 _selBox = RectangleF.FromLTRB(
                     Math.Min(_dragStart.X, w.X), Math.Min(_dragStart.Y, w.Y),
                     Math.Max(_dragStart.X, w.X), Math.Max(_dragStart.Y, w.Y));
-                _canvas.Invalidate();
+                Repaint();
                 return;
             }
 
@@ -853,7 +867,7 @@ namespace GEO_DASH.UI
                 _camY += (e.Y - _lastMouse.Y) / sc;
                 _lastMouse = e.Location;
             }
-            _canvas.Invalidate();
+            Repaint();
         }
 
         void CanvasUp(object s, MouseEventArgs e)
@@ -878,7 +892,7 @@ namespace GEO_DASH.UI
             _panning = false;
             _movingSel = false;
             UpdateStatus();
-            _canvas.Invalidate();
+            Repaint();
         }
 
         int HitTest(PointF w)
@@ -985,12 +999,20 @@ namespace GEO_DASH.UI
             Status($"Конструкция «{piece.Name}» сохранена — ищи её в BUILD, вкладка «Конструкции»");
         }
 
-        void RebuildPreview()
+        /// <summary>
+        /// Обновление картинки редактора. Полная пересборка мира нужна только когда
+        /// поменялись настройки уровня — на каждый поставленный блок она и тормозила.
+        /// </summary>
+        void RebuildPreview(bool full = false)
         {
-            _preview.Init(_lv);
-            _canvas.Invalidate();
+            if (full) _preview.Init(_lv);
+            else _preview.RefreshEditor();
+            Repaint();
             UpdateStatus();
         }
+
+        /// <summary>Просит перерисовать холст: сам кадр нарисуется по таймеру, ровно 60 раз в секунду.</summary>
+        void Repaint() => _dirty = true;
 
         void PushUndo()
         {
@@ -1006,7 +1028,7 @@ namespace GEO_DASH.UI
             _undo.RemoveAt(_undo.Count - 1);
             _lv = LevelData.FromJson(_undo[^1]);
             _sel.Clear();
-            RebuildPreview();
+            RebuildPreview(true);
         }
 
         void Redo()
@@ -1016,7 +1038,7 @@ namespace GEO_DASH.UI
             _lv = LevelData.FromJson(_redo[^1]);
             _redo.RemoveAt(_redo.Count - 1);
             _sel.Clear();
-            RebuildPreview();
+            RebuildPreview(true);
         }
 
         void Save() => LocalStore.SaveMyLevel(_lv);
@@ -1033,7 +1055,7 @@ namespace GEO_DASH.UI
             using var f = new LevelSettingsForm(_lv.Settings);
             if (f.ShowDialog(this) == DialogResult.OK)
             {
-                RebuildPreview();
+                RebuildPreview(true);
                 Text = AppConfig.AppName + " — Редактор — " + _lv.Settings.Name;
             }
         }

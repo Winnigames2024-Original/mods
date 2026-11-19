@@ -2,12 +2,20 @@ using System.Text.Json;
 
 namespace GEO_DASH
 {
+    /// <summary>Сохранённый аккаунт: заходим под ним без повторного ввода пароля.</summary>
+    public class SavedAccount
+    {
+        public string Name { get; set; } = "";
+        public string Token { get; set; } = "";
+        public bool Admin { get; set; }
+        public string LastSeen { get; set; } = "";
+    }
+
     public class AppSettings
     {
-        public string ServerHost { get; set; } = "166.1.161.200";
-        public int ServerPort { get; set; } = 37534;
-        public string SiteUrl { get; set; } = "https://geodash.winnigames2024.ru/";
         public string Token { get; set; } = "";
+        /// <summary>Все аккаунты, под которыми уже заходили на этом компьютере.</summary>
+        public List<SavedAccount> Accounts { get; set; } = new();
         public string UserName { get; set; } = "";
         public bool IsAdmin { get; set; }
         public double MusicVolume { get; set; } = 0.8;
@@ -16,8 +24,18 @@ namespace GEO_DASH
         public bool ShowHitboxes { get; set; }
         public bool AutoUpdate { get; set; } = true;
         public bool OfflineAutoDownload { get; set; } = true;
-        public bool Fullscreen { get; set; }
+        public bool Fullscreen { get; set; } = true;
         public int Fps { get; set; } = 60;
+
+        // ---- внешний вид кубика ----
+        /// <summary>Номер встроенного рисунка (1..16).</summary>
+        public int IconShape { get; set; } = 1;
+        /// <summary>Основной цвет кубика.</summary>
+        public int IconColor1 { get; set; } = unchecked((int)0xFF3CF2FF);
+        /// <summary>Цвет рисунка на кубике.</summary>
+        public int IconColor2 { get; set; } = unchecked((int)0xFF1B2A66);
+        /// <summary>Своя картинка на кубике: файл на диске (пусто — встроенный рисунок).</summary>
+        public string IconImage { get; set; } = "";
         public string UpdateChannel { get; set; } = "main";
         /// <summary>Где лежат кнопки в игре — настраивается в самой игре по кнопке «=».</summary>
         public Core.GuiLayout Gui { get; set; } = new();
@@ -28,6 +46,19 @@ namespace GEO_DASH
         public const string AppName = "GEO DASH";
         public const string Brand = "Winnigames2024";
         public const string AdminUser = "Winnigames2024";
+
+        // ------------------------------------------------------------------
+        // Адрес сервера живёт только здесь, в коде. На формах он не
+        // показывается и в settings.json не сохраняется — игроку он не нужен.
+        // ------------------------------------------------------------------
+        const string Host = "166.1.161.200";
+        const int Port = 37534;
+
+        /// <summary>Сайт игры — тоже только в коде.</summary>
+        public const string SiteUrl = "https://geodash.winnigames2024.ru/";
+
+        /// <summary>Как сервер подписан в интерфейсе — без адреса.</summary>
+        public const string ServerLabel = "сервер Winnigames2024";
 
         /// <summary>Репозиторий обновлений (всё ставится/обновляется через GitHub + curl).</summary>
         public const string GitHubOwner = "Winnigames2024-Original";
@@ -99,10 +130,52 @@ namespace GEO_DASH
             catch { }
         }
 
-        public static string ApiBase => $"http://{Settings.ServerHost}:{Settings.ServerPort}";
+        public static string ApiBase => $"http://{Host}:{Port}";
 
         public static bool LoggedIn => !string.IsNullOrEmpty(Settings.Token);
         public static bool IsAdminUser =>
             string.Equals(Settings.UserName, AdminUser, StringComparison.OrdinalIgnoreCase) || Settings.IsAdmin;
+
+        // --------------------------------------------------------- аккаунты
+
+        /// <summary>Запомнить аккаунт, под которым вошли, чтобы заходить в один клик.</summary>
+        public static void RememberAccount(string name, string token, bool admin)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            var list = Settings.Accounts;
+            var a = list.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (a == null) { a = new SavedAccount { Name = name }; list.Add(a); }
+            a.Token = token ?? "";
+            a.Admin = admin;
+            a.LastSeen = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+            // последний вход — первым в списке
+            list.Remove(a);
+            list.Insert(0, a);
+            while (list.Count > 8) list.RemoveAt(list.Count - 1);
+            Save();
+        }
+
+        /// <summary>Переключиться на сохранённый аккаунт.</summary>
+        public static void UseAccount(SavedAccount a)
+        {
+            if (a == null) return;
+            Settings.UserName = a.Name;
+            Settings.Token = a.Token;
+            Settings.IsAdmin = a.Admin;
+            Save();
+        }
+
+        /// <summary>Убрать аккаунт из списка сохранённых.</summary>
+        public static void ForgetAccount(string name)
+        {
+            Settings.Accounts.RemoveAll(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (string.Equals(Settings.UserName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                Settings.UserName = "";
+                Settings.Token = "";
+                Settings.IsAdmin = false;
+            }
+            Save();
+        }
     }
 }

@@ -36,6 +36,8 @@ namespace GEO_DASH.Core
         public bool Reverse;
         /// <summary>Платформер: игрок сам ходит влево-вправо.</summary>
         public bool Platformer;
+        /// <summary>Сколько шаров (orbs) использовано за попытку — идёт в рекорды.</summary>
+        public int OrbsUsed;
         /// <summary>Экранные эффекты 2.2.</summary>
         public readonly ScreenFx Fx = new();
         /// <summary>События, включённые триггером Event.</summary>
@@ -61,7 +63,8 @@ namespace GEO_DASH.Core
         public readonly HashSet<int> CoinsCollected = new();
 
         public double GroundY = 0;
-        public double RoofY = 900;
+        /// <summary>Потолка у уровня нет — вверх можно улетать сколько угодно.</summary>
+        public double RoofY = 1e7;
         public double RightEdge = 1200;
 
         public Action<string> Sfx;                       // "jump","orb","death","portal","coin","win"
@@ -93,6 +96,24 @@ namespace GEO_DASH.Core
             Reverse = lv.Settings.ReverseGameplay;
             Platformer = lv.Settings.PlatformerFreeMove;
             Restart(true);
+        }
+
+        /// <summary>
+        /// Быстрое обновление для редактора: уровень тот же, просто стало больше или меньше
+        /// объектов. Полную пересборку (Init) делаем только когда поменялись настройки уровня.
+        /// </summary>
+        public void RefreshEditor()
+        {
+            if (Level == null) return;
+            int n = Level.Objects.Count;
+            if (St == null || St.Length != n)
+            {
+                var old = St;
+                St = new ObjState[n];
+                for (int i = 0; i < n; i++)
+                    St[i] = (old != null && i < old.Length && old[i] != null) ? old[i] : new ObjState();
+            }
+            RightEdge = Level.RightEdge();
         }
 
         void BuildIndex()
@@ -168,7 +189,11 @@ namespace GEO_DASH.Core
             Trig.Reset();
             _trigPtr = 0;
             CoinsGot = 0; CoinsCollected.Clear();
+            OrbsUsed = 0;
             DualMode = Level.Settings.StartDual;
+            // двойной прыжок выдаётся только триггером — на старте его нет
+            P1.ExtraJumps = P2.ExtraJumps = 0;
+            P1.AirJumpsLeft = P2.AirJumpsLeft = 0;
 
             double startY = 15;
             double startX = 0;
@@ -274,7 +299,7 @@ namespace GEO_DASH.Core
             {
                 bool first = p.LavaTime <= 0;
                 p.LavaTime += dt;
-                if (first) Sfx?.Invoke("orb");
+                if (first) { Sfx?.Invoke("orb"); OrbsUsed++; }
                 if (p.LavaTime >= Phys.LavaSeconds) { Die(p); return; }
             }
             else if (p.LavaTime > 0)
@@ -357,6 +382,38 @@ namespace GEO_DASH.Core
 
                 // червяк проходит сквозь обычные блоки
                 if (worm && d.WormPhase) { p.NoClipWorm = true; continue; }
+
+                // склон не убивает: по нему заезжают наверх, как в игре
+                if (d.Kind == ObjKind.Slope)
+                {
+                    double lo = Math.Min(r.Top, r.Bottom), hi = Math.Max(r.Top, r.Bottom);
+                    double left = Math.Min(r.Left, r.Right), wide = Math.Max(1, Math.Abs(r.Right - r.Left));
+                    double t = Math.Clamp((p.X - left) / wide, 0, 1);
+                    double frac = d.Style == DrawStyle.SlopeUp ? t : 1 - t;
+                    double surf = lo + (hi - lo) * frac;      // высота склона под игроком
+
+                    if (p.GravityDir > 0)
+                    {
+                        double want = surf + p.Size / 2;
+                        if (p.Y <= want + 4)
+                        {
+                            p.Y = want;
+                            if (p.VY < 0) p.VY = 0;
+                            p.OnGround = true; p.RobotJumping = false;
+                        }
+                    }
+                    else
+                    {
+                        double want = hi - (surf - lo) - p.Size / 2;
+                        if (p.Y >= want - 4)
+                        {
+                            p.Y = want;
+                            if (p.VY > 0) p.VY = 0;
+                            p.OnGround = true; p.RobotJumping = false;
+                        }
+                    }
+                    continue;
+                }
 
                 double overlapL = box.Right - r.Left;
                 double overlapR = r.Right - box.Left;

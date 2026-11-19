@@ -137,8 +137,9 @@ namespace GEO_DASH.Render
                     new RectangleF(0, top.Y, v.Client.Width, v.Client.Height - top.Y + 2),
                     gid, gc, line, scroll, tex);
 
+            // потолок рисуем, только если он у уровня вообще есть
             var roof = v.W2S(0, w.RoofY);
-            if (roof.Y > 0)
+            if (w.RoofY < 100000 && roof.Y > 0)
                 GdBackdrop.DrawGround(g,
                     new RectangleF(0, -2, v.Client.Width, roof.Y + 2),
                     gid, gc, line, scroll, tex, true);
@@ -539,9 +540,9 @@ namespace GEO_DASH.Render
             switch (p.Mode)
             {
                 case GameMode.Cube:
-                    using (var br = new SolidBrush(col)) g.FillRectangle(br, rr);
-                    using (var pen = new Pen(dark, Math.Max(2f, rr.Width * 0.11f))) g.DrawRectangle(pen, rr.X, rr.Y, rr.Width, rr.Height);
-                    using (var br = new SolidBrush(light)) g.FillRectangle(br, Inflate(rr, -rr.Width * 0.3f));
+                    // внешний вид кубика берётся из набора иконок (и своей картинки)
+                    IconKit.Draw(g, rr, AppConfig.Settings.IconShape, col,
+                                 Color.FromArgb(AppConfig.Settings.IconColor2));
                     break;
 
                 case GameMode.Ship:
@@ -556,10 +557,8 @@ namespace GEO_DASH.Render
                     break;
 
                 case GameMode.Ball:
-                    using (var br = new SolidBrush(col)) g.FillEllipse(br, rr);
-                    using (var pen = new Pen(dark, Math.Max(2f, rr.Width * 0.12f))) g.DrawEllipse(pen, rr);
-                    using (var br = new SolidBrush(light))
-                        g.FillRectangle(br, rr.X, rr.Y + rr.Height * 0.4f, rr.Width, rr.Height * 0.2f);
+                    IconKit.Draw(g, rr, AppConfig.Settings.IconShape, col,
+                                 Color.FromArgb(AppConfig.Settings.IconColor2), round: true);
                     break;
 
                 case GameMode.Ufo:

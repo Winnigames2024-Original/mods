@@ -12,12 +12,22 @@ namespace GEO_DASH.UI
         AccountDto _me;
         readonly System.Windows.Forms.Timer _poll = new() { Interval = 15000 };
 
+        /// <summary>Панель, в которой живут все экраны игры (как activity на телефоне).</summary>
+        readonly Panel _screens = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 10, 30) };
+
         public MainForm()
         {
             Text = AppConfig.AppName + " — " + AppConfig.Brand;
             ClientSize = new Size(1180, 720);
             MinimumSize = new Size(1000, 640);
             StartPosition = FormStartPosition.CenterScreen;
+
+            Controls.Add(_screens);
+            _screens.BringToFront();
+            Nav.Attach(this, _screens);
+
+            FullScreen.Hook(this);
+            Load += (s, e) => { if (AppConfig.Settings.Fullscreen) FullScreen.Apply(this, true); };
 
             BuildUi();
             Resize += (s, e) => Layout2();
@@ -32,7 +42,7 @@ namespace GEO_DASH.UI
             Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) MusicPlayer.Pause(); };
         }
 
-        GdButton _bEditor, _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync;
+        GdButton _bEditor, _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync, _bChat, _bIcons;
 
         void BuildUi()
         {
@@ -61,6 +71,12 @@ namespace GEO_DASH.UI
             _bSync = Add("", GdIcon.Refresh, 0, 0, 84, 86, Color.FromArgb(120, 220, 180), Color.FromArgb(30, 120, 100),
                 async (s, e) => await SyncAsync());
             _bSync.Caption = "СИНХРО";
+            _bIcons = Add("", GdIcon.Star, 0, 0, 84, 86, Color.FromArgb(255, 200, 90), Color.FromArgb(170, 115, 10),
+                (s, e) => Open(new IconsForm()));
+            _bIcons.Caption = "ИКОНКИ";
+            _bChat = Add("", GdIcon.Online, 0, 0, 84, 86, Color.FromArgb(120, 200, 255), Color.FromArgb(25, 95, 190),
+                (s, e) => Open(new ChatListForm()));
+            _bChat.Caption = "ЧАТЫ";
             _bAdmin = Add("", GdIcon.Admin, 0, 0, 84, 86, Color.FromArgb(255, 110, 110), Color.FromArgb(150, 30, 40),
                 (s, e) => Open(new AdminForm()));
             _bAdmin.Caption = "АДМИНКА";
@@ -81,9 +97,9 @@ namespace GEO_DASH.UI
             _bDaily.Location = new Point(cx + 230, cy + 0);
 
             int y = ClientSize.Height - 112;
-            int count = 4 + (AppConfig.IsAdminUser ? 1 : 0);
+            int count = 6 + (AppConfig.IsAdminUser ? 1 : 0);
             int bx = cx - (count * 92 - 8) / 2;
-            foreach (var b in new[] { _bProfile, _bFriends, _bSettings, _bSync, _bAdmin })
+            foreach (var b in new[] { _bProfile, _bIcons, _bFriends, _bChat, _bSettings, _bSync, _bAdmin })
             {
                 if (b == null) continue;
                 b.Location = new Point(bx, y);
@@ -135,7 +151,7 @@ namespace GEO_DASH.UI
             {
                 Gd.Outlined(g, _status, f, new RectangleF(84, bar.Y, ClientSize.Width - 320, 24), Gd.Paper, StringAlignment.Near, thick: 2f);
                 var (txt, col) = ApiClient.Online
-                    ? ("● ОНЛАЙН  " + AppConfig.Settings.ServerHost + ":" + AppConfig.Settings.ServerPort, Gd.Lime)
+                    ? ("● ОНЛАЙН · " + AppConfig.ServerLabel, Gd.Lime)
                     : ("● ОФЛАЙН — играем на локальных данных", Gd.Gold);
                 Gd.Outlined(g, txt, f, new RectangleF(ClientSize.Width - 420, bar.Y, 410, 24), col, StringAlignment.Far, thick: 2f);
             }
@@ -154,13 +170,18 @@ namespace GEO_DASH.UI
             }
         }
 
-        void Open(Form f)
+        /// <summary>Открыть экран внутри панели — окон больше не появляется.</summary>
+        new void Open(Form f)
         {
             Sfx.Play("click");
-            using (f) f.ShowDialog(this);
-            _bAdmin.Visible = AppConfig.IsAdminUser;
-            Layout2();
-            Content.Invalidate();
+            f.FormClosed += (s, e) =>
+            {
+                if (IsDisposed) return;
+                _bAdmin.Visible = AppConfig.IsAdminUser;
+                Layout2();
+                Content.Invalidate();
+            };
+            Nav.Go(f);
         }
 
         // ------------------------------------------------------------ запуск
@@ -168,6 +189,7 @@ namespace GEO_DASH.UI
         async Task StartupAsync()
         {
             Sfx.Init();
+            LoadIcon();
             Sfx.Volume = (float)AppConfig.Settings.SfxVolume;
             MusicPlayer.SetVolume(AppConfig.Settings.MusicVolume);
 
@@ -177,6 +199,14 @@ namespace GEO_DASH.UI
             await Task.Run(() => OfficialLevels.EnsureFiles());
 
             _ = MusicPlayer.PlayAsync(-1, 0, 0.6, true);
+
+            // игру открыли файлом уровня — сразу показываем его
+            if (!string.IsNullOrEmpty(Program.OpenLevelPath))
+            {
+                var p = Program.OpenLevelPath;
+                Program.OpenLevelPath = null;
+                Program.OpenLevelFile(p);
+            }
 
             await SyncAsync();
             if (AppConfig.Settings.AutoUpdate) await CheckUpdateAsync();
@@ -217,6 +247,18 @@ namespace GEO_DASH.UI
             using var f = new UpdateForm(info);
             f.ShowDialog(this);
             Content.Invalidate();
+        }
+
+        /// <summary>Своя картинка кубика подхватывается при запуске.</summary>
+        static void LoadIcon()
+        {
+            try
+            {
+                var p = AppConfig.Settings.IconImage;
+                if (!string.IsNullOrWhiteSpace(p) && File.Exists(p))
+                    Render.IconKit.SetCustom(p, Image.FromFile(p));
+            }
+            catch { }
         }
 
         void Status(string s)

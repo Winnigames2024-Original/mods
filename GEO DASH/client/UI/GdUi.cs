@@ -556,6 +556,30 @@ namespace GEO_DASH.UI
             FormClosed += (s, e) => _anim.Stop();
         }
 
+        /// <summary>
+        /// Слоёная отрисовка окна: дочерние кнопки и картинки больше не мигают
+        /// (фон и контролы попадают на экран одним куском).
+        /// </summary>
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000;   // WS_EX_COMPOSITED
+                return cp;
+            }
+        }
+
+        /// <summary>Открыть другой экран: внутри оболочки — в панели MainForm, иначе окном.</summary>
+        protected void Open(Form f) => Nav.Go(f);
+
+        /// <summary>Закрыть экран: встроенный — вернуться назад, обычный — закрыть окно.</summary>
+        protected void CloseScreen()
+        {
+            if (Nav.IsEmbedded(this)) Nav.Back();
+            else Close();
+        }
+
         /// <summary>Рисование экрана поверх фона (вместо OnPaint формы).</summary>
         protected virtual void OnRender(Graphics g) { }
 

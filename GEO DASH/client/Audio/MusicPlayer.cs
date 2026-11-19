@@ -54,7 +54,8 @@ namespace GEO_DASH.Audio
         public static async Task<bool> PlayAsync(int id, double startSec = 0, double volume = 1, bool loop = true)
         {
             if (!Enabled) return false;
-            if (id <= 0) { Stop(); return false; }
+            // 0 — музыки нет; отрицательные ID — встроенные треки, они играют всегда
+            if (id == 0 || (id < 0 && !Soundtrack.IsBuiltIn(id))) { Stop(); return false; }
             var path = await EnsureAsync(id);
             if (path == null) return false;
             return PlayFile(path, startSec, volume, loop, id);

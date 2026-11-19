@@ -29,7 +29,11 @@ fetch_builds() {
   local changed_build=0
 
   if [ -d "$SRC/.git" ]; then
-    for f in GEO_DASH.exe GEO_DASH.apk; do
+    # autoupdate.exe — та же программа, что и установщик, просто под другим именем
+    if [ -f "$SRC/$SUBDIR/download/GEO_DASH_Setup.exe" ]; then
+      cp -f "$SRC/$SUBDIR/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"
+    fi
+    for f in GEO_DASH.exe GEO_DASH.apk GEO_DASH_Setup.exe; do
       if [ -f "$SRC/$SUBDIR/download/$f" ]; then
         if ! cmp -s "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"; then
           cp -f "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"

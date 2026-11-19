@@ -16,6 +16,10 @@ namespace GEO_DASH.Net
         [JsonPropertyName("banned")] public bool Banned { get; set; }
         [JsonPropertyName("created")] public string Created { get; set; } = "";
         [JsonPropertyName("friends")] public int FriendCount { get; set; }
+        [JsonPropertyName("orbs")] public int Orbs { get; set; }
+        [JsonPropertyName("completed")] public int Completed { get; set; }
+        /// <summary>Значение в выбранной таблице рекордов.</summary>
+        [JsonPropertyName("score")] public int Score { get; set; }
     }
 
     public class LevelDto
@@ -155,5 +159,51 @@ namespace GEO_DASH.Net
         public bool FromCache;
         public static ApiReply<T> Fail(string e) => new ApiReply<T> { Ok = false, Error = e };
         public static ApiReply<T> Good(T d, bool cache = false) => new ApiReply<T> { Ok = true, Data = d, FromCache = cache };
+    }
+
+    /// <summary>Короткий ответ сервера «готово».</summary>
+    public class OkDto
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; set; }
+        [JsonPropertyName("error")] public string Error { get; set; } = "";
+    }
+
+    /// <summary>Сообщение в чате или в поддержке.</summary>
+    public class ChatMessageDto
+    {
+        [JsonPropertyName("id")] public int Id { get; set; }
+        [JsonPropertyName("from")] public string From { get; set; } = "";
+        [JsonPropertyName("to")] public string To { get; set; } = "";
+        [JsonPropertyName("text")] public string Text { get; set; } = "";
+        [JsonPropertyName("at")] public string At { get; set; } = "";
+    }
+
+    /// <summary>Переписка целиком.</summary>
+    public class ChatDto
+    {
+        [JsonPropertyName("peer")] public string Peer { get; set; } = "";
+        [JsonPropertyName("messages")] public List<ChatMessageDto> Messages { get; set; } = new();
+    }
+
+    /// <summary>Строчка в списке переписок.</summary>
+    public class ChatHeadDto
+    {
+        [JsonPropertyName("peer")] public string Peer { get; set; } = "";
+        [JsonPropertyName("support")] public bool Support { get; set; }
+        [JsonPropertyName("last")] public string Last { get; set; } = "";
+        [JsonPropertyName("lastFrom")] public string LastFrom { get; set; } = "";
+        [JsonPropertyName("at")] public string At { get; set; } = "";
+        [JsonPropertyName("unread")] public int Unread { get; set; }
+    }
+
+    /// <summary>Обращение в поддержку — для админки.</summary>
+    public class SupportHeadDto
+    {
+        [JsonPropertyName("user")] public string User { get; set; } = "";
+        [JsonPropertyName("last")] public string Last { get; set; } = "";
+        [JsonPropertyName("lastFrom")] public string LastFrom { get; set; } = "";
+        [JsonPropertyName("at")] public string At { get; set; } = "";
+        [JsonPropertyName("count")] public int Count { get; set; }
+        [JsonPropertyName("waiting")] public bool Waiting { get; set; }
     }
 }

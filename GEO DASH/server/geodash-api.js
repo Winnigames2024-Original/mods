@@ -25,6 +25,8 @@ const DIR = process.env.GEODASH_DIR || '/var/lib/geodash';
 const ADMIN = process.env.GEODASH_ADMIN || 'Winnigames2024';
 const MODERATION = (process.env.GEODASH_MODERATION || 'off').toLowerCase() === 'on';
 const VERSION_FILE = process.env.GEODASH_VERSION_FILE || '/opt/geodash/update.json';
+// сколько мегабайт отдаём под уровни игроков; дальше чистим самые ненужные
+const MAX_LEVEL_MB = parseInt(process.env.GEODASH_MAX_LEVEL_MB || '4096', 10);
 
 const DATA_DIR = path.join(DIR, 'leveldata');
 const MUSIC_DIR = path.join(DIR, 'music');
@@ -65,7 +67,8 @@ const db = {
   state: loadJson('state.json', { nextId: 1, daily: null, weekly: null, news: [], songs: {},
                                   nextSongId: 2000001, nextImageId: 1 }),
   images: loadJson('images.json', {}),
-  comments: loadJson('comments.json', {})
+  comments: loadJson('comments.json', {}),
+  chats: loadJson('chats.json', {})
 };
 
 const save = {
@@ -75,7 +78,8 @@ const save = {
   tokens: () => saveJson('tokens.json', db.tokens),
   state: () => saveJson('state.json', db.state),
   images: () => saveJson('images.json', db.images),
-  comments: () => saveJson('comments.json', db.comments)
+  comments: () => saveJson('comments.json', db.comments),
+  chats: () => saveJson('chats.json', db.chats)
 };
 
 // ------------------------------------------------------------------ утилиты
@@ -110,7 +114,9 @@ function pub(u) {
   return {
     name: u.name, avatar: u.avatar | 0,
     stars: u.stars | 0, coins: u.coins | 0, demons: u.demons | 0,
+    orbs: u.orbs | 0,
     levels: Object.values(db.levels).filter(l => key(l.author) === key(u.name)).length,
+    completed: Object.keys(u.completed || {}).length,
     attempts: u.attempts | 0, jumps: u.jumps | 0, about: u.about || '',
     admin: !!u.admin, banned: !!u.banned, created: u.created,
     friends: (u.friends || []).length
@@ -297,6 +303,93 @@ async function ensureSongFile(id) {
   return f;
 }
 
+
+// --------------------------------------------------------- место под уровни
+
+/** Сколько места занимают файлы уровней. */
+function levelsBytes() {
+  let sum = 0;
+  try {
+    for (const f of fs.readdirSync(DATA_DIR)) {
+      try { sum += fs.statSync(path.join(DATA_DIR, f)).size; } catch {}
+    }
+  } catch {}
+  return sum;
+}
+
+/** Насколько уровень «живой» за последнюю неделю: скачивания + запуски + лайки. */
+function weekScore(l) {
+  const w = l.week || {};
+  const fresh = w.stamp === weekStamp();
+  return fresh ? ((w.downloads | 0) + (w.plays | 0) + (w.likes | 0) * 3) : 0;
+}
+
+function bumpWeek(l, field) {
+  const st = weekStamp();
+  if (!l.week || l.week.stamp !== st) l.week = { stamp: st, downloads: 0, plays: 0, likes: 0 };
+  l.week[field] = (l.week[field] | 0) + 1;
+}
+
+/**
+ * Если места под уровни больше не осталось — убираем самые ненужные:
+ * сначала те, у кого меньше скачиваний, запусков и лайков за неделю,
+ * при равенстве — самые старые. Избранные и офлайн-уровни не трогаем.
+ */
+function trimLevels() {
+  const limit = MAX_LEVEL_MB * 1024 * 1024;
+  let used = levelsBytes();
+  if (used <= limit) return 0;
+
+  const list = Object.values(db.levels)
+    .filter(l => !l.featured && !l.epic && !l.offline)
+    .sort((a, b) => weekScore(a) - weekScore(b)
+                 || ((a.downloads | 0) + (a.plays | 0)) - ((b.downloads | 0) + (b.plays | 0))
+                 || String(a.created || '').localeCompare(String(b.created || '')));
+
+  let removed = 0;
+  for (const l of list) {
+    if (used <= limit * 0.9) break;
+    const file = path.join(DATA_DIR, l.id + '.gdl');
+    let size = 0;
+    try { size = fs.statSync(file).size; } catch {}
+    try { fs.unlinkSync(file); } catch {}
+    delete db.levels[l.id];
+    delete db.scores[l.id];
+    delete db.comments[l.id];
+    used -= size;
+    removed++;
+  }
+  if (removed) { save.levels(); save.scores(); save.comments(); }
+  return removed;
+}
+
+// ------------------------------------------------------------------ чаты
+
+const SUPPORT = 'SUPPORT';
+
+/** Имя ветки переписки: у поддержки своя на каждого игрока. */
+function threadKey(a, b) {
+  if (key(a) === key(SUPPORT)) return 'support:' + key(b);
+  if (key(b) === key(SUPPORT)) return 'support:' + key(a);
+  return 'dm:' + [key(a), key(b)].sort().join('|');
+}
+
+function thread(a, b) {
+  const k = threadKey(a, b);
+  return db.chats[k] || (db.chats[k] = { key: k, messages: [], read: {} });
+}
+
+function chatSend(from, to, text) {
+  const t = thread(from, to);
+  const m = { id: (t.messages.length ? t.messages[t.messages.length - 1].id : 0) + 1,
+              from, to, text: String(text).slice(0, 2000), at: now() };
+  t.messages.push(m);
+  while (t.messages.length > 500) t.messages.shift();
+  t.read[key(from)] = m.id;
+  save.chats();
+  return m;
+}
+
 // ------------------------------------------------------------------ роутер
 
 const routes = [];
@@ -378,10 +471,27 @@ route('GET', '/api/users', (req, res, p, q) => {
   ok(res, list);
 });
 
-route('GET', '/api/top', (req, res) => {
+/**
+ * Таблицы рекордов. by = stars | coins | demons | orbs | created | completed.
+ * coins считаются только за чужие опубликованные уровни.
+ */
+route('GET', '/api/top', (req, res, p, q) => {
+  const by = String((q && q.get && q.get('by')) || 'stars');
+  const val = u => {
+    switch (by) {
+      case 'coins': return u.coins | 0;
+      case 'demons': return u.demons | 0;
+      case 'orbs': return u.orbs | 0;
+      case 'created': return Object.values(db.levels).filter(l => key(l.author) === key(u.name)).length;
+      case 'completed': return Object.keys(u.completed || {}).length;
+      default: return u.stars | 0;
+    }
+  };
   const list = Object.values(db.users)
-    .sort((a, b) => (b.stars | 0) - (a.stars | 0) || (b.coins | 0) - (a.coins | 0))
-    .slice(0, 100).map(pub);
+    .filter(u => !u.banned)
+    .sort((a, b) => val(b) - val(a) || (b.stars | 0) - (a.stars | 0))
+    .slice(0, 100)
+    .map(u => Object.assign(pub(u), { score: val(u), by }));
   ok(res, list);
 });
 
@@ -405,6 +515,10 @@ route('GET', '/api/levels', (req, res, p, q) => {
     case 'top': list.sort((a, b) => (b.likes | 0) - (a.likes | 0)); break;
     case 'featured': list = list.filter(l => l.featured); break;
     case 'epic': list = list.filter(l => l.epic); break;
+    case 'plays': list.sort((a, b) => (b.plays | 0) - (a.plays | 0)); break;
+    case 'stars': list.sort((a, b) => (b.stars | 0) - (a.stars | 0) || (b.likes | 0) - (a.likes | 0)); break;
+    case 'hard': list.sort((a, b) => (b.difficulty | 0) - (a.difficulty | 0) || (b.likes | 0) - (a.likes | 0)); break;
+    case 'week': list.sort((a, b) => weekScore(b) - weekScore(a)); break;
     default: list.sort((a, b) => String(b.created).localeCompare(String(a.created)));
   }
   ok(res, list.slice(page * 50, page * 50 + 50).map(levelPub));
@@ -448,6 +562,13 @@ route('POST', '/api/levels', async (req, res) => {
   if (data.length < 20) return bad(res, 'Пустой уровень');
   if (data.length > 10 * 1024 * 1024) return bad(res, 'Уровень слишком большой');
 
+  // публиковать можно только пройденный уровень, и все монетки должны быть собраны
+  const coinsTotal = Math.max(0, parseInt(b.coinsTotal || '0', 10));
+  const coinsGot = Math.max(0, parseInt(b.coins || '0', 10));
+  if (!b.completed) return bad(res, 'Сначала пройди свой уровень целиком');
+  if (coinsTotal > 0 && coinsGot < coinsTotal)
+    return bad(res, `Собери все монетки: ${coinsGot} из ${coinsTotal}`);
+
   let id = parseInt(b.id || '0', 10);
   let l = id > 0 ? db.levels[id] : null;
 
@@ -482,10 +603,13 @@ route('POST', '/api/levels', async (req, res) => {
   l.version = (l.version | 0) + 1;
   l.updated = now();
 
+  l.coins = coinsTotal;
+
   fs.writeFileSync(path.join(DATA_DIR, l.id + '.gdl'), data);
+  const freed = trimLevels();           // место кончилось — убрали самые ненужные
   save.levels();
   save.state();
-  ok(res, levelPub(l));
+  ok(res, Object.assign(levelPub(l), freed ? { trimmed: freed } : {}));
 });
 
 route('POST', '/api/levels/:id/like', async (req, res, p) => {
@@ -494,6 +618,7 @@ route('POST', '/api/levels/:id/like', async (req, res, p) => {
   if (!l) return bad(res, 'Уровень не найден', 404);
   const b = await readBody(req);
   l.likes = Math.max(0, (l.likes | 0) + (b.like === false ? -1 : 1));
+  bumpWeek(l, 'likes');
   save.levels();
   ok(res, levelPub(l));
 });
@@ -508,6 +633,7 @@ route('POST', '/api/levels/:id/complete', async (req, res, p) => {
   const coins = Math.max(0, Math.min(3, parseInt(b.coins || '0', 10)));
 
   l.plays = (l.plays | 0) + 1;
+  bumpWeek(l, 'plays');
   save.levels();
 
   if (u) {
@@ -527,8 +653,15 @@ route('POST', '/api/levels/:id/complete', async (req, res, p) => {
       u.stars = (u.stars | 0) + (DIFF_STARS[l.difficulty | 0] || 0);
       if (isDemon(l.difficulty | 0)) u.demons = (u.demons | 0) + 1;
     }
+    // монетки идут в рекорд только за чужие опубликованные уровни
+    const foreign = key(l.author) !== key(u.name);
     const gainCoins = Math.max(0, coins - (prev.coins | 0));
-    if (gainCoins) u.coins = (u.coins | 0) + gainCoins;
+    if (gainCoins && foreign) u.coins = (u.coins | 0) + gainCoins;
+
+    // собранные шары (orbs) — тоже рекорд
+    const orbs = Math.max(0, parseInt(b.orbs || '0', 10));
+    if (orbs) u.orbs = (u.orbs | 0) + orbs;
+
     save.users(); save.scores();
   }
   ok(res, levelPub(l));
@@ -550,6 +683,123 @@ route('POST', '/api/levels/:id/delete', (req, res, p) => {
   try { fs.unlinkSync(path.join(DATA_DIR, p.id + '.gdl')); } catch {}
   save.levels(); save.scores();
   ok(res);
+});
+
+
+// ---------- чаты и поддержка ----------
+
+/** Список моих переписок: друзья, игроки и поддержка. */
+route('GET', '/api/chats', (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const me = key(u.name);
+  const list = [];
+  for (const t of Object.values(db.chats)) {
+    const mine = t.key === 'support:' + me
+      || (t.key.startsWith('dm:') && t.key.slice(3).split('|').includes(me))
+      || (u.admin && t.key.startsWith('support:'));
+    if (!mine || !t.messages.length) continue;
+
+    const last = t.messages[t.messages.length - 1];
+    let peer;
+    if (t.key.startsWith('support:')) {
+      const who = t.key.slice('support:'.length);
+      peer = (who === me && !u.admin) ? SUPPORT : (who === me ? SUPPORT : who);
+      if (u.admin && who !== me) peer = who;
+    } else {
+      peer = t.key.slice(3).split('|').find(x => x !== me) || me;
+    }
+    const seen = t.read[me] | 0;
+    list.push({
+      peer, support: t.key.startsWith('support:'),
+      last: last.text, lastFrom: last.from, at: last.at,
+      unread: t.messages.filter(m => m.id > seen && key(m.from) !== me).length
+    });
+  }
+  list.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  ok(res, list);
+});
+
+/** Переписка с игроком; peer = SUPPORT — переписка с поддержкой. */
+route('GET', '/api/chats/:peer', (req, res, p) => {
+  const u = requireUser(req, res); if (!u) return;
+  let peer = decodeURIComponent(p.peer);
+  // админ открывает ветку поддержки конкретного игрока по его имени
+  const t = (u.admin && key(peer) !== key(SUPPORT) && db.chats['support:' + key(peer)] && req.headers['x-support'] === '1')
+    ? db.chats['support:' + key(peer)]
+    : thread(u.name, peer);
+  t.read[key(u.name)] = t.messages.length ? t.messages[t.messages.length - 1].id : 0;
+  save.chats();
+  ok(res, { peer, messages: t.messages.slice(-200) });
+});
+
+/** Написать игроку или в поддержку. */
+route('POST', '/api/chats/:peer', async (req, res, p) => {
+  const u = requireUser(req, res); if (!u) return;
+  if (u.banned) return bad(res, 'Аккаунт заблокирован', 403);
+  const b = await readBody(req);
+  const text = String(b.text || '').trim();
+  if (!text) return bad(res, 'Пустое сообщение');
+
+  let peer = decodeURIComponent(p.peer);
+  if (key(peer) === key(SUPPORT)) {
+    chatSend(u.name, SUPPORT, text);
+    return ok(res);
+  }
+  if (!db.users[key(peer)]) return bad(res, 'Игрок не найден', 404);
+
+  // поддержка отвечает игроку от имени SUPPORT
+  if (u.admin && b.asSupport) {
+    const t = thread(SUPPORT, peer);
+    const m = { id: (t.messages.length ? t.messages[t.messages.length - 1].id : 0) + 1,
+                from: SUPPORT, to: peer, text: text.slice(0, 2000), at: now() };
+    t.messages.push(m);
+    save.chats();
+    return ok(res);
+  }
+  chatSend(u.name, db.users[key(peer)].name, text);
+  ok(res);
+});
+
+/** Все обращения в поддержку — для админки. */
+route('GET', '/api/admin/support', (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  if (!u.admin) return bad(res, 'Только для админа', 403);
+  const list = [];
+  for (const [k, t] of Object.entries(db.chats)) {
+    if (!k.startsWith('support:') || !t.messages.length) continue;
+    const last = t.messages[t.messages.length - 1];
+    list.push({
+      user: k.slice('support:'.length),
+      last: last.text, lastFrom: last.from, at: last.at,
+      count: t.messages.length,
+      waiting: key(last.from) !== key(SUPPORT)
+    });
+  }
+  list.sort((a, b) => (b.waiting - a.waiting) || String(b.at).localeCompare(String(a.at)));
+  ok(res, list);
+});
+
+// ---------- публикация ----------
+
+/** Снять свой уровень с публикации (файл и записи удаляются). */
+route('POST', '/api/levels/:id/unpublish', (req, res, p) => {
+  const u = requireUser(req, res); if (!u) return;
+  const l = db.levels[p.id];
+  if (!l) return bad(res, 'Уровень не найден', 404);
+  if (key(l.author) !== key(u.name) && !u.admin) return bad(res, 'Это не твой уровень', 403);
+  delete db.levels[p.id];
+  delete db.scores[p.id];
+  delete db.comments[p.id];
+  try { fs.unlinkSync(path.join(DATA_DIR, p.id + '.gdl')); } catch {}
+  save.levels(); save.scores(); save.comments();
+  ok(res, { ok: true, unpublished: Number(p.id) });
+});
+
+/** Сколько места занято уровнями. */
+route('GET', '/api/storage', (req, res) => {
+  const used = levelsBytes();
+  ok(res, { usedMb: Math.round(used / 1048576), limitMb: MAX_LEVEL_MB,
+            levels: Object.keys(db.levels).length });
 });
 
 // ---------- daily / weekly / offline ----------

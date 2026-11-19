@@ -63,10 +63,11 @@ namespace GEO_DASH.UI
         {
             var lv = _levels[_index];
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone(), practice))
-                f.ShowDialog(this);
-            PlayPreview();
-            Content.Invalidate();
+            Nav.Go(new GameForm(lv.DeepClone(), practice), () =>
+            {
+                PlayPreview();
+                Content.Invalidate();
+            });
         }
 
         protected override void OnRender(Graphics g)

@@ -41,6 +41,7 @@ namespace GEO_DASH.UI
                 return b;
             }
 
+            B("ОБ УРОВНЕ", GdIcon.Info, Color.FromArgb(150, 200, 255), Color.FromArgb(35, 95, 185), (s, e) => Info());
             B("ИГРАТЬ", GdIcon.Play, Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100), (s, e) => Play(false));
             B("ТРЕНИРОВКА", GdIcon.Check, Color.FromArgb(120, 190, 255), Color.FromArgb(30, 90, 190), (s, e) => Play(true));
 
@@ -59,8 +60,7 @@ namespace GEO_DASH.UI
                     {
                         var lv = Sel;
                         if (lv == null || lv.Settings.ServerId <= 0) { _msg = "Уровень не с сервера"; Content.Invalidate(); return; }
-                        using var f = new CommentsForm(lv.Settings.ServerId, lv.Settings.Name);
-                        f.ShowDialog(this);
+                        Nav.Go(new CommentsForm(lv.Settings.ServerId, lv.Settings.Name));
                     });
                 B("КОПИЯ В МОИ", GdIcon.Copy, Color.FromArgb(160, 170, 210), Color.FromArgb(70, 80, 130), (s, e) => CopyToMine());
                 B("ОБНОВИТЬ С СЕРВЕРА", GdIcon.Refresh, Color.FromArgb(120, 220, 255), Color.FromArgb(20, 110, 180), async (s, e) => await Redownload());
@@ -88,7 +88,8 @@ namespace GEO_DASH.UI
                     Level = _data[i], Width = Math.Max(400, w), Height = 112,
                     Margin = new Padding(2, 2, 2, 6), Selected = i == _index
                 };
-                card.Click += (s, e) => { Select(idx); };
+                // клик по уровню открывает его карточку — как в игре
+                card.Click += (s, e) => { Select(idx); Info(); };
                 card.DoubleClick += (s, e) => { Select(idx); Play(false); };
                 _cards.Add(card);
                 _list.Controls.Add(card);
@@ -110,12 +111,20 @@ namespace GEO_DASH.UI
 
         LevelData Sel => _index >= 0 && _index < _data.Count ? _data[_index] : null;
 
+        /// <summary>Карточка уровня: публикация, монетки, прогресс и комментарии.</summary>
+        void Info()
+        {
+            var lv = Sel;
+            if (lv == null) { _msg = "Выбери уровень"; Content.Invalidate(); return; }
+            Nav.Go(new PublicLevelInfoForm(lv, _mode == LevelListMode.My), () => { Reload(); Content.Invalidate(); });
+        }
+
         void Play(bool practice)
         {
             var lv = Sel;
             if (lv == null) return;
             MusicPlayer.Stop();
-            using (var f = new GameForm(lv.DeepClone(), practice)) f.ShowDialog(this);
+            Nav.Go(new GameForm(lv.DeepClone(), practice));
             Reload();
         }
 
@@ -125,7 +134,7 @@ namespace GEO_DASH.UI
             lv.Settings.Name = "Уровень " + (LocalStore.MyLevels().Count + 1);
             lv.Settings.Author = AppConfig.Settings.UserName;
             LocalStore.SaveMyLevel(lv);
-            using (var f = new EditorForm(lv)) f.ShowDialog(this);
+            Nav.Go(new EditorForm(lv));
             Reload();
         }
 
@@ -133,7 +142,7 @@ namespace GEO_DASH.UI
         {
             var lv = Sel;
             if (lv == null) return;
-            using (var f = new EditorForm(lv)) f.ShowDialog(this);
+            Nav.Go(new EditorForm(lv));
             Reload();
         }
 

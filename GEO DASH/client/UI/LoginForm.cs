@@ -70,7 +70,7 @@ namespace GEO_DASH.UI
 
         protected override void OnRender(Graphics g)
         {
-                        Header(g, "АККАУНТ", AppConfig.Settings.ServerHost + ":" + AppConfig.Settings.ServerPort);
+                        Header(g, "АККАУНТ", AppConfig.ServerLabel);
             using var f = Gd.Bold(11f);
             Gd.Outlined(g, "Имя", f, new RectangleF(60, 150, 90, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             Gd.Outlined(g, "Пароль", f, new RectangleF(60, 205, 90, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);

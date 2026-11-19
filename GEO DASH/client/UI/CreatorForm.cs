@@ -41,7 +41,7 @@ namespace GEO_DASH.UI
             Cell(2, 1, "USERS", GdIcon.Friends, Color.FromArgb(255, 150, 200), Color.FromArgb(160, 50, 110),
                 (s, e) => Open(new SearchForm(SearchMode.Users)), "поиск игроков");
             Cell(3, 1, "TOP", GdIcon.Profile, Color.FromArgb(160, 180, 230), Color.FromArgb(60, 80, 150),
-                (s, e) => Open(new SearchForm(SearchMode.Top)), "таблица лидеров");
+                (s, e) => Open(new RecordsForm()), "звёзды, демоны, монетки, шары");
 
             Cell(0, 2, "MY LEVELS", GdIcon.Edit, Color.FromArgb(255, 170, 60), Color.FromArgb(180, 90, 10),
                 (s, e) => Open(new EditorMenuForm()), "редактор уровней");
@@ -59,7 +59,7 @@ namespace GEO_DASH.UI
         void Open(Form f)
         {
             Audio.Sfx.Play("click");
-            using (f) f.ShowDialog(this);
+            Nav.Go(f);
             Content.Invalidate();
         }
 
