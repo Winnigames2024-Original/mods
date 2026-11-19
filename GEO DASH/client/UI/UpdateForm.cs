@@ -42,12 +42,9 @@ namespace GEO_DASH.UI
             Status("Скачиваю обновление с GitHub…");
 
             var prog = new Progress<string>(s => Status(s));
-            var timer = new System.Windows.Forms.Timer { Interval = 60 };
-            timer.Tick += (a, b) => { _bar = Math.Min(0.95, _bar + 0.012); Content.Invalidate(); };
-            timer.Start();
+            var pct = new Progress<double>(v => { _bar = v; Content.Invalidate(); });
 
-            bool ok = await Updater.DownloadAndApplyAsync(_info, prog);
-            timer.Stop();
+            bool ok = await Updater.DownloadAndApplyAsync(_info, prog, pct);
             _bar = 1;
 
             if (ok)

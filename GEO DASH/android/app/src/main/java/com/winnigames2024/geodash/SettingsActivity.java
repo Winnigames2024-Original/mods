@@ -53,6 +53,11 @@ public class SettingsActivity extends GdActivity {
                     if (fs != null) for (java.io.File f : fs) f.delete();
                     toast("Кэш очищен");
                 }));
+        btn("ОБНОВЛЕНИЕ", Ui.I_DOWNLOAD, Color.rgb(140, 200, 255), Color.rgb(30, 95, 190),
+                0.06f, 0.86f, 0.24f, 0.12f, () -> {
+                    toast("Проверяю обновление…");
+                    Updater.check(this, true);
+                });
         back(0.80f, 0.86f);
 
         text("Песни и уровни лежат в assets: songs, levels, saved, official",

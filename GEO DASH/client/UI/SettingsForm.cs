@@ -113,7 +113,8 @@ namespace GEO_DASH.UI
             }
             if (GdDialog.Confirm(this, "Обновление", $"Есть версия {info.version}. Обновить?"))
             {
-                if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(x => { _msg = x; Content.Invalidate(); })))
+                if (await Updater.DownloadAndApplyAsync(info, new Progress<string>(x => { _msg = x; Content.Invalidate(); }),
+                        new Progress<double>(_ => Content.Invalidate())))
                     Application.Exit();
             }
         }

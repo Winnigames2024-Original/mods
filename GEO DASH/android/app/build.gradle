@@ -9,14 +9,25 @@ android {
         applicationId "com.winnigames2024.geodash"
         minSdk 21
         targetSdk 34
-        versionCode 6
-        versionName "1.4.1"
+        versionCode 7
+        versionName "1.4.2"
+    }
+
+    // свой постоянный ключ в репозитории: подпись одинаковая у всех сборок,
+    // иначе телефон не даст поставить обновление поверх старой версии
+    signingConfigs {
+        geodash {
+            storeFile rootProject.file('geodash.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug      // подписываем debug-ключом, чтобы apk ставился
+            signingConfig signingConfigs.geodash
         }
     }
 

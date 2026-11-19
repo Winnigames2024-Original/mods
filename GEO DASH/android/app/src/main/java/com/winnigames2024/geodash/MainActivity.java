@@ -41,6 +41,7 @@ public class MainActivity extends GdActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        Updater.resumeInstall(this);   // вернулись из настроек — ставим скачанное обновление
         if (Music.currentId != -1) Music.play(-1, 0, 0.6f, true);
     }
 

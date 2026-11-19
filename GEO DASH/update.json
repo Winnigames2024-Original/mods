@@ -1,7 +1,7 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Версия игры мелким текстом снизу слева в главном меню; всё из 1.4.0",
+  "notes": "Автообновление: на ПК качает новый exe с процентами и сам подменяет файл, на телефоне качает apk, просит разрешение на установку и открывает установщик. Кнопка «ОБНОВЛЕНИЕ» в настройках.",
   "date": "2026-11-19"
 }

@@ -53,23 +53,74 @@ namespace GEO_DASH.Update
         }
 
         /// <summary>Качает новый exe рядом и подменяет его батником после выхода.</summary>
-        public static async Task<bool> DownloadAndApplyAsync(Info info, IProgress<string> prog = null)
+        public static async Task<bool> DownloadAndApplyAsync(Info info, IProgress<string> prog = null,
+                                                             IProgress<double> percent = null)
         {
             try
             {
                 string url = string.IsNullOrEmpty(info.exe)
-                    ? AppConfig.RawBase + "/client/GEO%20DASH.exe"
+                    ? AppConfig.RawBase + "/download/GEO_DASH.exe"
                     : info.exe;
 
                 prog?.Report("Скачиваю обновление…");
-                var bytes = await Http.GetByteArrayAsync(url);
-                if (bytes.Length < 100_000) { prog?.Report("Файл обновления повреждён"); return false; }
-
                 string exePath = Environment.ProcessPath ?? Application.ExecutablePath;
                 string dir = Path.GetDirectoryName(exePath)!;
                 string newPath = Path.Combine(dir, "GEO DASH.new.exe");
-                await File.WriteAllBytesAsync(newPath, bytes);
 
+                // качаем потоком, чтобы видеть проценты
+                using (var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        prog?.Report("Сервер обновлений ответил " + (int)resp.StatusCode);
+                        return false;
+                    }
+                    long total = resp.Content.Headers.ContentLength ?? 0;
+                    long done = 0;
+                    var buf = new byte[256 * 1024];
+
+                    await using var src = await resp.Content.ReadAsStreamAsync();
+                    await using (var dst = new FileStream(newPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        int n;
+                        var last = DateTime.MinValue;
+                        while ((n = await src.ReadAsync(buf)) > 0)
+                        {
+                            await dst.WriteAsync(buf.AsMemory(0, n));
+                            done += n;
+                            if (total > 0 && (DateTime.UtcNow - last).TotalMilliseconds > 120)
+                            {
+                                last = DateTime.UtcNow;
+                                double k = done / (double)total;
+                                percent?.Report(k);
+                                prog?.Report($"Скачиваю обновление… {k * 100:0}%  ({done / 1048576.0:0.0} из {total / 1048576.0:0.0} МБ)");
+                            }
+                        }
+                    }
+                    percent?.Report(1);
+                }
+
+                var fi = new FileInfo(newPath);
+                if (!fi.Exists || fi.Length < 1_000_000)
+                {
+                    prog?.Report("Файл обновления повреждён");
+                    try { File.Delete(newPath); } catch { }
+                    return false;
+                }
+
+                // это точно windows-программа? (подпись MZ в начале файла)
+                await using (var check = File.OpenRead(newPath))
+                {
+                    if (check.ReadByte() != 'M' || check.ReadByte() != 'Z')
+                    {
+                        prog?.Report("Скачался не тот файл — обновление отменено");
+                        check.Close();
+                        try { File.Delete(newPath); } catch { }
+                        return false;
+                    }
+                }
+
+                prog?.Report("Готовлю замену файла…");
                 string bat = Path.Combine(Path.GetTempPath(), "geodash_update.bat");
                 await File.WriteAllTextAsync(bat,
                     "@echo off\r\n" +

@@ -97,6 +97,81 @@ public class GdDialog {
 
     // ------------------------------------------------------------ окна
 
+    /** Окно с полосой загрузки — для обновления. */
+    public static class Progress {
+        final Activity a;
+        final FrameLayout overlay;
+        final TextView text;
+        final BarView bar;
+        boolean closed;
+
+        Progress(Activity a, FrameLayout overlay, TextView text, BarView bar) {
+            this.a = a; this.overlay = overlay; this.text = text; this.bar = bar;
+        }
+
+        /** k — доля от 0 до 1. */
+        public void update(final double k, final String msg) {
+            a.runOnUiThread(() -> {
+                if (closed) return;
+                bar.value = (float) Math.max(0, Math.min(1, k));
+                bar.invalidate();
+                if (msg != null) text.setText(msg);
+            });
+        }
+
+        public void close() {
+            a.runOnUiThread(() -> {
+                if (closed) return;
+                closed = true;
+                GdDialog.close(a, overlay);
+            });
+        }
+    }
+
+    static class BarView extends View {
+        float value;
+        BarView(Context c) { super(c); }
+
+        @Override protected void onDraw(Canvas c) {
+            RectF r = new RectF(0, 0, getWidth(), getHeight());
+            float rad = r.height() / 2;
+            c.drawRoundRect(r, rad, rad, Gd.fill(Color.argb(190, 10, 12, 26)));
+            float w = (r.width() - 6) * value;
+            if (w > 2) {
+                RectF f = new RectF(r.left + 3, r.top + 3, r.left + 3 + w, r.bottom - 3);
+                Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                p.setShader(new LinearGradient(0, f.top, 0, f.bottom,
+                        Color.rgb(140, 255, 170), Color.rgb(20, 170, 110), Shader.TileMode.CLAMP));
+                c.drawRoundRect(f, (r.height() - 6) / 2, (r.height() - 6) / 2, p);
+            }
+            c.drawRoundRect(r, rad, rad, Gd.stroke(Gd.INK, 3f));
+            Gd.outlined(c, (int) (value * 100) + "%", r.centerX(), r.centerY() + r.height() * 0.22f,
+                    r.height() * 0.6f, Gd.PAPER, Paint.Align.CENTER);
+        }
+    }
+
+    /** Показать окно с полосой загрузки. */
+    public static Progress progress(Activity a, String title, String message) {
+        FrameLayout overlay = open(a, title, "");
+        LinearLayout box = boxOf(overlay);
+
+        TextView t = new TextView(a);
+        t.setText(message);
+        t.setTextColor(Color.argb(235, 220, 230, 255));
+        t.setTextSize(15);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(0, 14, 0, 10);
+        box.addView(t);
+
+        BarView bar = new BarView(a);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 44);
+        lp.setMargins(0, 8, 0, 6);
+        box.addView(bar, lp);
+
+        return new Progress(a, overlay, t, bar);
+    }
+
     /** Сообщение с кнопками. */
     public static void message(Activity a, String title, String msg, String[] buttons, OnPick cb) {
         FrameLayout o = open(a, title, msg);
