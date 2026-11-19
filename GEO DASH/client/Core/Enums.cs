@@ -53,7 +53,9 @@ namespace GEO_DASH.Core
         Coin = 7,
         Slope = 8,
         Text = 9,
-        Finish = 10
+        Finish = 10,
+        /// <summary>Вода и лава — зоны, в которых куб плавает.</summary>
+        Liquid = 11
     }
 
     public enum PortalKind

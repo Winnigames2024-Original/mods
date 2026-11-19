@@ -288,6 +288,11 @@ namespace GEO_DASH.Render
                     using (var br = new SolidBrush(Color.FromArgb(Math.Min(90, a), col))) g.FillEllipse(br, r);
                     break;
 
+                case DrawStyle.Water:
+                case DrawStyle.Lava:
+                    DrawLiquid(g, r, def.Style == DrawStyle.Lava, a);
+                    break;
+
                 case DrawStyle.Text:
                     using (var br = new SolidBrush(Color.FromArgb(a, col)))
                     using (var f = new Font("Segoe UI", Math.Max(6f, r.Height * 0.6f), FontStyle.Bold))
@@ -604,6 +609,49 @@ namespace GEO_DASH.Render
         public static RectangleF Inflate(RectangleF r, float d)
         {
             var c = r; c.Inflate(d, d); return c;
+        }
+
+        /// <summary>Вода и лава: заливка, волна по поверхности и пузырьки.</summary>
+        static void DrawLiquid(Graphics g, RectangleF r, bool lava, int alpha)
+        {
+            if (r.Width < 1 || r.Height < 1) return;
+            double t = Environment.TickCount64 / 1000.0;
+
+            Color top = lava ? Color.FromArgb(255, 150, 40) : Color.FromArgb(90, 190, 255);
+            Color bottom = lava ? Color.FromArgb(170, 30, 10) : Color.FromArgb(20, 70, 180);
+            int a = Math.Clamp(alpha, 0, 255);
+
+            using (var br = new LinearGradientBrush(new RectangleF(r.X, r.Y - 1, r.Width, r.Height + 2),
+                       Color.FromArgb(a * (lava ? 230 : 170) / 255, top),
+                       Color.FromArgb(a * (lava ? 245 : 205) / 255, bottom), LinearGradientMode.Vertical))
+                g.FillRectangle(br, r);
+
+            // волна по верхней кромке
+            float amp = Math.Min(6f, r.Height * 0.12f);
+            var pts = new List<PointF>();
+            int seg = Math.Clamp((int)(r.Width / 12), 4, 64);
+            for (int i = 0; i <= seg; i++)
+            {
+                float x = r.X + r.Width * i / seg;
+                float y = r.Y + (float)(Math.Sin(t * (lava ? 1.6 : 2.4) + i * 0.6) * amp);
+                pts.Add(new PointF(x, y));
+            }
+            using (var pen = new Pen(Color.FromArgb(Math.Min(255, a), lava ? Color.FromArgb(255, 220, 120) : Color.FromArgb(200, 240, 255)),
+                       Math.Max(2f, r.Height * 0.06f)))
+                if (pts.Count > 1) g.DrawLines(pen, pts.ToArray());
+
+            // пузырьки
+            int bubbles = Math.Clamp((int)(r.Width / 40), 1, 10);
+            for (int i = 0; i < bubbles; i++)
+            {
+                double ph = (t * (lava ? 0.35 : 0.6) + i * 0.27) % 1.0;
+                float bx = r.X + r.Width * ((i * 0.37f + 0.12f) % 1f);
+                float by = r.Bottom - (float)(r.Height * ph);
+                float bs = Math.Max(2f, r.Height * (lava ? 0.09f : 0.06f));
+                using var br = new SolidBrush(Color.FromArgb((int)(a * 0.5 * (1 - ph)),
+                    lava ? Color.FromArgb(255, 230, 150) : Color.White));
+                g.FillEllipse(br, bx, by, bs, bs);
+            }
         }
 
         public static Color Blend(Color a, Color b, double k)

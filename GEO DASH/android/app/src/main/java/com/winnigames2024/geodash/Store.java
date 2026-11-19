@@ -41,7 +41,7 @@ public class Store {
 
     public static String host() { return prefs.getString("host", "166.1.161.200"); }
     public static int port() { return prefs.getInt("port", 37534); }
-    public static String site() { return prefs.getString("site", "http://geodash.winnigames2024.ru"); }
+    public static String site() { return prefs.getString("site", "https://geodash.winnigames2024.ru"); }
     public static String token() { return prefs.getString("token", ""); }
     public static String user() { return prefs.getString("user", ""); }
     public static boolean admin() { return user().equalsIgnoreCase("Winnigames2024") || prefs.getBoolean("admin", false); }

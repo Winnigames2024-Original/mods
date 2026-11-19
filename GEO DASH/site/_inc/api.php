@@ -70,7 +70,11 @@ function gd_head(string $title, string $active = '') {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= h($title) ?> — GEO DASH</title>
 <meta name="description" content="GEO DASH — ритм-платформер от Winnigames2024: уровни, редактор, друзья, daily и weekly. Скачать для Windows и Android.">
-<link rel="stylesheet" href="/assets/style.css?v=3">
+<link rel="stylesheet" href="/assets/style.css?v=5">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/assets/icon.png">
+<link rel="apple-touch-icon" href="/assets/icon.png">
+<meta name="theme-color" content="#287dff">
 </head>
 <body>
 <header class="top"><div class="container nav">

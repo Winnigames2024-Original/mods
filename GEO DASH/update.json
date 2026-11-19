@@ -1,7 +1,7 @@
 {
-  "version": "1.4.2",
+  "version": "1.5.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Автообновление: на ПК качает новый exe с процентами и сам подменяет файл, на телефоне качает apk, просит разрешение на установку и открывает установщик. Кнопка «ОБНОВЛЕНИЕ» в настройках.",
+  "notes": "Вода, в которой плаваешь, и лава: больше пяти секунд в ней — сгораешь. Сайт в стиле игры, HTTPS в install.sh, иконка сайта.",
   "date": "2026-11-19"
 }

@@ -107,13 +107,24 @@ public class Updater {
 
     /** Скачивание файла с процентами. */
     static boolean fetchTo(String url, File out, GdDialog.Progress bar) {
+        return fetchTo(url, out, bar, 0);
+    }
+
+    static boolean fetchTo(String url, File out, GdDialog.Progress bar, int hop) {
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(url).openConnection();
             c.setConnectTimeout(10000);
             c.setReadTimeout(120000);
             c.setInstanceFollowRedirects(true);
-            if (c.getResponseCode() >= 400) return false;
+            int code = c.getResponseCode();
+            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                String to = c.getHeaderField("Location");
+                c.disconnect();
+                if (to == null || hop >= 4) return false;
+                return fetchTo(new URL(new URL(url), to).toString(), out, bar, hop + 1);
+            }
+            if (code >= 400) return false;
             int total = c.getContentLength();
             InputStream in = c.getInputStream();
             FileOutputStream os = new FileOutputStream(out);

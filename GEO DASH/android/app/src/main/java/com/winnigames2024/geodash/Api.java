@@ -209,11 +209,23 @@ public class Api {
     }
 
     public static byte[] fetchBytes(String url) {
+        return fetchBytes(url, 0);
+    }
+
+    static byte[] fetchBytes(String url, int hop) {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setConnectTimeout(8000);
             c.setReadTimeout(60000);
-            if (c.getResponseCode() >= 400) return null;
+            int code = c.getResponseCode();
+            // http -> https сам java не переходит, идём руками
+            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                String to = c.getHeaderField("Location");
+                c.disconnect();
+                if (to == null || hop >= 4) return null;
+                return fetchBytes(new URL(new URL(url), to).toString(), hop + 1);
+            }
+            if (code >= 400) return null;
             InputStream in = c.getInputStream();
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             byte[] buf = new byte[16384];

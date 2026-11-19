@@ -204,7 +204,7 @@ namespace GEO_DASH.UI
             _content.Controls.Add(_palette);
             _palette.BringToFront();
 
-            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное", "Конструкции" })
+            foreach (var cat in new[] { "Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Сбор", "Триггеры", "Служебное", "Конструкции" })
             {
                 string c = cat;
                 var b = new GdButton

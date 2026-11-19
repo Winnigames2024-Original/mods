@@ -180,7 +180,7 @@ public class EditorCanvasActivity extends Activity {
         panel.addView(tabsScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, (int) (H * 0.10f)));
 
-        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Сбор", "Триггеры", "Служебное", "Конструкции"};
+        String[] cats = {"Блоки", "Шипы", "Порталы", "Шары и пады", "Декор", "Жидкости", "Сбор", "Триггеры", "Служебное", "Конструкции"};
         for (String c : cats) {
             final String cc = c;
             Ui.GdBtn b = new Ui.GdBtn(this).set(c, Ui.I_NONE,
@@ -365,6 +365,18 @@ public class EditorCanvasActivity extends Activity {
                 p.moveTo(box.left, box.bottom); p.lineTo(box.right, box.bottom); p.lineTo(box.centerX(), box.top);
                 p.close();
                 c.drawPath(p, Gd.fill(Color.rgb(150, 160, 230)));
+                break;
+            }
+            case Catalog.ST_WATER:
+            case Catalog.ST_LAVA: {
+                boolean lava = d.style == Catalog.ST_LAVA;
+                Paint lp = new Paint(Paint.ANTI_ALIAS_FLAG);
+                lp.setShader(new LinearGradient(0, box.top, 0, box.bottom,
+                        lava ? Color.rgb(255, 150, 40) : Color.rgb(90, 190, 255),
+                        lava ? Color.rgb(170, 30, 10) : Color.rgb(20, 70, 180), Shader.TileMode.CLAMP));
+                c.drawRect(box, lp);
+                c.drawLine(box.left, box.top + 3, box.right, box.top + 3,
+                        Gd.stroke(lava ? Color.rgb(255, 220, 120) : Color.rgb(200, 240, 255), 2.4f));
                 break;
             }
             case Catalog.ST_GLOW:
@@ -926,6 +938,11 @@ public class EditorCanvasActivity extends Activity {
             ITEMS.add(new Item(7, "платформа", "Блоки"));
             ITEMS.add(new Item(5, "склон ↗", "Блоки"));
             ITEMS.add(new Item(6, "склон ↘", "Блоки"));
+
+            ITEMS.add(new Item(94, "вода", "Жидкости"));
+            ITEMS.add(new Item(95, "вода XL", "Жидкости"));
+            ITEMS.add(new Item(96, "лава", "Жидкости"));
+            ITEMS.add(new Item(97, "лава XL", "Жидкости"));
 
             ITEMS.add(new Item(20, "шип", "Шипы"));
             ITEMS.add(new Item(21, "малый", "Шипы"));

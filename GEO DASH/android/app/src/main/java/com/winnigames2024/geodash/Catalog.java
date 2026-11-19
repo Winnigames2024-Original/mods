@@ -6,13 +6,14 @@ import android.util.SparseArray;
 public final class Catalog {
 
     public static final int BLOCK = 0, HAZARD = 1, PORTAL = 2, ORB = 3, PAD = 4,
-            TRIGGER = 5, DECO = 6, COIN = 7, SLOPE = 8, TEXT = 9, FINISH = 10;
+            TRIGGER = 5, DECO = 6, COIN = 7, SLOPE = 8, TEXT = 9, FINISH = 10, LIQUID = 11;
 
     public static final int ST_BLOCK = 0, ST_SLAB = 1, ST_PLATFORM = 2, ST_BRICK = 3, ST_GLASS = 4,
             ST_SLOPE_UP = 5, ST_SLOPE_DOWN = 6, ST_SPIKE = 7, ST_SPIKE_SMALL = 8, ST_SPIKE_HALF = 9,
             ST_SAW = 10, ST_SAW_BIG = 11, ST_SPIKE_ROW = 12, ST_HAZARD_BLOCK = 13, ST_ORB = 14,
             ST_PAD = 15, ST_PORTAL = 16, ST_DECO = 17, ST_CIRCLE = 18, ST_TRI = 19, ST_GLOW = 20,
-            ST_TEXT = 21, ST_COIN = 22, ST_PICKUP = 23, ST_FINISH = 24, ST_CHECKPOINT = 25, ST_TRIGGER = 26;
+            ST_TEXT = 21, ST_COIN = 22, ST_PICKUP = 23, ST_FINISH = 24, ST_CHECKPOINT = 25, ST_TRIGGER = 26,
+            ST_WATER = 27, ST_LAVA = 28;
 
     public static class Def {
         public int id, kind, style;
@@ -64,6 +65,12 @@ public final class Catalog {
 
         add(new Def(80, COIN, ST_COIN).hit(-2, -2, 34, 34));
         add(new Def(82, COIN, ST_PICKUP).hit(-2, -2, 34, 34));
+
+        // вода и лава: в них плавают, в лаве горят
+        add(new Def(94, LIQUID, ST_WATER));
+        add(new Def(95, LIQUID, ST_WATER).size(300, 120).hit(0, 0, 300, 120));
+        add(new Def(96, LIQUID, ST_LAVA));
+        add(new Def(97, LIQUID, ST_LAVA).size(300, 120).hit(0, 0, 300, 120));
 
         add(new Def(90, FINISH, ST_FINISH).size(30, 300).hit(0, 0, 30, 300));
         add(new Def(92, DECO, ST_CHECKPOINT).size(30, 120).hit(0, 0, 30, 120));

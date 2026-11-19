@@ -19,6 +19,9 @@ APP="/opt/geodash"
 WEB="/var/www/geodash"
 DATA="/var/lib/geodash"
 SUBDIR="GEO DASH"
+# HTTPS: ставится сам сертификат Let's Encrypt. Выключить: GEODASH_SSL=off
+SSL="${GEODASH_SSL:-on}"
+SSL_EMAIL="${GEODASH_EMAIL:-admin@winnigames2024.ru}"
 
 say() { echo -e "\033[1;36m==>\033[0m $*"; }
 
@@ -137,9 +140,36 @@ server {
 NGINX
 
 ln -sf /etc/nginx/sites-available/geodash /etc/nginx/sites-enabled/geodash
+
+# если домен занят другим сайтом — скажем об этом прямо
+CONFLICT="$(grep -rl "server_name[^;]*$DOMAIN" /etc/nginx/sites-enabled/ 2>/dev/null | grep -v "/geodash$" || true)"
+if [ -n "$CONFLICT" ]; then
+  say "ВНИМАНИЕ: домен $DOMAIN уже прописан в: $CONFLICT"
+  say "Отключаю эти конфиги, чтобы домен открывал GEO DASH (файлы остаются в sites-available)"
+  for c in $CONFLICT; do rm -f "$c"; done
+fi
+
 nginx -t
 systemctl reload nginx
 systemctl enable nginx >/dev/null 2>&1 || true
+
+# ---------------------------------------------------------------- https
+SCHEME="http"
+if [ "$SSL" = "on" ]; then
+  say "Включаю HTTPS (Let's Encrypt) для $DOMAIN…"
+  apt-get install -y certbot python3-certbot-nginx >/dev/null 2>&1 || true
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect \
+       -m "$SSL_EMAIL" >/tmp/geodash-certbot.log 2>&1; then
+    SCHEME="https"
+    say "Сертификат получен, http отправляет на https"
+    systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+  else
+    say "Сертификат не выдали (подробности: /tmp/geodash-certbot.log). Сайт работает по http."
+    say "Частые причины: A-запись домена ещё не на этот сервер или закрыт порт 80."
+  fi
+  # install.sh и песни должны открываться и без шифрования
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+fi
 
 # ---------------------------------------------------------------- автообновление
 say "Включаю автообновление каждые 5 минут…"
@@ -179,8 +209,8 @@ echo
 echo "================================================================"
 echo "  GEO DASH установлен"
 echo "----------------------------------------------------------------"
-echo "  Сайт:        http://$DOMAIN/            (это и есть /geodash/index.php)"
-echo "  Скачать:     http://$DOMAIN/download/"
+echo "  Сайт:        $SCHEME://$DOMAIN/            (это и есть /geodash/index.php)"
+echo "  Скачать:     $SCHEME://$DOMAIN/download/"
 echo "  API:         http://$(curl -fsS --max-time 4 ifconfig.me || echo SERVER_IP):$API_PORT/api/ping"
 echo "  Проверка:    $API_OK"
 echo "  Админ:       Winnigames2024 (зарегистрируй это имя — права выдадутся сами)"
@@ -190,6 +220,10 @@ echo "  Сервис:      systemctl status geodash"
 echo "  Логи:        journalctl -u geodash -f"
 echo "  Обновление:  каждые 5 минут (systemctl status geodash-update.timer)"
 echo
-echo "  HTTPS:       apt-get install -y certbot python3-certbot-nginx && certbot --nginx -d $DOMAIN"
+if [ "$SCHEME" = "https" ]; then
+echo "  HTTPS:       включён, сертификат продлевается сам (certbot.timer)"
+else
+echo "  HTTPS:       повторить:  certbot --nginx -d $DOMAIN --redirect -m $SSL_EMAIL"
+fi
 echo "  DNS:         A-запись  geodash -> IP этого сервера"
 echo "================================================================"

@@ -5,7 +5,7 @@ namespace GEO_DASH.Core
         Block, Slab, Platform, Brick, Glass, SlopeUp, SlopeDown,
         Spike, SpikeSmall, SpikeHalf, Saw, SawBig, SpikeRow, HazardBlock,
         Orb, Pad, Portal, Deco, DecoCircle, DecoTri, Glow, Text,
-        Coin, Pickup, Finish, Checkpoint, Trigger, Teleport
+        Coin, Pickup, Finish, Checkpoint, Trigger, Teleport, Water, Lava
     }
 
     public class ObjectDef
@@ -79,6 +79,16 @@ namespace GEO_DASH.Core
             Add(new ObjectDef { Id = 82, Name = "Пикап (предмет)", Category = "Сбор", Kind = ObjKind.Coin, Style = DrawStyle.Pickup, Hx = -2, Hy = -2, Hw = 34, Hh = 34 });
 
             // ---------- служебное ----------
+            // ---------- жидкости ----------
+            Add(new ObjectDef { Id = 94, Name = "Вода", Category = "Жидкости", Kind = ObjKind.Liquid, Style = DrawStyle.Water,
+                W = 30, H = 30, Hw = 30, Hh = 30, WormPhase = true });
+            Add(new ObjectDef { Id = 95, Name = "Вода (широкая)", Category = "Жидкости", Kind = ObjKind.Liquid, Style = DrawStyle.Water,
+                W = 300, H = 120, Hw = 300, Hh = 120, WormPhase = true });
+            Add(new ObjectDef { Id = 96, Name = "Лава", Category = "Жидкости", Kind = ObjKind.Liquid, Style = DrawStyle.Lava,
+                W = 30, H = 30, Hw = 30, Hh = 30, WormPhase = true });
+            Add(new ObjectDef { Id = 97, Name = "Лава (широкая)", Category = "Жидкости", Kind = ObjKind.Liquid, Style = DrawStyle.Lava,
+                W = 300, H = 120, Hw = 300, Hh = 120, WormPhase = true });
+
             Add(new ObjectDef { Id = 90, Name = "Финиш", Category = "Служебное", Kind = ObjKind.Finish, Style = DrawStyle.Finish, W = 30, H = 300, Hw = 30, Hh = 300 });
             Add(new ObjectDef { Id = 92, Name = "Чекпоинт", Category = "Служебное", Kind = ObjKind.Deco, Style = DrawStyle.Checkpoint, W = 30, H = 120, Hw = 30, Hh = 120 });
 

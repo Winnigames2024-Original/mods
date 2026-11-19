@@ -185,6 +185,8 @@ namespace GEO_DASH.Core
             if (NoClipCheat) return;
             Dead = true;
             DeathTimer = 0;
+            P1.LavaTime = 0; P1.InLava = false; P1.InLiquid = false;
+            P2.LavaTime = 0; P2.InLava = false; P2.InLiquid = false;
             Sfx?.Invoke("death");
             Trig.FireOnDeath();
             OnDeathEvent?.Invoke();
@@ -248,6 +250,19 @@ namespace GEO_DASH.Core
             ResolveSolids(p, prevX, prevY);
             ResolveBounds(p);
             TouchObjects(p, inp);
+
+            // в лаве можно пробыть пять секунд, потом сгораешь
+            if (p.InLava)
+            {
+                bool first = p.LavaTime <= 0;
+                p.LavaTime += dt;
+                if (first) Sfx?.Invoke("orb");
+                if (p.LavaTime >= Phys.LavaSeconds) { Die(p); return; }
+            }
+            else if (p.LavaTime > 0)
+            {
+                p.LavaTime = Math.Max(0, p.LavaTime - dt * 0.8);
+            }
             p.UpdateRotation(dt);
 
             if (p.Mode == GameMode.Wave && p.TrailOn)
@@ -432,6 +447,8 @@ namespace GEO_DASH.Core
         {
             var box = p.Box;
             var inner = p.InnerBox;
+            p.InLiquid = false;
+            p.InLava = false;
             foreach (var i in new List<int>(Candidates(box)))
             {
                 var o = Level.Objects[i];
@@ -442,6 +459,15 @@ namespace GEO_DASH.Core
 
                 switch (d.Kind)
                 {
+                    case ObjKind.Liquid:
+                        // вода и лава: плаваем; в лаве ещё и горим
+                        if (r.IntersectsWith(inner))
+                        {
+                            p.InLiquid = true;
+                            if (d.Style == DrawStyle.Lava) p.InLava = true;
+                        }
+                        break;
+
                     case ObjKind.Hazard:
                         if (r.IntersectsWith(inner)) { Die(p); return; }
                         break;

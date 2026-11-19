@@ -14,6 +14,8 @@ public class Engine {
     // ------------------------------------------------------------ константы
 
     static final double CUBE_G = 2800, CUBE_JUMP = 661;
+    // плавание: тянет слабее, зажатая кнопка гребёт вверх; в лаве живём пять секунд
+    static final double SWIM_G = 0.34, SWIM_PUSH = 1750, SWIM_MAX = 340, LAVA_SECONDS = 5.0;
     static final double BALL_G = 2500, BALL_MAX = 1100;
     static final double SHIP_G = 1500, SHIP_THRUST = 3000, SHIP_MAX = 520;
     static final double UFO_G = 2300, UFO_JUMP = 520;
@@ -27,6 +29,9 @@ public class Engine {
         public double x, y, vy, rotation, gravityMul = 1, wormBurrow, spiderFlash, robotHold;
         public int gravityDir = 1, mode = Gd.CUBE, speed = 1, index;
         public boolean mini, mirror, onGround, onCeiling, hidden, noClipWorm, robotJumping, trailOn = true;
+        /** В воде или лаве — плавает; в лаве ещё и горит. */
+        public boolean inLiquid, inLava;
+        public double lavaTime;
         public final List<float[]> waveTrail = new ArrayList<>();
 
         public double size() { return 30 * (mini ? 0.6 : 1.0); }
@@ -271,6 +276,16 @@ public class Engine {
         resolveSolids(p, prevY);
         resolveBounds(p);
         touchObjects(p, pressed);
+
+        // в лаве можно пробыть пять секунд, потом сгораешь
+        if (p.inLava) {
+            if (p.lavaTime <= 0) sfx("orb");
+            p.lavaTime += dt;
+            if (p.lavaTime >= LAVA_SECONDS) { die(); return; }
+        } else if (p.lavaTime > 0) {
+            p.lavaTime = Math.max(0, p.lavaTime - dt * 0.8);
+        }
+
         updateRotation(p, dt);
 
         if (p.mode == Gd.WAVE && p.trailOn) {
@@ -281,6 +296,25 @@ public class Engine {
 
     void integrate(Player p, double dt, boolean hold, boolean pressed) {
         double g = -p.gravity() * p.gravityDir;
+
+        // ---- в воде и лаве плывём
+        if (p.inLiquid) {
+            p.vy += g * SWIM_G * dt;
+            if (p.mode == Gd.WORM && pressed) {
+                p.gravityDir = -p.gravityDir;
+                p.vy = 0;
+            } else if (p.mode == Gd.BALL && pressed && (p.onGround || p.onCeiling)) {
+                p.gravityDir = -p.gravityDir;
+                p.vy = 0;
+                p.onGround = p.onCeiling = false;
+            } else if (hold) {
+                p.vy += SWIM_PUSH * p.gravityDir * dt;
+            }
+            double lim = p.mode == Gd.WAVE ? SWIM_MAX * 0.8 : SWIM_MAX;
+            p.vy = clamp(p.vy, -lim, lim);
+            return;
+        }
+
         switch (p.mode) {
             case Gd.CUBE:
                 p.vy += g * dt;
@@ -502,6 +536,8 @@ public class Engine {
 
     void touchObjects(Player p, boolean pressed) {
         RectF box = p.box(), inner = p.inner();
+        p.inLiquid = false;
+        p.inLava = false;
         for (int i : new ArrayList<>(candidates(box))) {
             Level.Obj o = level.objects.get(i);
             ObjState s = st[i];
@@ -510,6 +546,12 @@ public class Engine {
             RectF r = objHit(i);
 
             switch (d.kind) {
+                case Catalog.LIQUID:
+                    if (hit(r, inner)) {
+                        p.inLiquid = true;
+                        if (d.style == Catalog.ST_LAVA) p.inLava = true;
+                    }
+                    break;
                 case Catalog.HAZARD:
                     if (hit(r, inner)) { die(); return; }
                     break;
@@ -943,6 +985,8 @@ public class Engine {
     void die() {
         if (dead || finished || noclip) return;
         dead = true; deathTimer = 0;
+        p1.lavaTime = 0; p1.inLava = false; p1.inLiquid = false;
+        p2.lavaTime = 0; p2.inLava = false; p2.inLiquid = false;
         sfx("death");
         for (Level.Trig t : new ArrayList<>(onDeathTrigs)) if (t.targetGroup != 0) fireGroup(t.targetGroup);
         if (listener != null) listener.onDeath();

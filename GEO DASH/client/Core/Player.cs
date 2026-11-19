@@ -19,6 +19,13 @@ namespace GEO_DASH.Core
         public const double CubeGravity = 2800;
         public const double CubeJump = 661;
 
+        // плавание: тянет слабее, зажатая кнопка гребёт вверх
+        public const double SwimGravityScale = 0.34;
+        public const double SwimPush = 1750;
+        public const double SwimMaxV = 340;
+        /// <summary>Сколько можно пробыть в лаве.</summary>
+        public const double LavaSeconds = 5.0;
+
         public const double BallGravity = 2500;
         public const double BallMaxFall = 1100;
 
@@ -62,6 +69,12 @@ namespace GEO_DASH.Core
         public bool Dead;
         public bool Hidden;
         public bool NoClipWorm;         // текущий тик червяк внутри блока
+        /// <summary>Игрок в воде или лаве — плавает.</summary>
+        public bool InLiquid;
+        /// <summary>Игрок в лаве: больше пяти секунд — сгорает.</summary>
+        public bool InLava;
+        /// <summary>Сколько секунд уже в лаве.</summary>
+        public double LavaTime;
         public bool OnGround;
         public bool OnCeiling;
         public double Rotation;
@@ -130,6 +143,32 @@ namespace GEO_DASH.Core
         public void Integrate(double dt, PlayerInput inp, ref SpiderRequest spider)
         {
             double g = -Gravity * GravityDir;
+
+            // ---- в воде и лаве плывём: всё плавное, клик гребёт вверх
+            if (InLiquid)
+            {
+                VY += g * Phys.SwimGravityScale * dt;
+
+                if (Mode == GameMode.Worm && inp.Pressed)
+                {
+                    GravityDir = -GravityDir;
+                    VY = 0;
+                }
+                else if (Mode == GameMode.Ball && inp.Pressed && (OnGround || OnCeiling))
+                {
+                    GravityDir = -GravityDir;
+                    VY = 0;
+                    OnGround = OnCeiling = false;
+                }
+                else if (inp.Hold)
+                {
+                    VY += Phys.SwimPush * GravityDir * dt;
+                }
+
+                VY = Clamp(VY, -Phys.SwimMaxV, Phys.SwimMaxV);
+                if (Mode == GameMode.Wave) VY = Clamp(VY, -Phys.SwimMaxV * 0.8, Phys.SwimMaxV * 0.8);
+                return;
+            }
 
             switch (Mode)
             {

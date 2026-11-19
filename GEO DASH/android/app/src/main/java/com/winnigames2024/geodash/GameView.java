@@ -442,6 +442,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             case Catalog.ST_GLOW:
                 c.drawOval(r, Gd.fill(Color.argb(Math.min(90, alpha), Color.red(col), Color.green(col), Color.blue(col))));
                 break;
+            case Catalog.ST_WATER:
+            case Catalog.ST_LAVA:
+                drawLiquid(c, r, d.style == Catalog.ST_LAVA, alpha);
+                break;
             case Catalog.ST_TEXT:
                 Gd.outlined(c, o.text, r.left, r.bottom, Math.max(10f, r.height() * 0.8f), col, Paint.Align.LEFT);
                 break;
@@ -650,6 +654,44 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         c.restore();
     }
 
+    /** Вода и лава: заливка, волна по поверхности и пузырьки. */
+    static void drawLiquid(Canvas c, RectF r, boolean lava, int alpha) {
+        if (r.width() < 1 || r.height() < 1) return;
+        double t = System.currentTimeMillis() / 1000.0;
+        int a = Math.max(0, Math.min(255, alpha));
+
+        int top = lava ? Color.rgb(255, 150, 40) : Color.rgb(90, 190, 255);
+        int bot = lava ? Color.rgb(170, 30, 10) : Color.rgb(20, 70, 180);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setShader(new LinearGradient(0, r.top, 0, r.bottom,
+                Color.argb(a * (lava ? 230 : 170) / 255, Color.red(top), Color.green(top), Color.blue(top)),
+                Color.argb(a * (lava ? 245 : 205) / 255, Color.red(bot), Color.green(bot), Color.blue(bot)),
+                Shader.TileMode.CLAMP));
+        c.drawRect(r, p);
+
+        float amp = Math.min(6f, r.height() * 0.12f);
+        int seg = (int) Math.max(4, Math.min(48, r.width() / 12));
+        Path wave = new Path();
+        for (int i = 0; i <= seg; i++) {
+            float x = r.left + r.width() * i / seg;
+            float y = r.top + (float) (Math.sin(t * (lava ? 1.6 : 2.4) + i * 0.6) * amp);
+            if (i == 0) wave.moveTo(x, y); else wave.lineTo(x, y);
+        }
+        c.drawPath(wave, Gd.stroke(lava ? Color.rgb(255, 220, 120) : Color.rgb(200, 240, 255),
+                Math.max(2f, r.height() * 0.06f)));
+
+        int bubbles = (int) Math.max(1, Math.min(8, r.width() / 40));
+        for (int i = 0; i < bubbles; i++) {
+            double ph = (t * (lava ? 0.35 : 0.6) + i * 0.27) % 1.0;
+            float bx = r.left + r.width() * (((i * 0.37f) + 0.12f) % 1f);
+            float by = r.bottom - (float) (r.height() * ph);
+            float bs = Math.max(2f, r.height() * (lava ? 0.09f : 0.06f));
+            int bc = lava ? Color.rgb(255, 230, 150) : Color.WHITE;
+            c.drawCircle(bx, by, bs / 2, Gd.fill(Color.argb((int) (a * 0.5 * (1 - ph)),
+                    Color.red(bc), Color.green(bc), Color.blue(bc))));
+        }
+    }
+
     void drawHud(Canvas c, int W, int H) {
         hit.clear();
 
@@ -709,6 +751,25 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                         mr.right + 12 + i * fs * 1.1f + fs * 0.9f, mr.bottom + fs * 1.9f), true);
         if (!Api.online)
             Gd.outlined(c, "ОФЛАЙН", W - 16, fs * 1.4f, fs * 0.62f, Gd.GOLD, Paint.Align.RIGHT);
+
+        // в лаве — обратный отсчёт до смерти
+        if (eng.p1.lavaTime > 0.05) {
+            float lw = Math.min(420, W * 0.34f);
+            RectF lr = new RectF(W / 2f - lw / 2, H - 150, W / 2f + lw / 2, H - 124);
+            double left = Math.max(0, Engine.LAVA_SECONDS - eng.p1.lavaTime);
+            c.drawRoundRect(lr, 13f, 13f, Gd.fill(Color.argb(200, 40, 8, 4)));
+            float lavaW = (float) ((lr.width() - 6) * (left / Engine.LAVA_SECONDS));
+            if (lavaW > 2) {
+                RectF f2 = new RectF(lr.left + 3, lr.top + 3, lr.left + 3 + lavaW, lr.bottom - 3);
+                Paint lp = new Paint(Paint.ANTI_ALIAS_FLAG);
+                lp.setShader(new LinearGradient(0, f2.top, 0, f2.bottom,
+                        Color.rgb(255, 210, 90), Color.rgb(220, 60, 20), Shader.TileMode.CLAMP));
+                c.drawRoundRect(f2, 10f, 10f, lp);
+            }
+            c.drawRoundRect(lr, 13f, 13f, Gd.stroke(Gd.INK, 3f));
+            Gd.outlined(c, String.format("ЛАВА — %.1f с", left), lr.centerX(),
+                    lr.centerY() + lr.height() * 0.22f, lr.height() * 0.58f, Gd.PAPER, Paint.Align.CENTER);
+        }
 
         if (toastT > 0)
             Gd.outlined(c, toast, W / 2f, H - 40, fs * 0.9f, Gd.GOLD, Paint.Align.CENTER);

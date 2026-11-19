@@ -432,6 +432,29 @@ namespace GEO_DASH.UI
                     Gd.Outlined(g, "ОФЛАЙН", f, new RectangleF(w - 120, 32, 110, 22), Gd.Gold, StringAlignment.Far, thick: 2f);
             }
 
+            // в лаве — обратный отсчёт до смерти
+            if (_w.P1.LavaTime > 0.05)
+            {
+                float lw = Math.Min(420, w * 0.34f);
+                var lr = new RectangleF(w / 2f - lw / 2, ClientSize.Height - 150, lw, 26);
+                double left = Math.Max(0, Phys.LavaSeconds - _w.P1.LavaTime);
+                using (var path = Gd.Round(lr, 13f))
+                using (var br = new SolidBrush(Color.FromArgb(200, 40, 8, 4)))
+                    g.FillPath(br, path);
+                var lavaFill = new RectangleF(lr.X + 3, lr.Y + 3,
+                    (float)((lr.Width - 6) * (left / Phys.LavaSeconds)), lr.Height - 6);
+                if (lavaFill.Width > 2)
+                    using (var path = Gd.Round(lavaFill, 10f))
+                    using (var br = new LinearGradientBrush(new RectangleF(lavaFill.X, lavaFill.Y - 1, lavaFill.Width, lavaFill.Height + 2),
+                               Color.FromArgb(255, 210, 90), Color.FromArgb(220, 60, 20), LinearGradientMode.Vertical))
+                        g.FillPath(br, path);
+                using (var path = Gd.Round(lr, 13f))
+                using (var pen = new Pen(Gd.Ink, 3f))
+                    g.DrawPath(pen, path);
+                using (var f = Gd.Title(11f))
+                    Gd.Outlined(g, $"ЛАВА — {left:0.0} с", f, lr, Gd.Paper, thick: 2.6f);
+            }
+
             if (_toastT > 0)
                 using (var f = Gd.Title(14f))
                     Gd.Outlined(g, _toast, f, new RectangleF(0, ClientSize.Height - 96, w, 32), Gd.Gold, thick: 3f);

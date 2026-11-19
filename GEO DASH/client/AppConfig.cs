@@ -6,7 +6,7 @@ namespace GEO_DASH
     {
         public string ServerHost { get; set; } = "166.1.161.200";
         public int ServerPort { get; set; } = 37534;
-        public string SiteUrl { get; set; } = "http://geodash.winnigames2024.ru/";
+        public string SiteUrl { get; set; } = "https://geodash.winnigames2024.ru/";
         public string Token { get; set; } = "";
         public string UserName { get; set; } = "";
         public bool IsAdmin { get; set; }

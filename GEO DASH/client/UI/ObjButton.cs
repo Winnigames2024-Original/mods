@@ -196,6 +196,19 @@ namespace GEO_DASH.UI
                     using (var br = new SolidBrush(Color.FromArgb(150, 160, 230)))
                         g.FillPolygon(br, new[] { new PointF(box.Left, box.Bottom), new PointF(box.Right, box.Bottom), new PointF(box.X + box.Width / 2, box.Top) });
                     break;
+                case DrawStyle.Water:
+                case DrawStyle.Lava:
+                    {
+                        bool lava = d.Style == DrawStyle.Lava;
+                        using var br = new LinearGradientBrush(box,
+                            lava ? Color.FromArgb(255, 150, 40) : Color.FromArgb(90, 190, 255),
+                            lava ? Color.FromArgb(170, 30, 10) : Color.FromArgb(20, 70, 180),
+                            LinearGradientMode.Vertical);
+                        g.FillRectangle(br, box);
+                        using var pen = new Pen(lava ? Color.FromArgb(255, 220, 120) : Color.FromArgb(200, 240, 255), 2.4f);
+                        g.DrawLine(pen, box.Left, box.Top + 3, box.Right, box.Top + 3);
+                        break;
+                    }
                 case DrawStyle.Glow:
                     using (var br = new SolidBrush(Color.FromArgb(90, 160, 200, 255))) g.FillEllipse(br, box);
                     break;
