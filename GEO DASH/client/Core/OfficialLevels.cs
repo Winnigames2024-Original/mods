@@ -432,7 +432,292 @@ namespace GEO_DASH.Core
             return b.Build();
         }
 
-        public static LevelData[] All() => new[] { Easy(), Hard(), Insane(), Eye(), EyeSpy() };
+
+        /// <summary>
+        /// «Night Ride» — наш демон под трек BIKE с Newgrounds (#1191782).
+        /// Уровень собран по самой песне: смена скорости, режимов и экранных
+        /// эффектов стоит там, где в треке подъёмы и сбросы.
+        /// Трек не вшит в игру — он качается по ID, как любая музыка с сайта.
+        /// </summary>
+        public static LevelData Bike()
+        {
+            const int SongId = 1191782;
+            var b = new Builder("Night Ride", Difficulty.InsaneDemon, SongId, "BIKE");
+            b.L.Settings.SongArtist = "Newgrounds #1191782";
+            b.L.Settings.BgColor = unchecked((int)0xFF0A0D2E);
+            b.L.Settings.GroundColor = unchecked((int)0xFF05061A);
+            b.L.Settings.BgId = 13;
+            b.L.Settings.GroundId = 6;
+            b.L.Settings.StartSpeed = SpeedTier.Normal;
+            b.L.Settings.Description = "Ночная поездка под BIKE. Трек тянется с сайта по ID 1191782.";
+
+            // ---- разметка трека: с какой секунды какая скорость ----
+            var plan = new (double t, SpeedTier sp)[]
+            {
+                (  0, SpeedTier.Normal ),   // вступление
+                ( 10, SpeedTier.Fast   ),   // разгон
+                ( 20, SpeedTier.Faster ),   // первый сброс
+                ( 30, SpeedTier.Faster ),
+                ( 40, SpeedTier.Fastest),   // второй сброс
+                ( 50, SpeedTier.Fast   ),   // передышка
+                ( 60, SpeedTier.Fastest),   // третий сброс
+                ( 70, SpeedTier.Faster ),
+                ( 80, SpeedTier.Hyper  ),   // пик
+                ( 90, SpeedTier.Faster )    // выезд
+            };
+            const double End = 99.6;
+
+            // позиция в клетках к секунде трека
+            double Gx(double t)
+            {
+                double x = 0;
+                for (int i = 0; i < plan.Length; i++)
+                {
+                    double a = plan[i].t, c = i + 1 < plan.Length ? plan[i + 1].t : End;
+                    if (t <= a) break;
+                    double dt = Math.Min(t, c) - a;
+                    x += Speeds.Mul[(int)plan[i].sp] * 311.58 * dt;
+                    if (t <= c) break;
+                }
+                return x / 30.0;
+            }
+
+            // ---- служебное: ставим объекты и эффекты по времени ----
+            void Trig(double t, double gy, Action<TriggerData> cfg)
+            {
+                b.Obj(100, Math.Round(Gx(t)), gy, o =>
+                {
+                    o.Trigger = new TriggerData();
+                    cfg(o.Trigger);
+                });
+            }
+
+            void Fx(double t, TriggerType type, double strength, double dur)
+                => Trig(t, 9, tr => { tr.Type = type; tr.FxStrength = strength; tr.Duration = dur; });
+
+            void Shake(double t, double power, double dur)
+                => Trig(t, 10, tr =>
+                {
+                    tr.Type = TriggerType.Shake;
+                    tr.ShakeStrength = power;
+                    tr.ShakeInterval = 0.04;
+                    tr.Duration = dur;
+                });
+
+            void Bg(double t, int color, double fade = 1.2)
+                => Trig(t, 11, tr => { tr.Type = TriggerType.BgColor; tr.Color = color; tr.FadeTime = fade; });
+
+            void Grad(double t, int top, int bottom, double dur = 1.0)
+                => Trig(t, 12, tr =>
+                {
+                    tr.Type = TriggerType.Gradient;
+                    tr.Color = top; tr.Color2 = bottom;
+                    tr.Duration = dur; tr.FxStrength = 0.75;
+                });
+
+            void Speed(double t, SpeedTier sp) => b.Portal(Math.Round(Gx(t)), 1, SpeedPortal(sp));
+            void Mode(double t, PortalKind k) => b.Portal(Math.Round(Gx(t)), 1, k);
+
+            // пол и потолок на отрезке времени
+            void Tunnel(double t0, double t1, int floorY, int ceilY)
+            {
+                int a = (int)Math.Round(Gx(t0)), c = (int)Math.Round(Gx(t1));
+                for (int x = a; x <= c; x++) { b.Obj(1, x, floorY); b.Obj(1, x, ceilY); }
+            }
+
+            // ------------------------------------------------ 0:00 вступление
+            b.Text(Gx(0.9), 8, "NIGHT RIDE");
+            Grad(0.2, unchecked((int)0x8820306A), unchecked((int)0x00000000), 2.0);
+            for (double t = 2.0; t < 9.6; t += 1.15)
+            {
+                b.Spike(Math.Round(Gx(t)));
+                if (t > 5) b.SmallSpike(Math.Round(Gx(t)) + 2);
+            }
+            b.Coin(Math.Round(Gx(8.4)), 6, 1);
+            Fx(9.4, TriggerType.Vignette, 0.5, 1.2);
+
+            // ------------------------------------------------ 0:10 разгон
+            Speed(10, SpeedTier.Fast);
+            Bg(10, unchecked((int)0xFF14215E));
+            Shake(10, 9, 0.5);
+            for (double t = 10.6; t < 19.4; t += 0.95)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Block(gx, 0, 3);
+                b.Spike(gx + 4);
+                if ((int)(t * 10) % 3 == 0) b.Orb(gx + 6, 4, OrbKind.Yellow);
+            }
+            Fx(18.0, TriggerType.Pixelate, 0.35, 1.6);
+
+            // ------------------------------------------------ 0:20 первый сброс: корабль
+            Speed(20, SpeedTier.Faster);
+            Mode(20, PortalKind.ModeShip);
+            Shake(20, 20, 0.9);
+            Fx(20, TriggerType.Flash, 0.9, 0.5);
+            Fx(20.1, TriggerType.Chromatic, 0.8, 1.4);
+            Bg(20, unchecked((int)0xFF2A1060));
+            Grad(20, unchecked((int)0x993C1CFF), unchecked((int)0x11000000), 9.0);
+            Tunnel(20.3, 29.6, -1, 13);
+            for (double t = 21; t < 29.4; t += 0.62)
+            {
+                double gx = Math.Round(Gx(t));
+                int y = 2 + (int)((t * 7) % 9);
+                b.Obj(1, gx, y);
+                if ((int)(t * 3) % 4 == 0) b.Saw(gx + 2, y + 2);
+            }
+            b.Coin(Math.Round(Gx(26.5)), 11, 2);
+
+            // ------------------------------------------------ 0:30 куб и шар
+            Mode(30, PortalKind.ModeCube);
+            Fx(30, TriggerType.Shockwave, 0.7, 0.8);
+            for (double t = 30.4; t < 33.4; t += 0.7)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Spike(gx); b.Spike(gx + 1);
+                b.Orb(gx + 4, 4, OrbKind.Pink);
+            }
+            // удары 33.7 / 35.7 / 38.0 / 40.4 — на каждый вспышка и тряска
+            foreach (var hit in new[] { 33.7, 35.7, 38.0 })
+            {
+                Fx(hit, TriggerType.Flash, 0.65, 0.3);
+                Shake(hit, 14, 0.4);
+                double gx = Math.Round(Gx(hit));
+                b.Pad(gx, 1, PadKind.Yellow);
+                b.Spike(gx + 3); b.Spike(gx + 4); b.Spike(gx + 5);
+            }
+            Mode(36.2, PortalKind.ModeBall);
+            Tunnel(36.4, 39.6, -1, 8);
+            for (double t = 36.8; t < 39.4; t += 0.5)
+            {
+                b.Obj(20, Math.Round(Gx(t)), 0);
+                b.Obj(22, Math.Round(Gx(t)) + 2, 7);
+            }
+            Mode(39.7, PortalKind.ModeCube);
+
+            // ------------------------------------------------ 0:40 второй сброс: мини-волна
+            Speed(40, SpeedTier.Fastest);
+            Mode(40, PortalKind.ModeWave);
+            b.Portal(Math.Round(Gx(40)), 4, PortalKind.Mini);
+            Shake(40, 22, 1.0);
+            Fx(40, TriggerType.Flash, 1.0, 0.45);
+            Fx(40.1, TriggerType.Glitch, 0.75, 1.2);
+            Bg(40, unchecked((int)0xFF5A1038));
+            Grad(40, unchecked((int)0x99FF2E6E), unchecked((int)0x11000000), 9.5);
+            Tunnel(40.4, 49.6, -1, 9);
+            {
+                int a = (int)Math.Round(Gx(40.6)), c = (int)Math.Round(Gx(49.4));
+                for (int x = a, k = 0; x < c; x += 5, k++)
+                {
+                    int lo = k % 2 == 0 ? 0 : 6;
+                    b.Obj(1, x, lo); b.Obj(1, x, lo + 1);
+                }
+            }
+            b.Coin(Math.Round(Gx(45.0)), 4, 3);
+
+            // ------------------------------------------------ 0:50 передышка: НЛО
+            Speed(50, SpeedTier.Fast);
+            Mode(50, PortalKind.ModeCube);
+            b.Portal(Math.Round(Gx(50)), 4, PortalKind.Big);
+            Mode(50.6, PortalKind.ModeUfo);
+            Bg(50, unchecked((int)0xFF0D2A4E));
+            Grad(50, unchecked((int)0x6616C8FF), unchecked((int)0x00000000), 9.0);
+            Fx(50, TriggerType.Blur, 0.4, 1.5);
+            Tunnel(50.8, 59.4, -1, 12);
+            for (double t = 51.4; t < 59.2; t += 0.78)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Column(gx, 1, 3);
+                b.Column(gx + 3, 8, 3);
+            }
+
+            // ------------------------------------------------ 1:00 третий сброс: дуал
+            Speed(60, SpeedTier.Fastest);
+            Mode(60, PortalKind.ModeCube);
+            b.Portal(Math.Round(Gx(60)), 4, PortalKind.Dual);
+            Shake(60, 24, 1.1);
+            Fx(60, TriggerType.Flash, 1.0, 0.5);
+            Fx(60.1, TriggerType.Chromatic, 0.9, 1.6);
+            Fx(60.1, TriggerType.Shockwave, 0.9, 0.9);
+            Bg(60, unchecked((int)0xFF3A0A52));
+            Grad(60, unchecked((int)0xAA9B2BFF), unchecked((int)0x11000000), 9.5);
+            Tunnel(60.4, 69.6, -1, 15);
+            for (double t = 60.8; t < 69.4; t += 0.55)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Obj(20, gx, 0);
+                b.Obj(22, gx + 2, 14);
+                if ((int)(t * 2) % 5 == 0) b.Orb(gx + 1, 7, OrbKind.Blue);
+            }
+
+            // ------------------------------------------------ 1:10 паук
+            Speed(70, SpeedTier.Faster);
+            b.Portal(Math.Round(Gx(70)), 1, PortalKind.Single);
+            Mode(70.4, PortalKind.ModeSpider);
+            Fx(70, TriggerType.Pixelate, 0.4, 1.4);
+            Bg(70, unchecked((int)0xFF102A22));
+            Tunnel(70.6, 79.6, -1, 10);
+            for (double t = 71.2; t < 79.2; t += 0.62)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Obj(20, gx, ((int)(t * 2)) % 2 == 0 ? 0 : 9);
+                if ((int)(t * 4) % 7 == 0) b.Saw(gx + 2, 5);
+            }
+
+            // ------------------------------------------------ 1:20 пик
+            Speed(80, SpeedTier.Hyper);
+            Mode(80, PortalKind.ModeCube);
+            Shake(80, 26, 1.2);
+            Fx(80, TriggerType.Flash, 1.0, 0.5);
+            Fx(80.1, TriggerType.Glitch, 0.85, 1.4);
+            Bg(80, unchecked((int)0xFF5E1A08));
+            Grad(80, unchecked((int)0xAAFF7A1E), unchecked((int)0x11000000), 9.5);
+            Mode(80.6, PortalKind.ModeRobot);
+            for (double t = 81; t < 87.6; t += 0.8)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Block(gx, (int)((t * 3) % 5), 4);
+                b.Spike(gx + 6);
+            }
+            // удар 87.9 — всё трясётся и вспыхивает
+            Shake(87.9, 30, 1.0);
+            Fx(87.9, TriggerType.Flash, 1.0, 0.4);
+            Fx(87.9, TriggerType.Shockwave, 1.0, 1.0);
+            Mode(88.0, PortalKind.ModeCube);
+            for (double t = 88.3; t < 89.6; t += 0.42)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Spike(gx); b.CeilSpike(gx + 2, 7);
+            }
+
+            // ------------------------------------------------ 1:30 выезд
+            Speed(90, SpeedTier.Faster);
+            Bg(90, unchecked((int)0xFF0A0D2E));
+            Grad(90, unchecked((int)0x6616C8FF), unchecked((int)0x00000000), 9.0);
+            Fx(90, TriggerType.Vignette, 0.6, 2.0);
+            for (double t = 90.6; t < 97.6; t += 0.9)
+            {
+                double gx = Math.Round(Gx(t));
+                b.Spike(gx);
+                if ((int)(t * 2) % 3 == 0) b.Orb(gx + 3, 4, OrbKind.Yellow);
+            }
+            b.Text(Gx(98.2), 7, "RIDE ON");
+            b.Finish(Math.Round(Gx(End)) - 2);
+            return b.Build();
+        }
+
+        /// <summary>Портал нужной скорости.</summary>
+        static PortalKind SpeedPortal(SpeedTier sp) => sp switch
+        {
+            SpeedTier.Slow => PortalKind.SpeedSlow,
+            SpeedTier.Normal => PortalKind.SpeedNormal,
+            SpeedTier.Fast => PortalKind.SpeedFast,
+            SpeedTier.Faster => PortalKind.SpeedFaster,
+            SpeedTier.Fastest => PortalKind.SpeedFastest,
+            SpeedTier.Hyper => PortalKind.SpeedHyper,
+            _ => PortalKind.SpeedUltra
+        };
+
+        public static LevelData[] All() => new[] { Easy(), Hard(), Insane(), Eye(), EyeSpy(), Bike() };
 
         /// <summary>
         /// Кладёт файлы основных уровней в assets/official. Уровни собираются кодом,

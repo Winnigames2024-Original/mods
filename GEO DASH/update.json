@@ -1,8 +1,8 @@
 {
-  "version": "1.8.0",
+  "version": "1.8.1",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Пять основных уровней: Neon Start, Static Rush, Hyperdrive, Oko и большой демон Eye Spy. На Android тоже оба уровня про глаза, склоны не убивают, потолка нет, адрес сервера убран с экранов.",
+  "notes": "Новый демон Night Ride под трек BIKE (Newgrounds #1191782): скорости, режимы и экранные эффекты расставлены по самой песне. Есть и на ПК, и на Android.",
   "date": "2026-11-19"
 }

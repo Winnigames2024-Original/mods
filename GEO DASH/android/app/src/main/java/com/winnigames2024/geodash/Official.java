@@ -340,9 +340,254 @@ public class Official {
         b.obj(20, gx + 1, cy + rad + 1);
     }
 
+
+    // ---------------------------------------------------------- Night Ride
+
+    /** Множители скорости по тирам — как в игре. */
+    static final double[] SPEED = {0.807, 1.0, 1.243, 1.502, 1.849, 2.25, 2.70};
+    /** Разметка трека BIKE: с какой секунды какой тир скорости. */
+    static final double[] PLAN_T  = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
+    static final int[]    PLAN_SP = {1,  2,  3,  3,  4,  2,  4,  3,  5,  3};
+    static final double TRACK_END = 99.6;
+
+    /** Позиция в клетках к секунде трека. */
+    static double gx(double t) {
+        double x = 0;
+        for (int i = 0; i < PLAN_T.length; i++) {
+            double a = PLAN_T[i];
+            double c = i + 1 < PLAN_T.length ? PLAN_T[i + 1] : TRACK_END;
+            if (t <= a) break;
+            x += SPEED[PLAN_SP[i]] * 311.58 * (Math.min(t, c) - a);
+            if (t <= c) break;
+        }
+        return x / 30.0;
+    }
+
+    static int speedPortal(int tier) {
+        switch (tier) {
+            case 0: return Level.P_S05;
+            case 1: return Level.P_S1;
+            case 2: return Level.P_S2;
+            case 3: return Level.P_S3;
+            case 4: return Level.P_S4;
+            case 5: return Level.P_S5;
+            default: return Level.P_S6;
+        }
+    }
+
+    static void trig(B b, double t, double gy, int type, double dur, double strength,
+                     double shake, int color, int color2) {
+        Level.Obj o = new Level.Obj();
+        o.typeId = 100;
+        o.x = Math.round(gx(t)) * 30;
+        o.y = gy * 30;
+        o.trig = new Level.Trig();
+        o.trig.type = type;
+        o.trig.duration = dur;
+        o.trig.fxStrength = strength;
+        if (shake > 0) { o.trig.shakeStrength = shake; o.trig.shakeInterval = 0.04; }
+        if (color != 0) o.trig.color = color;
+        if (color2 != 0) o.trig.color2 = color2;
+        b.lv.objects.add(o);
+    }
+
+    static void fx(B b, double t, int type, double strength, double dur) {
+        trig(b, t, 9, type, dur, strength, 0, 0, 0);
+    }
+
+    static void shake(B b, double t, double power, double dur) {
+        trig(b, t, 10, Level.T_SHAKE, dur, 0.6, power, 0, 0);
+    }
+
+    static void bg(B b, double t, int color) {
+        trig(b, t, 11, Level.T_BG, 0.5, 0.6, 0, color, 0);
+    }
+
+    static void grad(B b, double t, int top, int bottom, double dur) {
+        trig(b, t, 12, Level.T_GRADIENT, dur, 0.75, 0, top, bottom);
+    }
+
+    static void tunnel(B b, double t0, double t1, int floorY, int ceilY) {
+        int a = (int) Math.round(gx(t0)), c = (int) Math.round(gx(t1));
+        for (int x = a; x <= c; x++) { b.obj(1, x, floorY); b.obj(1, x, ceilY); }
+    }
+
+    /**
+     * «Night Ride» — демон под трек BIKE с Newgrounds (#1191782).
+     * Скорости, режимы и эффекты стоят там, где в треке подъёмы и сбросы.
+     * Сам трек не вшит в игру — качается по ID, как любая музыка с сайта.
+     */
+    public static Level bike() {
+        B b = new B("Night Ride", 10, 1191782, "BIKE");
+        b.lv.settings.songArtist = "Newgrounds #1191782";
+        b.lv.settings.bgColor = 0xFF0A0D2E;
+        b.lv.settings.groundColor = 0xFF05061A;
+        b.lv.settings.bgId = 13;
+        b.lv.settings.groundId = 6;
+        b.lv.settings.startSpeed = 1;
+        b.lv.settings.desc = "Ночная поездка под BIKE. Трек тянется с сайта по ID 1191782.";
+
+        b.text(gx(0.9), 8, "NIGHT RIDE");
+        grad(b, 0.2, 0x8820306A, 0x00000000, 2.0);
+        for (double t = 2.0; t < 9.6; t += 1.15) {
+            b.spike(Math.round(gx(t)));
+            if (t > 5) b.small(Math.round(gx(t)) + 2);
+        }
+        b.coin(Math.round(gx(8.4)), 6, 1);
+        fx(b, 9.4, Level.T_VIGNETTE, 0.5, 1.2);
+
+        b.portal(Math.round(gx(10)), 1, speedPortal(2));
+        bg(b, 10, 0xFF14215E);
+        shake(b, 10, 9, 0.5);
+        for (double t = 10.6; t < 19.4; t += 0.95) {
+            double x = Math.round(gx(t));
+            b.block(x, 0, 3);
+            b.spike(x + 4);
+            if ((int) (t * 10) % 3 == 0) b.orb(x + 6, 4, 0);
+        }
+        fx(b, 18.0, Level.T_PIXELATE, 0.35, 1.6);
+
+        b.portal(Math.round(gx(20)), 1, speedPortal(3));
+        b.portal(Math.round(gx(20)) + 1, 1, Level.P_SHIP);
+        shake(b, 20, 20, 0.9);
+        fx(b, 20, Level.T_FLASH, 0.9, 0.5);
+        fx(b, 20.1, Level.T_CHROMATIC, 0.8, 1.4);
+        bg(b, 20, 0xFF2A1060);
+        grad(b, 20, 0x993C1CFF, 0x11000000, 9.0);
+        tunnel(b, 20.3, 29.6, -1, 13);
+        for (double t = 21; t < 29.4; t += 0.62) {
+            double x = Math.round(gx(t));
+            int y = 2 + (int) ((t * 7) % 9);
+            b.obj(1, x, y);
+            if ((int) (t * 3) % 4 == 0) b.saw(x + 2, y + 2);
+        }
+        b.coin(Math.round(gx(26.5)), 11, 2);
+
+        b.portal(Math.round(gx(30)), 1, Level.P_CUBE);
+        fx(b, 30, Level.T_SHOCK, 0.7, 0.8);
+        for (double t = 30.4; t < 33.4; t += 0.7) {
+            double x = Math.round(gx(t));
+            b.spike(x); b.spike(x + 1);
+            b.orb(x + 4, 4, 1);
+        }
+        double[] hits = {33.7, 35.7, 38.0};
+        for (double hit : hits) {
+            fx(b, hit, Level.T_FLASH, 0.65, 0.3);
+            shake(b, hit, 14, 0.4);
+            double x = Math.round(gx(hit));
+            b.pad(x, 1, 0);
+            b.spike(x + 3); b.spike(x + 4); b.spike(x + 5);
+        }
+        b.portal(Math.round(gx(36.2)), 1, Level.P_BALL);
+        tunnel(b, 36.4, 39.6, -1, 8);
+        for (double t = 36.8; t < 39.4; t += 0.5) {
+            b.obj(20, Math.round(gx(t)), 0);
+            b.obj(22, Math.round(gx(t)) + 2, 7);
+        }
+        b.portal(Math.round(gx(39.7)), 1, Level.P_CUBE);
+
+        b.portal(Math.round(gx(40)), 1, speedPortal(4));
+        b.portal(Math.round(gx(40)) + 1, 1, Level.P_WAVE);
+        b.portal(Math.round(gx(40)), 4, Level.P_MINI);
+        shake(b, 40, 22, 1.0);
+        fx(b, 40, Level.T_FLASH, 1.0, 0.45);
+        fx(b, 40.1, Level.T_GLITCH, 0.75, 1.2);
+        bg(b, 40, 0xFF5A1038);
+        grad(b, 40, 0x99FF2E6E, 0x11000000, 9.5);
+        tunnel(b, 40.4, 49.6, -1, 9);
+        {
+            int a = (int) Math.round(gx(40.6)), c = (int) Math.round(gx(49.4));
+            int k = 0;
+            for (int x = a; x < c; x += 5, k++) {
+                int lo = k % 2 == 0 ? 0 : 6;
+                b.obj(1, x, lo); b.obj(1, x, lo + 1);
+            }
+        }
+        b.coin(Math.round(gx(45.0)), 4, 3);
+
+        b.portal(Math.round(gx(50)), 1, speedPortal(2));
+        b.portal(Math.round(gx(50)) + 1, 1, Level.P_CUBE);
+        b.portal(Math.round(gx(50)), 4, Level.P_BIG);
+        b.portal(Math.round(gx(50.6)), 1, Level.P_UFO);
+        bg(b, 50, 0xFF0D2A4E);
+        grad(b, 50, 0x6616C8FF, 0x00000000, 9.0);
+        fx(b, 50, Level.T_BLUR, 0.4, 1.5);
+        tunnel(b, 50.8, 59.4, -1, 12);
+        for (double t = 51.4; t < 59.2; t += 0.78) {
+            double x = Math.round(gx(t));
+            for (int k = 0; k < 3; k++) b.obj(1, x, 1 + k);
+            for (int k = 0; k < 3; k++) b.obj(1, x + 3, 8 + k);
+        }
+
+        b.portal(Math.round(gx(60)), 1, speedPortal(4));
+        b.portal(Math.round(gx(60)) + 1, 1, Level.P_CUBE);
+        b.portal(Math.round(gx(60)), 4, Level.P_DUAL);
+        shake(b, 60, 24, 1.1);
+        fx(b, 60, Level.T_FLASH, 1.0, 0.5);
+        fx(b, 60.1, Level.T_CHROMATIC, 0.9, 1.6);
+        fx(b, 60.1, Level.T_SHOCK, 0.9, 0.9);
+        bg(b, 60, 0xFF3A0A52);
+        grad(b, 60, 0xAA9B2BFF, 0x11000000, 9.5);
+        tunnel(b, 60.4, 69.6, -1, 15);
+        for (double t = 60.8; t < 69.4; t += 0.55) {
+            double x = Math.round(gx(t));
+            b.obj(20, x, 0);
+            b.obj(22, x + 2, 14);
+            if ((int) (t * 2) % 5 == 0) b.orb(x + 1, 7, 2);
+        }
+
+        b.portal(Math.round(gx(70)), 1, speedPortal(3));
+        b.portal(Math.round(gx(70)) + 1, 1, Level.P_SINGLE);
+        b.portal(Math.round(gx(70.4)), 1, Level.P_SPIDER);
+        fx(b, 70, Level.T_PIXELATE, 0.4, 1.4);
+        bg(b, 70, 0xFF102A22);
+        tunnel(b, 70.6, 79.6, -1, 10);
+        for (double t = 71.2; t < 79.2; t += 0.62) {
+            double x = Math.round(gx(t));
+            b.obj(20, x, ((int) (t * 2)) % 2 == 0 ? 0 : 9);
+            if ((int) (t * 4) % 7 == 0) b.saw(x + 2, 5);
+        }
+
+        b.portal(Math.round(gx(80)), 1, speedPortal(5));
+        b.portal(Math.round(gx(80)) + 1, 1, Level.P_CUBE);
+        shake(b, 80, 26, 1.2);
+        fx(b, 80, Level.T_FLASH, 1.0, 0.5);
+        fx(b, 80.1, Level.T_GLITCH, 0.85, 1.4);
+        bg(b, 80, 0xFF5E1A08);
+        grad(b, 80, 0xAAFF7A1E, 0x11000000, 9.5);
+        b.portal(Math.round(gx(80.6)), 1, Level.P_ROBOT);
+        for (double t = 81; t < 87.6; t += 0.8) {
+            double x = Math.round(gx(t));
+            b.block(x, (int) ((t * 3) % 5), 4);
+            b.spike(x + 6);
+        }
+        shake(b, 87.9, 30, 1.0);
+        fx(b, 87.9, Level.T_FLASH, 1.0, 0.4);
+        fx(b, 87.9, Level.T_SHOCK, 1.0, 1.0);
+        b.portal(Math.round(gx(88.0)), 1, Level.P_CUBE);
+        for (double t = 88.3; t < 89.6; t += 0.42) {
+            double x = Math.round(gx(t));
+            b.spike(x); b.ceil(x + 2, 7);
+        }
+
+        b.portal(Math.round(gx(90)), 1, speedPortal(3));
+        bg(b, 90, 0xFF0A0D2E);
+        grad(b, 90, 0x6616C8FF, 0x00000000, 9.0);
+        fx(b, 90, Level.T_VIGNETTE, 0.6, 2.0);
+        for (double t = 90.6; t < 97.6; t += 0.9) {
+            double x = Math.round(gx(t));
+            b.spike(x);
+            if ((int) (t * 2) % 3 == 0) b.orb(x + 3, 4, 0);
+        }
+        b.text(gx(98.2), 7, "RIDE ON");
+        b.finish(Math.round(gx(TRACK_END)) - 2);
+        return b.build();
+    }
+
     public static List<Level> all() {
         List<Level> l = new ArrayList<>();
-        l.add(easy()); l.add(hard()); l.add(insane()); l.add(oko()); l.add(eyeSpy());
+        l.add(easy()); l.add(hard()); l.add(insane());
+        l.add(oko()); l.add(eyeSpy()); l.add(bike());
         return l;
     }
 }
