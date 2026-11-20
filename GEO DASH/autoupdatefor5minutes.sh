@@ -227,6 +227,33 @@ fi
 systemctl is-enabled geodash-update.timer >/dev/null 2>&1 || \
   systemctl enable --now geodash-update.timer >/dev/null 2>&1 || true
 
+# заявка с сайта должна срабатывать мгновенно: ставим юниты, если их ещё нет
+if [ ! -f /etc/systemd/system/geodash-request.path ]; then
+  cat > /etc/systemd/system/geodash-request.service <<UNIT
+[Unit]
+Description=GEO DASH: обновление по заявке с сайта
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '[ -f $WEB/.update-request ] && /usr/local/bin/geodash-autoupdate || true'
+UNIT
+  cat > /etc/systemd/system/geodash-request.path <<UNIT
+[Unit]
+Description=GEO DASH: ждать заявку на обновление с сайта
+
+[Path]
+PathExists=$WEB/.update-request
+Unit=geodash-request.service
+
+[Install]
+WantedBy=paths.target
+UNIT
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  log "поставил мгновенную реакцию на заявку с сайта"
+fi
+systemctl is-enabled geodash-request.path >/dev/null 2>&1 || \
+  systemctl enable --now geodash-request.path >/dev/null 2>&1 || true
+
 # ---- свежие сборки игры ----
 fetch_builds
 

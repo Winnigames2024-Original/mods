@@ -250,6 +250,20 @@ Type=oneshot
 ExecStart=/bin/bash -c '[ -f $WEB/.update-request ] && /usr/local/bin/geodash-autoupdate || true'
 UNIT
 
+# срабатывает сразу, как только файл заявки появился
+cat > /etc/systemd/system/geodash-request.path <<UNIT
+[Unit]
+Description=GEO DASH: ждать заявку на обновление с сайта
+
+[Path]
+PathExists=$WEB/.update-request
+Unit=geodash-request.service
+
+[Install]
+WantedBy=paths.target
+UNIT
+
+# запасной путь, если по какой-то причине не сработал .path
 cat > /etc/systemd/system/geodash-request.timer <<UNIT
 [Unit]
 Description=GEO DASH: смотреть заявки на обновление каждую минуту
@@ -264,6 +278,7 @@ UNIT
 
 systemctl daemon-reload
 systemctl enable --now geodash-update.timer >/dev/null 2>&1 || true
+systemctl enable --now geodash-request.path >/dev/null 2>&1 || true
 systemctl enable --now geodash-request.timer >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------- итог
