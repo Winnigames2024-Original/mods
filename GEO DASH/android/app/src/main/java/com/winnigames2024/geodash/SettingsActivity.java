@@ -7,6 +7,7 @@ import android.widget.SeekBar;
 public class SettingsActivity extends GdActivity {
 
     SeekBar music, sfx;
+    int renderH = Store.renderHeight();
 
     @Override protected int bgA() { return Color.rgb(70, 75, 205); }
     @Override protected int bgId() { return 14; }
@@ -29,6 +30,14 @@ public class SettingsActivity extends GdActivity {
         sfx.setMax(100);
         sfx.setProgress((int) (Store.sfxVolume() * 100));
         root.addView(sfx, Ui.lp(W, H, 0.28f, 0.59f, 0.40f, 0.08f));
+
+        text("Качество картинки", 0.06f, 0.40f, 0.22f, 0.06f, Gd.NEON, 15);
+        qualityBtn = btn(qualityText(), Ui.I_REFRESH, Color.rgb(200, 180, 255), Color.rgb(80, 60, 160),
+                0.28f, 0.38f, 0.30f, 0.10f, () -> {
+                    renderH = renderH == 720 ? 540 : (renderH == 540 ? 0 : 720);
+                    qualityBtn.text = qualityText();
+                    qualityBtn.invalidate();
+                });
 
         btn("СОХРАНИТЬ", Ui.I_SAVE, Color.rgb(120, 255, 170), Color.rgb(20, 150, 100),
                 0.06f, 0.72f, 0.22f, 0.12f, this::save);
@@ -54,8 +63,21 @@ public class SettingsActivity extends GdActivity {
                 0.06f, 0.87f, 0.70f, 0.07f, Gd.DIM, 13);
     }
 
+    Ui.GdBtn qualityBtn;
+
+    /**
+     * Чем ниже качество, тем меньше картинка, в которой считается кадр:
+     * видеочипу телефона не приходится закрашивать каждый пиксель экрана
+     * полупрозрачными слоями, и уровни перестают подлагивать.
+     */
+    String qualityText() {
+        if (renderH <= 0) return "ВЫСОКОЕ (КАК ЭКРАН)";
+        return renderH <= 540 ? "НИЗКОЕ (960x540)" : "СРЕДНЕЕ (1280x720)";
+    }
+
     void save() {
         Store.setVolumes(music.getProgress() / 100f, sfx.getProgress() / 100f);
+        Store.setRenderHeight(renderH);
         toast("Сохранено");
     }
 }

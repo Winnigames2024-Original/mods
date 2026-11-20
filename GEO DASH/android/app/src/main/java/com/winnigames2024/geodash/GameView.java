@@ -104,7 +104,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             Canvas c = null;
             try {
                 c = getHolder().lockCanvas();
-                if (c != null) render(c);
+                if (c != null) {
+                    ensureFrame();
+                    if (frame == null) render(c);
+                    else {
+                        render(frameC);
+                        c.drawBitmap(frame,
+                                new android.graphics.Rect(0, 0, frame.getWidth(), frame.getHeight()),
+                                new RectF(0, 0, getWidth(), getHeight()), blit);
+                    }
+                }
             } catch (Exception ignored) {
             } finally {
                 if (c != null) try { getHolder().unlockCanvasAndPost(c); } catch (Exception ignored) { }
@@ -143,8 +152,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     @Override public boolean onTouchEvent(MotionEvent e) {
         int act = e.getActionMasked();
         int idx = e.getActionIndex();
-        float x = e.getX(idx), y = e.getY(idx);
-        boolean right = x > getWidth() / 2f;
+        // палец всегда в пикселях экрана, а кнопки размечены в координатах
+        // картинки кадра — переводим сразу, иначе промахи при низком качестве
+        float tk = vh() / (float) Math.max(1, getHeight());
+        float x = e.getX(idx) * tk, y = e.getY(idx) * tk;
+        boolean right = x > vw() / 2f;
 
         switch (act) {
             case MotionEvent.ACTION_DOWN:
@@ -161,8 +173,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                     if (id != null && id.startsWith("i:")) {
                         dragItem = itemByName(id.substring(2));
                         if (dragItem != null) {
-                            dragOffX = x - (float) (dragItem.x * getWidth());
-                            dragOffY = y - (float) (dragItem.y * getHeight());
+                            dragOffX = x - (float) (dragItem.x * vw());
+                            dragOffY = y - (float) (dragItem.y * vh());
                         }
                     }
                     return true;
@@ -191,8 +203,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
             case MotionEvent.ACTION_MOVE:
                 if (guiEdit && dragItem != null) {
-                    dragItem.x = Math.max(0.02, Math.min(0.98, (x - dragOffX) / Math.max(1, getWidth())));
-                    dragItem.y = Math.max(0.02, Math.min(0.98, (y - dragOffY) / Math.max(1, getHeight())));
+                    dragItem.x = Math.max(0.02, Math.min(0.98, (x - dragOffX) / Math.max(1, vw())));
+                    dragItem.y = Math.max(0.02, Math.min(0.98, (y - dragOffY) / Math.max(1, vh())));
                 }
                 return true;
 
@@ -288,10 +300,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     // ------------------------------------------------------------ отрисовка
 
-    float scale() { return (float) (getHeight() / (480.0 / Math.max(0.05, eng.camZoom))); }
+    float scale() { return (float) (vh() / (480.0 / Math.max(0.05, eng.camZoom))); }
 
-    float sx(double wx) { return (float) ((wx - (eng.camX + eng.camOffX + eng.shakeX)) * scale() + getWidth() / 2.0); }
-    float sy(double wy) { return (float) (getHeight() / 2.0 - (wy - (eng.camY + eng.camOffY + eng.shakeY)) * scale()); }
+    float sx(double wx) { return (float) ((wx - (eng.camX + eng.camOffX + eng.shakeX)) * scale() + vw() / 2.0); }
+    float sy(double wy) { return (float) (vh() / 2.0 - (wy - (eng.camY + eng.camOffY + eng.shakeY)) * scale()); }
 
     RectF worldRect(double x, double y, double w, double h) {
         float left = sx(x), top = sy(y + h);
@@ -299,8 +311,49 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         return new RectF(left, top, left + (float) (w * s), top + (float) (h * s));
     }
 
+    // ——— картинка кадра фиксированного размера ———
+    android.graphics.Bitmap frame;
+    Canvas frameC;
+    final Paint blit = new Paint();
+    int vwc, vhc;
+
+    /**
+     * Подготовить картинку кадра по настройке качества. Рисовать
+     * полупрозрачные слои в полном разрешении телефона (2400x1080) видеочипу
+     * тяжело, поэтому кадр считается в картинке нужной высоты и одним куском
+     * растягивается на экран. Соотношение сторон берётся от экрана — значит
+     * видно ровно тот же кусок уровня.
+     */
+    void ensureFrame() {
+        int sw = getWidth(), sh = getHeight();
+        int qh = Store.renderHeight();
+        if (qh <= 0 || sh <= qh + 40) {
+            if (frame != null) { frame.recycle(); frame = null; frameC = null; }
+            vwc = sw; vhc = sh;
+            return;
+        }
+        int h = qh, w = Math.max(1, Math.round(qh * (sw / (float) Math.max(1, sh))));
+        if (frame == null || frame.getWidth() != w || frame.getHeight() != h) {
+            if (frame != null) frame.recycle();
+            // без альфа-канала: фон всё равно закрашивается целиком, а памяти
+            // и пропускной способности уходит вдвое меньше
+            frame = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.RGB_565);
+            frameC = new Canvas(frame);
+            blit.setFilterBitmap(true);
+            blit.setAntiAlias(false);
+            blit.setDither(false);
+        }
+        vwc = w; vhc = h;
+    }
+
+    /** Ширина картинки, в которой рисуем кадр. */
+    int vw() { return vwc > 0 ? vwc : getWidth(); }
+
+    /** Высота картинки, в которой рисуем кадр. */
+    int vh() { return vhc > 0 ? vhc : getHeight(); }
+
     void render(Canvas c) {
-        int W = getWidth(), H = getHeight();
+        int W = vw(), H = vh();
         int bg = eng.color(Engine.CH_BG);
 
         // фон как в игре: ровный цвет с узором, едет медленнее уровня
@@ -865,7 +918,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             if (o == null) continue;
             double size = o.optBoolean("mini") ? 22 : 30;
             RectF r = worldRect(o.optDouble("x", 0) - size / 2, o.optDouble("y", 0) - size / 2, size, size);
-            if (r.right < -60 || r.left > getWidth() + 60) continue;
+            if (r.right < -60 || r.left > vw() + 60) continue;
             int col = o.optInt("color", Color.rgb(102, 204, 255));
             boolean dead = o.optBoolean("dead");
             c.drawRect(r, Gd.fill(Color.argb(dead ? 70 : 150, Color.red(col), Color.green(col), Color.blue(col))));

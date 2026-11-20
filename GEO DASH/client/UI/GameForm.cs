@@ -74,7 +74,7 @@ namespace GEO_DASH.UI
             _mpTimer.Tick += async (s, e) => await MpTick();
             FormClosed += (s, e) =>
             {
-                _loop.Dispose(); MusicPlayer.Stop(); SaveRun(); _buf?.Dispose();
+                _loop.Dispose(); MusicPlayer.Stop(); SaveRun(); _buf?.Dispose(); _scene?.Dispose();
                 _mpTimer.Stop();
                 if (_mpRoom != null) _ = ApiClient.MpLeaveAsync(_mpRoom);
             };
@@ -234,7 +234,7 @@ namespace GEO_DASH.UI
         {
             if (e.Button == MouseButtons.Left)
             {
-                string id = HitId(e.Location);
+                string id = HitId(Scene(e.Location));
 
                 // режим настройки интерфейса: тащим кнопки по экрану
                 if (_guiEdit)
@@ -248,9 +248,10 @@ namespace GEO_DASH.UI
                     }
                     foreach (var (r, nm) in _hit)
                     {
-                        if (!nm.StartsWith("i:") || !r.Contains(e.Location)) continue;
+                        if (!nm.StartsWith("i:") || !r.Contains(Scene(e.Location))) continue;
                         _dragItem = ItemByName(nm.Substring(2));
-                        _dragOff = new PointF(e.X - r.X - r.Width / 2, e.Y - r.Y - r.Height / 2);
+                        var sp = Scene(e.Location);
+                        _dragOff = new PointF(sp.X - r.X - r.Width / 2, sp.Y - r.Y - r.Height / 2);
                         return;
                     }
                     return;
@@ -290,8 +291,9 @@ namespace GEO_DASH.UI
         {
             if (_guiEdit && _dragItem != null)
             {
-                _dragItem.X = Math.Clamp((e.X - _dragOff.X) / Math.Max(1, ClientSize.Width), 0.02, 0.98);
-                _dragItem.Y = Math.Clamp((e.Y - _dragOff.Y) / Math.Max(1, ClientSize.Height), 0.02, 0.98);
+                var mp = Scene(e.Location);
+                _dragItem.X = Math.Clamp((mp.X - _dragOff.X) / Math.Max(1, View.Width), 0.02, 0.98);
+                _dragItem.Y = Math.Clamp((mp.Y - _dragOff.Y) / Math.Max(1, View.Height), 0.02, 0.98);
                 Invalidate();
             }
             base.OnMouseMove(e);
@@ -331,10 +333,10 @@ namespace GEO_DASH.UI
         /// <summary>Прямоугольник элемента интерфейса по его доле экрана.</summary>
         RectangleF RectOf(GuiItem it, float aspect = 1f)
         {
-            float s = (float)(it.Size * ClientSize.Height);
+            float s = (float)(it.Size * View.Height);
             float w = s * aspect, h = s;
-            return new RectangleF((float)(it.X * ClientSize.Width) - w / 2,
-                                  (float)(it.Y * ClientSize.Height) - h / 2, w, h);
+            return new RectangleF((float)(it.X * View.Width) - w / 2,
+                                  (float)(it.Y * View.Height) - h / 2, w, h);
         }
 
         void TogglePause() => SetPaused(!_paused);
@@ -364,11 +366,58 @@ namespace GEO_DASH.UI
         // ------------------------------------------------------------- рендер
 
         Bitmap _buf;
+        Bitmap _scene;
+        double _sceneK = 1;
+
+        /// <summary>
+        /// Размер картинки, в которой считается кадр. На большом мониторе
+        /// рисовать каждый пиксель градиентами и свечением дорого, поэтому
+        /// кадр готовится в картинке заданной высоты (настройка качества) и
+        /// одним куском растягивается на окно. Соотношение сторон берётся
+        /// от окна — значит видно ровно тот же кусок уровня.
+        /// </summary>
+        Size View
+        {
+            get
+            {
+                int w = Math.Max(1, View.Width), h = Math.Max(1, View.Height);
+                int qh = AppConfig.Settings.RenderHeight;
+                if (qh <= 0 || h <= qh + 40) return new Size(w, h);
+                return new Size(Math.Max(1, (int)Math.Round(qh * (w / (double)h))), qh);
+            }
+        }
+
+        /// <summary>Точка окна — в координаты картинки кадра.</summary>
+        Point Scene(Point p) =>
+            _sceneK == 1 ? p : new Point((int)Math.Round(p.X * _sceneK), (int)Math.Round(p.Y * _sceneK));
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            var g = e.Graphics;
-            _v.Client = ClientSize;
+            var size = View;
+            _sceneK = size.Height / (double)Math.Max(1, ClientSize.Height);
+
+            if (size == ClientSize) { PaintScene(e.Graphics, size); return; }
+
+            if (_scene == null || _scene.Width != size.Width || _scene.Height != size.Height)
+            {
+                _scene?.Dispose();
+                _scene = new Bitmap(size.Width, size.Height);
+            }
+            using (var sg = Graphics.FromImage(_scene)) PaintScene(sg, size);
+
+            var og = e.Graphics;
+            og.InterpolationMode = InterpolationMode.Bilinear;
+            og.PixelOffsetMode = PixelOffsetMode.Half;
+            og.DrawImage(_scene, new Rectangle(0, 0, ClientSize.Width, ClientSize.Height),
+                         0, 0, _scene.Width, _scene.Height, GraphicsUnit.Pixel);
+            og.InterpolationMode = InterpolationMode.Default;
+            og.PixelOffsetMode = PixelOffsetMode.Default;
+        }
+
+        /// <summary>Нарисовать кадр целиком в заданную поверхность.</summary>
+        void PaintScene(Graphics g, Size size)
+        {
+            _v.Client = size;
             _v.CamX = _w.Cam.CamX + _w.GameplayOffsetX;
             _v.CamY = _w.Cam.CamY + _w.GameplayOffsetY;
             _v.Zoom = _w.Cam.Zoom;
@@ -385,7 +434,7 @@ namespace GEO_DASH.UI
         /// <summary>Экранные эффекты 2.2: сначала рисуем мир в картинку, потом портим её как надо.</summary>
         void DrawWithFx(Graphics g)
         {
-            int w = Math.Max(1, ClientSize.Width), h = Math.Max(1, ClientSize.Height);
+            int w = Math.Max(1, View.Width), h = Math.Max(1, View.Height);
             if (_buf == null || _buf.Width != w || _buf.Height != h)
             {
                 _buf?.Dispose();
@@ -555,7 +604,7 @@ namespace GEO_DASH.UI
             {
                 double size = o.Mini ? 22 : 30;
                 var r = _v.WorldRect(o.X - size / 2, o.Y - size / 2, size, size);
-                if (r.Right < -60 || r.X > ClientSize.Width + 60) continue;
+                if (r.Right < -60 || r.X > View.Width + 60) continue;
 
                 var col = Color.FromArgb(o.Color == 0 ? unchecked((int)0xFF66CCFF) : o.Color);
                 using (var br = new SolidBrush(Color.FromArgb(o.Dead ? 70 : 150, col)))
@@ -572,13 +621,13 @@ namespace GEO_DASH.UI
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             _hit.Clear();
-            int w = ClientSize.Width;
+            int w = View.Width;
             int alpha = (int)Math.Clamp(Gui.Opacity * 255, 40, 255);
 
             // ---- полоса прогресса
             var pr = Gui.Progress;
-            float pw = (float)(pr.Size * w), ph = Math.Max(14f, ClientSize.Height * 0.03f);
-            var bar = new RectangleF((float)(pr.X * w) - pw / 2, (float)(pr.Y * ClientSize.Height) - ph / 2, pw, ph);
+            float pw = (float)(pr.Size * w), ph = Math.Max(14f, View.Height * 0.03f);
+            var bar = new RectangleF((float)(pr.X * w) - pw / 2, (float)(pr.Y * View.Height) - ph / 2, pw, ph);
             using (var path = Gd.Round(bar, ph / 2))
             {
                 using var br = new SolidBrush(Color.FromArgb(alpha, 10, 12, 26));
@@ -657,7 +706,7 @@ namespace GEO_DASH.UI
             if (_w.P1.LavaTime > 0.05)
             {
                 float lw = Math.Min(420, w * 0.34f);
-                var lr = new RectangleF(w / 2f - lw / 2, ClientSize.Height - 150, lw, 26);
+                var lr = new RectangleF(w / 2f - lw / 2, View.Height - 150, lw, 26);
                 double left = Math.Max(0, Phys.LavaSeconds - _w.P1.LavaTime);
                 using (var path = Gd.Round(lr, 13f))
                 using (var br = new SolidBrush(Color.FromArgb(200, 40, 8, 4)))
@@ -678,7 +727,7 @@ namespace GEO_DASH.UI
 
             if (_toastT > 0)
                 using (var f = Gd.Title(14f))
-                    Gd.Outlined(g, _toast, f, new RectangleF(0, ClientSize.Height - 96, w, 32), Gd.Gold, thick: 3f);
+                    Gd.Outlined(g, _toast, f, new RectangleF(0, View.Height - 96, w, 32), Gd.Gold, thick: 3f);
 
             if (_guiEdit) DrawGuiEditor(g);
         }
@@ -701,16 +750,16 @@ namespace GEO_DASH.UI
             {
                 var r = RectOf(it, name == "Полоса прогресса" ? 1f : 1f);
                 if (name == "Полоса прогресса")
-                    r = new RectangleF((float)(it.X * ClientSize.Width) - (float)(it.Size * ClientSize.Width) / 2,
-                                       (float)(it.Y * ClientSize.Height) - 14, (float)(it.Size * ClientSize.Width), 28);
+                    r = new RectangleF((float)(it.X * View.Width) - (float)(it.Size * View.Width) / 2,
+                                       (float)(it.Y * View.Height) - 14, (float)(it.Size * View.Width), 28);
                 using var pen = new Pen(Gd.Neon, 2.5f) { DashStyle = DashStyle.Dash };
                 g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
                 using var f = Gd.Bold(9f);
                 Gd.Outlined(g, name, f, new RectangleF(r.X, r.Y - 20, r.Width, 18), Gd.Neon, thick: 2.2f);
             }
 
-            float bw = 160, bh = 54, y = ClientSize.Height - bh - 18;
-            float x = ClientSize.Width / 2f - (bw * 2 + 54 * 2 + 30) / 2f;
+            float bw = 160, bh = 54, y = View.Height - bh - 18;
+            float x = View.Width / 2f - (bw * 2 + 54 * 2 + 30) / 2f;
             Btn(g, new RectangleF(x, y, bw, bh), "ГОТОВО", "g:done", Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100));
             Btn(g, new RectangleF(x + bw + 10, y, bw, bh), "СБРОС", "g:reset", Color.FromArgb(255, 180, 90), Color.FromArgb(170, 95, 10));
             Btn(g, new RectangleF(x + bw * 2 + 20, y, 54, bh), "+", "g:plus", Color.FromArgb(150, 160, 205), Color.FromArgb(60, 66, 110));
@@ -718,7 +767,7 @@ namespace GEO_DASH.UI
 
             using var ft = Gd.Bold(11f);
             Gd.Outlined(g, "тащи кнопки мышью · + и − меняют размер · ГОТОВО — сохранить", ft,
-                new RectangleF(0, y - 34, ClientSize.Width, 24), Gd.Paper, thick: 2.4f);
+                new RectangleF(0, y - 34, View.Width, 24), Gd.Paper, thick: 2.4f);
         }
 
         void Btn(Graphics g, RectangleF r, string text, string id, Color c1, Color c2)
@@ -735,13 +784,13 @@ namespace GEO_DASH.UI
                 g.FillRectangle(br, ClientRectangle);
 
             using (var f = Gd.Title(34f))
-                Gd.Outlined(g, "ПАУЗА", f, new RectangleF(0, 70, ClientSize.Width, 50), Gd.Paper, thick: 5f);
+                Gd.Outlined(g, "ПАУЗА", f, new RectangleF(0, 70, View.Width, 50), Gd.Paper, thick: 5f);
             using (var f = Gd.Bold(11f))
                 Gd.Outlined(g, $"{_level.Settings.Name}   ·   лучший результат {_bestPercent * 100:0}%   ·   попыток {_attempts}", f,
-                    new RectangleF(0, 124, ClientSize.Width, 24), Color.FromArgb(235, 215, 230, 255), thick: 2.4f);
+                    new RectangleF(0, 124, View.Width, 24), Color.FromArgb(235, 215, 230, 255), thick: 2.4f);
 
             float bw = 300, bh = 62, gap = 14;
-            float x = ClientSize.Width / 2f - bw / 2, y = 190;
+            float x = View.Width / 2f - bw / 2, y = 190;
             Btn(g, new RectangleF(x, y, bw, bh), "ПРОДОЛЖИТЬ", "p:resume", Color.FromArgb(120, 255, 170), Color.FromArgb(20, 150, 100));
             y += bh + gap;
             Btn(g, new RectangleF(x, y, bw, bh), "ЗАНОВО", "p:restart", Color.FromArgb(255, 190, 90), Color.FromArgb(175, 100, 10));
@@ -755,7 +804,7 @@ namespace GEO_DASH.UI
 
             using var fh = Gd.Bold(9.5f);
             Gd.Outlined(g, "Esc — продолжить · R — заново · Z/X — чекпоинт · F1 хитбоксы · F11 на весь экран", fh,
-                new RectangleF(0, ClientSize.Height - 40, ClientSize.Width, 22),
+                new RectangleF(0, View.Height - 40, View.Width, 22),
                 Color.FromArgb(220, 200, 215, 255), thick: 2.2f);
         }
 
@@ -783,13 +832,13 @@ namespace GEO_DASH.UI
             using (var br = new SolidBrush(Color.FromArgb(205, 12, 14, 26))) g.FillRectangle(br, ClientRectangle);
             using var tb = new SolidBrush(Theme.Text);
             var sz = g.MeasureString(title, Theme.H1);
-            g.DrawString(title, Theme.H1, tb, ClientSize.Width / 2 - sz.Width / 2, 120);
+            g.DrawString(title, Theme.H1, tb, View.Width / 2 - sz.Width / 2, 120);
             int y = 200;
             using var db = new SolidBrush(Theme.Dim);
             foreach (var l in lines)
             {
                 var s = g.MeasureString(l, Theme.Body);
-                g.DrawString(l, Theme.Body, db, ClientSize.Width / 2 - s.Width / 2, y);
+                g.DrawString(l, Theme.Body, db, View.Width / 2 - s.Width / 2, y);
                 y += 24;
             }
         }

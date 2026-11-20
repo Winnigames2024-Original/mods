@@ -67,6 +67,16 @@ public class Store {
     public static float sfxVolume() { return prefs.getFloat("sfx", 0.6f); }
     public static void setVolumes(float m, float s) { prefs.edit().putFloat("music", m).putFloat("sfx", s).apply(); }
 
+    /**
+     * Высота картинки, в которой считается кадр: 540 — низкое качество,
+     * 720 — среднее, 0 — как есть, во всё разрешение экрана. Рисовать
+     * полупрозрачные слои в 2400x1080 мобильному видеочипу тяжело, поэтому
+     * по умолчанию кадр готовится в 720p и растягивается на экран.
+     */
+    public static int renderHeight() { return prefs.getInt("renderh", 720); }
+
+    public static void setRenderHeight(int h) { prefs.edit().putInt("renderh", h).apply(); }
+
     // ------------------------------------------------------------ файлы
 
     public static String readFile(File f) {

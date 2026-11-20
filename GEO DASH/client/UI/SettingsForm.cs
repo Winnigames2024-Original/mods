@@ -8,7 +8,7 @@ namespace GEO_DASH.UI
     {
         readonly TrackBar _music, _sfx;
         readonly CheckBox _fps, _hit, _auto, _offline, _full;
-        readonly ComboBox _fpsCap;
+        readonly ComboBox _fpsCap, _quality;
         string _msg = "";
 
         public SettingsForm()
@@ -62,6 +62,18 @@ namespace GEO_DASH.UI
             if (_fpsCap.SelectedIndex < 0) _fpsCap.SelectedIndex = 0;
             Host(_fpsCap);
 
+            _quality = new ComboBox
+            {
+                Left = 480, Top = 344, Width = 210, DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(20, 18, 48), ForeColor = Gd.Paper, FlatStyle = FlatStyle.Flat
+            };
+            _quality.Items.AddRange(new object[]
+            {
+                "низкое (960x540)", "среднее (1280x720)", "высокое (как экран)"
+            });
+            _quality.SelectedIndex = s.RenderHeight <= 0 ? 2 : (s.RenderHeight <= 540 ? 0 : 1);
+            Host(_quality);
+
             _fps = Ck(380, "показывать FPS", s.ShowFps);
             _hit = Ck(408, "показывать хитбоксы", s.ShowHitboxes);
             _auto = Ck(436, "автообновление игры с GitHub", s.AutoUpdate);
@@ -82,6 +94,7 @@ namespace GEO_DASH.UI
             s.MusicVolume = _music.Value / 100.0;
             s.SfxVolume = _sfx.Value / 100.0;
             s.Fps = int.TryParse(_fpsCap.Text, out var f) ? f : 60;
+            s.RenderHeight = _quality.SelectedIndex switch { 0 => 540, 2 => 0, _ => 720 };
             s.ShowFps = _fps.Checked;
             s.ShowHitboxes = _hit.Checked;
             s.AutoUpdate = _auto.Checked;
@@ -121,6 +134,7 @@ namespace GEO_DASH.UI
             L("Громкость музыки", 236);
             L("Громкость звуков", 292);
             L("Лимит FPS", 346);
+            Gd.Outlined(g, "Качество картинки", f, new RectangleF(480, 318, 240, 24), Gd.Paper, StringAlignment.Near, thick: 2.2f);
             if (!string.IsNullOrEmpty(_msg))
                 Gd.Outlined(g, _msg, f, new RectangleF(40, 596, ClientSize.Width - 80, 24), Gd.Gold, StringAlignment.Near, thick: 2.2f);
         }

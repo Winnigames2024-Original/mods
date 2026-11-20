@@ -26,6 +26,13 @@ namespace GEO_DASH
         public bool OfflineAutoDownload { get; set; } = true;
         public bool Fullscreen { get; set; } = true;
         public int Fps { get; set; } = 60;
+        /// <summary>
+        /// Высота картинки, в которой считается кадр: 540 — низкое, 720 —
+        /// среднее, 0 — как есть, во всё разрешение экрана. На большом
+        /// мониторе рисовать каждый пиксель градиентами дорого, поэтому кадр
+        /// готовится в маленькой картинке и растягивается на экран.
+        /// </summary>
+        public int RenderHeight { get; set; } = 720;
 
         // ---- внешний вид кубика ----
         /// <summary>Номер встроенного рисунка (1..16).</summary>
