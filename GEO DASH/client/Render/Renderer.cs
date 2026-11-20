@@ -86,7 +86,8 @@ namespace GEO_DASH.Render
                                        (float)(def.W * sx), (float)(def.H * sy));
                 // отсечение: всё, что за экраном, не рисуем
                 if (r.Right < vis.Left || r.Left > vis.Right) continue;
-                if (r.Bottom > vis.Bottom || r.Top < vis.Top) continue;
+                // за экраном объект только тогда, когда он целиком выше или ниже его
+                if (r.Bottom < vis.Top || r.Top > vis.Bottom) continue;
 
                 if (def.Invisible && !editor && !ShowTriggers) continue;
                 if (o.HideInGame && !editor) continue;          // «скрытый» блок — только в редакторе

@@ -1,8 +1,8 @@
 {
-  "version": "1.9.3",
+  "version": "1.9.4",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Скачивание треков по номеру Newgrounds прямо из настроек уровня: шкала, тест музыки и выбор файла вручную, если сервер не отдал. Спрайты в премультиплицированной альфе, частицы в пуле без мусора, отрисовка без лишних кистей.",
+  "notes": "Починено отсечение: блоки у края экрана и пол снова рисуются. Червяк теперь ездит по блокам и проходит их только прорывом по клику.",
   "date": "2026-11-20"
 }

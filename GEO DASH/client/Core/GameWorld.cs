@@ -385,8 +385,10 @@ namespace GEO_DASH.Core
                 box = p.Box;
                 if (!r.IntersectsWith(box)) continue;
 
-                // червяк проходит сквозь обычные блоки
-                if (worm && d.WormPhase) { p.NoClipWorm = true; continue; }
+                // Червяк ездит ПО блокам и проходит их только прорывом по клику.
+                // Насквозь пропускаем лишь когда он уже оказался внутри блока,
+                // чтобы не застрял намертво.
+                if (worm && d.WormPhase && p.NoClipWorm) continue;
 
                 // склон не убивает: по нему заезжают наверх, как в игре
                 if (d.Kind == ObjKind.Slope)

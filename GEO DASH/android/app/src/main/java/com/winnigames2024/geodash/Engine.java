@@ -476,7 +476,9 @@ public class Engine {
             RectF box = p.box();
             if (!hit(r, box)) continue;
 
-            if (worm && d.wormPhase) { p.noClipWorm = true; continue; }
+            // Червяк ездит ПО блокам и проходит их только прорывом по клику.
+            // Насквозь пропускаем лишь когда он уже оказался внутри блока.
+            if (worm && d.wormPhase && p.noClipWorm) continue;
 
             // склон не убивает: по нему заезжают наверх, как в игре
             if (d.kind == Catalog.SLOPE) {
