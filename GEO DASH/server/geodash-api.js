@@ -1638,13 +1638,16 @@ route('POST', '/api/licence/claim', async (req, res) => {
   const b = await readBody(req);
   if (!secretOk(headerText(req, 'x-gd-issue') || b.secret)) return bad(res, 'Неверный ключ админа', 403);
 
-  const o = db.orders[String(b.order || '').slice(0, 64)];
+  // заказ ищем по номеру или по одноразовому коду из ссылки возврата
+  const o = b.token ? orderByToken(b.token) : db.orders[String(b.order || '').slice(0, 64)];
   if (!o || !(o.keys || []).length) return bad(res, 'Заказ не найден или ещё не оплачен', 404);
   const u = db.users[key(b.name)];
   if (!u) return bad(res, 'Игрок не найден', 404);
 
   if (o.buyer && key(o.buyer) !== key(u.name))
     return bad(res, 'Этот заказ уже закреплён за другим аккаунтом', 409);
+  if (b.token && o.tokenUsed && key(o.buyer || '') !== key(u.name))
+    return bad(res, 'Этот код уже использован', 409);
 
   o.buyer = u.name;
   u.licences = u.licences || [];
@@ -1660,6 +1663,7 @@ route('POST', '/api/licence/claim', async (req, res) => {
       if (!err) activated = r.key;
     }
   }
+  if (b.token) o.tokenUsed = true;          // код получения работает один раз
   save.orders(); save.licences(); save.users();
   ok(res, { ok: true, order: o, activated, keys: o.keys, licensed: licOkFor(u) });
 });
@@ -1767,6 +1771,20 @@ route('POST', '/api/licence/payconf', async (req, res) => {
   ok(res, { ok: true, conf });
 });
 
+/** Найти заказ по одноразовому коду получения лицензии. */
+function orderByToken(t) {
+  t = String(t || '');
+  if (t.length !== 32) return null;
+  for (const o of Object.values(db.orders)) if (o && o.token === t) return o;
+  return null;
+}
+
+route('GET', '/api/licence/token/:token', (req, res, p) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const o = orderByToken(p.token);
+  ok(res, { ok: true, found: !!o, order: o || null });
+});
+
 /** Сводка по ключам для служебной ссылки на сайте. */
 route('GET', '/api/licence/stats', (req, res) => {
   if (!localCall(req)) return bad(res, 'Только с сервера', 403);
@@ -1819,10 +1837,14 @@ route('POST', '/api/licence/order', async (req, res) => {
   const id = String(b.order || '').slice(0, 64);
   if (!id) return bad(res, 'Не указан заказ');
   if (db.orders[id] && (db.orders[id].keys || []).length) return ok(res, { ok: true, order: db.orders[id] });
+  const was = db.orders[id];
   db.orders[id] = {
     order: id, buyer: String(b.buyer || '').slice(0, 40),
     count: Math.max(1, Math.min(20, b.count | 0 || 1)),
-    sum: Number(b.sum) || 0, created: now(), paid: null, keys: [], note: ''
+    sum: Number(b.sum) || 0, created: now(), paid: null, keys: [], note: '',
+    // одноразовый код получения лицензии: уходит в ссылку возврата после оплаты
+    token: (was && was.token) || crypto.randomBytes(16).toString('hex'),
+    tokenUsed: !!(was && was.tokenUsed)
   };
   save.orders();
   ok(res, { ok: true, order: db.orders[id] });

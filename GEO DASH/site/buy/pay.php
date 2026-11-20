@@ -16,6 +16,7 @@ if (gd_pay_provider() !== 'yookassa') {
 $order = (string)($_POST['order'] ?? '');
 $count = max(1, min(20, (int)($_POST['count'] ?? 1)));
 $email = trim((string)($_POST['email'] ?? ''));
+$token = preg_replace('/[^0-9a-f]/', '', (string)($_POST['token'] ?? ''));
 
 if (!preg_match('/^gd[0-9a-f]{16}$/', $order)) {
     header('Location: ' . $back . '?err=' . urlencode('Заказ потерялся — начните заново')); exit;
@@ -31,7 +32,7 @@ gd_pay_api('POST', '/api/licence/order', [
 ]);
 
 [$ok, $res] = gd_kassa_start($order, $count,
-    'https://' . ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru'), $email);
+    'https://' . ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru'), $email, $token);
 
 if (!$ok) {
     header('Location: ' . $back . '?count=' . $count . '&err=' . urlencode($res));

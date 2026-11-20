@@ -11,11 +11,14 @@ $count = max(1, min(20, (int)($_GET['count'] ?? 1)));
 $how   = gd_pay_provider();
 $err   = (string)($_GET['err'] ?? '');
 
-$order = null; $fields = [];
+$order = null; $token = ''; $fields = [];
 if ($how !== '') {
-    $order = gd_pay_start((string)(gd_user() ?? ''), $count);
+    $new = gd_pay_start((string)(gd_user() ?? ''), $count);
+    $order = $new['order'] ?? null;
+    $token = (string)($new['token'] ?? '');
     if ($order && $how === 'yoomoney')
-        $fields = gd_pay_form($order, $count, 'https://' . ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru'));
+        $fields = gd_pay_form($order, $count,
+            'https://' . ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru'), $token);
 }
 
 gd_head('Купить ключ', 'account');
@@ -63,6 +66,7 @@ gd_head('Купить ключ', 'account');
       <?php if ($how === 'yookassa'): ?>
         <form class="form" method="post" action="/buy/pay.php">
           <input type="hidden" name="order" value="<?= h($order) ?>">
+          <input type="hidden" name="token" value="<?= h($token) ?>">
           <input type="hidden" name="count" value="<?= (int)$count ?>">
           <?php if (gd_pay_needs_email()): ?>
             <label>E-mail для чека</label>

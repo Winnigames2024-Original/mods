@@ -189,14 +189,35 @@ function gd_pay_order(string $order): array {
     return [$ok, $d];
 }
 
-/** Новый номер заказа и запись «кто покупает» до оплаты. */
-function gd_pay_start(string $buyer, int $count = 1): ?string {
+/**
+ * Новый заказ: номер и одноразовый код получения лицензии.
+ * Код уходит в ссылку возврата после оплаты и работает ровно один раз.
+ */
+function gd_pay_start(string $buyer, int $count = 1): ?array {
     $order = 'gd' . bin2hex(random_bytes(8));
-    [$ok] = gd_pay_api('POST', '/api/licence/order', [
+    [$ok, $r] = gd_pay_api('POST', '/api/licence/order', [
         'order' => $order, 'buyer' => $buyer,
         'count' => max(1, min(20, $count)), 'sum' => gd_pay_price() * max(1, $count),
     ]);
-    return $ok ? $order : null;
+    if (!$ok) return null;
+    return ['order' => $order, 'token' => (string)($r['order']['token'] ?? '')];
+}
+
+/** Заказ по одноразовому коду получения. */
+function gd_pay_by_token(string $token): array {
+    [$ok, $d] = gd_pay_api('GET', '/api/licence/token/' . rawurlencode($token));
+    return [$ok, $d];
+}
+
+/** Закрепить заказ за аккаунтом по одноразовому коду. */
+function gd_pay_claim_token(string $token, string $name): array {
+    [$ok, $d, $code] = gd_pay_api('POST', '/api/licence/claim', ['token' => $token, 'name' => $name]);
+    return [$ok, $d, $code];
+}
+
+/** Ссылка возврата после оплаты — выдача лицензии по одноразовому коду. */
+function gd_pay_return(string $token, string $siteUrl): string {
+    return rtrim($siteUrl, '/') . '/lklr/?action=givelicense&value=' . urlencode($token);
 }
 
 /**
@@ -363,7 +384,7 @@ function gd_kassa_api(string $method, string $path, ?array $body = null, string 
  * Создать платёж и вернуть адрес оплаты.
  * Ключ идемпотентности — номер заказа: повторное нажатие кнопки не создаёт второй платёж.
  */
-function gd_kassa_start(string $order, int $count, string $siteUrl, string $email = ''): array {
+function gd_kassa_start(string $order, int $count, string $siteUrl, string $email = '', string $token = ''): array {
     $c = gd_pay_conf();
     $sum = number_format($c['price'] * max(1, $count), 2, '.', '');
     $what = 'Лицензионный ключ GEO DASH' . ($count > 1 ? " ($count шт.)" : '');
@@ -373,7 +394,9 @@ function gd_kassa_start(string $order, int $count, string $siteUrl, string $emai
         'capture' => true,
         'confirmation' => [
             'type' => 'redirect',
-            'return_url' => rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
+            'return_url' => $token !== ''
+                ? gd_pay_return($token, $siteUrl)
+                : rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
         ],
         'description' => $what,
         'metadata' => ['order' => $order],
@@ -630,7 +653,7 @@ function gd_pay_action(): string { return 'https://yoomoney.ru/quickpay/confirm.
  * только номер заказа, лишние данные о покупателе нам собирать незачем.
  * E-mail спрашиваем лишь если в настройках включено askEmail.
  */
-function gd_pay_form(string $order, int $count, string $siteUrl): array {
+function gd_pay_form(string $order, int $count, string $siteUrl, string $token = ''): array {
     $c = gd_pay_conf();
     $what = 'Лицензионный ключ GEO DASH' . ($count > 1 ? " ($count шт.)" : '');
     return [
@@ -642,7 +665,9 @@ function gd_pay_form(string $order, int $count, string $siteUrl): array {
         'comment' => 'Заказ ' . $order,
         'sum' => $c['price'] * max(1, $count),
         'label' => $order,
-        'successURL' => rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
+        'successURL' => $token !== ''
+            ? gd_pay_return($token, $siteUrl)
+            : rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
         'need-fio' => 'false',
         'need-email' => !empty($c['askEmail']) ? 'true' : 'false',
         'need-phone' => 'false',
