@@ -90,6 +90,9 @@ namespace GEO_DASH.Core
         public bool RobotJumping;
         public double LastJumpTime;
         public double SpiderFlash;      // анимация прыжка паука
+        /// <summary>Сколько уже летим высоко над уровнем — слишком долго нельзя.</summary>
+        public double SkyTime;
+
         /// <summary>След телепорта: откуда шёл и сколько ещё рисовать.</summary>
         public double TeleFromY, TeleT;
         /// <summary>Червяк просит прорыться сквозь блок (обрабатывает мир).</summary>
@@ -130,7 +133,7 @@ namespace GEO_DASH.Core
             GravityMul = st.GravityScale <= 0 ? 1 : st.GravityScale;
             Rotation = 0; OnGround = false; OnCeiling = false;
             RobotHold = 0; RobotJumping = false; WormBurrow = 0;
-            TeleT = 0; WormDigRequest = false;
+            TeleT = 0; WormDigRequest = false; SkyTime = 0;
             WaveTrail.Clear();
             Hidden = false;
         }

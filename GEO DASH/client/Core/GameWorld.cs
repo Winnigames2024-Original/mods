@@ -63,8 +63,13 @@ namespace GEO_DASH.Core
         public readonly HashSet<int> CoinsCollected = new();
 
         public double GroundY = 0;
-        /// <summary>Потолка у уровня нет — вверх можно улетать сколько угодно.</summary>
+        /// <summary>Потолка у уровня нет — вверх можно улетать, но не бесконечно.</summary>
         public double RoofY = 1e7;
+
+        /// <summary>С какой высоты над уровнем начинается отсчёт.</summary>
+        public const double SkyHeight = 30 * 26;
+        /// <summary>Сколько можно лететь там, наверху, прежде чем разбиться.</summary>
+        public const double SkySeconds = 2.0;
         public double RightEdge = 1200;
 
         public Action<string> Sfx;                       // "jump","orb","death","portal","coin","win"
@@ -291,6 +296,15 @@ namespace GEO_DASH.Core
             if (sreq.Requested) SpiderTeleport(p);
             if (p.WormDigRequest) { p.WormDigRequest = false; WormDig(p); }
 
+            // Потолка у уровня нет, но улететь вверх навсегда нельзя:
+            // высоко над уровнем идёт отсчёт, и через пару секунд игрок разбивается.
+            if (p.Y > GroundY + SkyHeight)
+            {
+                p.SkyTime += dt;
+                if (p.SkyTime > SkySeconds) { Die(p); return; }
+            }
+            else p.SkyTime = 0;
+
             // след телепорта гаснет сам
             if (p.TeleT > 0) p.TeleT = Math.Max(0, p.TeleT - dt);
             if (p.SpiderFlash > 0) p.SpiderFlash = Math.Max(0, p.SpiderFlash - dt);
@@ -396,8 +410,14 @@ namespace GEO_DASH.Core
                     double lo = Math.Min(r.Top, r.Bottom), hi = Math.Max(r.Top, r.Bottom);
                     double left = Math.Min(r.Left, r.Right), wide = Math.Max(1, Math.Abs(r.Right - r.Left));
                     double t = Math.Clamp((p.X - left) / wide, 0, 1);
-                    double frac = d.Style == DrawStyle.SlopeUp ? t : 1 - t;
+                    bool up = d.Style is DrawStyle.SlopeUp or DrawStyle.SlopeUpHalf or DrawStyle.SlopeUpLong;
+                    double frac = up ? t : 1 - t;
                     double surf = lo + (hi - lo) * frac;      // высота склона под игроком
+
+                    // Склон не просто держит — он разгоняет вверх, как трамплин:
+                    // чем круче и чем быстрее едем, тем сильнее подкидывает.
+                    double slope = (hi - lo) / wide;
+                    double lift = up ? Math.Min(p.SpeedUnits * slope, Phys.CubeJump * 1.35) : 0;
 
                     if (p.GravityDir > 0)
                     {
@@ -405,8 +425,9 @@ namespace GEO_DASH.Core
                         if (p.Y <= want + 4)
                         {
                             p.Y = want;
-                            if (p.VY < 0) p.VY = 0;
-                            p.OnGround = true; p.RobotJumping = false;
+                            if (p.VY < lift) p.VY = lift;
+                            p.OnGround = lift <= 0;
+                            p.RobotJumping = false;
                         }
                     }
                     else
@@ -415,8 +436,9 @@ namespace GEO_DASH.Core
                         if (p.Y >= want - 4)
                         {
                             p.Y = want;
-                            if (p.VY > 0) p.VY = 0;
-                            p.OnGround = true; p.RobotJumping = false;
+                            if (p.VY > -lift) p.VY = -lift;
+                            p.OnGround = lift <= 0;
+                            p.RobotJumping = false;
                         }
                     }
                     continue;

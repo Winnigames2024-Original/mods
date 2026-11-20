@@ -1,8 +1,8 @@
 {
-  "version": "1.9.6",
+  "version": "2.0.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Демон iSpyWithMyLittleEye усилен: цепочки прорывов червяком по слоёным платформам, смены режима посреди дропа, нарастающая инверсия цветов перед дропом, красные вспышки и микротряска в такт, шесть глаз на фоне с пульсирующей радужкой.",
+  "notes": "Версия 2.0.0: своя иконка у игры и установщика, склоны подкидывают как трамплин и четыре новых вида склонов в редакторе, долгий полёт вверх теперь убивает.",
   "date": "2026-11-20"
 }

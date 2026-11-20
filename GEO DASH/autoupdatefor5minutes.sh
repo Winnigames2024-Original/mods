@@ -59,6 +59,7 @@ fetch_builds() {
       fi
 
       cp -f "$src" "$dst.part" && mv -f "$dst.part" "$dst" || { rm -f "$dst.part"; continue; }
+      touch "$dst"                     # отметка времени — когда файл лёг на сервер
       log "$f обновлён ($(du -h "$dst" | cut -f1))"
       changed_build=1
     done

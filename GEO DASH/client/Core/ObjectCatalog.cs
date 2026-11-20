@@ -3,6 +3,7 @@ namespace GEO_DASH.Core
     public enum DrawStyle
     {
         Block, Slab, Platform, Brick, Glass, SlopeUp, SlopeDown,
+        SlopeUpHalf, SlopeDownHalf, SlopeUpLong, SlopeDownLong,
         Spike, SpikeSmall, SpikeHalf, Saw, SawBig, SpikeRow, HazardBlock,
         Orb, Pad, Portal, Deco, DecoCircle, DecoTri, Glow, Text,
         Coin, Pickup, Finish, Checkpoint, Trigger, Teleport, Water, Lava, Image
@@ -43,6 +44,10 @@ namespace GEO_DASH.Core
             Add(new ObjectDef { Id = 4, Name = "Тонкая плита", Category = "Блоки", Kind = ObjKind.Block, Style = DrawStyle.Slab, H = 8, Hh = 8, Solid = true, WormPhase = true });
             Add(new ObjectDef { Id = 5, Name = "Склон вверх", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeUp, Solid = true, WormPhase = true });
             Add(new ObjectDef { Id = 6, Name = "Склон вниз", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeDown, Solid = true, WormPhase = true });
+            Add(new ObjectDef { Id = 10, Name = "Пологий вверх", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeUpHalf, H = 15, Hh = 15, Solid = true, WormPhase = true });
+            Add(new ObjectDef { Id = 11, Name = "Пологий вниз", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeDownHalf, H = 15, Hh = 15, Solid = true, WormPhase = true });
+            Add(new ObjectDef { Id = 12, Name = "Трамплин вверх", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeUpLong, W = 60, Hw = 60, Solid = true, WormPhase = true });
+            Add(new ObjectDef { Id = 13, Name = "Трамплин вниз", Category = "Блоки", Kind = ObjKind.Slope, Style = DrawStyle.SlopeDownLong, W = 60, Hw = 60, Solid = true, WormPhase = true });
             Add(new ObjectDef { Id = 7, Name = "Платформа", Category = "Блоки", Kind = ObjKind.Block, Style = DrawStyle.Platform, H = 10, Hh = 10, Solid = true, TopOnly = true, WormPhase = true });
             Add(new ObjectDef { Id = 8, Name = "Кирпич", Category = "Блоки", Kind = ObjKind.Block, Style = DrawStyle.Brick, Solid = true, WormPhase = true });
             Add(new ObjectDef { Id = 9, Name = "Стекло", Category = "Блоки", Kind = ObjKind.Block, Style = DrawStyle.Glass, Solid = true, WormPhase = true });

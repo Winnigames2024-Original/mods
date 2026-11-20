@@ -29,6 +29,8 @@ public class Engine {
         public double x, y, vy, rotation, gravityMul = 1, wormBurrow, spiderFlash, robotHold;
         /** След телепорта: откуда шёл и сколько ещё рисовать. */
         public double teleFromY, teleT;
+        /** Сколько уже летим высоко над уровнем. */
+        public double skyTime;
         /** Червяк просит прорыться сквозь блок. */
         public boolean wormDig;
         public int gravityDir = 1, mode = Gd.CUBE, speed = 1, index;
@@ -103,6 +105,10 @@ public class Engine {
     public double gameplayOffX, gameplayOffY, gameplayAngle;
 
     public double groundY = 0, roofY = 1e7, rightEdge = 1200;   // потолка у уровня нет
+    /** С какой высоты над уровнем начинается отсчёт. */
+    static final double SKY_HEIGHT = 30 * 26;
+    /** Сколько можно лететь наверху, прежде чем разбиться. */
+    static final double SKY_SECONDS = 2.0;
     public final Map<Integer, Integer> items = new HashMap<>();
     public final List<double[]> checkpoints = new ArrayList<>();   // x,y,vy,gravityDir,mode,speed,mini,time
 
@@ -290,6 +296,12 @@ public class Engine {
 
         integrate(p, dt, hold, pressed);
         p.y += p.vy * dt;
+
+        // улететь вверх навсегда нельзя: наверху идёт отсчёт
+        if (p.y > groundY + SKY_HEIGHT) {
+            p.skyTime += dt;
+            if (p.skyTime > SKY_SECONDS) { die(); return; }
+        } else p.skyTime = 0;
 
         if (p.wormDig) { p.wormDig = false; wormDig(p); }
         if (p.teleT > 0) p.teleT = Math.max(0, p.teleT - dt);
@@ -486,23 +498,32 @@ public class Engine {
                 double left = Math.min(rBottomX(r), rTopX(r));
                 double wide = Math.max(1, Math.abs(rTopX(r) - rBottomX(r)));
                 double t = Math.max(0, Math.min(1, (p.x - left) / wide));
-                double frac = d.style == Catalog.ST_SLOPE_UP ? t : 1 - t;
+                boolean up = d.style == Catalog.ST_SLOPE_UP
+                        || d.style == Catalog.ST_SLOPE_UP_HALF
+                        || d.style == Catalog.ST_SLOPE_UP_LONG;
+                double frac = up ? t : 1 - t;
                 double surf = lo + (hi - lo) * frac;
                 double halfS = p.size() / 2;
+
+                // склон подкидывает, как трамплин: чем круче и быстрее, тем сильнее
+                double slope = (hi - lo) / wide;
+                double lift = up ? Math.min(p.speedUnits() * slope, CUBE_JUMP * 1.35) : 0;
 
                 if (p.gravityDir > 0) {
                     double want = surf + halfS;
                     if (p.y <= want + 4) {
                         p.y = want;
-                        if (p.vy < 0) p.vy = 0;
-                        p.onGround = true; p.robotJumping = false;
+                        if (p.vy < lift) p.vy = lift;
+                        p.onGround = lift <= 0;
+                        p.robotJumping = false;
                     }
                 } else {
                     double want = hi - (surf - lo) - halfS;
                     if (p.y >= want - 4) {
                         p.y = want;
-                        if (p.vy > 0) p.vy = 0;
-                        p.onGround = true; p.robotJumping = false;
+                        if (p.vy > -lift) p.vy = -lift;
+                        p.onGround = lift <= 0;
+                        p.robotJumping = false;
                     }
                 }
                 continue;

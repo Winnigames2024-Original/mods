@@ -336,8 +336,13 @@ namespace GEO_DASH.Render
 
                 case DrawStyle.SlopeUp:
                 case DrawStyle.SlopeDown:
+                case DrawStyle.SlopeUpHalf:
+                case DrawStyle.SlopeDownHalf:
+                case DrawStyle.SlopeUpLong:
+                case DrawStyle.SlopeDownLong:
                     {
-                        PointF[] pts = def.Style == DrawStyle.SlopeUp
+                        bool rising = def.Style is DrawStyle.SlopeUp or DrawStyle.SlopeUpHalf or DrawStyle.SlopeUpLong;
+                        PointF[] pts = rising
                             ? new[] { new PointF(r.X, r.Bottom), new PointF(r.Right, r.Bottom), new PointF(r.Right, r.Y) }
                             : new[] { new PointF(r.X, r.Bottom), new PointF(r.Right, r.Bottom), new PointF(r.X, r.Y) };
                         using (var br = new SolidBrush(c)) g.FillPolygon(br, pts);

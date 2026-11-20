@@ -13,7 +13,9 @@ public final class Catalog {
             ST_SAW = 10, ST_SAW_BIG = 11, ST_SPIKE_ROW = 12, ST_HAZARD_BLOCK = 13, ST_ORB = 14,
             ST_PAD = 15, ST_PORTAL = 16, ST_DECO = 17, ST_CIRCLE = 18, ST_TRI = 19, ST_GLOW = 20,
             ST_TEXT = 21, ST_COIN = 22, ST_PICKUP = 23, ST_FINISH = 24, ST_CHECKPOINT = 25, ST_TRIGGER = 26,
-            ST_WATER = 27, ST_LAVA = 28, ST_IMAGE = 29;
+            ST_WATER = 27, ST_LAVA = 28, ST_IMAGE = 29,
+            ST_SLOPE_UP_HALF = 30, ST_SLOPE_DOWN_HALF = 31,
+            ST_SLOPE_UP_LONG = 32, ST_SLOPE_DOWN_LONG = 33;
 
     public static class Def {
         public int id, kind, style;
@@ -39,6 +41,10 @@ public final class Catalog {
         add(new Def(4, BLOCK, ST_SLAB).size(30, 8).hit(0, 0, 30, 8).solid());
         add(new Def(5, SLOPE, ST_SLOPE_UP).solid());
         add(new Def(6, SLOPE, ST_SLOPE_DOWN).solid());
+        add(new Def(10, SLOPE, ST_SLOPE_UP_HALF).size(30, 15).hit(0, 0, 30, 15).solid());
+        add(new Def(11, SLOPE, ST_SLOPE_DOWN_HALF).size(30, 15).hit(0, 0, 30, 15).solid());
+        add(new Def(12, SLOPE, ST_SLOPE_UP_LONG).size(60, 30).hit(0, 0, 60, 30).solid());
+        add(new Def(13, SLOPE, ST_SLOPE_DOWN_LONG).size(60, 30).hit(0, 0, 60, 30).solid());
         add(new Def(7, BLOCK, ST_PLATFORM).size(30, 10).hit(0, 0, 30, 10).solid().top());
         add(new Def(8, BLOCK, ST_BRICK).solid());
         add(new Def(9, BLOCK, ST_GLASS).solid());

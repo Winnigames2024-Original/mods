@@ -106,8 +106,12 @@ namespace GEO_DASH.UI
                     break;
                 case DrawStyle.SlopeUp:
                 case DrawStyle.SlopeDown:
+                case DrawStyle.SlopeUpHalf:
+                case DrawStyle.SlopeDownHalf:
+                case DrawStyle.SlopeUpLong:
+                case DrawStyle.SlopeDownLong:
                     using (var br = new SolidBrush(Color.FromArgb(225, 228, 248)))
-                        g.FillPolygon(br, d.Style == DrawStyle.SlopeUp
+                        g.FillPolygon(br, d.Style is DrawStyle.SlopeUp or DrawStyle.SlopeUpHalf or DrawStyle.SlopeUpLong
                             ? new[] { new PointF(box.Left, box.Bottom), new PointF(box.Right, box.Bottom), new PointF(box.Right, box.Top) }
                             : new[] { new PointF(box.Left, box.Bottom), new PointF(box.Right, box.Bottom), new PointF(box.Left, box.Top) });
                     break;

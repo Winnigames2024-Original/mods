@@ -452,7 +452,11 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 c.drawLine(r.left, r.top, r.right, r.top, Gd.stroke(detail, 2f));
                 break;
             case Catalog.ST_SLOPE_UP:
-            case Catalog.ST_SLOPE_DOWN: {
+            case Catalog.ST_SLOPE_DOWN:
+            case Catalog.ST_SLOPE_UP_HALF:
+            case Catalog.ST_SLOPE_DOWN_HALF:
+            case Catalog.ST_SLOPE_UP_LONG:
+            case Catalog.ST_SLOPE_DOWN_LONG: {
                 Path path = new Path();
                 if (d.style == Catalog.ST_SLOPE_UP) {
                     path.moveTo(r.left, r.bottom); path.lineTo(r.right, r.bottom); path.lineTo(r.right, r.top);
