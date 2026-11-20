@@ -38,6 +38,7 @@
         <activity android:name=".ProfileActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".FriendsActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".SettingsActivity"     android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+        <activity android:name=".CrashActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".MyLevelsActivity"     android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".SongsActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".AdminActivity"        android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />

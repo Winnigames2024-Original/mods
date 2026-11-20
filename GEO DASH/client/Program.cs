@@ -45,7 +45,7 @@ namespace GEO_DASH
                 if (!RestartAuth) return;
             }
 
-            ReportLastCrash();          // прошлый запуск оборвался? расскажем админу
+            ShowCrashReport();          // прошлый запуск оборвался? покажем и расскажем админу
             AppConfig.Stage("главное меню");
             Application.Run(new MainForm());
             AppConfig.StageClear();     // вышли штатно — чёрный ящик чистим
@@ -88,27 +88,52 @@ namespace GEO_DASH
 
         /// <summary>
         /// Если в прошлый раз игра умерла жёстко (без исключения), чёрный ящик
-        /// хранит последний этап. Рассказываем о нём и чистим.
+        /// хранит последний этап: показываем это игроку окном и отправляем
+        /// отчёт админу. Админу окно показывается и просто так — со списком
+        /// всего, что прислали игроки.
         /// </summary>
-        static void ReportLastCrash()
+        static void ShowCrashReport()
         {
             try
             {
                 string stage = AppConfig.LastStage();
-                if (string.IsNullOrWhiteSpace(stage)) return;
+                bool crashed = !string.IsNullOrWhiteSpace(stage);
+                bool admin = AppConfig.IsAdminUser;
+                if (!crashed && !admin) return;
 
                 string tail = "";
                 var log = Path.Combine(AppConfig.DataDir, "crash.log");
                 if (File.Exists(log))
                 {
                     var lines = File.ReadAllLines(log);
-                    tail = string.Join("\n", lines.Skip(Math.Max(0, lines.Length - 12)));
+                    tail = string.Join("\r\n", lines.Skip(Math.Max(0, lines.Length - 14)));
                 }
-                AppConfig.Trace("прошлый запуск оборвался на этапе: " + stage);
-                Report("вылет", "Игра закрылась без ошибки.\n\nПоследние записи:\n" + tail, stage);
-                AppConfig.StageClear();
+
+                if (crashed)
+                {
+                    AppConfig.Trace("прошлый запуск оборвался на этапе: " + stage);
+                    Report("вылет", "Игра закрылась без ошибки.\n\nПоследние записи:\n" + tail, stage);
+                    AppConfig.StageClear();
+                }
+
+                // админу окно нужно только когда есть что показать
+                if (!crashed && admin && !HasFreshReports()) return;
+
+                using var f = new UI.CrashForm(crashed ? stage : "", tail, admin);
+                f.ShowDialog();
             }
             catch { }
+        }
+
+        /// <summary>Есть ли непрочитанные отчёты — чтобы не дёргать админа зря.</summary>
+        static bool HasFreshReports()
+        {
+            try
+            {
+                var r = Net.ApiClient.ReportsAsync().GetAwaiter().GetResult();
+                return r.Ok && r.Data != null && r.Data.Fresh > 0;
+            }
+            catch { return false; }
         }
     }
 }

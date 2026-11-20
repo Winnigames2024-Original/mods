@@ -76,7 +76,41 @@ public class MainActivity extends GdActivity {
         ui.post(() -> { if (statusView != null) statusView.invalidate(); });
     }
 
+    /**
+     * Прошлый запуск упал — покажем игроку, на чём именно. Админу экран
+     * открывается и просто так, когда игроки прислали новые отчёты.
+     */
+    private void showCrashReport() {
+        final boolean mine = !Store.prefs.getString("crash_text", "").isEmpty();
+        if (mine) {
+            startActivity(new android.content.Intent(this, CrashActivity.class));
+            return;
+        }
+        if (!Store.admin() || Store.prefs.getBoolean("reports_shown", false)) return;
+
+        // админу — только если есть непрочитанные
+        Api.async(() -> {
+            String s = Api.rawGet("/api/admin/reports");
+            if (s == null) return;
+            try {
+                org.json.JSONObject o = new org.json.JSONObject(s);
+                if (o.optInt("fresh", 0) <= 0) return;
+                ui.post(() -> {
+                    Store.prefs.edit().putBoolean("reports_shown", true).apply();
+                    GdDialog.message(this, "ЕСТЬ ОТЧЁТЫ",
+                            "Игроки прислали новые отчёты об ошибках: " + o.optInt("fresh", 0) + ".",
+                            new String[]{"ПОСМОТРЕТЬ", "ПОЗЖЕ"}, i -> {
+                                if (i == 0) startActivity(
+                                        new android.content.Intent(this, CrashActivity.class));
+                            });
+                });
+            } catch (Exception ignored) { }
+        });
+    }
+
     @Override protected void build() {
+        showCrashReport();
+
         // PLAY — большая круглая кнопка с треугольником
         PlayView play = new PlayView(this);
         play.setOnClickListener(v -> { Music.sfx("click"); go(PlayActivity.class); });

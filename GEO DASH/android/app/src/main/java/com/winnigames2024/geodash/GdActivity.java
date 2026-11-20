@@ -107,6 +107,12 @@ public abstract class GdActivity extends Activity {
                 java.io.StringWriter w = new java.io.StringWriter();
                 e.printStackTrace(new java.io.PrintWriter(w));
                 final String text = w.toString();
+                try {
+                    Store.prefs.edit()
+                            .putString("crash_text", text.length() > 4000 ? text.substring(0, 4000) : text)
+                            .putString("crash_stage", stage)
+                            .commit();      // именно commit: процесс уже умирает
+                } catch (Throwable ignored) { }
                 Thread send = new Thread(() -> Api.report("вылет", text, stage));
                 send.start();
                 send.join(2500);           // ждём недолго: отчёт важен, но не ценой зависания

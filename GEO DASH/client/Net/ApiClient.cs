@@ -470,6 +470,14 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<LicenceMineDto>> LicenceActivateAsync(string key, string device, string platform) =>
             PostAsync<LicenceMineDto>("/api/licence/activate", new { key, device, platform });
 
+        /// <summary>Отчёты об ошибках — только для админа.</summary>
+        public static Task<ApiReply<ReportsDto>> ReportsAsync() =>
+            GetAsync<ReportsDto>("/api/admin/reports");
+
+        /// <summary>Отметить отчёты прочитанными или очистить список.</summary>
+        public static Task<ApiReply<OkDto>> ReportsSeenAsync(bool clear = false) =>
+            PostAsync<OkDto>("/api/admin/reports/seen", new { clear });
+
         /// <summary>
         /// Отчёт об ошибке: игра сама рассказывает админу, на чём вылетела.
         /// Отправляется молча — игроку ничего делать не нужно.

@@ -1,9 +1,9 @@
 {
-  "version": "2.2.5",
+  "version": "2.2.6",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
   "setupApk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.apk",
-  "notes": "Версия 2.2.5: в установщике и в диалоге на телефоне можно вместо ключа войти в аккаунт — сервер сам найдёт ключ со свободным местом для этого компьютера или телефона и подставит его, а если свободного нет, так и напишет. Игра теперь сама рассказывает админу о вылетах: отчёт с аккаунтом, версией и тем, на чём оборвалось, виден в админке на сайте. Внутри появился чёрный ящик — он переживает даже жёсткое падение и помнит последний этап.",
+  "notes": "Версия 2.2.6: если игра закрылась сама, при следующем запуске она прямо показывает, на чём оборвалась — окно на компьютере и экран на телефоне; отчёт при этом уже ушёл администратору. Администратор в том же окне видит отчёты всех игроков: когда, с какого аккаунта, какая версия и на чём упало. Плюс всё из 2.2.5: вход по аккаунту вместо ключа в установщике и в диалоге на телефоне.",
   "date": "2026-11-20"
 }

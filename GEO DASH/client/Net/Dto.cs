@@ -168,6 +168,29 @@ namespace GEO_DASH.Net
         [JsonPropertyName("error")] public string Error { get; set; } = "";
     }
 
+    /// <summary>Отчёт об ошибке, присланный игрой.</summary>
+    public class ReportDto
+    {
+        [JsonPropertyName("id")] public string Id { get; set; } = "";
+        [JsonPropertyName("at")] public string At { get; set; } = "";
+        [JsonPropertyName("user")] public string User { get; set; } = "";
+        [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+        [JsonPropertyName("platform")] public string Platform { get; set; } = "";
+        [JsonPropertyName("version")] public string Version { get; set; } = "";
+        [JsonPropertyName("stage")] public string Stage { get; set; } = "";
+        [JsonPropertyName("text")] public string Text { get; set; } = "";
+        [JsonPropertyName("seen")] public bool Seen { get; set; }
+    }
+
+    /// <summary>Список отчётов для админа.</summary>
+    public class ReportsDto
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; set; }
+        [JsonPropertyName("reports")] public List<ReportDto> Reports { get; set; } = new();
+        [JsonPropertyName("total")] public int Total { get; set; }
+        [JsonPropertyName("fresh")] public int Fresh { get; set; }
+    }
+
     /// <summary>Сообщение в чате или в поддержке.</summary>
     public class ChatMessageDto
     {

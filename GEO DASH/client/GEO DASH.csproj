@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <LangVersion>latest</LangVersion>
-    <Version>2.2.5</Version>
+    <Version>2.2.6</Version>
     <Company>Winnigames2024</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <Product>GEO DASH</Product>
