@@ -22,6 +22,21 @@ namespace GEO_DASH
             AppConfig.Load();
 
             Application.ThreadException += (s, e) => Crash(e.Exception);
+
+            // Ошибка, которую кто-то поймал и промолчал, тоже бывает причиной
+            // вылета. Пишем первые несколько штук — дальше молчим, чтобы не
+            // засорять журнал.
+            int caught = 0;
+            AppDomain.CurrentDomain.FirstChanceException += (s, e) =>
+            {
+                if (caught++ > 15) return;
+                try
+                {
+                    AppConfig.Trace("поймана ошибка (" + AppConfig.LastStageNow() + "): "
+                        + e.Exception.GetType().Name + " — " + e.Exception.Message);
+                }
+                catch { }
+            };
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Crash(e.ExceptionObject as Exception);
 
             // открыли файл уровня .gdl — запомним, покажем его сразу после входа

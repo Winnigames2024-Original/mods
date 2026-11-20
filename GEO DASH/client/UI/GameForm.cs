@@ -76,7 +76,9 @@ namespace GEO_DASH.UI
             _mpTimer.Tick += async (s, e) => await MpTick();
             FormClosed += (s, e) =>
             {
-                _loop.Dispose(); MusicPlayer.Stop(); SaveRun(); _buf?.Dispose(); _scene?.Dispose();
+                _loop.Dispose(); MusicPlayer.Stop(); SaveRun();
+                _bufG?.Dispose(); _buf?.Dispose(); _smallG?.Dispose(); _small?.Dispose();
+                _sceneG?.Dispose(); _scene?.Dispose();
                 _mpTimer.Stop();
                 if (_mpRoom != null) _ = ApiClient.MpLeaveAsync(_mpRoom);
             };
@@ -363,7 +365,11 @@ namespace GEO_DASH.UI
         {
             base.OnResize(e);
             if (WindowState == FormWindowState.Minimized) SetPaused(true);
+            _needBuffer = true;     // размер поменялся — картинку кадра пересоберём
         }
+
+        /// <summary>Картинку кадра пора пересобрать (поменялся размер окна).</summary>
+        bool _needBuffer = true;
 
         // ------------------------------------------------------------- рендер
 
@@ -395,22 +401,58 @@ namespace GEO_DASH.UI
 
         bool _firstFrame = true;
 
+        /// <summary>Холст картинки кадра живёт столько же, сколько сама картинка.</summary>
+        Graphics _sceneG;
+
+        /// <summary>Рисовать кадр в картинку не вышло — дальше рисуем прямо в окно.</summary>
+        bool _noBuffer;
+
         protected override void OnPaint(PaintEventArgs e)
         {
             if (_firstFrame) { _firstFrame = false; AppConfig.Trace("первый кадр уровня нарисован"); }
-            AppConfig.Stage("кадр: подготовка");
+
+            if (ClientSize.Width < 2 || ClientSize.Height < 2) return;   // окно свёрнуто
+            AppConfig.Stage("кадр: размер");
             var size = View;
             _sceneK = size.Height / (double)Math.Max(1, ClientSize.Height);
 
-            if (size == ClientSize) { PaintScene(e.Graphics, size); return; }
-
-            if (_scene == null || _scene.Width != size.Width || _scene.Height != size.Height)
+            if (_noBuffer || size == ClientSize)
             {
-                _scene?.Dispose();
-                _scene = new Bitmap(size.Width, size.Height);
+                _sceneK = 1;
+                PaintSafe(e.Graphics, ClientSize);
+                return;
             }
-            using (var sg = Graphics.FromImage(_scene)) PaintScene(sg, size);
 
+            // Картинка и холст создаются только при смене размера и живут
+            // дальше: выделять их каждый кадр — верный способ упереться в
+            // пределы gdi и уронить процесс без всякой ошибки.
+            if (_needBuffer || _scene == null || _sceneG == null
+                || _scene.Width != size.Width || _scene.Height != size.Height)
+            {
+                AppConfig.Stage("кадр: создаю картинку " + size.Width + "x" + size.Height);
+                _needBuffer = false;
+                try
+                {
+                    _sceneG?.Dispose(); _sceneG = null;
+                    _scene?.Dispose(); _scene = null;
+                    if (size.Width < 2 || size.Height < 2) { _noBuffer = true; _sceneK = 1;
+                        PaintSafe(e.Graphics, ClientSize); return; }
+                    _scene = new Bitmap(size.Width, size.Height);
+                    _sceneG = Graphics.FromImage(_scene);
+                }
+                catch (Exception ex)
+                {
+                    AppConfig.Trace("картинку кадра создать не вышло: " + ex.Message);
+                    _noBuffer = true;
+                    _sceneK = 1;
+                    PaintSafe(e.Graphics, ClientSize);
+                    return;
+                }
+            }
+
+            PaintSafe(_sceneG, size);
+
+            AppConfig.Stage("кадр: вывод на экран");
             var og = e.Graphics;
             og.InterpolationMode = InterpolationMode.Bilinear;
             og.PixelOffsetMode = PixelOffsetMode.Half;
@@ -418,6 +460,22 @@ namespace GEO_DASH.UI
                          0, 0, _scene.Width, _scene.Height, GraphicsUnit.Pixel);
             og.InterpolationMode = InterpolationMode.Default;
             og.PixelOffsetMode = PixelOffsetMode.Default;
+            AppConfig.Stage("кадр: готов");
+        }
+
+        /// <summary>
+        /// Кадр с подстраховкой: ошибка рисования больше не роняет игру —
+        /// она попадает в журнал и уходит отчётом админу.
+        /// </summary>
+        void PaintSafe(Graphics g, Size size)
+        {
+            try { PaintScene(g, size); }
+            catch (Exception ex)
+            {
+                AppConfig.Trace("кадр не нарисовался: " + ex);
+                try { _ = Net.ApiClient.ReportAsync("кадр", ex.ToString(), AppConfig.LastStageNow()); }
+                catch { }
+            }
         }
 
         /// <summary>Нарисовать кадр целиком в заданную поверхность.</summary>
@@ -442,21 +500,41 @@ namespace GEO_DASH.UI
         }
 
         /// <summary>Экранные эффекты 2.2: сначала рисуем мир в картинку, потом портим её как надо.</summary>
+        Graphics _bufG;
+        Bitmap _small;
+        Graphics _smallG;
+
+        /// <summary>
+        /// Маленькая картинка для пикселизации и размытия. Раньше она
+        /// создавалась каждый кадр — за несколько секунд игры это сотни
+        /// дескрипторов gdi, на которых процесс и умирал молча.
+        /// </summary>
+        Graphics SmallCanvas(int w, int h)
+        {
+            if (_small == null || _small.Width != w || _small.Height != h)
+            {
+                _smallG?.Dispose(); _smallG = null;
+                _small?.Dispose();
+                _small = new Bitmap(Math.Max(1, w), Math.Max(1, h));
+                _smallG = Graphics.FromImage(_small);
+            }
+            return _smallG;
+        }
+
         void DrawWithFx(Graphics g)
         {
             AppConfig.Stage("эффекты: подготовка картинки");
             int w = Math.Max(1, View.Width), h = Math.Max(1, View.Height);
-            if (_buf == null || _buf.Width != w || _buf.Height != h)
+            if (_buf == null || _bufG == null || _buf.Width != w || _buf.Height != h)
             {
+                _bufG?.Dispose(); _bufG = null;
                 _buf?.Dispose();
                 _buf = new Bitmap(w, h);
+                _bufG = Graphics.FromImage(_buf);
             }
 
-            using (var bg = Graphics.FromImage(_buf))
-            {
-                bg.Clear(Color.Black);
-                Renderer.Draw(bg, _w, _v, false);
-            }
+            _bufG.Clear(Color.Black);
+            Renderer.Draw(_bufG, _w, _v, false);
 
             var fx = _w.Fx;
             Image img = _buf;
@@ -466,15 +544,12 @@ namespace GEO_DASH.UI
             if (fx.Pixelate.On)
             {
                 int k = (int)Math.Clamp(2 + fx.Pixelate.K * 26, 2, 40);
-                using var small = new Bitmap(Math.Max(1, w / k), Math.Max(1, h / k));
-                using (var sg = Graphics.FromImage(small))
-                {
-                    sg.InterpolationMode = InterpolationMode.Bilinear;
-                    sg.DrawImage(img, 0, 0, small.Width, small.Height);
-                }
+                var sg = SmallCanvas(Math.Max(1, w / k), Math.Max(1, h / k));
+                sg.InterpolationMode = InterpolationMode.Bilinear;
+                sg.DrawImage(img, 0, 0, _small.Width, _small.Height);
                 g.InterpolationMode = InterpolationMode.NearestNeighbor;
                 g.PixelOffsetMode = PixelOffsetMode.Half;
-                DrawColored(g, small, new Rectangle(0, 0, w, h), fx);
+                DrawColored(g, _small, new Rectangle(0, 0, w, h), fx);
                 g.InterpolationMode = InterpolationMode.Default;
                 return;
             }
@@ -483,14 +558,11 @@ namespace GEO_DASH.UI
             if (fx.Blur.On)
             {
                 int k = (int)Math.Clamp(2 + fx.Blur.K * 10, 2, 14);
-                using var small = new Bitmap(Math.Max(1, w / k), Math.Max(1, h / k));
-                using (var sg = Graphics.FromImage(small))
-                {
-                    sg.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                    sg.DrawImage(img, 0, 0, small.Width, small.Height);
-                }
+                var sg = SmallCanvas(Math.Max(1, w / k), Math.Max(1, h / k));
+                sg.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                sg.DrawImage(img, 0, 0, _small.Width, _small.Height);
                 g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                DrawColored(g, small, new Rectangle(0, 0, w, h), fx);
+                DrawColored(g, _small, new Rectangle(0, 0, w, h), fx);
                 g.InterpolationMode = InterpolationMode.Default;
                 return;
             }

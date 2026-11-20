@@ -116,8 +116,10 @@ namespace GEO_DASH
         // лежит в файле, отображённом в память: запись туда почти бесплатна,
         // а содержимое остаётся на диске, даже если процесс убит.
 
+        static System.IO.MemoryMappedFiles.MemoryMappedFile _stageFile;
         static System.IO.MemoryMappedFiles.MemoryMappedViewAccessor _stage;
         static string _stageLast = "";
+        static string _stageNow = "";
 
         static void StageOpen()
         {
@@ -130,9 +132,11 @@ namespace GEO_DASH
                     ? Encoding.UTF8.GetString(bytes).TrimEnd('\0').Trim()
                     : "";
 
-                var mmf = System.IO.MemoryMappedFiles.MemoryMappedFile.CreateFromFile(
+                // ссылку держим в статике: иначе сборщик мусора вправе
+                // закрыть отображение прямо посреди игры
+                _stageFile = System.IO.MemoryMappedFiles.MemoryMappedFile.CreateFromFile(
                     path, FileMode.Create, null, 256);
-                _stage = mmf.CreateViewAccessor(0, 256);
+                _stage = _stageFile.CreateViewAccessor(0, 256);
             }
             catch { }
         }
@@ -140,6 +144,7 @@ namespace GEO_DASH
         /// <summary>Что игра делает прямо сейчас — переживает даже жёсткий вылет.</summary>
         public static void Stage(string what)
         {
+            _stageNow = what ?? "";
             StageOpen();
             if (_stage == null) return;
             try
@@ -151,6 +156,9 @@ namespace GEO_DASH
             }
             catch { }
         }
+
+        /// <summary>Чем игра занята прямо сейчас.</summary>
+        public static string LastStageNow() => _stageNow;
 
         /// <summary>Чем игра была занята перед прошлым вылетом (пусто — вышли штатно).</summary>
         public static string LastStage()
