@@ -158,6 +158,8 @@ changed=0
 STALE=0
 if [ ! -f "$APP/update.json" ] || ! cmp -s "$SRC/$SUBDIR/update.json" "$APP/update.json"; then STALE=1; fi
 if [ ! -f "$WEB/index.php" ]; then STALE=1; fi
+# сайт мог измениться без смены update.json — сверяем отметку коммита
+if [ "$(cat "$WEB/.sitever" 2>/dev/null)" != "$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null)" ]; then STALE=1; fi
 
 if [ "$before" != "$after" ] || [ "$FORCED" = "1" ] || [ "$STALE" = "1" ]; then
   # ---- сайт ----
