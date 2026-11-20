@@ -2,15 +2,26 @@
 /**
  * GEO DASH — лицензионные ключи и оплата через ЮMoney.
  *
+ * Поддерживаются два способа, настраивается любой из них:
+ *
+ *   ЮKassa (магазин, API v3) — предпочтительный, если он настроен:
+ *     "shopId": "123456", "secretKey": "live_XXXX"
+ *
+ *   ЮMoney (кошелёк, платёжная форма + http-уведомления):
+ *     "receiver": "4100XXXXXXXXXX", "secret": "секрет уведомлений"
+ *
  * Настройки оплаты НЕ лежат в репозитории. Файл на сервере:
  *
  *   /etc/geodash/pay.json
  *   {
- *     "receiver": "4100XXXXXXXXXX",            номер кошелька или shopId
- *     "secret":   "секрет http-уведомлений",   из настроек ЮMoney
- *     "price":    199,
- *     "currency": "RUB",
- *     "issueKey": "GEODASH_AADDMMIINN22002266JSD"
+ *     "shopId":    "",
+ *     "secretKey": "",
+ *     "receiver":  "",
+ *     "secret":    "",
+ *     "price":     199,
+ *     "currency":  "RUB",
+ *     "vatCode":   0,
+ *     "issueKey":  "GEODASH_AADDMMIINN22002266JSD"
  *   }
  *
  *   chown root:www-data /etc/geodash/pay.json && chmod 640 /etc/geodash/pay.json
@@ -26,11 +37,14 @@ function gd_pay_conf(): array {
     static $c = null;
     if ($c !== null) return $c;
     $c = [
-        'receiver' => (string)(getenv('GEODASH_YOOMONEY') ?: ''),
-        'secret'   => (string)(getenv('GEODASH_YOOMONEY_SECRET') ?: ''),
-        'price'    => (int)(getenv('GEODASH_PRICE') ?: 199),
-        'currency' => 'RUB',
-        'issueKey' => (string)(getenv('GEODASH_ISSUE_SECRET') ?: 'GEODASH_AADDMMIINN22002266JSD'),
+        'receiver'  => (string)(getenv('GEODASH_YOOMONEY') ?: ''),
+        'secret'    => (string)(getenv('GEODASH_YOOMONEY_SECRET') ?: ''),
+        'shopId'    => (string)(getenv('GEODASH_KASSA_SHOP') ?: ''),
+        'secretKey' => (string)(getenv('GEODASH_KASSA_KEY') ?: ''),
+        'vatCode'   => (int)(getenv('GEODASH_VAT') ?: 0),
+        'price'     => (int)(getenv('GEODASH_PRICE') ?: 199),
+        'currency'  => 'RUB',
+        'issueKey'  => (string)(getenv('GEODASH_ISSUE_SECRET') ?: 'GEODASH_AADDMMIINN22002266JSD'),
     ];
     if (is_readable(GD_PAY_FILE)) {
         $j = json_decode((string)file_get_contents(GD_PAY_FILE), true);
@@ -40,14 +54,32 @@ function gd_pay_conf(): array {
     return $c;
 }
 
-/** Настроена ли продажа ключей. */
-function gd_pay_ready(): bool {
+/**
+ * Чем принимаем оплату: 'yookassa' (магазин), 'yoomoney' (кошелёк) или ''.
+ * Если настроены оба — работает ЮKassa, у неё и чеки, и возвраты.
+ */
+function gd_pay_provider(): string {
     $c = gd_pay_conf();
-    return $c['receiver'] !== '' && $c['secret'] !== '';
+    if ($c['shopId'] !== '' && $c['secretKey'] !== '') return 'yookassa';
+    if ($c['receiver'] !== '' && $c['secret'] !== '') return 'yoomoney';
+    return '';
 }
+
+/** Настроена ли продажа ключей. */
+function gd_pay_ready(): bool { return gd_pay_provider() !== ''; }
 
 function gd_pay_price(): int { return gd_pay_conf()['price']; }
 function gd_pay_receiver(): string { return gd_pay_conf()['receiver']; }
+
+/** Нужен ли чек по 54-ФЗ: тогда просим e-mail у покупателя. */
+function gd_pay_needs_email(): bool {
+    return gd_pay_provider() === 'yookassa' && gd_pay_conf()['vatCode'] > 0;
+}
+
+function gd_pay_name(string $p = ''): string {
+    $p = $p ?: gd_pay_provider();
+    return $p === 'yookassa' ? 'ЮKassa' : ($p === 'yoomoney' ? 'ЮMoney' : '—');
+}
 
 /** Запрос к игровому серверу с секретом выдачи (только по 127.0.0.1). */
 function gd_pay_api(string $method, string $path, $body = null): array {
@@ -213,6 +245,196 @@ function gd_pay_notify(array $post): array {
         'by'    => 'yoomoney',
     ]);
     gd_pay_event('ключ выдан', ['order' => $label, 'sum' => $paid, 'sign' => $how,
+        'note' => 'покупатель ' . (string)($order['buyer'] ?? '?') . ', ключей: ' . $count]);
+    return ['ok' => true, 'note' => 'Ключ выдан'];
+}
+
+// --------------------------------------------------------------- ЮKassa
+//
+// Платёж создаём сами: POST /v3/payments с басовой авторизацией shopId:secretKey
+// и ключом идемпотентности, в ответ приходит адрес, куда отправить покупателя.
+// Уведомление проверяем дважды — по адресу отправителя и перечитывая платёж у
+// ЮKassa: подписи у уведомлений нет, и доверять телу запроса нельзя.
+
+define('GD_KASSA_API', getenv('GEODASH_KASSA_API') ?: 'https://api.yookassa.ru/v3');
+
+/** Адреса, с которых ЮKassa присылает уведомления (из её документации). */
+function gd_kassa_nets(): array {
+    return ['185.71.76.0/27', '185.71.77.0/27', '77.75.153.0/25',
+            '77.75.156.11/32', '77.75.156.35/32', '77.75.154.128/25', '2a02:5180::/32'];
+}
+
+/** Попадает ли адрес в одну из подсетей ЮKassa. */
+function gd_kassa_ip_ok(string $ip): bool {
+    if (getenv('GEODASH_KASSA_ANYIP')) return true;      // для проверки на тестовом сервере
+    $bin = @inet_pton($ip);
+    if ($bin === false) return false;
+    foreach (gd_kassa_nets() as $net) {
+        [$addr, $bits] = array_pad(explode('/', $net, 2), 2, null);
+        $nb = @inet_pton($addr);
+        if ($nb === false || strlen($nb) !== strlen($bin)) continue;
+        $bits = $bits === null ? strlen($nb) * 8 : (int)$bits;
+        $full = intdiv($bits, 8);
+        $rest = $bits % 8;
+        if ($full && strncmp($bin, $nb, $full) !== 0) continue;
+        if ($rest) {
+            $mask = chr((0xff << (8 - $rest)) & 0xff);
+            if ((($bin[$full] ?? "\0") & $mask) !== (($nb[$full] ?? "\0") & $mask)) continue;
+        }
+        return true;
+    }
+    return false;
+}
+
+/** Запрос к API ЮKassa. */
+function gd_kassa_api(string $method, string $path, ?array $body = null, string $idem = ''): array {
+    $c = gd_pay_conf();
+    $ch = curl_init(GD_KASSA_API . $path);
+    $h = ['Accept: application/json'];
+    if ($body !== null) {
+        $h[] = 'Content-Type: application/json';
+        $h[] = 'Idempotence-Key: ' . ($idem !== '' ? $idem : bin2hex(random_bytes(12)));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $h,
+        CURLOPT_USERPWD => $c['shopId'] . ':' . $c['secretKey'],
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_TIMEOUT => 25,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($raw === false) return [false, ['description' => 'ЮKassa не отвечает: ' . $err], 0];
+    $j = json_decode((string)$raw, true);
+    return [$code >= 200 && $code < 300, is_array($j) ? $j : [], $code];
+}
+
+/**
+ * Создать платёж и вернуть адрес оплаты.
+ * Ключ идемпотентности — номер заказа: повторное нажатие кнопки не создаёт второй платёж.
+ */
+function gd_kassa_start(string $order, int $count, string $siteUrl, string $email = ''): array {
+    $c = gd_pay_conf();
+    $sum = number_format($c['price'] * max(1, $count), 2, '.', '');
+    $what = 'Лицензионный ключ GEO DASH' . ($count > 1 ? " ($count шт.)" : '');
+
+    $body = [
+        'amount' => ['value' => $sum, 'currency' => $c['currency']],
+        'capture' => true,
+        'confirmation' => [
+            'type' => 'redirect',
+            'return_url' => rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
+        ],
+        'description' => $what,
+        'metadata' => ['order' => $order],
+    ];
+
+    // чек нужен, когда у магазина включена фискализация
+    if ($c['vatCode'] > 0 && $email !== '') {
+        $body['receipt'] = [
+            'customer' => ['email' => $email],
+            'items' => [[
+                'description' => $what,
+                'quantity' => '1.00',
+                'amount' => ['value' => $sum, 'currency' => $c['currency']],
+                'vat_code' => $c['vatCode'],
+            ]],
+        ];
+    }
+
+    [$ok, $r] = gd_kassa_api('POST', '/payments', $body, $order);
+    if (!$ok) {
+        gd_pay_event('платёж не создан', ['order' => $order, 'sum' => (float)$sum, 'sign' => 'kassa',
+            'note' => (string)($r['description'] ?? 'ЮKassa отказала')]);
+        return [false, (string)($r['description'] ?? 'ЮKassa отказала в создании платежа')];
+    }
+    $url = $r['confirmation']['confirmation_url'] ?? '';
+    if ($url === '') return [false, 'ЮKassa не вернула адрес оплаты'];
+    return [true, $url];
+}
+
+/**
+ * Уведомление от ЮKassa: {"type":"notification","event":"payment.succeeded","object":{…}}.
+ * Подписи нет, поэтому проверяем адрес отправителя и перечитываем платёж.
+ */
+function gd_kassa_notify(string $raw, string $ip): array {
+    if (gd_pay_provider() !== 'yookassa')
+        return ['ok' => false, 'code' => 503, 'error' => 'ЮKassa не настроена'];
+
+    $j = json_decode($raw, true);
+    if (!is_array($j) || ($j['type'] ?? '') !== 'notification')
+        return ['ok' => false, 'code' => 400, 'error' => 'Не похоже на уведомление'];
+
+    $event = (string)($j['event'] ?? '');
+    $obj = is_array($j['object'] ?? null) ? $j['object'] : [];
+    $id = (string)($obj['id'] ?? '');
+
+    if (!gd_kassa_ip_ok($ip)) {
+        gd_pay_event('чужой адрес', ['sign' => 'kassa', 'note' => 'уведомление пришло с ' . $ip]);
+        return ['ok' => false, 'code' => 403, 'error' => 'Адрес не принадлежит ЮKassa'];
+    }
+
+    if ($event !== 'payment.succeeded') {
+        gd_pay_event('событие ' . ($event ?: '?'), ['sign' => 'kassa',
+            'note' => 'ключ выдаём только по payment.succeeded']);
+        return ['ok' => true, 'note' => 'Событие принято'];
+    }
+    if ($id === '') return ['ok' => false, 'code' => 400, 'error' => 'В уведомлении нет платежа'];
+
+    // перечитываем платёж у ЮKassa — телу запроса не верим
+    [$ok, $p] = gd_kassa_api('GET', '/payments/' . rawurlencode($id));
+    if (!$ok) {
+        gd_pay_event('платёж не перечитан', ['sign' => 'kassa', 'note' => 'id ' . $id]);
+        return ['ok' => false, 'code' => 502, 'error' => 'Не удалось перечитать платёж'];
+    }
+    if (($p['status'] ?? '') !== 'succeeded' || empty($p['paid'])) {
+        gd_pay_event('платёж не оплачен', ['sign' => 'kassa',
+            'note' => 'статус ' . (string)($p['status'] ?? '?')]);
+        return ['ok' => true, 'note' => 'Платёж не оплачен — ключ не выдаём'];
+    }
+
+    $label = (string)($p['metadata']['order'] ?? '');
+    $paid = (float)($p['amount']['value'] ?? 0);
+
+    if (!preg_match('/^gd[0-9a-f]{16}$/', $label)) {
+        gd_pay_event('платёж без заказа', ['sum' => $paid, 'sign' => 'kassa',
+            'note' => 'метка: ' . ($label === '' ? 'пусто' : $label)]);
+        return ['ok' => true, 'note' => 'Платёж без номера заказа'];
+    }
+
+    [$found, $info] = gd_pay_order($label);
+    $order = $info['order'] ?? null;
+    if ($found && $order && !empty($order['keys'])) {
+        gd_pay_event('повтор уведомления', ['order' => $label, 'sum' => $paid, 'sign' => 'kassa',
+            'note' => 'ключ уже выдан, второй раз не выдаём']);
+        return ['ok' => true, 'note' => 'Уже выдано'];
+    }
+
+    $count = max(1, (int)($order['count'] ?? 1));
+    $need = gd_pay_price() * $count;
+    if ($paid + 0.01 < $need) {
+        gd_pay_api('POST', '/api/licence/order', [
+            'order' => $label, 'buyer' => (string)($order['buyer'] ?? ''),
+            'count' => $count, 'sum' => $paid,
+        ]);
+        gd_pay_event('недоплата', ['order' => $label, 'sum' => $paid, 'sign' => 'kassa',
+            'note' => 'нужно было ' . (int)$need . ' ₽ за ' . $count . ' шт.']);
+        return ['ok' => true, 'note' => 'Недоплата: ключ не выдан'];
+    }
+
+    gd_pay_issue([
+        'count' => $count,
+        'note' => 'ЮKassa ' . $id,
+        'price' => gd_pay_price(),
+        'order' => $label,
+        'buyer' => (string)($order['buyer'] ?? ''),
+        'by' => 'yookassa',
+    ]);
+    gd_pay_event('ключ выдан', ['order' => $label, 'sum' => $paid, 'sign' => 'kassa',
         'note' => 'покупатель ' . (string)($order['buyer'] ?? '?') . ', ключей: ' . $count]);
     return ['ok' => true, 'note' => 'Ключ выдан'];
 }

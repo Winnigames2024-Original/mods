@@ -126,8 +126,8 @@ gd_head('Админка', 'admin');
     </p>
     <p style="margin-top:6px">
       <?php $payOk = gd_pay_ready(); ?>
-      <a class="btn small <?= $payOk ? 'ghost' : 'gold' ?>" href="/admin/yoomoney.php">
-        ОПЛАТА ЧЕРЕЗ ЮMONEY<?= $payOk ? '' : ' — НАСТРОИТЬ' ?></a>
+      <a class="btn small <?= $payOk ? 'ghost' : 'gold' ?>" href="/admin/pay.php">
+        ОПЛАТА: <?= h(gd_pay_name()) ?><?= $payOk ? '' : ' — НАСТРОИТЬ' ?></a>
       <span class="muted">продажа ключей на сайте: <b><?= $payOk ? 'включена' : 'выключена' ?></b></span>
     </p>
 

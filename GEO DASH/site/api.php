@@ -157,6 +157,18 @@ switch ($action) {
         // ЮMoney ждёт только 200 OK
         out_text('OK');
 
+    /**
+     * Уведомление от ЮKassa (API v3). Тело приходит как json, подписи нет:
+     * проверяем адрес отправителя и перечитываем платёж у самой ЮKassa.
+     * На всё, кроме успеха, отвечаем ошибкой — она повторит доставку.
+     */
+    case 'yookassa':
+        $raw = (string)file_get_contents('php://input');
+        $ip  = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        $res = gd_kassa_notify($raw, $ip);
+        if (!$res['ok']) { http_response_code($res['code'] ?? 400); echo $res['error']; exit; }
+        out_text('OK');
+
     /** Что выдано по заказу — этим пользуется страница «оплата прошла». */
     case 'order':
         $order = (string)($_GET['order'] ?? '');
@@ -189,7 +201,11 @@ switch ($action) {
                 'setupApk' => $file('GEO_DASH_Setup.apk'),
                 'autoupdate' => $file('autoupdate.exe'),
             ],
-            'licence' => ['sale' => gd_pay_ready(), 'price' => gd_pay_price()],
+            'licence' => [
+                'sale' => gd_pay_ready(),
+                'price' => gd_pay_price(),
+                'provider' => gd_pay_provider(),
+            ],
             'updatePending' => is_file($flag),
             'lastUpdate' => is_file($log) ? trim((string)file_get_contents($log)) : null,
         ]);
@@ -198,6 +214,7 @@ switch ($action) {
         out([
             'ok' => false,
             'error' => 'Неизвестное действие',
-            'actions' => ['updateserver', 'status', 'getlicencekey', 'licenceinfo', 'order', 'yoomoney']
+            'actions' => ['updateserver', 'status', 'getlicencekey', 'licenceinfo', 'order',
+                          'yoomoney', 'yookassa']
         ], 400);
 }

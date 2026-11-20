@@ -104,7 +104,7 @@ gd_head('Документация админа', 'admin');
 </style>
 <section class="section"><div class="container" style="max-width:900px">
   <p><a class="btn small ghost" href="/admin/">← В админку</a>
-     <a class="btn small ghost" href="/admin/yoomoney.php">Настройка ЮMoney</a></p>
+     <a class="btn small ghost" href="/admin/pay.php">Настройка оплаты</a></p>
   <div class="card docs">
     <?php if ($md === null): ?>
       <h2>Документация не найдена</h2>

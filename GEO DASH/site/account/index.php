@@ -72,7 +72,7 @@ gd_head('Мой аккаунт', 'account');
       <?php else: ?>
         <span class="muted">Покупка ключей на сайте пока не включена. Ключ можно получить у <?= h(GD_ADMIN) ?>.</span>
         <?php if (gd_is_admin()): ?>
-          <a class="btn small gold" href="/admin/yoomoney.php">НАСТРОИТЬ ЮMONEY</a>
+          <a class="btn small gold" href="/admin/pay.php">НАСТРОИТЬ ОПЛАТУ</a>
         <?php endif; ?>
       <?php endif; ?>
       <a class="btn small ghost" href="/download/">Скачать установщик</a>
