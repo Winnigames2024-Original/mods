@@ -604,6 +604,7 @@ namespace GEO_DASH.Core
             p.OnGround = true;
             p.OnCeiling = false;
             p.WormBurrow = 1;
+            Cam.Shake(7, 0.03, 0.14);      // лёгкий толчок камеры на прорыв
             Sfx?.Invoke("portal");
         }
 

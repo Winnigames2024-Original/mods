@@ -370,12 +370,24 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         float px = (float) ((eng.p1.x - eng.camX) * scale() + W / 2.0);
         float py = (float) (H / 2.0 - (eng.p1.y - eng.camY) * scale());
 
-        for (int i = 0; i < 3; i++) {
-            float ex = (float) (((i * 0.37 + 0.18) * W - eng.camX * scale() * 0.08) % (W * 1.5));
-            if (ex < -W * 0.4f) ex += W * 1.5f;
-            float ey = H * (i == 1 ? 0.30f : 0.46f);
-            float rw = H * (i == 1 ? 0.42f : 0.30f);
+        // шесть глаз разного размера и на разной глубине
+        final float[][] spots = {
+            {0.18f, 0.30f, 1.30f, 0.05f},
+            {0.52f, 0.52f, 0.95f, 0.08f},
+            {0.78f, 0.26f, 0.70f, 0.12f},
+            {1.05f, 0.60f, 0.85f, 0.07f},
+            {1.28f, 0.22f, 0.60f, 0.14f},
+            {1.48f, 0.48f, 1.05f, 0.06f}
+        };
+
+        for (float[] sp : spots) {
+            float pulse = 1f + flash * 0.07f;      // радужка дышит в такт
+            float rw = H * 0.42f * sp[2] * pulse;
             float rh = rw * 0.62f;
+
+            float ex = (float) ((sp[0] * W - eng.camX * scale() * sp[3]) % (W * 1.6));
+            if (ex < -W * 0.5f) ex += W * 1.6f;
+            float ey = H * sp[1];
 
             int g2 = (int) (245 * (1 - flash * 0.85f));
             eyeWhite.setColor(Color.argb(235, 245, g2, g2));

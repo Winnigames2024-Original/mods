@@ -398,85 +398,130 @@ namespace GEO_DASH.Core
             }
             b.Coin(Math.Round(Gx(27.5)), 10, 2);
 
-            // 0:30 волна
-            Mode(30, PortalKind.ModeWave);
-            b.Portal(Math.Round(Gx(30)), 4, PortalKind.Mini);
-            Fx(30, TriggerType.Shockwave, 0.7, 0.8);
-            Tunnel(30.3, 39.6, -1, 9);
+            // ---------------- 0:32–0:48 пред-дроп: цвета переворачиваются ----------------
+            // Такт трека — 141,3 удара в минуту. По сбивкам барабанов палитра
+            // резко перекидывается с чёрного на белый и обратно, всё чаще.
+            const double Beat = 60.0 / 141.3;
+
+            Mode(30, PortalKind.ModeBall);
+            Tunnel(30.3, 35.6, -1, 9);
+            for (double t = 30.6; t < 35.4; t += Beat)
             {
-                int a = (int)Math.Round(Gx(30.6)), c = (int)Math.Round(Gx(39.4));
-                for (int x = a, k = 0; x < c; x += 5, k++)
+                double gx = Math.Round(Gx(t));
+                b.Obj(20, gx, 0);
+                b.Obj(22, gx + 2, 8);
+            }
+            Mode(35.8, PortalKind.ModeCube);
+
+            for (int k = 0; k < 10; k++)
+            {
+                double t = 36.0 + k * Beat * 2;
+                if (t > 47.6) break;
+                // чем ближе дроп, тем короче вспышка инверсии
+                Fx(t, TriggerType.InvertColor, 1.0, Math.Max(0.10, 0.42 - k * 0.03));
+                Bg(t, k % 2 == 0 ? unchecked((int)0xFFF2F2F2) : unchecked((int)0xFF101010));
+                if (k % 2 == 0) Shake(t, 6 + k, 0.18);
+
+                double gx = Math.Round(Gx(t));
+                b.Spike(gx); b.Spike(gx + 1);
+                if (k % 3 == 0) b.Orb(gx + 4, 4, OrbKind.Pink);
+            }
+
+            // ---------------- 0:48–1:20 дроп: цепочки прорывов ----------------
+            Speed(48, SpeedTier.Fastest);
+            Mode(48.2, PortalKind.ModeWorm);
+            Bg(48, unchecked((int)0xFF140000));
+            Fx(48, TriggerType.Flash, 1.0, 0.45);
+            Fx(48.1, TriggerType.Chromatic, 0.9, 1.6);
+            Shake(48, 26, 1.2);
+
+            // красная вспышка и микротряска на каждый сильный удар бочки
+            for (double t = 48; t < 80; t += Beat * 2)
+            {
+                Fx(t, TriggerType.Flash, 0.42, 0.12);
+                Shake(t, 4, 0.1);
+            }
+
+            // 0:48–0:56 — лестница из слоёных платформ: 3–4 клика подряд
+            for (int chain = 0; chain < 4; chain++)
+            {
+                double t0 = 48.6 + chain * 2.0;
+                for (int step = 0; step < 4; step++)
+                {
+                    double t = t0 + step * Beat;
+                    double gx = Math.Round(Gx(t));
+                    int y = 2 + step * 2;                       // ступенька выше предыдущей
+                    b.Bridge(gx, 7, y, 2);
+                    // шип с обратной стороны: выйти нужно именно прорывом
+                    b.Obj(step % 2 == 0 ? 20 : 22, gx + 3, step % 2 == 0 ? y + 2 : y - 1);
+                }
+            }
+            b.Coin(Math.Round(Gx(55.0)), 11, 2);
+
+            // 0:57–1:02 — узкий зигзаг на волне
+            Mode(56.8, PortalKind.ModeWave);
+            b.Portal(Math.Round(Gx(56.8)), 4, PortalKind.Mini);
+            Tunnel(57.0, 62.4, -1, 9);
+            {
+                int a = (int)Math.Round(Gx(57.2)), c = (int)Math.Round(Gx(62.2));
+                for (int x = a, k = 0; x < c; x += 4, k++)
                 {
                     int lo = k % 2 == 0 ? 0 : 6;
                     b.Obj(1, x, lo); b.Obj(1, x, lo + 1);
                 }
             }
-            Mode(39.8, PortalKind.ModeCube);
-            b.Portal(Math.Round(Gx(39.8)), 4, PortalKind.Big);
 
-            // 0:40 второй дроп: корабль между глаз
-            Speed(40, SpeedTier.Fastest);
-            Mode(40.2, PortalKind.ModeShip);
-            Shake(40, 22, 1.0);
-            Fx(40, TriggerType.Flash, 1.0, 0.45);
-            Fx(40.1, TriggerType.Glitch, 0.75, 1.2);
-            Bg(40, unchecked((int)0xFF5A0A0A));
-            Tunnel(40.4, 49.6, -1, 14);
-            b.Eye(Math.Round(Gx(43)), 7, 4);
-            b.Eye(Math.Round(Gx(46)), 5, 3);
-            b.Eye(Math.Round(Gx(48.5)), 9, 3);
-            b.Coin(Math.Round(Gx(45.0)), 12, 3);
+            // 1:02–1:07 — паук по стенам
+            Mode(62.6, PortalKind.ModeSpider);
+            Tunnel(62.8, 67.4, -1, 10);
+            for (double t = 63.2; t < 67.2; t += Beat)
+                b.Obj(20, Math.Round(Gx(t)), ((int)(t / Beat)) % 2 == 0 ? 0 : 9);
 
-            // 0:50 передышка: куб
-            Speed(50, SpeedTier.Fast);
-            Mode(50.2, PortalKind.ModeCube);
-            Bg(50, unchecked((int)0xFF151515));
-            Fx(50, TriggerType.Vignette, 0.5, 1.5);
-            for (double t = 51; t < 59.4; t += 1.0)
+            // 1:07–1:20 — снова червяк: два больших глаза из блоков, сквозь них прорыв
+            Mode(67.6, PortalKind.ModeWorm);
+            Shake(67.6, 18, 0.6);
+            for (int e = 0; e < 2; e++)
             {
-                double gx = Math.Round(Gx(t));
-                b.Spike(gx);
-                if ((int)(t * 2) % 3 == 0) b.Orb(gx + 3, 4, OrbKind.Yellow);
-            }
-
-            // 1:00 третий дроп: червяк сквозь толщу
-            Speed(60, SpeedTier.Fastest);
-            Mode(60.2, PortalKind.ModeWorm);
-            Shake(60, 24, 1.1);
-            Fx(60, TriggerType.Flash, 1.0, 0.5);
-            Fx(60.1, TriggerType.Chromatic, 0.9, 1.6);
-            Bg(60, unchecked((int)0xFF6E0808));
-            for (int s = 0; s < 5; s++)
-            {
-                double gx = Math.Round(Gx(60.8 + s * 1.7));
-                b.Layered(gx, 12, 2, 6, 2);
+                double gx = Math.Round(Gx(68.4 + e * 5.2));
+                b.Eye(gx + 6, 6, 5, false);        // кольцо-глаз из блоков
+                b.Bridge(gx + 2, 9, 5, 3);         // толща, сквозь которую идём
                 b.Obj(20, gx + 4, 8);
-                b.Obj(22, gx + 8, 1);
+                b.Obj(22, gx + 9, 4);
             }
+            for (int chain = 0; chain < 3; chain++)
+            {
+                double t0 = 74.4 + chain * 1.8;
+                for (int step = 0; step < 3; step++)
+                {
+                    double t = t0 + step * Beat;
+                    double gx = Math.Round(Gx(t));
+                    int y = 6 - step * 2;
+                    b.Bridge(gx, 6, y, 2);
+                    b.Obj(step % 2 == 0 ? 22 : 20, gx + 2, step % 2 == 0 ? y - 1 : y + 2);
+                }
+            }
+            b.Coin(Math.Round(Gx(78.4)), 10, 3);
 
-            // 1:10 корабль
-            Speed(70, SpeedTier.Faster);
-            Mode(70.2, PortalKind.ModeShip);
-            Tunnel(70.4, 79.6, -1, 13);
-            for (double t = 71; t < 79; t += 0.7)
-                b.Obj(1, Math.Round(Gx(t)), 2 + (int)((t * 5) % 9));
-
-            // 1:20 пик: червяк на полной скорости
+            // ---------------- 1:20–1:30 финальный рывок ----------------
             Speed(80, SpeedTier.Hyper);
-            Mode(80.2, PortalKind.ModeWorm);
-            Shake(80, 26, 1.2);
+            Mode(80.2, PortalKind.ModeRobot);
+            Shake(80, 28, 1.2);
             Fx(80, TriggerType.Flash, 1.0, 0.5);
             Fx(80.1, TriggerType.Glitch, 0.85, 1.4);
             Bg(80, unchecked((int)0xFF8A0A0A));
-            for (int s = 0; s < 6; s++)
+            for (double t = 80.8; t < 85.6; t += Beat * 2)
             {
-                double gx = Math.Round(Gx(80.8 + s * 1.2));
-                b.Bridge(gx, 8, 3, 2);
-                b.Obj(s % 2 == 0 ? 20 : 22, gx + 3, s % 2 == 0 ? 5 : 2);
+                double gx = Math.Round(Gx(t));
+                b.Block(gx, (int)((t * 3) % 4), 5);
+                b.Spike(gx + 6);
             }
+            Mode(85.8, PortalKind.ModeWorm);
+            b.Eye(Math.Round(Gx(87.0)), 6, 6, false);
+            b.Bridge(Math.Round(Gx(86.6)), 12, 5, 3);
+            b.Obj(20, Math.Round(Gx(87.2)), 8);
             Shake(87.9, 30, 1.0);
             Fx(87.9, TriggerType.Shockwave, 1.0, 1.0);
-            Mode(88.2, PortalKind.ModeCube);
+            Mode(88.4, PortalKind.ModeCube);
 
             // 1:30 выезд
             Speed(90, SpeedTier.Faster);

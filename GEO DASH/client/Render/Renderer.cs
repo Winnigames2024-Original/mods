@@ -191,6 +191,17 @@ namespace GEO_DASH.Render
 
         static readonly SolidBrush EyeFlashBrush = new(Color.Transparent);
 
+        /// <summary>Где стоят глаза: размер из кэша, место на экране, масштаб и глубина.</summary>
+        static readonly (int kind, float x, float y, float size, float depth)[] EyeSpots =
+        {
+            (1, 0.18f, 0.30f, 1.30f, 0.05f),
+            (0, 0.52f, 0.52f, 0.95f, 0.08f),
+            (2, 0.78f, 0.26f, 0.70f, 0.12f),
+            (0, 1.05f, 0.60f, 0.85f, 0.07f),
+            (2, 1.28f, 0.22f, 0.60f, 0.14f),
+            (1, 1.48f, 0.48f, 1.05f, 0.06f)
+        };
+
         /// <summary>
         /// Фон уровня «iSpy»: огромные глаза. Зрачок тянется к игроку,
         /// на долю такта по глазам проходит красная вспышка.
@@ -215,15 +226,20 @@ namespace GEO_DASH.Render
             var oldMode = g.InterpolationMode;
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
 
-            for (int i = 0; i < 3; i++)
+            // шесть глаз разного размера и на разной глубине
+            for (int i = 0; i < EyeSpots.Length; i++)
             {
-                var img = EyeBall[i];
-                float scale = ch / 620f * (i == 1 ? 1.25f : 1f);
+                var (kind, px01, py01, size, depth) = EyeSpots[i];
+                var img = EyeBall[kind];
+
+                // на дроп радужка слегка раздувается в такт
+                float pulse = 1f + flash * 0.07f;
+                float scale = ch / 620f * size * pulse;
                 float rw = img.Width * scale, rh = img.Height * scale;
 
-                float ex = (float)(((i * 0.37 + 0.18) * cw - w.Cam.CamX * v.Scale * 0.08) % (cw * 1.5));
-                if (ex < -cw * 0.4f) ex += cw * 1.5f;
-                float ey = ch * (i == 1 ? 0.30f : 0.46f);
+                float ex = (float)((px01 * cw - w.Cam.CamX * v.Scale * depth) % (cw * 1.6));
+                if (ex < -cw * 0.5f) ex += cw * 1.6f;
+                float ey = ch * py01;
 
                 g.DrawImage(img, ex - rw / 2, ey - rh / 2, rw, rh);
 

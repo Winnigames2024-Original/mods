@@ -9,8 +9,8 @@ android {
         applicationId "com.winnigames2024.geodash"
         minSdk 21
         targetSdk 34
-        versionCode 19
-        versionName "1.9.5"
+        versionCode 20
+        versionName "1.9.6"
     }
 
     // свой постоянный ключ в репозитории: подпись одинаковая у всех сборок,

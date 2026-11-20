@@ -9,7 +9,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>1.9.5</Version>
+    <Version>1.9.6</Version>
     <Company>Winnigames2024</Company>
     <Product>GEO DASH Setup</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>

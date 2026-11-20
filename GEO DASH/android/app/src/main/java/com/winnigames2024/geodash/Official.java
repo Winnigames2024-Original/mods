@@ -358,76 +358,113 @@ public class Official {
         }
         b.coin(Math.round(gx(27.5)), 10, 2);
 
-        b.portal(Math.round(gx(30)), 1, Level.P_WAVE);
-        b.portal(Math.round(gx(30)), 4, Level.P_MINI);
-        fx(b, 30, Level.T_SHOCK, 0.7, 0.8);
-        tunnel(b, 30.3, 39.6, -1, 9);
+        // ---------------- 0:32–0:48 пред-дроп: цвета переворачиваются ----------------
+        // Такт трека — 141,3 удара в минуту.
+        final double BEAT = 60.0 / 141.3;
+
+        b.portal(Math.round(gx(30)), 1, Level.P_BALL);
+        tunnel(b, 30.3, 35.6, -1, 9);
+        for (double t = 30.6; t < 35.4; t += BEAT) {
+            double x = Math.round(gx(t));
+            b.obj(20, x, 0);
+            b.obj(22, x + 2, 8);
+        }
+        b.portal(Math.round(gx(35.8)), 1, Level.P_CUBE);
+
+        for (int k = 0; k < 10; k++) {
+            double t = 36.0 + k * BEAT * 2;
+            if (t > 47.6) break;
+            fx(b, t, Level.T_INVERT, 1.0, Math.max(0.10, 0.42 - k * 0.03));
+            bg(b, t, k % 2 == 0 ? 0xFFF2F2F2 : 0xFF101010);
+            if (k % 2 == 0) shake(b, t, 6 + k, 0.18);
+
+            double x = Math.round(gx(t));
+            b.spike(x); b.spike(x + 1);
+            if (k % 3 == 0) b.orb(x + 4, 4, 1);
+        }
+
+        // ---------------- 0:48–1:20 дроп: цепочки прорывов ----------------
+        b.portal(Math.round(gx(48)), 1, speedPortal(4));
+        b.portal(Math.round(gx(48.2)), 1, Level.P_WORM);
+        bg(b, 48, 0xFF140000);
+        fx(b, 48, Level.T_FLASH, 1.0, 0.45);
+        fx(b, 48.1, Level.T_CHROMATIC, 0.9, 1.6);
+        shake(b, 48, 26, 1.2);
+
+        for (double t = 48; t < 80; t += BEAT * 2) {
+            fx(b, t, Level.T_FLASH, 0.42, 0.12);
+            shake(b, t, 4, 0.1);
+        }
+
+        for (int chain = 0; chain < 4; chain++) {
+            double t0 = 48.6 + chain * 2.0;
+            for (int step = 0; step < 4; step++) {
+                double t = t0 + step * BEAT;
+                double x = Math.round(gx(t));
+                int y = 2 + step * 2;
+                b.bridge(x, 7, y, 2);
+                b.obj(step % 2 == 0 ? 20 : 22, x + 3, step % 2 == 0 ? y + 2 : y - 1);
+            }
+        }
+        b.coin(Math.round(gx(55.0)), 11, 2);
+
+        b.portal(Math.round(gx(56.8)), 1, Level.P_WAVE);
+        b.portal(Math.round(gx(56.8)), 4, Level.P_MINI);
+        tunnel(b, 57.0, 62.4, -1, 9);
         {
-            int a = (int) Math.round(gx(30.6)), c = (int) Math.round(gx(39.4));
+            int a = (int) Math.round(gx(57.2)), c = (int) Math.round(gx(62.2));
             int k = 0;
-            for (int x = a; x < c; x += 5, k++) {
+            for (int x = a; x < c; x += 4, k++) {
                 int lo = k % 2 == 0 ? 0 : 6;
                 b.obj(1, x, lo); b.obj(1, x, lo + 1);
             }
         }
-        b.portal(Math.round(gx(39.8)), 1, Level.P_CUBE);
-        b.portal(Math.round(gx(39.8)), 4, Level.P_BIG);
 
-        b.portal(Math.round(gx(40)), 1, speedPortal(4));
-        b.portal(Math.round(gx(40.2)), 1, Level.P_SHIP);
-        shake(b, 40, 22, 1.0);
-        fx(b, 40, Level.T_FLASH, 1.0, 0.45);
-        fx(b, 40.1, Level.T_GLITCH, 0.75, 1.2);
-        bg(b, 40, 0xFF5A0A0A);
-        tunnel(b, 40.4, 49.6, -1, 14);
-        b.eye(Math.round(gx(43)), 7, 4, true);
-        b.eye(Math.round(gx(46)), 5, 3, true);
-        b.eye(Math.round(gx(48.5)), 9, 3, true);
-        b.coin(Math.round(gx(45.0)), 12, 3);
+        b.portal(Math.round(gx(62.6)), 1, Level.P_SPIDER);
+        tunnel(b, 62.8, 67.4, -1, 10);
+        for (double t = 63.2; t < 67.2; t += BEAT)
+            b.obj(20, Math.round(gx(t)), ((int) (t / BEAT)) % 2 == 0 ? 0 : 9);
 
-        b.portal(Math.round(gx(50)), 1, speedPortal(2));
-        b.portal(Math.round(gx(50.2)), 1, Level.P_CUBE);
-        bg(b, 50, 0xFF151515);
-        fx(b, 50, Level.T_VIGNETTE, 0.5, 1.5);
-        for (double t = 51; t < 59.4; t += 1.0) {
-            double x = Math.round(gx(t));
-            b.spike(x);
-            if ((int) (t * 2) % 3 == 0) b.orb(x + 3, 4, 0);
-        }
-
-        b.portal(Math.round(gx(60)), 1, speedPortal(4));
-        b.portal(Math.round(gx(60.2)), 1, Level.P_WORM);
-        shake(b, 60, 24, 1.1);
-        fx(b, 60, Level.T_FLASH, 1.0, 0.5);
-        fx(b, 60.1, Level.T_CHROMATIC, 0.9, 1.6);
-        bg(b, 60, 0xFF6E0808);
-        for (int s = 0; s < 5; s++) {
-            double x = Math.round(gx(60.8 + s * 1.7));
-            b.layered(x, 12, 2, 6, 2);
+        b.portal(Math.round(gx(67.6)), 1, Level.P_WORM);
+        shake(b, 67.6, 18, 0.6);
+        for (int e = 0; e < 2; e++) {
+            double x = Math.round(gx(68.4 + e * 5.2));
+            b.eye(x + 6, 6, 5, false);
+            b.bridge(x + 2, 9, 5, 3);
             b.obj(20, x + 4, 8);
-            b.obj(22, x + 8, 1);
+            b.obj(22, x + 9, 4);
         }
+        for (int chain = 0; chain < 3; chain++) {
+            double t0 = 74.4 + chain * 1.8;
+            for (int step = 0; step < 3; step++) {
+                double t = t0 + step * BEAT;
+                double x = Math.round(gx(t));
+                int y = 6 - step * 2;
+                b.bridge(x, 6, y, 2);
+                b.obj(step % 2 == 0 ? 22 : 20, x + 2, step % 2 == 0 ? y - 1 : y + 2);
+            }
+        }
+        b.coin(Math.round(gx(78.4)), 10, 3);
 
-        b.portal(Math.round(gx(70)), 1, speedPortal(3));
-        b.portal(Math.round(gx(70.2)), 1, Level.P_SHIP);
-        tunnel(b, 70.4, 79.6, -1, 13);
-        for (double t = 71; t < 79; t += 0.7)
-            b.obj(1, Math.round(gx(t)), 2 + (int) ((t * 5) % 9));
-
+        // ---------------- 1:20–1:30 финальный рывок ----------------
         b.portal(Math.round(gx(80)), 1, speedPortal(5));
-        b.portal(Math.round(gx(80.2)), 1, Level.P_WORM);
-        shake(b, 80, 26, 1.2);
+        b.portal(Math.round(gx(80.2)), 1, Level.P_ROBOT);
+        shake(b, 80, 28, 1.2);
         fx(b, 80, Level.T_FLASH, 1.0, 0.5);
         fx(b, 80.1, Level.T_GLITCH, 0.85, 1.4);
         bg(b, 80, 0xFF8A0A0A);
-        for (int s = 0; s < 6; s++) {
-            double x = Math.round(gx(80.8 + s * 1.2));
-            b.bridge(x, 8, 3, 2);
-            b.obj(s % 2 == 0 ? 20 : 22, x + 3, s % 2 == 0 ? 5 : 2);
+        for (double t = 80.8; t < 85.6; t += BEAT * 2) {
+            double x = Math.round(gx(t));
+            b.block(x, (int) ((t * 3) % 4), 5);
+            b.spike(x + 6);
         }
+        b.portal(Math.round(gx(85.8)), 1, Level.P_WORM);
+        b.eye(Math.round(gx(87.0)), 6, 6, false);
+        b.bridge(Math.round(gx(86.6)), 12, 5, 3);
+        b.obj(20, Math.round(gx(87.2)), 8);
         shake(b, 87.9, 30, 1.0);
         fx(b, 87.9, Level.T_SHOCK, 1.0, 1.0);
-        b.portal(Math.round(gx(88.2)), 1, Level.P_CUBE);
+        b.portal(Math.round(gx(88.4)), 1, Level.P_CUBE);
 
         b.portal(Math.round(gx(90)), 1, speedPortal(3));
         bg(b, 90, 0xFF101010);
