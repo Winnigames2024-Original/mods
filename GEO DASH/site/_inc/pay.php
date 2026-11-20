@@ -217,7 +217,7 @@ function gd_pay_claim_token(string $token, string $name): array {
 
 /** Ссылка возврата после оплаты — выдача лицензии по одноразовому коду. */
 function gd_pay_return(string $token, string $siteUrl): string {
-    return rtrim($siteUrl, '/') . '/lklr/?action=givelicense&value=' . urlencode($token);
+    return rtrim($siteUrl, '/') . '/licensekey/index.php?action=givelicense&value=' . urlencode($token);
 }
 
 /**
@@ -526,7 +526,7 @@ function gd_ym_ready(): bool {
 /** Адрес, который нужно вписать в «Redirect URI» при регистрации приложения. */
 function gd_ym_redirect(string $host = ''): string {
     $host = $host ?: ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru');
-    return 'https://' . $host . '/admin/ymauth.php';
+    return 'https://' . $host . '/licensekey/index.php';
 }
 
 /** Адрес для «Notification URI» — без параметров, их ЮMoney не принимает. */

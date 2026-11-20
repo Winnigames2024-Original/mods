@@ -27,14 +27,17 @@ if ($deny !== '') {
 } elseif ($code === '') {
     $text = 'ЮMoney не передала код. Начните подключение заново со страницы оплаты.';
 } else {
-    // код мог прийти на /admin/ymauth.php или на /lklr/ — пробуем оба адреса,
-    // ЮMoney сверяет redirect_uri побайтно с тем, что было в запросе
-    [$got, $res] = gd_ym_token_from_code($code);
-    if (!$got) {
-        $alt = 'https://' . ($_SERVER['HTTP_HOST'] ?? '') . '/lklr/';
-        [$got2, $res2] = gd_ym_token_from_code_at($code, $alt);
-        if ($got2) { $got = true; $res = $res2; }
+    // ЮMoney сверяет redirect_uri побайтно с тем, что было в запросе, а код
+    // мог прийти на любой из наших адресов — пробуем их по очереди
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $got = false; $res = 'ЮMoney не ответила';
+    foreach ([gd_ym_redirect(), 'https://' . $host . '/admin/ymauth.php',
+              'https://' . $host . '/lklr/'] as $uri) {
+        [$g, $r] = gd_ym_token_from_code_at($code, $uri);
+        if ($g) { $got = true; $res = $r; break; }
+        $res = $r;
     }
+
     if ($got) {
         [$saved, $r] = gd_pay_store_set(['ymToken' => $res]);
         $ok = $saved;
