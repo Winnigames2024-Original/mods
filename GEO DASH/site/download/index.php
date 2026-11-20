@@ -5,6 +5,7 @@ $exe = file_exists("$dir/GEO_DASH.exe") ? filesize("$dir/GEO_DASH.exe") : 0;
 $apk = file_exists("$dir/GEO_DASH.apk") ? filesize("$dir/GEO_DASH.apk") : 0;
 $setup = file_exists("$dir/GEO_DASH_Setup.exe") ? filesize("$dir/GEO_DASH_Setup.exe") : 0;
 $auto  = file_exists("$dir/autoupdate.exe") ? filesize("$dir/autoupdate.exe") : 0;
+$sapk  = file_exists("$dir/GEO_DASH_Setup.apk") ? filesize("$dir/GEO_DASH_Setup.apk") : 0;
 $rel = file_exists("$dir/.release") ? trim(file_get_contents("$dir/.release")) : '';
 $upd = file_exists("$dir/.updated") ? trim(file_get_contents("$dir/.updated")) : '';
 $mb  = fn($b) => $b ? number_format($b / 1048576, 1, ',', ' ') . ' МБ' : '—';
@@ -14,6 +15,16 @@ gd_head('Скачать', 'download');
 <section class="section"><div class="container">
   <h2>Скачать GEO DASH</h2>
   <p class="muted">Версия: <b><?= h($rel ?: 'dev') ?></b><?= $upd ? ' · обновлено ' . h(substr($upd, 0, 16)) : '' ?></p>
+
+  <div class="card" style="margin-top:18px;border-color:#7cf">
+    <h3>Ставьте установщиком — игре нужен лицензионный ключ</h3>
+    <p class="muted">
+      Игра запускается только из копии, поставленной установщиком, и спрашивает лицензионный ключ.
+      Ключ виден в <a href="/account/">вашем аккаунте</a>, его можно купить на сайте или получить
+      у <?= h(GD_ADMIN) ?>. Один ключ — один аккаунт, навсегда и на всех ваших устройствах:
+      и на компьютере, и на телефоне.
+    </p>
+  </div>
 
   <div class="card" style="margin-top:18px;border-color:#ffd24a">
     <h3>Установщик для Windows — так проще всего</h3>
@@ -51,18 +62,28 @@ gd_head('Скачать', 'download');
       </p>
     </div>
 
-    <div class="card">
-      <h3>Android</h3>
-      <p class="muted">APK с тем же движком и тем же аккаунтом. Уровни и песни сохраняются в <b>assets</b> приложения и играются офлайн.</p>
-      <p class="muted">Размер: <?= $mb($apk) ?></p>
+    <div class="card" style="border-color:#ffd24a">
+      <h3>Android — установщик</h3>
+      <p class="muted">
+        Маленькое приложение: качает последнюю версию игры с сервера, ставит её и передаёт
+        лицензионный ключ. Ставить игру нужно именно им — сама по себе она не запустится.
+      </p>
+      <p class="muted">Размер: <?= $mb($sapk) ?></p>
       <p style="margin-top:14px">
-        <?php if ($apk): ?>
-          <a class="btn pink" href="/download/GEO_DASH.apk">СКАЧАТЬ .APK</a>
+        <?php if ($sapk): ?>
+          <a class="btn gold" href="/download/GEO_DASH_Setup.apk">СКАЧАТЬ УСТАНОВЩИК .APK</a>
         <?php else: ?>
-          <span class="badge">сборка ещё не выложена</span>
+          <span class="badge">установщик ещё не выложен</span>
         <?php endif; ?>
       </p>
-      <p class="muted" style="margin-top:10px">При установке разреши «Установка из неизвестных источников».</p>
+      <p class="muted" style="margin-top:10px">
+        При установке разреши «Установка из неизвестных источников» — сначала установщику,
+        а потом он поставит игру сам.
+        <?php if ($apk): ?>
+          <br>Сама игра: <a href="/download/GEO_DASH.apk">GEO_DASH.apk</a> (<?= $mb($apk) ?>) —
+          нужна, только если ставите вручную.
+        <?php endif; ?>
+      </p>
     </div>
   </div>
 

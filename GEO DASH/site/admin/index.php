@@ -44,18 +44,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') !== 'song') {
         'offoff'    => gd_post('/api/admin/offline', ['id' => $id, 'offline' => false], gd_token()),
         'dellevel'  => gd_post("/api/levels/$id/delete", [], gd_token()),
         'news'      => gd_post('/api/admin/broadcast', ['text' => $_POST['text'] ?? ''], gd_token()),
+        'newkeys'   => gd_post('/api/admin/licence/new', ['count' => (int)($_POST['count'] ?? 1),
+                                'note' => trim($_POST['note'] ?? '')], gd_token()),
+        'grantkey'  => gd_post('/api/admin/licence/grant', ['name' => $name,
+                                'note' => 'выдано из админки'], gd_token()),
+        'revoke'    => gd_post('/api/admin/licence/revoke', ['key' => trim($_POST['key'] ?? ''),
+                                'revoked' => true], gd_token()),
+        'unrevoke'  => gd_post('/api/admin/licence/revoke', ['key' => trim($_POST['key'] ?? ''),
+                                'revoked' => false], gd_token()),
         default     => [false, ['error' => 'неизвестное действие']],
     };
-    if ($ok) $msg = 'Готово'; else $err = $r['error'] ?? 'Ошибка';
+    if ($ok) {
+        $msg = 'Готово';
+        // новые ключи показываем сразу — их нужно скопировать и отдать игроку
+        if (!empty($r['keys'])) $msg = 'Выдано: ' . implode('   ', (array)$r['keys']);
+        elseif (!empty($r['key'])) $msg = 'Ключ ' . $r['key'] . (!empty($r['licensed']) ? ' — активирован на ' . $name : '');
+    } else $err = $r['error'] ?? 'Ошибка';
 }
 
 [$okU, $users]  = gd_get('/api/admin/users', gd_token());
 [$okL, $levels] = gd_get('/api/levels?sort=recent', gd_token());
 [$okS, $stats]  = gd_get('/api/admin/stats', gd_token());
+[$okK, $lic]    = gd_get('/api/admin/licences', gd_token());
 gd_head('Админка', 'admin');
 ?>
 <section class="section"><div class="container">
   <h2>Админка</h2>
+  <p class="muted" style="margin-top:-8px">Как всё устроено, ключи, оплата и обновления —
+    <a href="/admin/docs.php"><b>документация админа</b></a>.</p>
   <?php if ($msg): ?><div class="alert ok"><?= h($msg) ?></div><?php endif; ?>
   <?php if ($err): ?><div class="alert err"><?= h($err) ?></div><?php endif; ?>
 
@@ -77,6 +93,59 @@ gd_head('Админка', 'admin');
       <input type="text" name="text" placeholder="объявление для всех игроков">
       <button class="btn small" type="submit">ОТПРАВИТЬ</button>
     </form>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <h3>Лицензионные ключи</h3>
+    <?php if ($okK && is_array($lic)): ?>
+      <div class="stats" style="margin:0 0 14px">
+        <div class="stat"><b><?= (int)($lic['total'] ?? 0) ?></b><span>всего</span></div>
+        <div class="stat"><b><?= (int)($lic['used'] ?? 0) ?></b><span>активировано</span></div>
+        <div class="stat"><b><?= (int)($lic['free'] ?? 0) ?></b><span>свободно</span></div>
+      </div>
+    <?php endif; ?>
+
+    <div class="flex" style="gap:18px;flex-wrap:wrap;align-items:flex-end">
+      <form method="post" class="flex" style="gap:8px">
+        <input type="hidden" name="act" value="newkeys">
+        <input type="number" name="count" value="1" min="1" max="50" style="max-width:90px" title="сколько ключей">
+        <input type="text" name="note" placeholder="пометка: кому и за что" style="max-width:260px">
+        <button class="btn small gold" type="submit">ВЫДАТЬ КЛЮЧИ</button>
+      </form>
+      <form method="post" class="flex" style="gap:8px">
+        <input type="hidden" name="act" value="grantkey">
+        <input type="text" name="name" placeholder="игрок" style="max-width:200px" required>
+        <button class="btn small" type="submit">ОТКРЫТЬ ИГРУ ИГРОКУ</button>
+      </form>
+    </div>
+    <p class="muted" style="margin-top:12px">
+      Ту же выдачу можно получить ссылкой, без входа в админку:
+      <code>/api.php?action=getlicencekey&amp;value=key:АДМИНКЛЮЧ;format:json;</code> —
+      см. <a href="/admin/docs.php">документацию</a>.
+    </p>
+
+    <?php if ($okK && !empty($lic['licences'])): ?>
+      <table class="lv" style="margin-top:14px">
+        <tr><th>Ключ</th><th>Выдан</th><th>Кому</th><th>Пометка</th><th></th></tr>
+        <?php foreach (array_slice($lic['licences'], 0, 80) as $k): ?>
+          <tr>
+            <td class="lvname"><code><?= h($k['key']) ?></code></td>
+            <td class="muted"><?= h(substr((string)$k['created'], 0, 16)) ?></td>
+            <td><?= $k['user'] ? '<a href="/profile/?user=' . urlencode($k['user']) . '">' . h($k['user']) . '</a>'
+                              : '<span class="muted">свободен</span>' ?></td>
+            <td class="muted"><?= h($k['note'] ?? '') ?><?= !empty($k['order']) ? ' · заказ ' . h($k['order']) : '' ?></td>
+            <td>
+              <form method="post">
+                <input type="hidden" name="act" value="<?= !empty($k['revoked']) ? 'unrevoke' : 'revoke' ?>">
+                <input type="hidden" name="key" value="<?= h($k['key']) ?>">
+                <button class="btn small <?= !empty($k['revoked']) ? 'ghost' : 'red' ?>" type="submit">
+                  <?= !empty($k['revoked']) ? 'Вернуть' : 'Отозвать' ?></button>
+              </form>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
   </div>
 
   <div class="card" style="margin-bottom:18px">

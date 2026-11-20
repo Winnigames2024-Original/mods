@@ -445,5 +445,15 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<List<SupportHeadDto>>> SupportListAsync() =>
             GetAsync<List<SupportHeadDto>>("/api/admin/support", "support");
 
+        // -------------------------------------------------------- лицензия
+
+        /// <summary>Открыта ли игра на этом аккаунте и какие ключи за ним.</summary>
+        public static Task<ApiReply<LicenceMineDto>> LicenceMineAsync() =>
+            GetAsync<LicenceMineDto>("/api/licence/mine", "licence");
+
+        /// <summary>Активировать ключ на этом аккаунте — один раз и навсегда.</summary>
+        public static Task<ApiReply<LicenceMineDto>> LicenceActivateAsync(string key, string device, string platform) =>
+            PostAsync<LicenceMineDto>("/api/licence/activate", new { key, device, platform });
+
     }
 }

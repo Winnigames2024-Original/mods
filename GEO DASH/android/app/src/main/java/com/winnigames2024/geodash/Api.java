@@ -71,6 +71,19 @@ public class Api {
         } catch (Exception e) { lastError = e.getMessage(); online = false; return null; }
     }
 
+    /** POST, который отдаёт ответ и при ошибке — чтобы показать её текст игроку. */
+    public static String rawPostAny(String path, String body) {
+        try {
+            HttpURLConnection c = open(path, "POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            try (OutputStream o = c.getOutputStream()) { o.write(body.getBytes(StandardCharsets.UTF_8)); }
+            String s = read(c);
+            online = true;
+            return s;
+        } catch (Exception e) { lastError = e.getMessage(); online = false; return null; }
+    }
+
     /** GET с кэшем: офлайн вернёт последний скачанный ответ. */
     public static String cachedGet(String path, String cacheKey) {
         String s = rawGet(path);
@@ -109,6 +122,22 @@ public class Api {
     public static JSONObject me() {
         String s = cachedGet("/api/me", "me");
         try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
+    }
+
+    /** Открыта ли игра на этом аккаунте и какие ключи за ним. */
+    public static JSONObject licenceMine() {
+        String s = rawGet("/api/licence/mine");
+        try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
+    }
+
+    /** Активировать ключ на этом аккаунте — один раз и навсегда. */
+    public static JSONObject licenceActivate(String key, String device, String platform) {
+        try {
+            JSONObject b = new JSONObject().put("key", key).put("device", device).put("platform", platform);
+            String s = rawPostAny("/api/licence/activate", b.toString());
+            if (s == null) return null;
+            return new JSONObject(s);
+        } catch (Exception e) { return null; }
     }
 
     public static JSONArray levels(String q, String sort, int diff) {

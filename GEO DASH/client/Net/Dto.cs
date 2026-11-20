@@ -196,6 +196,29 @@ namespace GEO_DASH.Net
         [JsonPropertyName("unread")] public int Unread { get; set; }
     }
 
+    /// <summary>Один лицензионный ключ.</summary>
+    public class LicenceDto
+    {
+        [JsonPropertyName("key")] public string Key { get; set; } = "";
+        [JsonPropertyName("created")] public string Created { get; set; } = "";
+        [JsonPropertyName("note")] public string Note { get; set; } = "";
+        [JsonPropertyName("user")] public string User { get; set; } = "";
+        [JsonPropertyName("usedAt")] public string UsedAt { get; set; } = "";
+        [JsonPropertyName("used")] public bool Used { get; set; }
+        [JsonPropertyName("revoked")] public bool Revoked { get; set; }
+    }
+
+    /// <summary>Ответ сервера про лицензию этого аккаунта.</summary>
+    public class LicenceMineDto
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; set; }
+        [JsonPropertyName("error")] public string Error { get; set; } = "";
+        [JsonPropertyName("licensed")] public bool Licensed { get; set; }
+        [JsonPropertyName("admin")] public bool Admin { get; set; }
+        [JsonPropertyName("key")] public string Key { get; set; } = "";
+        [JsonPropertyName("licences")] public List<LicenceDto> Licences { get; set; } = new();
+    }
+
     /// <summary>Обращение в поддержку — для админки.</summary>
     public class SupportHeadDto
     {

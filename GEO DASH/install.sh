@@ -86,7 +86,10 @@ id -u geodash >/dev/null 2>&1 || useradd --system --home "$DATA" --shell /usr/sb
 mkdir -p "$APP" "$DATA/leveldata" "$DATA/music"
 cp -f "$SRC/$SUBDIR/server/geodash-api.js" "$APP/geodash-api.js"
 cp -f "$SRC/$SUBDIR/update.json" "$APP/update.json" 2>/dev/null || true
+# документация админа: читается страницей /admin/docs.php, в сайт не выкладывается
+cp -f "$SRC/$SUBDIR/docs/ADMIN.md" "$APP/ADMIN.md" 2>/dev/null || true
 chown -R geodash:geodash "$DATA" "$APP"
+chmod 0644 "$APP/ADMIN.md" 2>/dev/null || true
 chmod 755 "$DATA" "$DATA/music"        # чтобы nginx отдавал /songs/<id>.mp3
 
 cp -f "$SRC/$SUBDIR/server/geodash.service" /etc/systemd/system/geodash.service

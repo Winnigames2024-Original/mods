@@ -58,7 +58,9 @@ public class AuthActivity extends GdActivity {
 
     void enter() {
         ui.post(() -> {
-            go(MainActivity.class);
+            // дальше лицензия: без ключа игра не запускается
+            String k = getIntent() != null ? getIntent().getStringExtra("gd_key") : null;
+            go(LicenceActivity.class, k == null ? null : "gd_key", k);
             finish();
         });
     }

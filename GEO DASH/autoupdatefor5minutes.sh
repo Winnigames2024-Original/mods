@@ -44,7 +44,7 @@ fetch_builds() {
   local changed_build=0
 
   if [ -d "$SRC/.git" ]; then
-    for f in GEO_DASH.exe GEO_DASH.apk GEO_DASH_Setup.exe; do
+    for f in GEO_DASH.exe GEO_DASH.apk GEO_DASH_Setup.exe GEO_DASH_Setup.apk; do
       src="$SRC/$SUBDIR/download/$f"
       dst="$WEB/download/$f"
       [ -f "$src" ] || continue
@@ -90,6 +90,11 @@ fetch_builds() {
     curl -fsSL --max-time 600 \
       "https://raw.githubusercontent.com/$OWNER/$REPO/main/GEO%20DASH/download/GEO_DASH.apk" \
       -o "$WEB/download/GEO_DASH.apk" 2>/dev/null && log "apk скачан с raw" || true
+  fi
+  if [ ! -f "$WEB/download/GEO_DASH_Setup.apk" ]; then
+    curl -fsSL --max-time 600 \
+      "https://raw.githubusercontent.com/$OWNER/$REPO/main/GEO%20DASH/download/GEO_DASH_Setup.apk" \
+      -o "$WEB/download/GEO_DASH_Setup.apk" 2>/dev/null && log "установщик apk скачан с raw" || true
   fi
 
   if [ "$changed_build" = "1" ] || [ ! -f "$WEB/download/.updated" ]; then
@@ -188,6 +193,14 @@ if [ "$before" != "$after" ] || [ "$FORCED" = "1" ] || [ "$STALE" = "1" ]; then
     date '+%Y-%m-%d %H:%M:%S' > "$WEB/.update-log" 2>/dev/null || true
     chown -R www-data:www-data "$WEB"
     changed=1
+  fi
+
+  # ---- документация админа ----
+  # кладём рядом с API, а не в сайт: внутри ключи выдачи, страница /admin/docs.php
+  # читает файл сама и показывает его только админу
+  if [ -f "$SRC/$SUBDIR/docs/ADMIN.md" ]; then
+    cp -f "$SRC/$SUBDIR/docs/ADMIN.md" "$APP/ADMIN.md"
+    chmod 0644 "$APP/ADMIN.md" 2>/dev/null || true
   fi
 
   # ---- версия клиента ----

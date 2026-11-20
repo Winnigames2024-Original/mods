@@ -49,7 +49,7 @@ namespace GeoDashSetup
         static readonly Color Paper = Color.FromArgb(240, 244, 255);
         static readonly Color Blue = Color.FromArgb(40, 125, 255);
 
-        readonly TextBox _dir;
+        readonly TextBox _dir, _key;
         readonly CheckBox _desktop, _menu, _service, _run, _assoc, _offline;
         readonly ProgressBar _bar;
         readonly Label _status;
@@ -59,7 +59,7 @@ namespace GeoDashSetup
         public SetupForm(bool uninstallMode)
         {
             Text = Cfg.AppName + " — установка";
-            ClientSize = new Size(640, 450);
+            ClientSize = new Size(640, 520);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -116,19 +116,47 @@ namespace GeoDashSetup
             _service = C("Служба автообновления: сама скачивает новые версии", 248, true);
             _run = C("Запустить игру после установки", 272, true);
 
-            _offline = C("Ставить без интернета — из файла рядом с установщиком", 296, HasLocalGame());
+            // по умолчанию всегда качаем свежую версию с сервера
+            _offline = C("Ставить из файла рядом с установщиком (если нет интернета)", 296, false);
             _offline.ForeColor = Color.FromArgb(255, 215, 120);
+            _offline.Enabled = HasLocalGame();
 
-            _bar = new ProgressBar { Left = 28, Top = 326, Width = 584, Height = 16, Style = ProgressBarStyle.Continuous };
+            L("Лицензионный ключ", 28, 330, 300, 10f, true);
+            L("не обязательно сейчас — игра спросит его при первом запуске",
+              200, 332, 412).ForeColor = Color.FromArgb(150, 190, 255);
+
+            _key = new TextBox
+            {
+                Left = 28, Top = 354, Width = 584, Text = Cfg.ReadMarkKey(Installed() ?? Cfg.DefaultDir),
+                BackColor = Color.FromArgb(22, 20, 52), ForeColor = Paper,
+                BorderStyle = BorderStyle.FixedSingle, CharacterCasing = CharacterCasing.Upper,
+                TextAlign = HorizontalAlignment.Center, MaxLength = 24,
+                Font = new Font("Consolas", 13f, FontStyle.Bold)
+            };
+            _key.TextChanged += (s, e) =>
+            {
+                string pretty = Lic.Pretty(_key.Text);
+                if (pretty != _key.Text)
+                {
+                    int tail = _key.Text.Length - _key.SelectionStart;
+                    _key.Text = pretty;
+                    _key.SelectionStart = Math.Max(0, pretty.Length - Math.Max(0, tail));
+                }
+                _key.ForeColor = _key.Text.Length == 0 || Lic.WellFormed(_key.Text)
+                    ? Paper : Color.FromArgb(255, 150, 150);
+            };
+            Controls.Add(_key);
+
+            _bar = new ProgressBar { Left = 28, Top = 396, Width = 584, Height = 16, Style = ProgressBarStyle.Continuous };
             Controls.Add(_bar);
 
-            _status = L("Готов к установке", 28, 346, 584);
+            _status = L("Готов к установке", 28, 416, 584);
             _status.ForeColor = Color.FromArgb(200, 215, 255);
 
             _go = new Button
             {
                 Text = Installed() == null ? "УСТАНОВИТЬ" : "ОБНОВИТЬ",
-                Left = 360, Top = 378, Width = 250, Height = 44, FlatStyle = FlatStyle.Flat,
+                Left = 360, Top = 448, Width = 250, Height = 44, FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(32, 150, 100), ForeColor = Paper,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold)
             };
@@ -137,7 +165,7 @@ namespace GeoDashSetup
 
             _remove = new Button
             {
-                Text = "УДАЛИТЬ", Left = 28, Top = 378, Width = 170, Height = 44, FlatStyle = FlatStyle.Flat,
+                Text = "УДАЛИТЬ", Left = 28, Top = 448, Width = 170, Height = 44, FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(120, 40, 48), ForeColor = Paper,
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 Visible = Installed() != null
@@ -245,6 +273,31 @@ namespace GeoDashSetup
                     }
                 }
 
+                if (!offline)
+                {
+                    // всегда ставим самую свежую сборку с сервера
+                    info = await Net.CheckAsync();
+                    Status(info != null && !string.IsNullOrEmpty(info.version)
+                        ? "Скачиваю GEO DASH " + info.version + "…"
+                        : "Скачиваю последнюю версию игры…");
+
+                    if (!await Net.DownloadFirstAsync(Net.GameUrls(info), Cfg.GameExe(dir),
+                                                      new Progress<string>(Status), prog))
+                    {
+                        if (LocalGame() != null)
+                        {
+                            Status("Скачать не вышло — ставлю из файла рядом");
+                            offline = true;
+                        }
+                        else
+                        {
+                            Status("Не получилось скачать игру. Проверь интернет.");
+                            return;
+                        }
+                    }
+                    else _bar.Value = 100;
+                }
+
                 if (offline)
                 {
                     string local = LocalGame();
@@ -257,22 +310,18 @@ namespace GeoDashSetup
                     File.Copy(local, Cfg.GameExe(dir), true);
                     _bar.Value = 100;
                 }
-                else
-                {
-                    Status("Скачиваю игру…");
-                    info = await Net.CheckAsync();
-                    string url = info != null && !string.IsNullOrEmpty(info.exe) ? info.exe : Cfg.ExeUrl;
-                    if (!await Net.DownloadAsync(url, Cfg.GameExe(dir), new Progress<string>(Status), prog))
-                    {
-                        Status("Не получилось скачать игру. Проверь интернет.");
-                        return;
-                    }
-                    _bar.Value = 100;
-                }
 
                 // отдельная качалка обновлений рядом с игрой
                 try { File.Copy(Cfg.SetupExe(dir), Cfg.AutoUpdateExe(dir), true); } catch { }
                 Cfg.WriteVersion(dir, info?.version ?? Net.LocalVersion(dir));
+
+                // метка установки: по ней игра понимает, что её поставили
+                // установщиком, и сама активирует введённый здесь ключ
+                string lic = Lic.WellFormed(_key.Text) ? Lic.Pretty(_key.Text) : Cfg.ReadMarkKey(dir);
+                Cfg.WriteMark(dir, info?.version ?? Net.LocalVersion(dir), lic);
+                if (_key.Text.Trim().Length > 0 && !Lic.WellFormed(_key.Text))
+                    Status("Ключ набран не полностью — игра спросит его при запуске");
+
                 Status("Создаю ярлыки…");
                 if (_desktop.Checked)
                     Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
@@ -325,6 +374,7 @@ namespace GeoDashSetup
 
             UpdateService.Uninstall();
             try { File.Delete(Cfg.GameExe(dir)); } catch { }
+            try { File.Delete(Cfg.InstallMark(dir)); } catch { }
             try
             {
                 File.Delete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),

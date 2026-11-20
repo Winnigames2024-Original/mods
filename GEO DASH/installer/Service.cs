@@ -55,12 +55,12 @@ namespace GeoDashSetup
             string local = Net.LocalVersion(dir);
             if (!Net.IsNewer(info.version, local)) return "Установлена последняя версия " + local;
 
-            string url = string.IsNullOrEmpty(info.exe) ? Cfg.ExeUrl : info.exe;
             string staged = Path.Combine(dir, "GEO DASH.new.exe");
-            
+
             Log(dir, $"есть версия {info.version} (у нас {local}) — качаю");
 
-            if (!await Net.DownloadAsync(url, staged)) { Log(dir, "скачать не получилось"); return "Скачать не получилось"; }
+            if (!await Net.DownloadFirstAsync(Net.GameUrls(info), staged))
+            { Log(dir, "скачать не получилось"); return "Скачать не получилось"; }
 
             if (GameRunning())
             {

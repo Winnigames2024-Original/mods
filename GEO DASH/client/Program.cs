@@ -9,6 +9,9 @@ namespace GEO_DASH
         /// <summary>Файл уровня, с которым игру открыли двойным кликом.</summary>
         public static string OpenLevelPath;
 
+        /// <summary>Игрок нажал «сменить аккаунт» в окне лицензии — спрашиваем вход заново.</summary>
+        public static bool RestartAuth;
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -32,8 +35,15 @@ namespace GEO_DASH
                 }
             }
 
-            // без аккаунта в игру не пускаем: авто-вход, иначе вход или регистрация
-            if (!AuthForm.Ensure()) return;
+            // без аккаунта в игру не пускаем: авто-вход, иначе вход или регистрация,
+            // а дальше лицензия: без ключа игра не запускается
+            for (int tries = 0; tries < 4; tries++)
+            {
+                RestartAuth = false;
+                if (!AuthForm.Ensure()) return;
+                if (LicenceForm.Ensure()) break;
+                if (!RestartAuth) return;
+            }
 
             Application.Run(new MainForm());
         }

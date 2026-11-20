@@ -1,8 +1,9 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Версия 2.0.0: своя иконка у игры и установщика, склоны подкидывают как трамплин и четыре новых вида склонов в редакторе, долгий полёт вверх теперь убивает.",
+  "setupApk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.apk",
+  "notes": "Версия 2.1.0: лицензионные ключи. Игра запускается из копии, поставленной установщиком, и спрашивает ключ — он виден в аккаунте на сайте, покупается через ЮMoney или выдаётся админом. Установщик для ПК теперь всегда качает свежую сборку, и появился установщик на телефон.",
   "date": "2026-11-20"
 }

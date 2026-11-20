@@ -1,0 +1,42 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.winnigames2024.geodash.setup'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.winnigames2024.geodash.setup"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "2.1.0"
+    }
+
+    // та же подпись, что у игры — ключ лежит рядом, в папке android
+    signingConfigs {
+        geodash {
+            storeFile rootProject.file('../android/geodash.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.geodash
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint { abortOnError false }
+
+    buildFeatures { buildConfig true }
+}
+
+dependencies { }

@@ -68,7 +68,9 @@ const db = {
                                   nextSongId: 2000001, nextImageId: 1 }),
   images: loadJson('images.json', {}),
   comments: loadJson('comments.json', {}),
-  chats: loadJson('chats.json', {})
+  chats: loadJson('chats.json', {}),
+  licences: loadJson('licences.json', {}),
+  orders: loadJson('orders.json', {})
 };
 
 const save = {
@@ -79,7 +81,9 @@ const save = {
   state: () => saveJson('state.json', db.state),
   images: () => saveJson('images.json', db.images),
   comments: () => saveJson('comments.json', db.comments),
-  chats: () => saveJson('chats.json', db.chats)
+  chats: () => saveJson('chats.json', db.chats),
+  licences: () => saveJson('licences.json', db.licences),
+  orders: () => saveJson('orders.json', db.orders)
 };
 
 // ------------------------------------------------------------------ утилиты
@@ -119,7 +123,9 @@ function pub(u) {
     completed: Object.keys(u.completed || {}).length,
     attempts: u.attempts | 0, jumps: u.jumps | 0, about: u.about || '',
     admin: !!u.admin, banned: !!u.banned, created: u.created,
-    friends: (u.friends || []).length
+    friends: (u.friends || []).length,
+    // лицензия: наружу отдаём только «да/нет», сам ключ — лишь владельцу
+    licensed: licOkFor(u)
   };
 }
 
@@ -1447,6 +1453,290 @@ route('POST', '/api/admin/broadcast', async (req, res) => {
   db.state.news.push('[' + now().slice(0, 16).replace('T', ' ') + '] ' + text);
   save.state();
   ok(res);
+});
+
+// --------------------------------------------------------------- лицензии
+//
+// Ключ: GD-XXXX-XXXX-XXXX-XXXX. Алфавит Крокфорда — без похожих друг на
+// друга букв (I, L, O, U), при вводе O→0 и I/L→1 исправляются сами.
+// Последний символ — контрольный: описку видно сразу, без запроса к серверу.
+//
+// Один ключ активируется один раз и навсегда остаётся за аккаунтом; на самом
+// аккаунте он работает на всех устройствах игрока. Купить можно сколько угодно
+// ключей — лишние лежат в аккаунте покупателя, их можно отдать другим.
+
+const LIC_ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const ISSUE_SECRET = process.env.GEODASH_ISSUE_SECRET || 'GEODASH_AADDMMIINN22002266JSD';
+
+function licCheck(body) {
+  let sum = 0;
+  for (let i = 0; i < body.length; i++) {
+    const v = LIC_ALPHA.indexOf(body[i]);
+    sum += (v < 0 ? 0 : v) * (i + 2);
+  }
+  return LIC_ALPHA[sum % 32];
+}
+
+/** Привести как угодно набранный ключ к 16 символам алфавита. */
+function licNorm(s) {
+  let t = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // «GD» впереди — часть записи ключа; но если без них остаётся меньше 16
+  // знаков, значит с этих букв начинается сам ключ
+  if (t.startsWith('GD') && t.length - 2 >= 16) t = t.slice(2);
+  return t.replace(/O/g, '0').replace(/[IL]/g, '1').replace(/U/g, 'V');
+}
+
+function licFormat(raw) {
+  return 'GD-' + raw.slice(0, 4) + '-' + raw.slice(4, 8) + '-' + raw.slice(8, 12) + '-' + raw.slice(12, 16);
+}
+
+/** Контрольная сумма сходится — ключ хотя бы набран правильно. */
+function licWellFormed(s) {
+  const raw = licNorm(s);
+  return raw.length === 16 && licCheck(raw.slice(0, 15)) === raw[15];
+}
+
+function licFind(s) {
+  const raw = licNorm(s);
+  return raw.length === 16 ? (db.licences[raw] || null) : null;
+}
+
+function licNew(meta) {
+  meta = meta || {};
+  for (let guard = 0; guard < 50; guard++) {
+    let body = '';
+    for (let i = 0; i < 15; i++) body += LIC_ALPHA[crypto.randomInt(32)];
+    const raw = body + licCheck(body);
+    if (db.licences[raw]) continue;
+    const rec = {
+      raw, key: licFormat(raw), created: now(),
+      by: String(meta.by || '').slice(0, 40),
+      note: String(meta.note || '').slice(0, 200),
+      price: meta.price | 0,
+      order: String(meta.order || '').slice(0, 64),
+      buyer: String(meta.buyer || '').slice(0, 40),
+      user: null, usedAt: null, devices: [], platform: '', revoked: false
+    };
+    db.licences[raw] = rec;
+    return rec;
+  }
+  return null;
+}
+
+function licPub(r, full) {
+  if (!r) return null;
+  const o = {
+    key: r.key, created: r.created, note: r.note || '', price: r.price | 0,
+    order: r.order || '', buyer: r.buyer || '', user: r.user || null,
+    usedAt: r.usedAt || null, used: !!r.user, revoked: !!r.revoked
+  };
+  if (full) { o.devices = r.devices || []; o.platform = r.platform || ''; o.by = r.by || ''; }
+  return o;
+}
+
+/** Есть ли у аккаунта рабочая лицензия. У админа игра открыта всегда. */
+function licOkFor(u) {
+  if (!u) return false;
+  if (u.admin || key(u.name) === key(ADMIN)) return true;
+  const r = licFind(u.licence || '');
+  return !!(r && !r.revoked && key(r.user || '') === key(u.name));
+}
+
+function secretOk(given) {
+  const a = crypto.createHash('sha256').update(String(given || '')).digest();
+  const b = crypto.createHash('sha256').update(ISSUE_SECRET).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+/** Выдача ключей с самого сервера (php на этой же машине). */
+function localCall(req) {
+  const a = String(req.socket.remoteAddress || '');
+  return a === '127.0.0.1' || a === '::1' || a === '::ffff:127.0.0.1';
+}
+
+/** Активировать ключ на аккаунте. Возвращает текст ошибки или null. */
+function licActivate(u, keyText, device, platform) {
+  if (!licWellFormed(keyText)) return 'Ключ набран неверно — проверьте символы';
+  const r = licFind(keyText);
+  if (!r) return 'Такого ключа нет';
+  if (r.revoked) return 'Ключ отозван';
+
+  const mine = key(r.user || '') === key(u.name);
+  if (r.user && !mine) return 'Ключ уже активирован на другом аккаунте';
+  if (!r.user && licOkFor(u) && !u.admin) return 'На этом аккаунте уже есть лицензия — ключ не потрачен, отдайте его другому игроку';
+
+  if (!r.user) { r.user = u.name; r.usedAt = now(); }
+  if (platform) r.platform = String(platform).slice(0, 16);
+  const dev = String(device || '').slice(0, 80);
+  r.devices = r.devices || [];
+  if (dev && !r.devices.includes(dev)) {
+    r.devices.push(dev);
+    while (r.devices.length > 10) r.devices.shift();
+  }
+  u.licence = r.key;
+  u.licenceAt = r.usedAt;
+  u.licences = u.licences || [];
+  if (!u.licences.includes(r.key)) u.licences.push(r.key);
+  save.licences(); save.users();
+  return null;
+}
+
+/** Игра спрашивает: можно ли играть на этом аккаунте. */
+route('GET', '/api/licence/mine', (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const mine = Object.values(db.licences).filter(r =>
+    key(r.user || '') === key(u.name) || key(r.buyer || '') === key(u.name));
+  ok(res, {
+    ok: true,
+    licensed: licOkFor(u),
+    admin: !!u.admin || key(u.name) === key(ADMIN),
+    key: u.licence || '',
+    licences: mine.map(r => licPub(r))
+  });
+});
+
+route('POST', '/api/licence/activate', async (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const b = await readBody(req);
+  const err = licActivate(u, b.key, b.device, b.platform);
+  if (err) return bad(res, err, 403);
+  ok(res, { ok: true, licensed: true, key: u.licence, account: pub(u) });
+});
+
+/** Выдача ключей: только с самой машины сервера и только с секретом. */
+route('POST', '/api/licence/issue', async (req, res) => {
+  if (!localCall(req)) return bad(res, 'Выдача ключей доступна только с сервера', 403);
+  const b = await readBody(req);
+  if (!secretOk(headerText(req, 'x-gd-issue') || b.secret)) return bad(res, 'Неверный ключ админа', 403);
+
+  const count = Math.max(1, Math.min(50, b.count | 0 || 1));
+  const made = [];
+  for (let i = 0; i < count; i++) {
+    const r = licNew({ by: String(b.by || 'admin'), note: b.note, price: b.price, order: b.order, buyer: b.buyer });
+    if (r) made.push(r);
+  }
+
+  // key:…;user:ИМЯ — ключ сразу активируется на этом аккаунте
+  let activated = '';
+  const target = b.user ? db.users[key(b.user)] : null;
+  if (b.user && !target) return bad(res, 'Игрок «' + b.user + '» не найден', 404);
+  if (target && made.length) {
+    const err = licActivate(target, made[0].key, 'issue', 'any');
+    activated = err ? ('не активирован: ' + err) : target.name;
+  }
+
+  if (b.order) {
+    const id = String(b.order).slice(0, 64);
+    const o = db.orders[id] || { order: id, created: now(), count: made.length };
+    o.buyer = String(b.buyer || o.buyer || '').slice(0, 40);
+    o.sum = Number(b.price) || o.sum || 0;
+    o.paid = now();
+    o.keys = (o.keys || []).concat(made.map(r => r.key));
+    if (b.note) o.note = String(b.note).slice(0, 200);
+    db.orders[id] = o;
+    save.orders();
+  }
+  save.licences();
+  ok(res, {
+    ok: true, count: made.length, activated,
+    keys: made.map(r => r.key), licences: made.map(r => licPub(r))
+  });
+});
+
+/** Заказ уже оплачен — не выдавать второй раз. */
+route('GET', '/api/licence/order/:order', (req, res, p) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const o = db.orders[String(p.order).slice(0, 64)];
+  ok(res, { ok: true, found: !!o, order: o || null });
+});
+
+/** Сводка по ключам для служебной ссылки на сайте. */
+route('GET', '/api/licence/stats', (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const all = Object.values(db.licences);
+  ok(res, {
+    ok: true,
+    total: all.length,
+    used: all.filter(r => r.user).length,
+    free: all.filter(r => !r.user && !r.revoked).length,
+    revoked: all.filter(r => r.revoked).length,
+    orders: Object.keys(db.orders).length,
+    last: all.sort((a, b) => String(b.created).localeCompare(String(a.created)))
+             .slice(0, 10).map(r => ({ key: r.key, created: r.created, user: r.user, note: r.note }))
+  });
+});
+
+/** Записать заказ до оплаты: кто покупает и сколько ключей. */
+route('POST', '/api/licence/order', async (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const b = await readBody(req);
+  if (!secretOk(headerText(req, 'x-gd-issue') || b.secret)) return bad(res, 'Неверный ключ админа', 403);
+  const id = String(b.order || '').slice(0, 64);
+  if (!id) return bad(res, 'Не указан заказ');
+  if (db.orders[id] && (db.orders[id].keys || []).length) return ok(res, { ok: true, order: db.orders[id] });
+  db.orders[id] = {
+    order: id, buyer: String(b.buyer || '').slice(0, 40),
+    count: Math.max(1, Math.min(20, b.count | 0 || 1)),
+    sum: Number(b.sum) || 0, created: now(), paid: null, keys: [], note: ''
+  };
+  save.orders();
+  ok(res, { ok: true, order: db.orders[id] });
+});
+
+// --- админка лицензий ---
+
+route('GET', '/api/admin/licences', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const list = Object.values(db.licences)
+    .sort((a, b) => String(b.created).localeCompare(String(a.created)))
+    .map(r => licPub(r, true));
+  ok(res, {
+    ok: true, total: list.length,
+    used: list.filter(r => r.used).length,
+    free: list.filter(r => !r.used && !r.revoked).length,
+    licences: list
+  });
+});
+
+route('POST', '/api/admin/licence/new', async (req, res) => {
+  const a = requireAdmin(req, res); if (!a) return;
+  const b = await readBody(req);
+  const count = Math.max(1, Math.min(50, b.count | 0 || 1));
+  const made = [];
+  for (let i = 0; i < count; i++) {
+    const r = licNew({ by: a.name, note: b.note, price: b.price, buyer: b.buyer });
+    if (r) made.push(r);
+  }
+  save.licences();
+  ok(res, { ok: true, keys: made.map(r => r.key) });
+});
+
+route('POST', '/api/admin/licence/revoke', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const b = await readBody(req);
+  const r = licFind(b.key);
+  if (!r) return bad(res, 'Такого ключа нет', 404);
+  r.revoked = b.revoked === false ? false : true;
+  if (r.user) {
+    const u = db.users[key(r.user)];
+    if (u && u.licence === r.key && r.revoked) { u.licence = ''; save.users(); }
+    if (u && !r.revoked && !u.licence) { u.licence = r.key; save.users(); }
+  }
+  save.licences();
+  ok(res, { ok: true, licence: licPub(r, true) });
+});
+
+/** Выдать ключ сразу на аккаунт — например игроку, который оплатил иначе. */
+route('POST', '/api/admin/licence/grant', async (req, res) => {
+  const a = requireAdmin(req, res); if (!a) return;
+  const b = await readBody(req);
+  const u = db.users[key(b.name)];
+  if (!u) return bad(res, 'Игрок не найден', 404);
+  const r = licNew({ by: a.name, note: String(b.note || 'выдано админом'), buyer: u.name });
+  if (!r) return bad(res, 'Не удалось создать ключ', 500);
+  const err = licActivate(u, r.key, 'admin-grant', 'any');
+  if (err) { save.licences(); return ok(res, { ok: true, key: r.key, note: err }); }
+  ok(res, { ok: true, key: r.key, licensed: true });
 });
 
 // ------------------------------------------------------------------ сервер
