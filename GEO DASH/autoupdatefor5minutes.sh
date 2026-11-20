@@ -22,6 +22,21 @@ ONLY_BUILDS="${1:-}"
 
 log() { logger -t geodash-update "$*" 2>/dev/null || true; echo "$*"; }
 
+# ---------------------------------------------------------------- один за раз
+# Обновление может прийти сразу с двух сторон: заявкой с сайта и руками.
+# Два git одновременно оставляют index.lock и всё ломают — поэтому замок.
+LOCK=/run/geodash-update.lock
+if [ -z "${GEODASH_LOCKED:-}" ]; then
+  export GEODASH_LOCKED=1
+  exec flock -w 300 "$LOCK" "$0" "$@"
+fi
+
+# если прошлый запуск умер на середине — снимаем брошенный замок git
+if [ -f "$SRC/.git/index.lock" ] && ! pgrep -x git >/dev/null 2>&1; then
+  rm -f "$SRC/.git/index.lock"
+  log "убрал брошенный index.lock"
+fi
+
 # ---------------------------------------------------------- сборки с GitHub
 # Сборки лежат прямо в репозитории: GEO DASH/download/GEO_DASH.exe и .apk
 fetch_builds() {
