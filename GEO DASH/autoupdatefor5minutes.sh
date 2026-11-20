@@ -86,13 +86,17 @@ fetch_builds() {
 fix_download_location() {
   local CONF=/etc/nginx/sites-available/geodash
   [ -f "$CONF" ] || return 0
-  grep -q 'location = /download/' "$CONF" && return 0
-  grep -q 'location /download/' "$CONF" || return 0
 
-  # перебираем конфиг построчно: старый блок /download/ меняем на два новых
+  # нужна правка, если есть старый блок /download/ или строка «location = /download/»
+  grep -qE 'location (= )?/download/' "$CONF" || return 0
+  grep -q 'location = /download/' "$CONF" || grep -q 'location /download/ {' "$CONF" || return 0
+
   awk '
+    # страница /download/ должна попадать в PHP, поэтому отдельный exact-блок убираем
+    /location = \/download\/ *\{/ { next }
+
+    # старый блок, который отдавал файлом вообще всё внутри /download/
     /location \/download\/ \{/ {
-      print "    location = /download/ { try_files /download/index.php =404; }";
       print "    location ~ ^/download/.+\\.(exe|apk|zip)$ {";
       print "        add_header Content-Disposition \"attachment\";";
       print "        try_files $uri =404;";
@@ -110,9 +114,9 @@ fix_download_location() {
 
   if nginx -t >/dev/null 2>&1; then
     systemctl reload nginx >/dev/null 2>&1 || true
-    log "страница /download/ починена в nginx"
+    log "страница /download/ теперь открывается как PHP"
   else
-    mv -f "$CONF.bak" "$CONF"            # не прошло — возвращаем как было
+    mv -f "$CONF.bak" "$CONF"
     log "правка nginx не подошла, вернул прежний конфиг"
   fi
 }
