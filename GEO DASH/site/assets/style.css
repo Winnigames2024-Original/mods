@@ -184,3 +184,101 @@ footer a{color:var(--gold)}
 .lv:first-child{border-top:none}
 .lvname{font-weight:900;font-size:17px;text-shadow:2px 2px 0 #000}
 .form.card{max-width:460px;margin:26px auto}
+
+/* =====================================================================
+   ТРИ СТИЛЯ САЙТА: обычный (как был), тёмный и светлый.
+   Выбранный стиль пишется в <html data-theme="..."> и в cookie gdtheme.
+   ===================================================================== */
+
+/* переключатель в шапке */
+.themes{display:inline-flex;gap:6px;margin-left:6px}
+.themes button{
+  width:30px;height:30px;border-radius:10px;border:2px solid #000;cursor:pointer;
+  padding:0;font-size:14px;line-height:1;font-weight:900;color:#fff;
+  background:linear-gradient(180deg,#5a56a8,#2a2560);
+  box-shadow:0 3px 0 #000;transition:transform .07s ease,filter .12s ease;
+}
+.themes button:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.themes button[aria-pressed="true"]{background:linear-gradient(180deg,#ffe489,#dc9a0d);color:#2a1c00}
+
+/* ------------------------------ тёмный ------------------------------ */
+[data-theme="dark"]{
+  --bg:#12122a; --bg2:#0a0a1c; --ground:#141432;
+  --panel:#1b1b3a; --panel2:#11112899;
+  --neon:#4fd8ff; --mag:#ff6ccd; --lime:#8cff9b; --gold:#ffd45e; --red:#ff6b7a;
+  --ink:#04040c; --paper:#e9ecff; --dim:#a7b0d8;
+}
+[data-theme="dark"] body{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 26px, rgba(0,0,0,0) 26px 64px),
+    linear-gradient(180deg,#1a1a3c 0%, var(--bg) 45%, var(--bg2) 100%);
+  background-attachment:fixed,fixed;
+  background-size:180px 180px, cover;
+}
+[data-theme="dark"] body::after{
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 3px, rgba(0,0,0,0) 3px 32px),
+    linear-gradient(180deg,#191938 0%, #08081a 100%);
+  border-top:4px solid #3b3b6e;
+}
+[data-theme="dark"] header.top{
+  background:linear-gradient(180deg,rgba(14,14,34,.97),rgba(7,7,20,.95));
+  border-bottom:4px solid #2a2a52;
+}
+[data-theme="dark"] .btn{background:linear-gradient(180deg,#4f6fd8,#22306e)}
+[data-theme="dark"] .btn.ghost{background:linear-gradient(180deg,#30305e,#1b1b3c)}
+[data-theme="dark"] .card,[data-theme="dark"] .panel{
+  background:linear-gradient(180deg,#1d1d40,#131328);
+}
+
+/* ------------------------------ светлый ----------------------------- */
+[data-theme="light"]{
+  --bg:#eaf0ff; --bg2:#d9e4ff; --ground:#c3d3f7;
+  --panel:#ffffff; --panel2:#f2f5ffcc;
+  --neon:#0c86a8; --mag:#c42d92; --lime:#2f9a4a; --gold:#b97b00; --red:#cf3b4c;
+  --ink:#1b2340; --paper:#17203c; --dim:#4a5578;
+}
+[data-theme="light"] body{
+  color:var(--paper);
+  background:
+    repeating-linear-gradient(135deg, rgba(40,70,160,.06) 0 26px, rgba(0,0,0,0) 26px 64px),
+    linear-gradient(180deg,#f7faff 0%, var(--bg) 45%, var(--bg2) 100%);
+  background-attachment:fixed,fixed;
+  background-size:180px 180px, cover;
+}
+[data-theme="light"] body::after{
+  background:
+    repeating-linear-gradient(90deg, rgba(30,50,120,.10) 0 3px, rgba(0,0,0,0) 3px 32px),
+    linear-gradient(180deg,var(--ground) 0%, #a9bff0 100%);
+  border-top:4px solid #ffffff;
+  box-shadow:0 -6px 18px rgba(40,60,120,.18) inset;
+}
+[data-theme="light"] header.top{
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(234,240,255,.95));
+  border-bottom:4px solid #2a3a66;
+  box-shadow:0 6px 0 rgba(40,60,120,.12);
+}
+[data-theme="light"] .logo{color:#17203c;text-shadow:2px 2px 0 #c9d6f6}
+[data-theme="light"] .nav a.link{color:#2b3761;text-shadow:none}
+[data-theme="light"] .nav a.link:hover{background:#1b234014;border-color:#2a3a66;color:#111a35}
+[data-theme="light"] .nav a.link.active{background:#1b234020;border-color:#2a3a66;color:#8a5c00}
+[data-theme="light"] .pill{
+  background:linear-gradient(180deg,#ffffff,#e4ebff);color:#17203c;
+  border:3px solid #2a3a66;box-shadow:0 4px 0 #2a3a66;text-shadow:none;
+}
+[data-theme="light"] a{color:#17203c}
+[data-theme="light"] a:hover{color:#8a5c00}
+[data-theme="light"] .card,[data-theme="light"] .panel{
+  background:linear-gradient(180deg,#ffffff,#eef3ff);
+  border-color:#2a3a66;color:#17203c;
+}
+[data-theme="light"] .btn{
+  border-color:#2a3a66;box-shadow:0 6px 0 #2a3a66,0 10px 22px rgba(40,60,120,.18);
+  text-shadow:1px 1px 0 rgba(0,0,0,.25);
+}
+[data-theme="light"] .btn.ghost{background:linear-gradient(180deg,#ffffff,#dde6ff);color:#17203c;text-shadow:none}
+[data-theme="light"] .muted,[data-theme="light"] .dim{color:var(--dim)}
+[data-theme="light"] .themes button{
+  background:linear-gradient(180deg,#ffffff,#dde6ff);color:#17203c;border-color:#2a3a66;box-shadow:0 3px 0 #2a3a66;
+}
+[data-theme="light"] .themes button[aria-pressed="true"]{background:linear-gradient(180deg,#ffe489,#dc9a0d);color:#2a1c00}

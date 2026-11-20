@@ -61,20 +61,44 @@ function gd_diff_class(int $d): string {
 
 function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+/** Выбранный стиль сайта: classic (как был), dark или light. */
+function gd_theme(): string {
+    $t = $_COOKIE['gdtheme'] ?? 'classic';
+    return in_array($t, ['classic', 'dark', 'light'], true) ? $t : 'classic';
+}
+
 function gd_head(string $title, string $active = '') {
     $user = gd_user();
+    $theme = gd_theme();
     ?><!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="<?= h($theme) ?>">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= h($title) ?> — GEO DASH</title>
 <meta name="description" content="GEO DASH — ритм-платформер от Winnigames2024: уровни, редактор, друзья, daily и weekly. Скачать для Windows и Android.">
-<link rel="stylesheet" href="/assets/style.css?v=5">
+<link rel="stylesheet" href="/assets/style.css?v=7">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="/assets/icon.png">
 <link rel="apple-touch-icon" href="/assets/icon.png">
-<meta name="theme-color" content="#287dff">
+<meta name="theme-color" content="<?= $theme === 'dark' ? '#12122a' : ($theme === 'light' ? '#eaf0ff' : '#287dff') ?>">
+<script>
+// стиль сайта переключается сразу, без перезагрузки, и помнится год
+(function () {
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-set-theme]');
+    if (!b) return;
+    var t = b.getAttribute('data-set-theme');
+    document.documentElement.setAttribute('data-theme', t);
+    document.cookie = 'gdtheme=' + t + ';path=/;max-age=31536000;samesite=lax';
+    document.querySelectorAll('[data-set-theme]').forEach(function (x) {
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+    });
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = t === 'dark' ? '#12122a' : (t === 'light' ? '#eaf0ff' : '#287dff');
+  });
+})();
+</script>
 </head>
 <body>
 <header class="top"><div class="container nav">
@@ -91,6 +115,14 @@ function gd_head(string $title, string $active = '') {
     <?php if (gd_is_admin()): ?><a class="link" href="/admin/">Админка</a><?php endif; ?>
   <?php endif; ?>
   <span class="spacer"></span>
+  <span class="themes" role="group" aria-label="Стиль сайта">
+    <button type="button" data-set-theme="classic" title="Обычный стиль"
+            aria-pressed="<?= $theme === 'classic' ? 'true' : 'false' ?>">◆</button>
+    <button type="button" data-set-theme="dark" title="Тёмный стиль"
+            aria-pressed="<?= $theme === 'dark' ? 'true' : 'false' ?>">☾</button>
+    <button type="button" data-set-theme="light" title="Светлый стиль"
+            aria-pressed="<?= $theme === 'light' ? 'true' : 'false' ?>">☀</button>
+  </span>
   <?php if ($user): ?>
     <span class="pill"><?= h($user) ?></span>
     <a class="btn small ghost" href="/logout.php">Выйти</a>
