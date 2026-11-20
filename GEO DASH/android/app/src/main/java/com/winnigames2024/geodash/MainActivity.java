@@ -33,10 +33,17 @@ public class MainActivity extends GdActivity {
                 account = Api.me();
                 setStatus(Api.online ? "Готово" : "Офлайн — доступны локальные и сохранённые уровни");
                 checkMaintenance();
+                ui.post(() -> LicenceGate.check(MainActivity.this));
                 Updater.check(MainActivity.this);
             });
         } else {
-            Api.async(() -> { account = Api.me(); ui.post(() -> { if (statusView != null) statusView.invalidate(); }); });
+            Api.async(() -> {
+                account = Api.me();
+                ui.post(() -> {
+                    if (statusView != null) statusView.invalidate();
+                    LicenceGate.check(MainActivity.this);
+                });
+            });
         }
     }
 

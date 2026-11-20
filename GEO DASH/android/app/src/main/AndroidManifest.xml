@@ -25,7 +25,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".LicenceActivity"      android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
         <activity android:name=".MainActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
 
         <activity android:name=".PlayActivity"         android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />

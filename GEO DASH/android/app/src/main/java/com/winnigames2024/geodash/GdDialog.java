@@ -241,6 +241,49 @@ public class GdDialog {
         row.addView(no, lp2);
     }
 
+    /**
+     * Ввод текста со своими подписями кнопок и действием на отмену.
+     * Нужен там, где отказ что-то значит — например в запросе лицензионного ключа.
+     */
+    public static void inputOr(Activity a, String title, String message, String hint, String def,
+                               String okText, String cancelText, OnText cb, Runnable onCancel) {
+        FrameLayout o = open(a, title, message);
+        LinearLayout box = boxOf(o);
+
+        EditText e = new EditText(a);
+        e.setHint(hint);
+        e.setText(def == null ? "" : def);
+        e.setTextColor(Gd.PAPER);
+        e.setHintTextColor(Gd.DIM);
+        e.setBackgroundColor(Color.rgb(20, 18, 48));
+        e.setPadding(20, 14, 20, 14);
+        e.setSingleLine(true);
+        e.setAllCaps(true);
+        e.setGravity(Gravity.CENTER);
+        e.setTextSize(19);
+        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        elp.setMargins(0, 18, 0, 0);
+        box.addView(e, elp);
+
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(row);
+        int h = (int) (rootOf(a).getHeight() * 0.13f);
+
+        Ui.GdBtn ok = new Ui.GdBtn(a).set(okText, Ui.I_CHECK, Color.rgb(120, 255, 170), Color.rgb(20, 150, 100));
+        ok.setOnClickListener(v -> { close(a, o); if (cb != null) cb.text(e.getText().toString().trim()); });
+        Ui.GdBtn no = new Ui.GdBtn(a).set(cancelText, Ui.I_CROSS, Color.rgb(220, 120, 120), Color.rgb(140, 40, 50));
+        no.setOnClickListener(v -> { close(a, o); if (onCancel != null) onCancel.run(); });
+
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, h, 1f);
+        lp1.setMargins(6, 16, 6, 0);
+        row.addView(ok, lp1);
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, h, 1f);
+        lp2.setMargins(6, 16, 6, 0);
+        row.addView(no, lp2);
+    }
+
     /** Список вариантов (вместо setItems у AlertDialog). */
     public static void items(Activity a, String title, String[] items, OnPick cb) {
         FrameLayout o = open(a, title, null);

@@ -1,9 +1,9 @@
 {
-  "version": "2.1.2",
+  "version": "2.1.3",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
   "setupApk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.apk",
-  "notes": "Версия 2.1.2: ключ вводится в установщике и проверяется на сервере, рядом с игрой он лежит зашифрованным. Первый запуск требует интернета — без проверки ключа игра не открывается, дальше работает и офлайн. Добавлено обслуживание сервера: админ может закрыть игру и обновить сервер одной кнопкой.",
+  "notes": "Версия 2.1.3: на телефоне ключ спрашивается обычным диалогом прямо в меню и тут же проверяется на сервере — отдельного экрана больше нет. Плюс всё из 2.1.2: ключ обязателен в установщике и лежит рядом с игрой зашифрованным, первый запуск требует интернета, у админа появились кнопки обновления и экстренного закрытия игры.",
   "date": "2026-11-20"
 }
