@@ -8,8 +8,8 @@ android {
         applicationId "com.winnigames2024.geodash.setup"
         minSdk 21
         targetSdk 34
-        versionCode 2
-        versionName "2.2.0"
+        versionCode 3
+        versionName "2.2.1"
     }
 
     // та же подпись, что у игры — ключ лежит рядом, в папке android
