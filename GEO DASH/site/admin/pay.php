@@ -389,7 +389,8 @@ chmod 640 /etc/geodash/pay.json</div>
       и заполните так:</p>
     <table class="lv">
       <tr><th>Поле</th><th>Что вписать</th></tr>
-      <tr><td>Название для пользователей</td><td><code>GEO DASH</code></td></tr>
+      <tr><td>Название для пользователей</td><td><code id="ymName">Оплата</code>
+        <button class="btn small ghost ym-copy" data-copy="ymName" type="button">Скопировать</button></td></tr>
       <tr><td>Адрес сайта</td><td><code id="ymSite">https://<?= h($host) ?></code></td></tr>
       <tr><td>Почта для связи</td><td>ваша почта</td></tr>
       <tr><td>Redirect URI</td><td><code id="ymRedir"><?= h(gd_ym_redirect($host)) ?></code>
