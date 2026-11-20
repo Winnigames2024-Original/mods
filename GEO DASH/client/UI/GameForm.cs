@@ -53,7 +53,8 @@ namespace GEO_DASH.UI
             DoubleBuffered = true;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
             ClientSize = new Size(1280, 720);
-            WindowState = AppConfig.Settings.Fullscreen ? FormWindowState.Maximized : FormWindowState.Normal;
+            // внутри оболочки игра занимает всю панель; отдельным окном — весь экран
+            if (AppConfig.Settings.Fullscreen && !Nav.Ready) FullScreen.Hook(this);
             KeyPreview = true;
 
             Renderer.ShowHitboxes = AppConfig.Settings.ShowHitboxes;

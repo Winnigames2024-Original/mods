@@ -27,7 +27,14 @@ namespace GEO_DASH.UI
             Nav.Attach(this, _screens);
 
             FullScreen.Hook(this);
+            // полный экран включаем и до показа, и после: так он встаёт на любом экране
             Load += (s, e) => { if (AppConfig.Settings.Fullscreen) FullScreen.Apply(this, true); };
+            Shown += (s, e) =>
+            {
+                if (AppConfig.Settings.Fullscreen && !FullScreen.IsOn(this)) FullScreen.Apply(this, true);
+                Layout2();
+                Content.Invalidate();
+            };
 
             BuildUi();
             Resize += (s, e) => Layout2();

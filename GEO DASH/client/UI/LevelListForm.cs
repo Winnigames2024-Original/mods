@@ -85,11 +85,12 @@ namespace GEO_DASH.UI
                 int idx = i;
                 var card = new LevelCard
                 {
-                    Level = _data[i], Width = Math.Max(400, w), Height = 112,
+                    Level = _data[i], Width = Math.Max(400, w), Height = 140,
                     Margin = new Padding(2, 2, 2, 6), Selected = i == _index
                 };
                 // клик по уровню открывает его карточку — как в игре
-                card.Click += (s, e) => { Select(idx); Info(); };
+                card.Click += (s, e) => { if (card.LastClickOnSong) return; Select(idx); Info(); };
+                card.SongClicked += async (s, e) => await SongAction(card);
                 card.DoubleClick += (s, e) => { Select(idx); Play(false); };
                 _cards.Add(card);
                 _list.Controls.Add(card);
@@ -110,6 +111,45 @@ namespace GEO_DASH.UI
         }
 
         LevelData Sel => _index >= 0 && _index < _data.Count ? _data[_index] : null;
+
+        /// <summary>Кнопка трека прямо на карточке: скачать его или удалить.</summary>
+        async Task SongAction(LevelCard card)
+        {
+            var lv = card?.Level;
+            int id = lv?.Settings.SongId ?? 0;
+            if (id <= 0) return;
+
+            if (MusicPlayer.IsCached(id))
+            {
+                if (!GdDialog.Confirm(this, "Удалить трек",
+                        $"Удалить скачанный трек #{id}? Уровень без него будет играть молча."))
+                    return;
+                _msg = MusicPlayer.Delete(id) ? $"Трек #{id} удалён" : $"Не вышло удалить трек #{id}";
+                card.Invalidate();
+                Content.Invalidate();
+                return;
+            }
+
+            _msg = $"Качаю трек #{id}…";
+            Content.Invalidate();
+            var path = await MusicPlayer.EnsureAsync(id, new Progress<string>(t =>
+            {
+                _msg = t; Content.Invalidate();
+            }));
+
+            if (path != null)
+            {
+                _msg = $"Трек #{id} скачан";
+                Toasts.Show("Трек скачан", "#" + id + "  " + (lv.Settings.SongName ?? ""), Toasts.Kind.Download);
+            }
+            else
+                _msg = ApiClient.Online
+                    ? $"Сервер не отдал трек #{id} — залей mp3 на сайте под этим ID"
+                    : "Нет сети — трек скачается позже";
+
+            card.Invalidate();
+            Content.Invalidate();
+        }
 
         /// <summary>Карточка уровня: публикация, монетки, прогресс и комментарии.</summary>
         void Info()

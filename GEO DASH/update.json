@@ -1,8 +1,8 @@
 {
-  "version": "1.9.1",
+  "version": "1.9.2",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Блоки и шипы рисуются из готовых картинок — кадр больше ничего не создаёт, игра тянет 120+ FPS. В редакторе появилась полоса перемотки по уровню, поворот Q/E и сдвиг WASD. На сайте заработала ссылка обновления сервера /api.php?action=updateserver.",
-  "date": "2026-11-19"
+  "notes": "Под каждым уровнем в списке появилась строка трека: номер, название и кнопка «скачать» или «удалить». Полный экран включается надёжнее. В установщике видно галочки.",
+  "date": "2026-11-20"
 }

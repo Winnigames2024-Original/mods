@@ -1,6 +1,7 @@
 using System.Drawing.Drawing2D;
 using GEO_DASH.Core;
 using GEO_DASH.Net;
+using GEO_DASH.Audio;
 
 namespace GEO_DASH.UI
 {
@@ -52,15 +53,32 @@ namespace GEO_DASH.UI
         public string Line2 = "";
         bool _hover;
 
+        /// <summary>Нажали кнопку трека (скачать или удалить).</summary>
+        public event EventHandler SongClicked;
+
+        /// <summary>Последний клик пришёлся на кнопку трека — карточку открывать не надо.</summary>
+        public bool LastClickOnSong { get; private set; }
+
+        RectangleF _songBtn;
+
         public LevelCard()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
                      | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
             BackColor = Color.Transparent;
             Cursor = Cursors.Hand;
-            Size = new Size(640, 108);
+            Size = new Size(640, 136);
             MouseEnter += (s, e) => { _hover = true; Invalidate(); };
             MouseLeave += (s, e) => { _hover = false; Invalidate(); };
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            LastClickOnSong = _songBtn.Width > 1 && _songBtn.Contains(e.Location);
+            base.OnMouseDown(e);
+            if (!LastClickOnSong) return;
+            SongClicked?.Invoke(this, EventArgs.Empty);
+            Invalidate();
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -110,8 +128,11 @@ namespace GEO_DASH.UI
                     pr.Completed ? Gd.Lime : Gd.Gold, StringAlignment.Near, thick: 2.2f);
             }
 
+            // ---- строка трека прямо под уровнем, как в игре ----
+            DrawSongRow(g, new RectangleF(r.X + 10, r.Bottom - 34, r.Width - 20, 28), st);
+
             // полоса прогресса справа
-            var bar = new RectangleF(tx, r.Bottom - 20, Math.Max(40, r.Right - tx - 16), 9);
+            var bar = new RectangleF(tx, r.Bottom - 48, Math.Max(40, r.Right - tx - 16), 9);
             using (var br = new SolidBrush(Color.FromArgb(150, 10, 12, 26)))
             using (var p1 = Gd.Round(bar, 4.5f))
                 g.FillPath(br, p1);
@@ -120,6 +141,40 @@ namespace GEO_DASH.UI
                 using (var p2 = Gd.Round(fill, 4.5f))
                 using (var br = new SolidBrush(pr.Completed ? Gd.Lime : Gd.Gold))
                     g.FillPath(br, p2);
+        }
+
+        /// <summary>Трек уровня: номер, название и кнопка «скачать» или «удалить».</summary>
+        void DrawSongRow(Graphics g, RectangleF row, LevelSettings st)
+        {
+            _songBtn = RectangleF.Empty;
+
+            using var plate = Gd.Round(row, 9f);
+            using (var br = new SolidBrush(Color.FromArgb(150, 12, 10, 32))) g.FillPath(br, plate);
+            using (var pen = new Pen(Color.FromArgb(120, 80, 90, 160), 2f)) g.DrawPath(pen, plate);
+
+            string label;
+            if (st.SongId == 0) label = "♪  без музыки";
+            else if (st.SongId < 0) label = "♪  встроенный трек · " + (st.SongName ?? "");
+            else label = "♪  #" + st.SongId + "  ·  " + (string.IsNullOrWhiteSpace(st.SongName) ? "трек" : st.SongName);
+
+            bool cached = st.SongId > 0 && MusicPlayer.IsCached(st.SongId);
+            float bw = st.SongId > 0 ? 104f : 0f;
+
+            using (var f = Gd.Bold(9f))
+                Gd.Outlined(g, label, f,
+                    new RectangleF(row.X + 10, row.Y + 4, row.Width - bw - 22, 20),
+                    cached ? Gd.Lime : Color.FromArgb(230, 205, 220, 255), StringAlignment.Near, thick: 2.2f);
+
+            if (st.SongId <= 0) return;
+
+            _songBtn = new RectangleF(row.Right - bw - 6, row.Y + 3, bw, row.Height - 6);
+            var c1 = cached ? Color.FromArgb(235, 130, 130) : Color.FromArgb(130, 220, 255);
+            var c2 = cached ? Color.FromArgb(150, 40, 50) : Color.FromArgb(25, 95, 180);
+
+            Gd.ButtonPlate(g, _songBtn, c1, c2, 9f, false, false);
+            using (var f = Gd.Bold(8.5f))
+                Gd.Outlined(g, cached ? "УДАЛИТЬ" : "СКАЧАТЬ", f,
+                    new RectangleF(_songBtn.X, _songBtn.Y + 4, _songBtn.Width, 18), Gd.Paper, thick: 2.2f);
         }
     }
 }

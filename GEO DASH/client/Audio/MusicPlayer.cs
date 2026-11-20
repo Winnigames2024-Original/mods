@@ -85,6 +85,20 @@ namespace GEO_DASH.Audio
             catch (Exception ex) { LastError = ex.Message; return false; }
         }
 
+        /// <summary>Удалить скачанный трек с диска. Встроенные не трогаем.</summary>
+        public static bool Delete(int id)
+        {
+            if (id <= 0) return false;
+            try
+            {
+                if (_currentId == id) Stop();
+                var p = CachePath(id);
+                if (File.Exists(p)) File.Delete(p);
+                return !File.Exists(p);
+            }
+            catch { return false; }
+        }
+
         public static void Stop()
         {
             try { _out?.Stop(); _out?.Dispose(); } catch { }
