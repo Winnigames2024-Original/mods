@@ -50,11 +50,16 @@ fetch_builds() {
 
     # autoupdate.exe — та же программа, что установщик. Делаем жёсткую ссылку,
     # чтобы не держать на диске вторую копию в 70 МБ.
-    if [ -f "$WEB/download/GEO_DASH_Setup.exe" ]; then
-      if ! cmp -s "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"; then
-        rm -f "$WEB/download/autoupdate.exe"
-        ln -f "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe" 2>/dev/null \
-          || cp -f "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"
+    setup="$WEB/download/GEO_DASH_Setup.exe"
+    auto="$WEB/download/autoupdate.exe"
+    if [ -s "$setup" ] && ! cmp -s "$setup" "$auto"; then
+      rm -f "$auto"
+      ln -f "$setup" "$auto" 2>/dev/null || cp -f "$setup" "$auto" 2>/dev/null || true
+      if [ -s "$auto" ]; then
+        chmod 0644 "$auto" 2>/dev/null || true
+        log "autoupdate.exe готов ($(du -h "$auto" | cut -f1))"
+      else
+        log "autoupdate.exe сделать не вышло"
       fi
     fi
   fi

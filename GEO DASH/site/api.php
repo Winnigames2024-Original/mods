@@ -70,6 +70,7 @@ switch ($action) {
                 'exe' => $file('GEO_DASH.exe'),
                 'apk' => $file('GEO_DASH.apk'),
                 'setup' => $file('GEO_DASH_Setup.exe'),
+                'autoupdate' => $file('autoupdate.exe'),
             ],
             'updatePending' => is_file($flag),
             'lastUpdate' => is_file($log) ? trim((string)file_get_contents($log)) : null,
