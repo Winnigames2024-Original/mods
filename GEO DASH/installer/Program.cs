@@ -101,10 +101,10 @@ namespace GeoDashSetup
 
             CheckBox C(string t, int y, bool on)
             {
-                var c = new CheckBox
+                var c = new GdCheck
                 {
-                    Text = t, Left = 28, Top = y, Width = 560, Checked = on,
-                    ForeColor = Paper, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat
+                    Text = t, Left = 28, Top = y, Width = 560, Height = 24, Checked = on,
+                    ForeColor = Paper
                 };
                 Controls.Add(c);
                 return c;
@@ -478,6 +478,73 @@ namespace GeoDashSetup
             _bar.Style = ProgressBarStyle.Continuous;
             _bar.Value = _bar.Maximum;
             _text.Text = text;
+        }
+    }
+
+    /// <summary>
+    /// Галочка в стиле игры: тёмный квадрат с обводкой и яркой зелёной птичкой.
+    /// Своя отрисовка нужна потому, что обычная галочка Windows на тёмном фоне
+    /// получается белым квадратом, в котором ничего не видно.
+    /// </summary>
+    public class GdCheck : CheckBox
+    {
+        public GdCheck()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
+                     | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
+            Cursor = Cursors.Hand;
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Invalidate(); }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); Invalidate(); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.Clear(Parent?.BackColor ?? Color.FromArgb(14, 12, 34));
+
+            int side = 18;
+            var box = new Rectangle(0, (Height - side) / 2, side, side);
+
+            // подложка квадрата
+            using (var br = new SolidBrush(Checked
+                       ? Color.FromArgb(32, 150, 100)
+                       : Color.FromArgb(28, 26, 60)))
+                g.FillRectangle(br, box);
+
+            using (var pen = new Pen(Checked ? Color.FromArgb(120, 255, 180)
+                                             : Color.FromArgb(90, 95, 150), 2f))
+                g.DrawRectangle(pen, box);
+
+            // птичка
+            if (Checked)
+            {
+                using var pen = new Pen(Color.FromArgb(235, 255, 240), 2.6f)
+                {
+                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                    EndCap = System.Drawing.Drawing2D.LineCap.Round
+                };
+                g.DrawLines(pen, new[]
+                {
+                    new PointF(box.X + 4f,  box.Y + side * 0.52f),
+                    new PointF(box.X + 7.5f, box.Y + side * 0.74f),
+                    new PointF(box.X + 14f, box.Y + side * 0.28f)
+                });
+            }
+
+            // подпись
+            var text = new Rectangle(box.Right + 10, 0, Width - box.Right - 12, Height);
+            using (var br = new SolidBrush(Enabled ? ForeColor : Color.Gray))
+            using (var sf = new StringFormat { LineAlignment = StringAlignment.Center,
+                                               Trimming = StringTrimming.EllipsisCharacter })
+                g.DrawString(Text, Font, br, text, sf);
+
+            if (Focused)
+                using (var pen = new Pen(Color.FromArgb(120, 160, 220, 255), 1f))
+                    g.DrawRectangle(pen, box.X - 3, box.Y - 3, side + 6, side + 6);
         }
     }
 }
