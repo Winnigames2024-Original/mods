@@ -1,4 +1,6 @@
 using GEO_DASH.Core;
+using GEO_DASH.Net;
+using GEO_DASH.Audio;
 
 namespace GEO_DASH.UI
 {
@@ -57,6 +59,65 @@ namespace GEO_DASH.UI
             return c;
         }
 
+        /// <summary>Подпись под шкалой: скачан трек или нет.</summary>
+        void UpdateSongState()
+        {
+            if (_songState == null) return;
+            int id = (int)_songId.Value;
+            if (id == 0) { _songState.Text = "Уровень без музыки"; return; }
+            if (id < 0) { _songState.Text = "Встроенный трек — качать не нужно"; return; }
+            _songState.Text = SongDownloader.Have(id)
+                ? $"Трек #{id} уже скачан"
+                : $"Трек #{id} ещё не скачан";
+        }
+
+        /// <summary>Скачать трек по номеру: сервер, потом Newgrounds, потом файл вручную.</summary>
+        async Task GetSongAsync()
+        {
+            if (_songBusy) return;
+            int id = (int)_songId.Value;
+            if (id <= 0) { UpdateSongState(); return; }
+
+            _songBusy = true;
+            _songBar.Value = 0;
+            var pct = new Progress<int>(v => { if (!IsDisposed) _songBar.Value = Math.Clamp(v, 0, 100); });
+            var log = new Progress<string>(t => { if (!IsDisposed) _songState.Text = t; });
+
+            string path = await SongDownloader.GetAsync(id, pct, log);
+            _songBusy = false;
+
+            if (path != null)
+            {
+                _songBar.Value = 100;
+                _songState.Text = $"Трек #{id} готов";
+                if (string.IsNullOrWhiteSpace(_songName.Text)) _songName.Text = "Трек #" + id;
+                Toasts.Show("Трек скачан", "#" + id, Toasts.Kind.Download);
+                return;
+            }
+
+            _songBar.Value = 0;
+            string why = string.IsNullOrEmpty(SongDownloader.LastError) ? "не получилось" : SongDownloader.LastError;
+            if (!GdDialog.Confirm(this, "Трек не скачался",
+                    $"Не вышло забрать трек #{id}: {why}.\n\nВыбрать файл mp3 вручную?"))
+            {
+                _songState.Text = "Трек #" + id + " не скачан: " + why;
+                return;
+            }
+
+            path = SongDownloader.PickManually(this, id);
+            _songState.Text = path != null ? $"Трек #{id} взят из файла" : "Файл не выбран";
+            if (path != null) _songBar.Value = 100;
+        }
+
+        /// <summary>Послушать трек прямо из настроек.</summary>
+        void TestSong()
+        {
+            int id = (int)_songId.Value;
+            if (id == 0) { _songState.Text = "Музыки у уровня нет"; return; }
+            _ = MusicPlayer.PlayAsync(id, (double)_offset.Value, 0.8, false);
+            _songState.Text = "Играю трек #" + id;
+        }
+
         void Section(string t)
         {
             _y += 10;
@@ -70,6 +131,9 @@ namespace GEO_DASH.UI
         }
 
         TextBox _name, _desc, _copyPass, _pass, _songName;
+        ProgressBar _songBar;
+        Label _songState;
+        bool _songBusy;
         NumericUpDown _songId, _offset, _gravity;
         ComboBox _mode, _speed, _diff, _copyMode;
         CheckBox _mini, _dual, _mirror, _gravUp, _two, _reverse, _fadeIn, _platformer, _mp;
@@ -138,6 +202,42 @@ namespace GEO_DASH.UI
             };
             _p.Controls.Add(pick);
             _y += 54;
+
+            // ---- скачивание трека по номеру прямо здесь ----
+            _songBar = new ProgressBar
+            {
+                Left = 24, Top = _y, Width = 482, Height = 14, Style = ProgressBarStyle.Continuous
+            };
+            _p.Controls.Add(_songBar);
+            _y += 22;
+
+            _songState = new Label
+            {
+                Left = 24, Top = _y, Width = 482, Height = 20, BackColor = Color.Transparent,
+                ForeColor = Color.FromArgb(205, 220, 255), Font = Gd.Reg(9f)
+            };
+            _p.Controls.Add(_songState);
+            _y += 26;
+
+            var getSong = new GdButton
+            {
+                Text = "СКАЧАТЬ ТРЕК", Icon = GdIcon.Download, Left = 24, Top = _y, Width = 232, Height = 44,
+                Color1 = Color.FromArgb(130, 220, 255), Color2 = Color.FromArgb(25, 95, 180)
+            };
+            getSong.Click += async (s, e) => await GetSongAsync();
+            _p.Controls.Add(getSong);
+
+            var testSong = new GdButton
+            {
+                Text = "ТЕСТ МУЗЫКИ", Icon = GdIcon.Play, Left = 266, Top = _y, Width = 240, Height = 44,
+                Color1 = Color.FromArgb(120, 255, 170), Color2 = Color.FromArgb(20, 150, 100)
+            };
+            testSong.Click += (s, e) => TestSong();
+            _p.Controls.Add(testSong);
+            _y += 54;
+
+            UpdateSongState();
+            _songId.ValueChanged += (s, e) => UpdateSongState();
 
             Section("Защита уровня");
             L("Копирование уровня другими");

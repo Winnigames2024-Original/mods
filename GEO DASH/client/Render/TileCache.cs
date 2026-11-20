@@ -60,13 +60,17 @@ namespace GEO_DASH.Render
                 Cache[key] = bm;
             }
 
+            // тайлы уже в нужном размере: копируем как есть, без пересчёта
+            var oldPix = g.PixelOffsetMode;
+            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
             g.DrawImageUnscaled(bm, (int)Math.Round(r.X), (int)Math.Round(r.Y));
+            g.PixelOffsetMode = oldPix;
             return true;
         }
 
         static Bitmap Make(DrawStyle style, Color c, Color detail, int w, int h)
         {
-            var bm = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+            var bm = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
             using var g = Graphics.FromImage(bm);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Color.Transparent);

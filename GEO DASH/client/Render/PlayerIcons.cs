@@ -29,7 +29,7 @@ namespace GEO_DASH.Render
             var key = (mode, c1.ToArgb(), c2.ToArgb(), shape, custom);
             if (Cache.TryGetValue(key, out var bm)) return bm;
 
-            bm = new Bitmap(Size, Size, PixelFormat.Format32bppArgb);
+            bm = new Bitmap(Size, Size, PixelFormat.Format32bppPArgb);
             using (var g = Graphics.FromImage(bm))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;

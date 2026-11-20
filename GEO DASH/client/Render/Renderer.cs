@@ -128,6 +128,9 @@ namespace GEO_DASH.Render
                 camX * v.Scale * 0.26, camY * v.Scale * 0.16, tex);
         }
 
+        /// <summary>Одна кисть на все частицы — меняем только цвет.</summary>
+        static readonly SolidBrush ParticleBrush = new(Color.White);
+
         // кисти для глаз создаются один раз — в кадре ничего не выделяется
         static readonly SolidBrush EyeWhite = new(Color.FromArgb(235, 245, 245, 245));
         static readonly SolidBrush EyeDark = new(Color.FromArgb(255, 12, 12, 14));
@@ -648,14 +651,16 @@ namespace GEO_DASH.Render
         {
             var fx = w.Fx;
 
-            // частицы
-            foreach (var p in fx.Particles)
+            // частицы: идём по пулу, кисть одна на всех — в кадре ничего не создаётся
+            for (int i = 0; i < fx.Particles.Length; i++)
             {
+                ref readonly var p = ref fx.Particles[i];
+                if (!p.Alive) continue;
                 var sp = v.W2S(p.X, p.Y);
                 float sz = (float)(p.Size * Math.Max(0.4, v.Scale));
                 int a = (int)Math.Clamp(255 * (p.Life / Math.Max(0.1, p.MaxLife)), 0, 255);
-                using var br = new SolidBrush(Color.FromArgb(a, p.Color));
-                g.FillEllipse(br, sp.X - sz / 2, sp.Y - sz / 2, sz, sz);
+                ParticleBrush.Color = Color.FromArgb(a, p.Color);
+                g.FillEllipse(ParticleBrush, sp.X - sz / 2, sp.Y - sz / 2, sz, sz);
             }
 
             // ударная волна — расходящееся кольцо

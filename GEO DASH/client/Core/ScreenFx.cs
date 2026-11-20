@@ -19,10 +19,17 @@ namespace GEO_DASH.Core
         public bool On => T > 0 && Str > 0.001;
     }
 
-    public class Particle
+    /// <summary>
+    /// Частица. Это структура в заранее выделенном массиве: за кадр не создаётся
+    /// ни одного объекта, поэтому сборщик мусора не дёргает игру посреди уровня.
+    /// </summary>
+    public struct Particle
     {
         public double X, Y, VX, VY, Life, MaxLife, Size;
-        public Color Color;
+        public int Argb;
+        public bool Alive;
+
+        public Color Color => Color.FromArgb(Argb);
     }
 
     /// <summary>
@@ -42,14 +49,17 @@ namespace GEO_DASH.Core
         /// <summary>Множитель хода времени (TimeWarp).</summary>
         public double TimeScale = 1;
 
-        public readonly List<Particle> Particles = new();
+        /// <summary>Пул частиц: живые помечены флагом, место переиспользуется.</summary>
+        public readonly Particle[] Particles = new Particle[256];
+        int _next;
 
         public void Reset()
         {
             Invert = Gray = Pixelate = Glitch = Chromatic = Blur = Vignette = Flash = Shock = default;
             GradientOn = false;
             TimeScale = 1;
-            Particles.Clear();
+            for (int i = 0; i < Particles.Length; i++) Particles[i].Alive = false;
+            _next = 0;
         }
 
         public bool AnyPost => Invert.On || Gray.On || Pixelate.On || Glitch.On || Chromatic.On || Blur.On;
@@ -57,21 +67,23 @@ namespace GEO_DASH.Core
         public void Burst(double x, double y, int count, Color col, double power)
         {
             var rnd = Random.Shared;
+            int argb = col.ToArgb();
             for (int i = 0; i < count; i++)
             {
+                // берём следующее место по кругу: самые старые частицы вытесняются
+                ref var p = ref Particles[_next];
+                _next = (_next + 1) % Particles.Length;
+
                 double a = rnd.NextDouble() * Math.PI * 2;
                 double v = power * (0.4 + rnd.NextDouble());
-                Particles.Add(new Particle
-                {
-                    X = x, Y = y,
-                    VX = Math.Cos(a) * v, VY = Math.Sin(a) * v,
-                    Life = 0.5 + rnd.NextDouble() * 0.7,
-                    MaxLife = 1.2,
-                    Size = 4 + rnd.NextDouble() * 8,
-                    Color = col
-                });
+                p.X = x; p.Y = y;
+                p.VX = Math.Cos(a) * v; p.VY = Math.Sin(a) * v;
+                p.Life = 0.5 + rnd.NextDouble() * 0.7;
+                p.MaxLife = 1.2;
+                p.Size = 4 + rnd.NextDouble() * 8;
+                p.Argb = argb;
+                p.Alive = true;
             }
-            if (Particles.Count > 600) Particles.RemoveRange(0, Particles.Count - 600);
         }
 
         public void Update(double dt)
@@ -79,11 +91,12 @@ namespace GEO_DASH.Core
             Invert.Update(dt); Gray.Update(dt); Pixelate.Update(dt); Glitch.Update(dt);
             Chromatic.Update(dt); Blur.Update(dt); Vignette.Update(dt); Flash.Update(dt); Shock.Update(dt);
 
-            for (int i = Particles.Count - 1; i >= 0; i--)
+            for (int i = 0; i < Particles.Length; i++)
             {
-                var p = Particles[i];
+                ref var p = ref Particles[i];
+                if (!p.Alive) continue;
                 p.Life -= dt;
-                if (p.Life <= 0) { Particles.RemoveAt(i); continue; }
+                if (p.Life <= 0) { p.Alive = false; continue; }
                 p.X += p.VX * dt;
                 p.Y += p.VY * dt;
                 p.VY -= 420 * dt;          // мир Y вверх — частицы падают вниз
