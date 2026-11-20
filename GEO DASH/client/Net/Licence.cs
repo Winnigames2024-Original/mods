@@ -60,8 +60,12 @@ namespace GEO_DASH.Net
         /// <summary>Лицензия подтверждена в этом запуске.</summary>
         public static bool Ok { get; private set; }
 
-        /// <summary>Почему не пускает: none, off (ключ отключён), revoked (отозван).</summary>
+        /// <summary>Почему не пускает: none, off (ключ отключён), revoked (отозван),
+        /// offline (первый запуск без интернета).</summary>
         public static string Reason { get; private set; } = "none";
+
+        /// <summary>Сервер в этом запуске ответил — значит проверка настоящая.</summary>
+        public static bool Online { get; private set; }
 
         /// <summary>Игра поставлена установщиком.</summary>
         public static bool Installed => InstallInfo() != null;
@@ -172,10 +176,16 @@ namespace GEO_DASH.Net
 
         // ------------------------------------------------------------ проверка
 
-        /// <summary>Запомненная активация для того же аккаунта — на случай «без интернета».</summary>
+        /// <summary>
+        /// Запомненная активация годится, только если её сделали на этом же
+        /// компьютере и под этим же аккаунтом, и хотя бы раз подтвердил сервер.
+        /// Поэтому подложенный из другой папки файл игру не открывает.
+        /// </summary>
         public static bool LocalOkFor(string user) =>
             !string.IsNullOrEmpty(St.Key) &&
-            string.Equals(St.User, user, StringComparison.OrdinalIgnoreCase);
+            !string.IsNullOrEmpty(St.CheckedAt) &&
+            string.Equals(St.User, user, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(St.Device, Device, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Спросить сервер про лицензию. Если сети нет — верим запомненной активации.
@@ -184,14 +194,17 @@ namespace GEO_DASH.Net
         {
             string user = AppConfig.Settings.UserName ?? "";
 
+            Online = false;
             var r = await ApiClient.LicenceMineAsync();
             if (r.Ok && r.Data != null)
             {
+                Online = true;
                 Reason = string.IsNullOrEmpty(r.Data.Reason) ? "none" : r.Data.Reason;
                 if (r.Data.Licensed)
                 {
                     St.Key = string.IsNullOrEmpty(r.Data.Key) ? (St.Key ?? "") : r.Data.Key;
                     St.User = user;
+                    St.Device = Device;
                     St.CheckedAt = DateTime.Now.ToString("s");
                     SaveState();
                     Ok = true;
@@ -203,8 +216,10 @@ namespace GEO_DASH.Net
                 return false;
             }
 
-            // сервер молчит: пускаем, если на этом компьютере уже активировали
+            // сервер молчит. Пускаем только если проверка уже проходила на этом
+            // компьютере: первый запуск без интернета игру не открывает.
             Ok = LocalOkFor(user);
+            if (!Ok) Reason = "offline";
             return Ok;
         }
 
@@ -219,18 +234,28 @@ namespace GEO_DASH.Net
 
             St.Key = string.IsNullOrEmpty(r.Data.Key) ? Pretty(keyText) : r.Data.Key;
             St.User = AppConfig.Settings.UserName ?? "";
+            St.Device = Device;
             St.CheckedAt = DateTime.Now.ToString("s");
             SaveState();
             Ok = true;
             return null;
         }
 
+        /// <summary>Ключ, оставленный установщиком: сначала файл, потом метка.</summary>
+        public static string InstallerKey()
+        {
+            var fromFile = KeyFile.Read(AppContext.BaseDirectory);
+            if (WellFormed(fromFile)) return Pretty(fromFile);
+            var i = InstallInfo();
+            return i != null && WellFormed(i.Key) ? Pretty(i.Key) : "";
+        }
+
         /// <summary>Ключ, который ввели в установщике — пробуем его сами, молча.</summary>
         public static async Task<bool> TryInstallerKeyAsync()
         {
-            var i = InstallInfo();
-            if (i == null || string.IsNullOrWhiteSpace(i.Key) || !WellFormed(i.Key)) return false;
-            return await ActivateAsync(i.Key) == null;
+            var k = InstallerKey();
+            if (k.Length == 0) return false;
+            return await ActivateAsync(k) == null;
         }
 
         /// <summary>Что показать игроку, когда игра не открывается.</summary>
@@ -238,6 +263,7 @@ namespace GEO_DASH.Net
         {
             "off" => "Ваш ключ отключён — включите его в аккаунте на сайте",
             "revoked" => "Ваш ключ отозван администратором",
+            "offline" => "Включите интернет: ключ проверяется на сервере",
             _ => "Вы не ввели лицензионный ключ"
         };
 

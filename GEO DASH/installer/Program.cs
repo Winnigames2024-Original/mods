@@ -122,7 +122,7 @@ namespace GeoDashSetup
             _offline.Enabled = HasLocalGame();
 
             L("Лицензионный ключ", 28, 330, 300, 10f, true);
-            L("не обязательно сейчас — игра спросит его при первом запуске",
+            L("нужен, чтобы скачать и запустить игру — проверяется на сервере",
               200, 332, 412).ForeColor = Color.FromArgb(150, 190, 255);
 
             _key = new TextBox
@@ -263,6 +263,23 @@ namespace GeoDashSetup
                 UpdateInfo info = null;
                 bool offline = _offline.Checked;
 
+                // ключ проверяем первым делом: без годного ключа не ставим
+                string lic = Lic.WellFormed(_key.Text) ? Lic.Pretty(_key.Text) : Cfg.ReadMarkKey(dir);
+                if (!Lic.WellFormed(lic))
+                {
+                    Status("Введите лицензионный ключ — он есть в вашем аккаунте на сайте");
+                    return;
+                }
+
+                Status("Проверяю ключ на сервере…");
+                var (keyOk, keySay) = await Net.CheckKeyAsync(lic);
+                if (!keyOk)
+                {
+                    Status(keySay.Length > 0 ? keySay : "Ключ не принят сервером");
+                    return;
+                }
+                Status(keySay.Length > 0 ? keySay : "Ключ годен");
+
                 if (!offline)
                 {
                     Status("Проверяю интернет…");
@@ -315,12 +332,10 @@ namespace GeoDashSetup
                 try { File.Copy(Cfg.SetupExe(dir), Cfg.AutoUpdateExe(dir), true); } catch { }
                 Cfg.WriteVersion(dir, info?.version ?? Net.LocalVersion(dir));
 
-                // метка установки: по ней игра понимает, что её поставили
-                // установщиком, и сама активирует введённый здесь ключ
-                string lic = Lic.WellFormed(_key.Text) ? Lic.Pretty(_key.Text) : Cfg.ReadMarkKey(dir);
+                // метка установки плюс сам ключ в licence.txt, зашифрованным:
+                // по метке игра понимает, что её поставили установщиком, а ключ
+                // активирует сама при первом запуске
                 Cfg.WriteMark(dir, info?.version ?? Net.LocalVersion(dir), lic);
-                if (_key.Text.Trim().Length > 0 && !Lic.WellFormed(_key.Text))
-                    Status("Ключ набран не полностью — игра спросит его при запуске");
 
                 Status("Создаю ярлыки…");
                 if (_desktop.Checked)

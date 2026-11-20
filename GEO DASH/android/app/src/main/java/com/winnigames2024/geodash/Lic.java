@@ -74,10 +74,14 @@ public class Lic {
     /** Почему не пускает: none, off (ключ отключён), revoked (отозван). */
     public static String reason = "none";
 
+    /** Сервер в этом запуске ответил — значит проверка настоящая. */
+    public static boolean online = false;
+
     /** Что показать игроку, когда игра не открывается. */
     public static String reasonText() {
         if (reason.equals("off")) return "Ваш ключ отключён — включите его в аккаунте на сайте";
         if (reason.equals("revoked")) return "Ваш ключ отозван администратором";
+        if (reason.equals("offline")) return "Включите интернет: ключ проверяется на сервере";
         return "Вы не ввели лицензионный ключ";
     }
 
@@ -86,14 +90,24 @@ public class Lic {
 
     public static void remember(String key, String user) {
         Store.prefs.edit().putString("lic_key", key == null ? "" : key)
-                .putString("lic_user", user == null ? "" : user).apply();
+                .putString("lic_user", user == null ? "" : user)
+                .putString("lic_device", device()).apply();
     }
 
-    public static void forget() { remember("", ""); }
+    public static void forget() {
+        Store.prefs.edit().putString("lic_key", "").putString("lic_user", "")
+                .putString("lic_device", "").apply();
+    }
 
-    /** Запомненная активация этого же аккаунта — на случай «без интернета». */
+    /**
+     * Запомненная активация годится, только если её сделали на этом же телефоне
+     * и под этим же аккаунтом. Поэтому подложенный в папку приложения файл
+     * игру не открывает: первый запуск всё равно идёт через сервер.
+     */
     public static boolean localOk() {
-        return !key().isEmpty() && keyUser().equalsIgnoreCase(Store.user());
+        return !key().isEmpty()
+                && keyUser().equalsIgnoreCase(Store.user())
+                && Store.prefs.getString("lic_device", "").equals(device());
     }
 
     /** Номер этого телефона — чтобы в админке было видно устройства. */
@@ -151,8 +165,10 @@ public class Lic {
      * Вызывать только из фонового потока.
      */
     public static boolean check() {
+        online = false;
         JSONObject r = Api.licenceMine();
         if (r != null) {
+            online = true;
             String why = r.optString("reason", "");
             reason = why.isEmpty() ? "none" : why;
             if (r.optBoolean("licensed")) {
@@ -163,7 +179,10 @@ public class Lic {
             if (localOk()) forget();     // сервер ответил «нет» — держать нечего
             return false;
         }
-        return localOk();
+        // сети нет: пускаем только если проверка уже проходила на этом телефоне
+        boolean ok = localOk();
+        if (!ok) reason = "offline";
+        return ok;
     }
 
     /** Активировать ключ. Возвращает текст ошибки или null, если всё вышло. */

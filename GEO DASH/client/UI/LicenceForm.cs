@@ -15,7 +15,7 @@ namespace GEO_DASH.UI
         readonly TextBox _key;
         readonly GdButton _go, _site, _again;
         string _msg = "Проверяю лицензию…";
-        bool _busy = true, _noInstaller;
+        bool _busy = true, _noInstaller, _offline;
 
         public bool Allowed { get; private set; }
 
@@ -117,7 +117,16 @@ namespace GEO_DASH.UI
             _noInstaller = !Licence.Installed && !AppConfig.IsAdminUser;
 
             bool ok = await Licence.CheckAsync();
-            if (!ok && await Licence.TryInstallerKeyAsync()) ok = true;
+            if (!ok && Licence.Online && await Licence.TryInstallerKeyAsync()) ok = true;
+
+            // ключ есть, а сети нет: проверить его нечем — просим включить интернет
+            if (!ok && !Licence.Online)
+            {
+                _offline = true;
+                Busy(false, Licence.ReasonText());
+                return;
+            }
+            _offline = false;
 
             if (ok && !_noInstaller) { Allow(); return; }
 
@@ -134,6 +143,11 @@ namespace GEO_DASH.UI
 
         async Task ActivateAsync()
         {
+            if (_offline)
+            {
+                Busy(false, "Пока нет интернета, ключ проверить нечем — включите сеть");
+                return;
+            }
             if (_noInstaller)
             {
                 Busy(false, "Сначала поставьте игру установщиком — кнопка справа");
@@ -193,7 +207,16 @@ namespace GEO_DASH.UI
                         Gd.Lime, StringAlignment.Near, thick: 2f);
             }
 
-            if (_noInstaller)
+            if (_offline)
+            {
+                var warn = new RectangleF(50, card.Bottom + 18, ClientSize.Width - 100, 62);
+                Gd.Plate(g, warn, Color.FromArgb(40, 70, 120), Color.FromArgb(18, 34, 70), 14f, 3.5f);
+                using var fo = Gd.Bold(10f);
+                Gd.Outlined(g, "Ключ проверяется на сервере. Включите интернет и нажмите «ПРОВЕРИТЬ СНОВА» —" +
+                               " дальше игра будет запускаться и без сети.", fo,
+                    RectangleF.Inflate(warn, -14, -10), Gd.Gold, thick: 2.2f);
+            }
+            else if (_noInstaller)
             {
                 var warn = new RectangleF(50, card.Bottom + 18, ClientSize.Width - 100, 62);
                 Gd.Plate(g, warn, Color.FromArgb(120, 40, 50), Color.FromArgb(70, 18, 28), 14f, 3.5f);

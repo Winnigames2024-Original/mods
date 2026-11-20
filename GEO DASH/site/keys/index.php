@@ -92,14 +92,14 @@ gd_head('Мои ключи', 'keys');
   </div>
 
   <?php if (!$keys): ?>
-    <div class="card">
-      <p>Ключей пока нет.
-        <?php if (gd_pay_ready()): ?>
-          Купить можно <a href="/buy/">на странице покупки</a> — ключ придёт сюда сразу после оплаты.
-        <?php else: ?>
-          Получить ключ можно у <?= h(GD_ADMIN) ?>.
-        <?php endif; ?>
+    <div class="card" style="text-align:center">
+      <p>Ключей пока нет. Купите — ключ появится здесь сразу после оплаты,
+        и игра откроется на этом аккаунте.</p>
+      <p style="margin-top:16px">
+        <a class="btn gold" href="/buy/">КУПИТЬ КЛЮЧ<?= gd_pay_ready() ? ' — ' . (int)gd_pay_price() . ' ₽' : '' ?></a>
       </p>
+      <p class="muted" style="margin-top:10px">Ключ можно и получить у <?= h(GD_ADMIN) ?>,
+        а потом ввести его в поле выше.</p>
     </div>
   <?php else: ?>
     <?php foreach ($keys as $k): ?>

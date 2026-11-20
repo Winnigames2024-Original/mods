@@ -1,9 +1,9 @@
 {
-  "version": "2.1.1",
+  "version": "2.1.2",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
   "setupApk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.apk",
-  "notes": "Версия 2.1.1: страница «Ключи» на сайте — все ключи аккаунта, с возможностью временно отключить ключ и включить обратно. Купить ключ можно без аккаунта: после оплаты сайт предложит его создать и сам выдаст ключ. Игра теперь говорит, почему не пускает: ключа нет, отключён или отозван. Оплата принимается и через ЮKassa, и через кошелёк ЮMoney.",
+  "notes": "Версия 2.1.2: ключ вводится в установщике и проверяется на сервере, рядом с игрой он лежит зашифрованным. Первый запуск требует интернета — без проверки ключа игра не открывается, дальше работает и офлайн. Добавлено обслуживание сервера: админ может закрыть игру и обновить сервер одной кнопкой.",
   "date": "2026-11-20"
 }

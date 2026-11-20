@@ -39,15 +39,27 @@ public class Api {
         return c;
     }
 
+    /** Сервер закрыт на обслуживание: игра показывает это и выходит. */
+    public static String maintenance = "";
+
     static String read(HttpURLConnection c) throws Exception {
-        InputStream in = c.getResponseCode() >= 400 ? c.getErrorStream() : c.getInputStream();
+        int code = c.getResponseCode();
+        InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
         if (in == null) return null;
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;
         while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
         in.close();
-        return new String(bo.toByteArray(), StandardCharsets.UTF_8);
+        String body = new String(bo.toByteArray(), StandardCharsets.UTF_8);
+        if (code == 503) {
+            try {
+                org.json.JSONObject j = new org.json.JSONObject(body);
+                if (j.optBoolean("maintenance"))
+                    maintenance = j.optString("error", "Сервер обновляется");
+            } catch (Exception ignored) { }
+        }
+        return body;
     }
 
     public static String rawGet(String path) {

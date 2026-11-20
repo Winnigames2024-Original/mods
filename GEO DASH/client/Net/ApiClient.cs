@@ -121,12 +121,22 @@ namespace GEO_DASH.Net
             }
         }
 
+        /// <summary>
+        /// Сервер закрыт на обслуживание. Текст ставит сам сервер; игра его
+        /// показывает и закрывается — чтобы никто не остался в полусломанной сети.
+        /// </summary>
+        public static string Maintenance { get; private set; } = "";
+
         static string ErrorOf(string text, int code)
         {
             try
             {
                 using var d = JsonDocument.Parse(text);
-                if (d.RootElement.TryGetProperty("error", out var e)) return e.GetString();
+                var root = d.RootElement;
+                if (code == 503 && root.TryGetProperty("maintenance", out var m) && m.ValueKind == JsonValueKind.True)
+                    Maintenance = root.TryGetProperty("error", out var me)
+                        ? (me.GetString() ?? "Сервер обновляется") : "Сервер обновляется";
+                if (root.TryGetProperty("error", out var e)) return e.GetString();
             }
             catch { }
             return "Ошибка сервера " + code;

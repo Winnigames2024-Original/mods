@@ -23,6 +23,9 @@ namespace GeoDashSetup
         public static string ExeUrl => RawBase + "/download/GEO_DASH.exe";
 
         public static string SiteStatusUrl => SiteBase + "/api.php?action=status";
+
+        /// <summary>Сервер игры — на нём проверяется лицензионный ключ.</summary>
+        public static string ApiBase => "http://166.1.161.200:37534";
         public static string SiteExeUrl => SiteBase + "/download/GEO_DASH.exe";
 
         /// <summary>Метка «поставлено установщиком» рядом с игрой: без неё игра просит ключ.</summary>
@@ -30,18 +33,23 @@ namespace GeoDashSetup
 
         public const string InstallerMark = "GEO DASH Setup";
 
+        /// <summary>Файл с зашифрованным ключом рядом с игрой.</summary>
+        public static string KeyFilePath(string dir) => Path.Combine(dir, "licence.txt");
+
         /// <summary>Записать метку установки и ключ, который ввели в установщике.</summary>
         public static void WriteMark(string dir, string version, string key)
         {
             try
             {
+                // ключ в метку не пишем: он лежит рядом, в licence.txt, и зашифрован
                 var o = new
                 {
                     installedBy = InstallerMark,
                     version = version ?? "",
                     at = DateTime.Now.ToString("s"),
-                    key = key ?? ""
+                    key = ""
                 };
+                if (!string.IsNullOrEmpty(key)) KeyStore.Write(dir, key);
                 File.WriteAllText(InstallMark(dir),
                     JsonSerializer.Serialize(o, new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -51,6 +59,8 @@ namespace GeoDashSetup
         /// <summary>Ключ, который уже лежит рядом с игрой (при переустановке).</summary>
         public static string ReadMarkKey(string dir)
         {
+            var fromFile = KeyStore.Read(dir);
+            if (fromFile.Length > 0) return fromFile;
             try
             {
                 var p = InstallMark(dir);
@@ -199,6 +209,31 @@ namespace GeoDashSetup
             // у GitHub свой кэш — добавляем метку времени, чтобы отдал свежий файл
             list.Add(Cfg.ExeUrl + "?v=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             return list.ToArray();
+        }
+
+        /// <summary>
+        /// Спросить сервер про ключ. Возвращает (годен, что сказать игроку).
+        /// Без интернета ставить нельзя: ключ проверяется только на сервере.
+        /// </summary>
+        public static async Task<(bool ok, string text)> CheckKeyAsync(string key)
+        {
+            try
+            {
+                var body = new StringContent("{\"key\":\"" + key.Replace("\"", "") + "\"}",
+                    System.Text.Encoding.UTF8, "application/json");
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                using var r = await Http.PostAsync(Cfg.ApiBase + "/api/licence/validate", body, cts.Token);
+                var text = await r.Content.ReadAsStringAsync();
+                using var d = JsonDocument.Parse(text);
+                var root = d.RootElement;
+                bool usable = root.TryGetProperty("usable", out var u) && u.GetBoolean();
+                string say = root.TryGetProperty("text", out var t) ? (t.GetString() ?? "") : "";
+                return (usable, say);
+            }
+            catch
+            {
+                return (false, "Сервер не отвечает — ключ проверить нечем, включите интернет");
+            }
         }
 
         /// <summary>Пробуем адреса по порядку, пока файл не скачается.</summary>

@@ -100,7 +100,9 @@ function gd_pay_conf(bool $fresh = false): array {
 function gd_pay_provider(): string {
     $c = gd_pay_conf();
     if ($c['shopId'] !== '' && $c['secretKey'] !== '') return 'yookassa';
-    if ($c['receiver'] !== '' && $c['secret'] !== '') return 'yoomoney';
+    // кошелька достаточно: оплату подтверждает приложение ЮMoney, а секрет
+    // уведомлений нужен только если их всё-таки включили
+    if ($c['receiver'] !== '') return 'yoomoney';
     return '';
 }
 

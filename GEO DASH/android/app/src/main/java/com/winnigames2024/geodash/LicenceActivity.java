@@ -20,7 +20,7 @@ public class LicenceActivity extends GdActivity {
     Ui.GdBtn bGo, bSite, bAgain;
     MsgView msg;
     String text = "Проверяю лицензию…";
-    boolean busy = true, noSetup = false;
+    boolean busy = true, noSetup = false, offline = false;
 
     @Override protected int bgA() { return Gd.BG_BLUE; }
     @Override protected int bgId() { return 1; }
@@ -105,11 +105,18 @@ public class LicenceActivity extends GdActivity {
         noSetup = !Lic.installedProperly() && !Store.admin();
         Api.async(() -> {
             boolean ok = Lic.check();
-            if (!ok) {
+            if (!ok && Lic.online) {
                 // ключ, переданный установщиком, пробуем молча
                 String k = getIntent() != null ? getIntent().getStringExtra("gd_key") : null;
                 if (k != null && Lic.wellFormed(k) && Lic.activate(k) == null) ok = true;
             }
+            // ключ проверить нечем — зовём включить интернет
+            if (!ok && !Lic.online) {
+                offline = true;
+                say(Lic.reasonText(), false);
+                return;
+            }
+            offline = false;
             if (ok && !noSetup) { enter(); return; }
             if (noSetup) {
                 say(ok ? "Лицензия есть, но игра поставлена не установщиком"
@@ -121,6 +128,7 @@ public class LicenceActivity extends GdActivity {
     }
 
     void activate() {
+        if (offline) { say("Пока нет интернета, ключ проверить нечем — включите сеть", false); return; }
         if (noSetup) { say("Сначала поставьте игру установщиком — кнопка «УСТАНОВЩИК»", false); return; }
         final String k = key.getText().toString();
         if (!Lic.wellFormed(k)) { say("Ключ набран не полностью: GD- и 16 знаков", false); return; }
@@ -160,7 +168,13 @@ public class LicenceActivity extends GdActivity {
                 Gd.outlined(c, "ключ набран верно", r.centerX(), getHeight() * 0.66f, fs * 0.9f,
                         Gd.LIME, Paint.Align.CENTER);
 
-            if (noSetup) {
+            if (offline) {
+                RectF w = new RectF(getWidth() * 0.12f, getHeight() * 0.78f,
+                        getWidth() * 0.88f, getHeight() * 0.95f);
+                Gd.plate(c, w, Color.rgb(40, 70, 120), Color.rgb(18, 34, 70), 14f);
+                Gd.outlined(c, "Включите интернет и нажмите «ПРОВЕРИТЬ СНОВА»",
+                        w.centerX(), w.centerY() + fs * 0.4f, fs * 0.95f, Gd.GOLD, Paint.Align.CENTER);
+            } else if (noSetup) {
                 RectF w = new RectF(getWidth() * 0.12f, getHeight() * 0.78f,
                         getWidth() * 0.88f, getHeight() * 0.95f);
                 Gd.plate(c, w, Color.rgb(120, 40, 50), Color.rgb(70, 18, 28), 14f);

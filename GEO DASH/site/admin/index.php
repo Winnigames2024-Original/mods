@@ -28,7 +28,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'song' &&
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') !== 'song') {
+/** Попросить сервер обновиться: заявку подхватывает systemd. */
+function gd_ask_update(): bool {
+    $flag = dirname(__DIR__) . '/.update-request';
+    return @file_put_contents($flag, date('c') . " админка\n") !== false;
+}
+
+// обновление сервера и экстренная остановка — до общего разбора действий
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['act'] ?? '', ['update', 'emergency'], true)) {
+    if (($_POST['act'] ?? '') === 'emergency') {
+        [$mok, $mr] = gd_post('/api/admin/maintenance',
+            ['on' => true, 'text' => trim($_POST['text'] ?? '') ?: 'Сервер обновляется, зайдите через пару минут'],
+            gd_token());
+        if (!$mok) $err = 'Не вышло закрыть игру: ' . (string)($mr['error'] ?? '');
+    }
+    if ($err === '') {
+        if (gd_ask_update()) {
+            $msg = ($_POST['act'] === 'emergency')
+                ? 'Игра закрыта для игроков, обновление запущено. Когда закончится — снимите режим кнопкой «Открыть игру».'
+                : 'Заявка принята: сервер обновляется';
+        } else $err = 'Не удалось записать заявку на обновление';
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && !in_array($_POST['act'] ?? '', ['song', 'update', 'emergency'], true)) {
     $act = $_POST['act'] ?? '';
     $id  = (int)($_POST['id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
@@ -53,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') !== 'song') {
                                 'revoked' => true], gd_token()),
         'unrevoke'  => gd_post('/api/admin/licence/revoke', ['key' => trim($_POST['key'] ?? ''),
                                 'revoked' => false], gd_token()),
+        'maintoff'  => gd_post('/api/admin/maintenance', ['on' => false], gd_token()),
         default     => [false, ['error' => 'неизвестное действие']],
     };
     if ($ok) {
@@ -67,12 +92,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') !== 'song') {
 [$okL, $levels] = gd_get('/api/levels?sort=recent', gd_token());
 [$okS, $stats]  = gd_get('/api/admin/stats', gd_token());
 [$okK, $lic]    = gd_get('/api/admin/licences', gd_token());
+[$okM, $state]  = gd_get('/api/state');
+$maint = $okM && !empty($state['maintenance']);
 gd_head('Админка', 'admin');
 ?>
 <section class="section"><div class="container">
   <h2>Админка</h2>
   <p class="muted" style="margin-top:-8px">Как всё устроено, ключи, оплата и обновления —
     <a href="/admin/docs.php"><b>документация админа</b></a>.</p>
+
+  <div class="card" style="margin-bottom:18px;<?= $maint ? 'border-color:#ffd24a' : '' ?>">
+    <h3>Сервер</h3>
+    <?php if ($maint): ?>
+      <p style="color:#ffd24a"><b>Игра сейчас закрыта для игроков.</b>
+        Они видят сообщение «<?= h((string)($state['text'] ?? '')) ?>» и выходят из игры.
+        Вход в аккаунт и админка работают.</p>
+    <?php else: ?>
+      <p class="muted">Обновление забирает всё из репозитория: сайт, API, сборки игры —
+        и перезапускает что нужно. Обычно занимает меньше минуты.</p>
+    <?php endif; ?>
+
+    <div class="flex" style="gap:10px;flex-wrap:wrap;margin-top:12px">
+      <form method="post">
+        <input type="hidden" name="act" value="update">
+        <button class="btn small green" type="submit">ОБНОВИТЬ СЕРВЕР</button>
+      </form>
+
+      <?php if ($maint): ?>
+        <form method="post">
+          <input type="hidden" name="act" value="maintoff">
+          <button class="btn small gold" type="submit">ОТКРЫТЬ ИГРУ</button>
+        </form>
+      <?php else: ?>
+        <form method="post" class="flex" style="gap:8px;flex-wrap:wrap"
+              onsubmit="return confirm('Закрыть игру для всех игроков и обновить сервер?')">
+          <input type="hidden" name="act" value="emergency">
+          <input type="text" name="text" placeholder="что показать игрокам" style="max-width:280px">
+          <button class="btn small red" type="submit">ЭКСТРЕННОЕ ЗАКРЫТИЕ И ОБНОВЛЕНИЕ</button>
+        </form>
+      <?php endif; ?>
+    </div>
+    <p class="muted" style="margin-top:10px">
+      «Экстренное» закрывает игру всем: сервер перестаёт отвечать игрокам, игра показывает
+      сообщение и выходит. После обновления не забудьте нажать «Открыть игру».
+    </p>
+  </div>
   <?php if ($msg): ?><div class="alert ok"><?= h($msg) ?></div><?php endif; ?>
   <?php if ($err): ?><div class="alert err"><?= h($err) ?></div><?php endif; ?>
 

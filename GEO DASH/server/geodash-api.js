@@ -1668,6 +1668,54 @@ route('POST', '/api/licence/claim', async (req, res) => {
   ok(res, { ok: true, order: o, activated, keys: o.keys, licensed: licOkFor(u) });
 });
 
+/** Что с сервером: идёт ли обслуживание и что сказать игрокам. */
+route('GET', '/api/state', (req, res) => {
+  const on = !!(db.state && db.state.maintenance);
+  ok(res, {
+    ok: true, maintenance: on,
+    text: on ? ((db.state && db.state.maintenanceText) || 'Сервер обновляется') : ''
+  });
+});
+
+/** Включить обслуживание или снять его. */
+route('POST', '/api/admin/maintenance', async (req, res) => {
+  const a = requireAdmin(req, res); if (!a) return;
+  const b = await readBody(req);
+  db.state.maintenance = b.on === false ? false : true;
+  db.state.maintenanceText = String(b.text || '').slice(0, 200) ||
+    'Сервер обновляется, зайдите через пару минут';
+  db.state.maintenanceAt = now();
+  save.state();
+  ok(res, { ok: true, maintenance: !!db.state.maintenance, text: db.state.maintenanceText });
+});
+
+/**
+ * Проверка ключа без входа в аккаунт — ею пользуется установщик.
+ * Отвечаем только «годен / занят / нет такого», без имён и подробностей.
+ */
+const validateHits = new Map();
+route('POST', '/api/licence/validate', async (req, res) => {
+  const ip = String(req.socket.remoteAddress || '');
+  const t = Date.now();
+  const hits = (validateHits.get(ip) || []).filter(x => t - x < 60000);
+  hits.push(t);
+  validateHits.set(ip, hits);
+  if (validateHits.size > 5000) validateHits.clear();
+  if (hits.length > 30) return bad(res, 'Слишком много проверок, подождите минуту', 429);
+
+  const b = await readBody(req);
+  if (!licWellFormed(b.key)) return ok(res, { ok: true, state: 'bad', usable: false,
+    text: 'Ключ набран неверно — проверьте символы' });
+
+  const r = licFind(b.key);
+  if (!r) return ok(res, { ok: true, state: 'unknown', usable: false, text: 'Такого ключа нет' });
+  if (r.revoked) return ok(res, { ok: true, state: 'revoked', usable: false, text: 'Ключ отозван' });
+  if (r.off) return ok(res, { ok: true, state: 'off', usable: false, text: 'Ключ отключён владельцем' });
+  if (r.user) return ok(res, { ok: true, state: 'used', usable: true,
+    text: 'Ключ уже активирован — в игре войдите под тем же аккаунтом' });
+  ok(res, { ok: true, state: 'free', usable: true, text: 'Ключ годен' });
+});
+
 route('POST', '/api/licence/activate', async (req, res) => {
   const u = requireUser(req, res); if (!u) return;
   const b = await readBody(req);
@@ -1908,10 +1956,30 @@ route('POST', '/api/admin/licence/grant', async (req, res) => {
 
 // ------------------------------------------------------------------ сервер
 
+/**
+ * Обслуживание: сервер закрывается для игроков, игра показывает сообщение и
+ * выходит. Админ и вход по-прежнему работают — иначе режим было бы не снять.
+ */
+function maintenanceOn() { return !!(db.state && db.state.maintenance); }
+function maintenanceText() {
+  return (db.state && db.state.maintenanceText) || 'Сервер обновляется, зайдите через пару минут';
+}
+
+const MAINTENANCE_FREE = ['/api/ping', '/api/login', '/api/state'];
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
   let u;
   try { u = new URL(req.url, 'http://x'); } catch { return bad(res, 'bad url'); }
+
+  // во время обслуживания пускаем только админа и служебные маршруты
+  if (maintenanceOn() && !MAINTENANCE_FREE.includes(u.pathname) && !u.pathname.startsWith('/api/admin')) {
+    const who = userOf(req);
+    if (!who || !who.admin) {
+      res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify({ ok: false, maintenance: true, error: maintenanceText() }));
+    }
+  }
 
   for (const r of routes) {
     if (r.method !== req.method) continue;

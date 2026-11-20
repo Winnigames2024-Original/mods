@@ -32,6 +32,7 @@ public class MainActivity extends GdActivity {
                 Api.sync(null);
                 account = Api.me();
                 setStatus(Api.online ? "Готово" : "Офлайн — доступны локальные и сохранённые уровни");
+                checkMaintenance();
                 Updater.check(MainActivity.this);
             });
         } else {
@@ -43,6 +44,24 @@ public class MainActivity extends GdActivity {
         super.onResume();
         Updater.resumeInstall(this);   // вернулись из настроек — ставим скачанное обновление
         if (Music.currentId != -1) Music.play(-1, 0, 0.6f, true);
+        Api.async(() -> { Api.me(); checkMaintenance(); });
+    }
+
+    private boolean closingForMaintenance = false;
+
+    /**
+     * Сервер закрыли на обслуживание — говорим об этом и выходим: в меню всё
+     * равно ничего не работает. Админа не трогаем, ему доделывать дела.
+     */
+    void checkMaintenance() {
+        if (closingForMaintenance || Api.maintenance.isEmpty() || Store.admin()) return;
+        closingForMaintenance = true;
+        ui.post(() -> {
+            Music.stop();
+            GdDialog.message(this, "СЕРВЕР ОБНОВЛЯЕТСЯ",
+                    Api.maintenance + "\n\nИгра закроется. Зайдите через пару минут.",
+                    new String[]{"ПОНЯТНО"}, i -> finishAffinity());
+        });
     }
 
     void setStatus(String s) {

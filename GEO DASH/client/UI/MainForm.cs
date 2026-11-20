@@ -39,7 +39,11 @@ namespace GEO_DASH.UI
             BuildUi();
             Resize += (s, e) => Layout2();
             Shown += async (s, e) => await StartupAsync();
-            _poll.Tick += async (s, e) => await RefreshAccountAsync(false);
+            _poll.Tick += async (s, e) =>
+            {
+                await RefreshAccountAsync(false);
+                CheckMaintenance();
+            };
             _poll.Start();
             FormClosed += (s, e) => { MusicPlayer.Stop(); Sfx.Dispose(); };
 
@@ -47,6 +51,24 @@ namespace GEO_DASH.UI
             Deactivate += (s, e) => BeginInvoke(() => { if (ActiveForm == null) MusicPlayer.Pause(); });
             Activated += (s, e) => MusicPlayer.Resume();
             Resize += (s, e) => { if (WindowState == FormWindowState.Minimized) MusicPlayer.Pause(); };
+        }
+
+        bool _closingForMaintenance;
+
+        /// <summary>
+        /// Сервер закрыли на обслуживание — показываем, что случилось, и выходим.
+        /// Иначе игрок остался бы в меню, где ничего не работает.
+        /// </summary>
+        void CheckMaintenance()
+        {
+            if (_closingForMaintenance || string.IsNullOrEmpty(ApiClient.Maintenance)) return;
+            if (AppConfig.IsAdminUser) return;      // админу дают доделать дела
+
+            _closingForMaintenance = true;
+            MusicPlayer.Stop();
+            GdDialog.Info(this, "СЕРВЕР ОБНОВЛЯЕТСЯ", ApiClient.Maintenance +
+                "\n\nИгра закроется. Зайдите через пару минут.");
+            Close();
         }
 
         GdButton _bEditor, _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync, _bChat, _bIcons;
