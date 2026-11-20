@@ -151,9 +151,10 @@ fix_hidden_files() {
   local CONF=/etc/nginx/sites-available/geodash
   [ -f "$CONF" ] || return 0
 
-  # уже закрыты?
-  grep -q 'location ~ /\\\.' "$CONF" && return 0
-  grep -q 'location ~ /\.(git|env)' "$CONF" || return 0
+  # уже закрыты? сравниваем ровно строкой, без regexp — иначе старое правило
+  # про .git/.env само себя принимает за новое
+  grep -qF 'location ~ /\. { deny all; }' "$CONF" && return 0
+  grep -qF 'location ~ /\.(git|env)' "$CONF" || return 0
 
   awk '
     /location ~ \/\\\.\(git\|env\)/ {
