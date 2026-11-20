@@ -2070,7 +2070,10 @@ function maintenanceText() {
   return (db.state && db.state.maintenanceText) || 'Сервер обновляется, зайдите через пару минут';
 }
 
-const MAINTENANCE_FREE = ['/api/ping', '/api/login', '/api/state'];
+// Проверка ключа работает даже при закрытой игре: установщик должен
+// отвечать «ключ верный», а не «сервер обновляется», — играть всё равно
+// не дадут, потому что /api/licence/mine остаётся закрытым.
+const MAINTENANCE_FREE = ['/api/ping', '/api/login', '/api/state', '/api/licence/validate'];
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});

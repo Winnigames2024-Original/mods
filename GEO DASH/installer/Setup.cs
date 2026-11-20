@@ -226,8 +226,13 @@ namespace GeoDashSetup
                 var text = await r.Content.ReadAsStringAsync();
                 using var d = JsonDocument.Parse(text);
                 var root = d.RootElement;
+                // Сервер мог быть закрыт на обновление — тогда дело не в ключе
+                if (root.TryGetProperty("maintenance", out var m) && m.ValueKind == JsonValueKind.True)
+                    return (false, "Сервер сейчас закрыт на обновление — попробуйте через пару минут");
+
                 bool usable = root.TryGetProperty("usable", out var u) && u.GetBoolean();
                 string say = root.TryGetProperty("text", out var t) ? (t.GetString() ?? "") : "";
+                if (!usable && say.Length == 0) say = "Сервер не принял ключ — проверьте, что он введён целиком";
                 return (usable, say);
             }
             catch
