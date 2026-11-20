@@ -165,15 +165,12 @@ namespace GEO_DASH.UI
                 _designed[f] = want;
             }
 
-            if (f is IFillScreen || (want.Width >= host.Width - 8 && want.Height >= host.Height - 8))
-            {
-                f.Bounds = new Rectangle(0, 0, host.Width, host.Height);
-                return;
-            }
-
-            int w = Math.Min(want.Width, host.Width);
-            int h = Math.Min(want.Height, host.Height);
-            f.Bounds = new Rectangle((host.Width - w) / 2, (host.Height - h) / 2, w, h);
+            // Экран занимает всю панель всегда: раньше он оставался своим
+            // задуманным размером по центру, и в полном экране меню выглядело
+            // маленьким окошком посреди монитора. Начинку экран увеличивает
+            // сам (GdForm.ScaleUi) — отсюда ему и сообщается разметка.
+            if (f is GdForm gf && gf.DesignSize.Width == 0) gf.DesignSize = want;
+            f.Bounds = new Rectangle(0, 0, host.Width, host.Height);
         }
     }
 }

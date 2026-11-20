@@ -116,26 +116,32 @@ namespace GEO_DASH.UI
 
         void Layout2()
         {
-            int cx = ClientSize.Width / 2, cy = ClientSize.Height / 2 + 10;
-            if (_play != null) _play.Location = new Point(cx - _play.Width / 2, cy - _play.Height / 2 - 10);
+            float k = UiK;                       // в полном экране всё крупнее
+            int cx = ClientSize.Width / 2, cy = ClientSize.Height / 2 + (int)(10 * k);
+            if (_play != null) _play.Location = new Point(cx - _play.Width / 2, cy - _play.Height / 2 - (int)(10 * k));
 
             if (_bEditor == null) return;
-            _bEditor.Location = new Point(cx - 420, cy - 80);
-            _bOnline.Location = new Point(cx - 420, cy + 0);
-            _bSaved.Location = new Point(cx + 230, cy - 80);
-            _bDaily.Location = new Point(cx + 230, cy + 0);
+            int side = (int)(420 * k), right = (int)(230 * k), row = (int)(80 * k);
+            _bEditor.Location = new Point(cx - side, cy - row);
+            _bOnline.Location = new Point(cx - side, cy + 0);
+            _bSaved.Location = new Point(cx + right, cy - row);
+            _bDaily.Location = new Point(cx + right, cy + 0);
 
-            int y = ClientSize.Height - 112;
+            int y = ClientSize.Height - (int)(112 * k);
             int count = 6 + (AppConfig.IsAdminUser ? 1 : 0);
-            int bx = cx - (count * 92 - 8) / 2;
+            int stepX = (int)(92 * k);
+            int bx = cx - (count * stepX - (int)(8 * k)) / 2;
             foreach (var b in new[] { _bProfile, _bIcons, _bFriends, _bChat, _bSettings, _bSync, _bAdmin })
             {
                 if (b == null) continue;
                 b.Location = new Point(bx, y);
-                if (b.Visible) bx += 92;
+                if (b.Visible) bx += stepX;
             }
             Content.Invalidate();
         }
+
+        /// <summary>После масштабирования кнопки нужно расставить заново.</summary>
+        protected override void OnUiScaled() => Layout2();
 
         protected override void OnRender(Graphics g)
         {

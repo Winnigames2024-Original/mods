@@ -30,6 +30,25 @@ namespace GEO_DASH.UI
         public static Font Bold(float size) => new("Segoe UI", size, FontStyle.Bold, GraphicsUnit.Point);
         public static Font Reg(float size) => new("Segoe UI", size, FontStyle.Regular, GraphicsUnit.Point);
 
+        static readonly Dictionary<(string, float, FontStyle), Font> _fonts = new();
+
+        /// <summary>
+        /// Шрифт из общего кэша: при масштабировании интерфейса один и тот же
+        /// размер просят десятки кнопок на каждом изменении окна, и создавать
+        /// каждый раз новый Font — верный способ упереться в лимит дескрипторов.
+        /// </summary>
+        public static Font Cached(string family, float size, FontStyle style)
+        {
+            size = Math.Max(5f, MathF.Round(size * 4f) / 4f);
+            var k = (family, size, style);
+            if (!_fonts.TryGetValue(k, out var f))
+            {
+                f = new Font(family, size, style, GraphicsUnit.Point);
+                _fonts[k] = f;
+            }
+            return f;
+        }
+
         public static GraphicsPath Round(RectangleF r, float rad)
         {
             var p = new GraphicsPath();
@@ -552,7 +571,8 @@ namespace GEO_DASH.UI
             };
 
             _anim.Tick += (s, e) => { T += 0.033; Content.Invalidate(false); };
-            Shown += (s, e) => _anim.Start();
+            Shown += (s, e) => { _anim.Start(); ScaleUi(); };
+            Resize += (s, e) => ScaleUi();
             FormClosed += (s, e) => _anim.Stop();
         }
 
@@ -585,20 +605,102 @@ namespace GEO_DASH.UI
 
         protected void Header(Graphics g, string title, string sub = "")
         {
-            using var f = Gd.Title(26f);
-            Gd.Outlined(g, title, f, new RectangleF(0, 14, ClientSize.Width, 44), Gd.Paper);
+            using var f = Gd.Title(26f * UiK);
+            Gd.Outlined(g, title, f, new RectangleF(0, 14 * UiK, ClientSize.Width, 44 * UiK), Gd.Paper);
             if (!string.IsNullOrEmpty(sub))
             {
-                using var f2 = Gd.Bold(10f);
-                Gd.Outlined(g, sub, f2, new RectangleF(0, 58, ClientSize.Width, 22), Color.FromArgb(220, 190, 210, 255), thick: 2.2f);
+                using var f2 = Gd.Bold(10f * UiK);
+                Gd.Outlined(g, sub, f2, new RectangleF(0, 58 * UiK, ClientSize.Width, 22 * UiK), Color.FromArgb(220, 190, 210, 255), thick: 2.2f);
             }
         }
+
+        // ——— масштаб интерфейса под размер окна ———
+
+        /// <summary>Размер, под который размечено главное окно.</summary>
+        const float DesignW = 1180, DesignH = 720;
+
+        /// <summary>
+        /// Размер, под который размечен именно этот экран. Nav ставит его
+        /// перед встраиванием — до того, как экран растянут на всю панель.
+        /// </summary>
+        public Size DesignSize { get; set; }
+
+        /// <summary>
+        /// Во сколько раз окно больше разметочного. Экраны, которые считают
+        /// положение сами, умножают свои отступы на это число.
+        /// </summary>
+        protected float UiK { get; private set; } = 1;
+
+        /// <summary>Исходные (неотмасштабированные) рамки и кегли контролов.</summary>
+        readonly Dictionary<Control, (Rectangle box, float size)> _orig = new();
+        bool _scaling;
+
+        void Remember(Control root)
+        {
+            foreach (Control c in root.Controls)
+            {
+                if (!_orig.ContainsKey(c)) _orig[c] = (c.Bounds, c.Font.Size);
+                Remember(c);
+            }
+        }
+
+        /// <summary>
+        /// Растянуть начинку экрана под текущее окно: в полном экране кнопки и
+        /// подписи становятся крупнее, а не висят мелкой кучкой по центру.
+        /// Разметка экранов не меняется — всё считается от исходных размеров.
+        /// </summary>
+        protected void ScaleUi()
+        {
+            if (_scaling || ClientSize.Width < 200 || ClientSize.Height < 200) return;
+            _scaling = true;
+            try
+            {
+                Remember(Content);
+                float dw = DesignSize.Width > 0 ? DesignSize.Width : DesignW;
+                float dh = DesignSize.Height > 0 ? DesignSize.Height : DesignH;
+                float k = Math.Min(ClientSize.Width / dw, ClientSize.Height / dh);
+                UiK = Math.Clamp(k, 1f, 1.75f);
+
+                // Встроенный экран растянут на всю панель: его начинку держим
+                // по центру, иначе при другом соотношении сторон она прилипнет
+                // к левому верхнему углу.
+                int offX = DesignSize.Width > 0 ? (int)((ClientSize.Width - dw * UiK) / 2) : 0;
+                int offY = DesignSize.Height > 0 ? (int)((ClientSize.Height - dh * UiK) / 2) : 0;
+                if (offX < 0) offX = 0;
+                if (offY < 0) offY = 0;
+
+                foreach (var pair in _orig)
+                {
+                    var c = pair.Key;
+                    if (c.IsDisposed || c.Dock != DockStyle.None) continue;
+                    var (box, size) = pair.Value;
+                    var want = new Rectangle(
+                        (int)Math.Round(box.X * UiK) + offX, (int)Math.Round(box.Y * UiK) + offY,
+                        (int)Math.Round(box.Width * UiK), (int)Math.Round(box.Height * UiK));
+                    if (c.Bounds != want) c.Bounds = want;
+
+                    float fs = size * UiK;
+                    if (Math.Abs(c.Font.Size - fs) > 0.2f)
+                        c.Font = Gd.Cached(c.Font.FontFamily.Name, fs, c.Font.Style);
+                }
+            }
+            finally { _scaling = false; }
+
+            OnUiScaled();
+            Content.Invalidate();
+        }
+
+        /// <summary>Экран может доразместить что-то своё после масштабирования.</summary>
+        protected virtual void OnUiScaled() { }
 
         /// <summary>Добавить контрол на панель экрана.</summary>
         protected T2 Host<T2>(T2 c) where T2 : Control
         {
             Content.Controls.Add(c);
             c.BringToFront();
+            // Списки и карточки появляются уже после первого масштабирования —
+            // подгоняем их сразу, иначе они были бы мелкими до изменения окна.
+            if (UiK > 1.001f && !_scaling) ScaleUi();
             return c;
         }
 
