@@ -42,6 +42,7 @@ function gd_pay_conf(): array {
         'shopId'    => (string)(getenv('GEODASH_KASSA_SHOP') ?: ''),
         'secretKey' => (string)(getenv('GEODASH_KASSA_KEY') ?: ''),
         'vatCode'   => (int)(getenv('GEODASH_VAT') ?: 0),
+        'askEmail'  => false,
         'price'     => (int)(getenv('GEODASH_PRICE') ?: 199),
         'currency'  => 'RUB',
         'issueKey'  => (string)(getenv('GEODASH_ISSUE_SECRET') ?: 'GEODASH_AADDMMIINN22002266JSD'),
@@ -439,16 +440,33 @@ function gd_kassa_notify(string $raw, string $ip): array {
     return ['ok' => true, 'note' => 'Ключ выдан'];
 }
 
-/** Поля формы ЮMoney для кнопки «Купить». */
+/** Куда отправляется форма кошелька ЮMoney. */
+function gd_pay_action(): string { return 'https://yoomoney.ru/quickpay/confirm.xml'; }
+
+/**
+ * Поля формы ЮMoney для кнопки «Купить». Способ оплаты (кошелёк или карта)
+ * не задаём жёстко — его выбирает сам покупатель прямо в форме.
+ *
+ * need-fio / need-phone / need-address выключены сознательно: для ключа нужен
+ * только номер заказа, лишние данные о покупателе нам собирать незачем.
+ * E-mail спрашиваем лишь если в настройках включено askEmail.
+ */
 function gd_pay_form(string $order, int $count, string $siteUrl): array {
     $c = gd_pay_conf();
+    $what = 'Лицензионный ключ GEO DASH' . ($count > 1 ? " ($count шт.)" : '');
     return [
         'receiver' => $c['receiver'],
         'quickpay-form' => 'shop',
-        'paymentType' => 'AC',
-        'targets' => 'Лицензионный ключ GEO DASH' . ($count > 1 ? " ($count шт.)" : ''),
+        'targets' => $what,
+        'formcomment' => $what,
+        'short-dest' => $what,
+        'comment' => 'Заказ ' . $order,
         'sum' => $c['price'] * max(1, $count),
         'label' => $order,
         'successURL' => rtrim($siteUrl, '/') . '/buy/done.php?order=' . urlencode($order),
+        'need-fio' => 'false',
+        'need-email' => !empty($c['askEmail']) ? 'true' : 'false',
+        'need-phone' => 'false',
+        'need-address' => 'false',
     ];
 }

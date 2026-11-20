@@ -65,11 +65,24 @@ gd_head('Купить ключ', 'account');
         <p class="muted" style="margin-top:14px">Платёж принимает ЮKassa: карта, СБП, кошелёк ЮMoney —
           способ выбирается на её странице.</p>
       <?php else: ?>
-        <form method="POST" action="https://yoomoney.ru/quickpay/confirm">
+        <form method="POST" action="<?= h(gd_pay_action()) ?>">
           <?php foreach ($fields as $k => $v): ?>
             <input type="hidden" name="<?= h($k) ?>" value="<?= h($v) ?>">
           <?php endforeach; ?>
-          <button class="btn gold" type="submit">ОПЛАТИТЬ ЧЕРЕЗ ЮMONEY</button>
+
+          <p style="margin:0 0 10px"><b>Чем платите</b></p>
+          <div class="flex" style="gap:18px;margin-bottom:18px;flex-wrap:wrap">
+            <label class="flex" style="gap:8px;align-items:center;cursor:pointer">
+              <input type="radio" name="paymentType" value="AC" checked>
+              <span>Банковская карта</span>
+            </label>
+            <label class="flex" style="gap:8px;align-items:center;cursor:pointer">
+              <input type="radio" name="paymentType" value="PC">
+              <span>Кошелёк ЮMoney</span>
+            </label>
+          </div>
+
+          <button class="btn gold" type="submit">ОПЛАТИТЬ <?= (int)(gd_pay_price() * $count) ?> ₽</button>
         </form>
       <?php endif; ?>
 
