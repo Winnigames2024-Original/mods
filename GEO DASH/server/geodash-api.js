@@ -1515,7 +1515,7 @@ function licNew(meta) {
       price: meta.price | 0,
       order: String(meta.order || '').slice(0, 64),
       buyer: String(meta.buyer || '').slice(0, 40),
-      user: null, usedAt: null, devices: [], platform: '', revoked: false
+      user: null, usedAt: null, devices: [], platform: '', revoked: false, off: false
     };
     db.licences[raw] = rec;
     return rec;
@@ -1528,7 +1528,7 @@ function licPub(r, full) {
   const o = {
     key: r.key, created: r.created, note: r.note || '', price: r.price | 0,
     order: r.order || '', buyer: r.buyer || '', user: r.user || null,
-    usedAt: r.usedAt || null, used: !!r.user, revoked: !!r.revoked
+    usedAt: r.usedAt || null, used: !!r.user, revoked: !!r.revoked, off: !!r.off
   };
   if (full) { o.devices = r.devices || []; o.platform = r.platform || ''; o.by = r.by || ''; }
   return o;
@@ -1539,7 +1539,7 @@ function licOkFor(u) {
   if (!u) return false;
   if (u.admin || key(u.name) === key(ADMIN)) return true;
   const r = licFind(u.licence || '');
-  return !!(r && !r.revoked && key(r.user || '') === key(u.name));
+  return !!(r && !r.revoked && !r.off && key(r.user || '') === key(u.name));
 }
 
 function secretOk(given) {
@@ -1581,6 +1581,16 @@ function licActivate(u, keyText, device, platform) {
   return null;
 }
 
+/** Почему игра не открывается: нет ключа, отключён владельцем или отозван. */
+function licReason(u) {
+  if (licOkFor(u)) return 'ok';
+  const r = licFind(u.licence || '');
+  if (!r) return 'none';
+  if (r.revoked) return 'revoked';
+  if (r.off) return 'off';
+  return 'none';
+}
+
 /** Игра спрашивает: можно ли играть на этом аккаунте. */
 route('GET', '/api/licence/mine', (req, res) => {
   const u = requireUser(req, res); if (!u) return;
@@ -1589,10 +1599,69 @@ route('GET', '/api/licence/mine', (req, res) => {
   ok(res, {
     ok: true,
     licensed: licOkFor(u),
+    reason: licReason(u),
     admin: !!u.admin || key(u.name) === key(ADMIN),
     key: u.licence || '',
     licences: mine.map(r => licPub(r))
   });
+});
+
+/**
+ * Временно отключить свой ключ или включить обратно. Пока ключ отключён, игра
+ * на этом аккаунте не запускается и просит ключ — как будто его и не было.
+ * Отозванный админом ключ владелец включить не может.
+ */
+route('POST', '/api/licence/toggle', async (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const b = await readBody(req);
+  const r = licFind(b.key);
+  if (!r) return bad(res, 'Такого ключа нет', 404);
+
+  const mine = key(r.user || '') === key(u.name) || key(r.buyer || '') === key(u.name);
+  if (!mine && !u.admin) return bad(res, 'Это не ваш ключ', 403);
+
+  const want = b.off === false ? false : true;
+  if (!want && r.revoked && !u.admin)
+    return bad(res, 'Ключ отозван администратором — включить его может только он', 403);
+
+  r.off = want;
+  save.licences();
+  ok(res, { ok: true, licence: licPub(r), licensed: licOkFor(u), reason: licReason(u) });
+});
+
+/**
+ * Привязать оплаченный заказ к аккаунту: оплата могла пройти без входа, и
+ * аккаунт игрок создаёт уже после неё. Номер заказа знает только покупатель.
+ */
+route('POST', '/api/licence/claim', async (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const b = await readBody(req);
+  if (!secretOk(headerText(req, 'x-gd-issue') || b.secret)) return bad(res, 'Неверный ключ админа', 403);
+
+  const o = db.orders[String(b.order || '').slice(0, 64)];
+  if (!o || !(o.keys || []).length) return bad(res, 'Заказ не найден или ещё не оплачен', 404);
+  const u = db.users[key(b.name)];
+  if (!u) return bad(res, 'Игрок не найден', 404);
+
+  if (o.buyer && key(o.buyer) !== key(u.name))
+    return bad(res, 'Этот заказ уже закреплён за другим аккаунтом', 409);
+
+  o.buyer = u.name;
+  u.licences = u.licences || [];
+  let activated = '';
+  for (const k of o.keys) {
+    const r = licFind(k);
+    if (!r) continue;
+    if (!r.buyer) r.buyer = u.name;
+    if (!u.licences.includes(r.key)) u.licences.push(r.key);
+    // первый свободный ключ сразу активируем — играть можно тут же
+    if (!activated && !r.user && !licOkFor(u)) {
+      const err = licActivate(u, r.key, 'claim', 'any');
+      if (!err) activated = r.key;
+    }
+  }
+  save.orders(); save.licences(); save.users();
+  ok(res, { ok: true, order: o, activated, keys: o.keys, licensed: licOkFor(u) });
 });
 
 route('POST', '/api/licence/activate', async (req, res) => {
@@ -1648,6 +1717,53 @@ route('GET', '/api/licence/order/:order', (req, res, p) => {
   if (!localCall(req)) return bad(res, 'Только с сервера', 403);
   const o = db.orders[String(p.order).slice(0, 64)];
   ok(res, { ok: true, found: !!o, order: o || null });
+});
+
+// ------------------------------------------- настройки оплаты (правит админка)
+//
+// Храним рядом с остальными данными, но файлом только для себя (0600): внутри
+// секреты платёжной системы. Сайт читает и пишет их через эти два маршрута —
+// самому php доступа к /etc не нужно.
+
+const PAY_FILE = path.join(DIR, 'pay.json');
+
+function payLoad() {
+  try { return JSON.parse(fs.readFileSync(PAY_FILE, 'utf8')) || {}; }
+  catch { return {}; }
+}
+
+function paySave(obj) {
+  fs.writeFileSync(PAY_FILE + '.tmp', JSON.stringify(obj, null, 2), { mode: 0o600 });
+  fs.renameSync(PAY_FILE + '.tmp', PAY_FILE);
+  try { fs.chmodSync(PAY_FILE, 0o600); } catch { }
+}
+
+/** Поля, которые админка вправе менять. */
+const PAY_FIELDS = ['shopId', 'secretKey', 'receiver', 'secret', 'price', 'vatCode', 'askEmail', 'currency'];
+
+route('GET', '/api/licence/payconf', (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  if (!secretOk(headerText(req, 'x-gd-issue'))) return bad(res, 'Неверный ключ админа', 403);
+  ok(res, { ok: true, conf: payLoad() });
+});
+
+route('POST', '/api/licence/payconf', async (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const b = await readBody(req);
+  if (!secretOk(headerText(req, 'x-gd-issue') || b.secret_key)) return bad(res, 'Неверный ключ админа', 403);
+
+  const conf = payLoad();
+  const patch = b.conf && typeof b.conf === 'object' ? b.conf : {};
+  for (const f of PAY_FIELDS) {
+    if (!(f in patch)) continue;
+    const v = patch[f];
+    if (v === null) { delete conf[f]; continue; }        // null — убрать поле
+    if (f === 'price' || f === 'vatCode') conf[f] = Math.max(0, v | 0);
+    else if (f === 'askEmail') conf[f] = !!v;
+    else conf[f] = String(v).trim().slice(0, 200);
+  }
+  try { paySave(conf); } catch (e) { return bad(res, 'Не удалось сохранить: ' + e.message, 500); }
+  ok(res, { ok: true, conf });
 });
 
 /** Сводка по ключам для служебной ссылки на сайте. */

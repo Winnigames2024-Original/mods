@@ -5,7 +5,7 @@
  */
 require_once __DIR__ . '/../_inc/api.php';
 require_once __DIR__ . '/../_inc/pay.php';
-gd_login_required();
+// вход не обязателен: аккаунт можно создать после оплаты
 
 $back = '/buy/';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: ' . $back); exit; }
@@ -26,7 +26,7 @@ if (gd_pay_needs_email() && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 // заказ мог не записаться, если API не отвечал, — записываем ещё раз
 gd_pay_api('POST', '/api/licence/order', [
-    'order' => $order, 'buyer' => gd_user(),
+    'order' => $order, 'buyer' => (string)(gd_user() ?? ''),
     'count' => $count, 'sum' => gd_pay_price() * $count,
 ]);
 

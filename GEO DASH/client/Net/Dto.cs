@@ -206,6 +206,7 @@ namespace GEO_DASH.Net
         [JsonPropertyName("usedAt")] public string UsedAt { get; set; } = "";
         [JsonPropertyName("used")] public bool Used { get; set; }
         [JsonPropertyName("revoked")] public bool Revoked { get; set; }
+        [JsonPropertyName("off")] public bool Off { get; set; }
     }
 
     /// <summary>Ответ сервера про лицензию этого аккаунта.</summary>
@@ -214,6 +215,8 @@ namespace GEO_DASH.Net
         [JsonPropertyName("ok")] public bool Ok { get; set; }
         [JsonPropertyName("error")] public string Error { get; set; } = "";
         [JsonPropertyName("licensed")] public bool Licensed { get; set; }
+        /// <summary>ok · none · off (владелец отключил) · revoked (отозван админом).</summary>
+        [JsonPropertyName("reason")] public string Reason { get; set; } = "";
         [JsonPropertyName("admin")] public bool Admin { get; set; }
         [JsonPropertyName("key")] public string Key { get; set; } = "";
         [JsonPropertyName("licences")] public List<LicenceDto> Licences { get; set; } = new();

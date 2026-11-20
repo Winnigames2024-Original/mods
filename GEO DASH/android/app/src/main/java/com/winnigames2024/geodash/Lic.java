@@ -71,6 +71,16 @@ public class Lic {
 
     // --------------------------------------------------------------- память
 
+    /** Почему не пускает: none, off (ключ отключён), revoked (отозван). */
+    public static String reason = "none";
+
+    /** Что показать игроку, когда игра не открывается. */
+    public static String reasonText() {
+        if (reason.equals("off")) return "Ваш ключ отключён — включите его в аккаунте на сайте";
+        if (reason.equals("revoked")) return "Ваш ключ отозван администратором";
+        return "Вы не ввели лицензионный ключ";
+    }
+
     public static String key() { return Store.prefs.getString("lic_key", ""); }
     public static String keyUser() { return Store.prefs.getString("lic_user", ""); }
 
@@ -143,6 +153,8 @@ public class Lic {
     public static boolean check() {
         JSONObject r = Api.licenceMine();
         if (r != null) {
+            String why = r.optString("reason", "");
+            reason = why.isEmpty() ? "none" : why;
             if (r.optBoolean("licensed")) {
                 String k = r.optString("key", "");
                 remember(k.isEmpty() ? key() : k, Store.user());

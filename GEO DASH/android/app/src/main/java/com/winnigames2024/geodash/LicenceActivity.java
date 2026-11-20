@@ -113,10 +113,10 @@ public class LicenceActivity extends GdActivity {
             if (ok && !noSetup) { enter(); return; }
             if (noSetup) {
                 say(ok ? "Лицензия есть, но игра поставлена не установщиком"
-                       : "Вы не ввели лицензионный ключ", false);
+                       : Lic.reasonText(), false);
                 return;
             }
-            say("Вы не ввели лицензионный ключ", false);
+            say(Lic.reasonText(), false);
         });
     }
 

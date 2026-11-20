@@ -60,6 +60,9 @@ namespace GEO_DASH.Net
         /// <summary>Лицензия подтверждена в этом запуске.</summary>
         public static bool Ok { get; private set; }
 
+        /// <summary>Почему не пускает: none, off (ключ отключён), revoked (отозван).</summary>
+        public static string Reason { get; private set; } = "none";
+
         /// <summary>Игра поставлена установщиком.</summary>
         public static bool Installed => InstallInfo() != null;
 
@@ -184,6 +187,7 @@ namespace GEO_DASH.Net
             var r = await ApiClient.LicenceMineAsync();
             if (r.Ok && r.Data != null)
             {
+                Reason = string.IsNullOrEmpty(r.Data.Reason) ? "none" : r.Data.Reason;
                 if (r.Data.Licensed)
                 {
                     St.Key = string.IsNullOrEmpty(r.Data.Key) ? (St.Key ?? "") : r.Data.Key;
@@ -228,6 +232,14 @@ namespace GEO_DASH.Net
             if (i == null || string.IsNullOrWhiteSpace(i.Key) || !WellFormed(i.Key)) return false;
             return await ActivateAsync(i.Key) == null;
         }
+
+        /// <summary>Что показать игроку, когда игра не открывается.</summary>
+        public static string ReasonText() => Reason switch
+        {
+            "off" => "Ваш ключ отключён — включите его в аккаунте на сайте",
+            "revoked" => "Ваш ключ отозван администратором",
+            _ => "Вы не ввели лицензионный ключ"
+        };
 
         /// <summary>Забыть активацию на этом компьютере (смена аккаунта).</summary>
         public static void Forget()

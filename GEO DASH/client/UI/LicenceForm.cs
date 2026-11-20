@@ -125,11 +125,11 @@ namespace GEO_DASH.UI
             {
                 Busy(false, ok
                     ? "Лицензия есть, но игра запущена не из установленной копии"
-                    : "Вы не ввели лицензионный ключ");
+                    : Licence.ReasonText());
                 return;
             }
 
-            Busy(false, "Вы не ввели лицензионный ключ");
+            Busy(false, Licence.ReasonText());
         }
 
         async Task ActivateAsync()

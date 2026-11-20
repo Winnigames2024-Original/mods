@@ -139,7 +139,9 @@ gd_head('Админка', 'admin');
             <td class="lvname"><code><?= h($k['key']) ?></code></td>
             <td class="muted"><?= h(substr((string)$k['created'], 0, 16)) ?></td>
             <td><?= $k['user'] ? '<a href="/profile/?user=' . urlencode($k['user']) . '">' . h($k['user']) . '</a>'
-                              : '<span class="muted">свободен</span>' ?></td>
+                              : '<span class="muted">свободен</span>' ?>
+                <?php if (!empty($k['off'])): ?><br><span class="badge" style="background:#a76">отключён владельцем</span><?php endif; ?>
+                <?php if (!empty($k['revoked'])): ?><br><span class="badge" style="background:#a33">отозван</span><?php endif; ?></td>
             <td class="muted"><?= h($k['note'] ?? '') ?><?= !empty($k['order']) ? ' · заказ ' . h($k['order']) : '' ?></td>
             <td>
               <form method="post">

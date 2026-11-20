@@ -33,7 +33,12 @@
 define('GD_PAY_FILE', getenv('GEODASH_PAY_FILE') ?: '/etc/geodash/pay.json');
 define('GD_PAY_API', getenv('GEODASH_API') ?: 'http://127.0.0.1:37534');
 
-function gd_pay_conf(): array {
+/**
+ * Настройки «снизу»: значения по умолчанию, переменные окружения и файл
+ * /etc/geodash/pay.json, если он есть. Отсюда берётся ключ выдачи, поэтому
+ * этот слой не обращается к API — иначе получилось бы кольцо.
+ */
+function gd_pay_base(): array {
     static $c = null;
     if ($c !== null) return $c;
     $c = [
@@ -51,7 +56,40 @@ function gd_pay_conf(): array {
         $j = json_decode((string)file_get_contents(GD_PAY_FILE), true);
         if (is_array($j)) $c = array_merge($c, array_filter($j, fn($v) => $v !== '' && $v !== null));
     }
+    return $c;
+}
+
+/** Есть ли файл настроек на сервере (его правят руками). */
+function gd_pay_file_used(): bool { return is_readable(GD_PAY_FILE); }
+
+/**
+ * Настройки, сохранённые из админки. Лежат у API: он пишет их файлом только для
+ * себя, поэтому сайту не нужен доступ к /etc и правка файла руками.
+ */
+function gd_pay_store(bool $fresh = false): array {
+    static $s = null;
+    if ($s !== null && !$fresh) return $s;
+    [$ok, $d] = gd_pay_api('GET', '/api/licence/payconf');
+    $s = $ok && is_array($d['conf'] ?? null) ? $d['conf'] : [];
+    return $s;
+}
+
+/** Сохранить настройки из админки. $patch: поле => значение, null — убрать. */
+function gd_pay_store_set(array $patch): array {
+    [$ok, $d, $code] = gd_pay_api('POST', '/api/licence/payconf', ['conf' => $patch]);
+    gd_pay_store(true);
+    gd_pay_conf(true);
+    return [$ok, $d, $code];
+}
+
+/** Итоговые настройки: сохранённое из админки важнее файла и окружения. */
+function gd_pay_conf(bool $fresh = false): array {
+    static $c = null;
+    if ($c !== null && !$fresh) return $c;
+    $c = array_merge(gd_pay_base(),
+        array_filter(gd_pay_store($fresh), fn($v) => $v !== '' && $v !== null));
     $c['price'] = max(1, (int)$c['price']);
+    $c['vatCode'] = max(0, (int)$c['vatCode']);
     return $c;
 }
 
@@ -85,7 +123,8 @@ function gd_pay_name(string $p = ''): string {
 /** Запрос к игровому серверу с секретом выдачи (только по 127.0.0.1). */
 function gd_pay_api(string $method, string $path, $body = null): array {
     $ch = curl_init(GD_PAY_API . $path);
-    $headers = ['Accept: application/json', 'X-GD-Issue: ' . gd_pay_conf()['issueKey']];
+    // ключ выдачи берём из нижнего слоя: он не зависит от сохранённых настроек
+    $headers = ['Accept: application/json', 'X-GD-Issue: ' . gd_pay_base()['issueKey']];
     if ($body !== null) {
         $headers[] = 'Content-Type: application/json';
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
@@ -131,6 +170,12 @@ function gd_pay_event(string $kind, array $o = []): void {
         'sign'  => (string)($o['sign'] ?? ''),
         'note'  => (string)($o['note'] ?? ''),
     ]);
+}
+
+/** Закрепить оплаченный заказ за аккаунтом и сразу активировать ключ. */
+function gd_pay_claim(string $order, string $name): array {
+    [$ok, $d, $code] = gd_pay_api('POST', '/api/licence/claim', ['order' => $order, 'name' => $name]);
+    return [$ok, $d, $code];
 }
 
 /** Последние уведомления об оплате. */

@@ -75,6 +75,7 @@ gd_head('Мой аккаунт', 'account');
           <a class="btn small gold" href="/admin/pay.php">НАСТРОИТЬ ОПЛАТУ</a>
         <?php endif; ?>
       <?php endif; ?>
+      <a class="btn small" href="/keys/">МОИ КЛЮЧИ</a>
       <a class="btn small ghost" href="/download/">Скачать установщик</a>
     </p>
   </div>

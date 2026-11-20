@@ -14,6 +14,50 @@ if (!gd_is_admin()) {
     exit;
 }
 
+$saved = ''; $failed = '';
+
+// ----- сохранение настроек прямо из админки -----
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $act = $_POST['act'] ?? '';
+    $patch = [];
+
+    if ($act === 'kassa' || $act === 'money') {
+        $patch['price'] = max(1, (int)($_POST['price'] ?? 199));
+    }
+
+    if ($act === 'kassa') {
+        $patch['shopId']  = trim((string)($_POST['shopId'] ?? ''));
+        $patch['vatCode'] = max(0, (int)($_POST['vatCode'] ?? 0));
+        // пустое поле секрета — оставить прежний
+        $sk = trim((string)($_POST['secretKey'] ?? ''));
+        if ($sk !== '') $patch['secretKey'] = $sk;
+        if ($patch['shopId'] !== '' && !preg_match('/^\d{4,12}$/', $patch['shopId']))
+            $failed = 'shopId — это только цифры, как в кабинете ЮKassa';
+    }
+
+    if ($act === 'money') {
+        $patch['receiver'] = preg_replace('/\D+/', '', (string)($_POST['receiver'] ?? ''));
+        $patch['askEmail'] = !empty($_POST['askEmail']);
+        $se = trim((string)($_POST['secret'] ?? ''));
+        if ($se !== '') $patch['secret'] = $se;
+        if ($patch['receiver'] !== '' && strlen($patch['receiver']) < 11)
+            $failed = 'Номер кошелька — 16 цифр, обычно начинается на 4100';
+    }
+
+    if ($act === 'offkassa') { $patch = ['shopId' => null, 'secretKey' => null]; }
+    if ($act === 'offmoney') { $patch = ['receiver' => null, 'secret' => null]; }
+
+    if ($failed === '' && $patch) {
+        [$ok, $r] = gd_pay_store_set($patch);
+        if ($ok) $saved = match ($act) {
+            'offkassa' => 'Приём через ЮKassa выключен',
+            'offmoney' => 'Приём через кошелёк выключен',
+            default    => 'Настройки сохранены и уже работают',
+        };
+        else $failed = (string)($r['error'] ?? 'Сервер игры не отвечает — настройки не сохранены');
+    }
+}
+
 $host    = $_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru';
 $nKassa  = 'https://' . $host . '/api.php?action=yookassa';
 $nMoney  = 'https://' . $host . '/api.php?action=yoomoney';
@@ -58,6 +102,8 @@ gd_head('Оплата ключей', 'admin');
      <a class="btn small ghost" href="/admin/docs.php">Документация</a></p>
 
   <h2>Оплата ключей</h2>
+  <?php if ($saved): ?><div class="alert ok"><?= h($saved) ?></div><?php endif; ?>
+  <?php if ($failed): ?><div class="alert err"><?= h($failed) ?></div><?php endif; ?>
   <p class="muted" style="margin-top:-8px">
     Игрок платит на странице <a href="/buy/">/buy/</a>, платёжная система присылает нам уведомление,
     и ключ сам появляется в его аккаунте. Способ можно выбрать любой — настройте один из двух.
@@ -76,6 +122,10 @@ gd_head('Оплата ключей', 'admin');
     <?php elseif ($how === 'yookassa' && $testKey): ?>
       <p style="margin-top:14px;color:#ffd24a">Ключ API тестовый (<code>test_…</code>) — настоящие деньги
         не списываются, но ключи выдаются. Для продажи поставьте рабочий ключ.</p>
+    <?php endif; ?>
+    <?php if ($hasFile): ?>
+      <p class="muted" style="margin-top:8px">На сервере есть файл <code><?= h(GD_PAY_FILE) ?></code>.
+        Он тоже читается, но то, что сохранено здесь кнопкой «Применить», важнее.</p>
     <?php endif; ?>
     <?php if ($hasShop && $hasKey && $hasRecv && $hasSecr): ?>
       <p class="muted" style="margin-top:8px">Настроены оба способа — работает ЮKassa.
@@ -134,11 +184,53 @@ gd_head('Оплата ключей', 'admin');
   </div>
 
   <!-- 3 -->
-  <div class="step <?= ($hasFile && $how === 'yookassa') ? 'done' : 'wait' ?>">
-    <h3>Шаг 3. Положить настройки на сервер <?= $dot($hasFile && $how === 'yookassa') ?></h3>
-    <p>Настройки оплаты не лежат в репозитории — только на сервере, в файле
-      <code><?= h(GD_PAY_FILE) ?></code>. Зайдите на сервер и выполните, подставив своё:</p>
-    <div class="ym-code" id="kConf">mkdir -p /etc/geodash
+  <div class="step <?= $how === 'yookassa' ? 'done' : 'wait' ?>">
+    <h3>Шаг 3. Ввести данные магазина <?= $dot($how === 'yookassa') ?></h3>
+    <p>Заполните поля и нажмите «Применить» — оплата включится сразу, заходить на сервер не нужно.
+      Данные хранит игровой сервер, файлом только для себя; сайт их не выкладывает и не показывает
+      обратно.</p>
+
+    <form class="form" method="post" style="margin-top:16px">
+      <input type="hidden" name="act" value="kassa">
+      <div class="grid c2" style="gap:16px">
+        <div>
+          <label>shopId — номер магазина</label>
+          <input type="text" name="shopId" value="<?= h($conf['shopId']) ?>" placeholder="123456"
+                 inputmode="numeric" autocomplete="off">
+        </div>
+        <div>
+          <label>Секретный ключ API</label>
+          <input type="password" name="secretKey" autocomplete="new-password"
+                 placeholder="<?= $hasKey ? 'сохранён — оставьте пустым' : 'live_… или test_…' ?>">
+        </div>
+        <div>
+          <label>Цена ключа, ₽</label>
+          <input type="number" name="price" min="1" max="100000" value="<?= (int)$conf['price'] ?>">
+        </div>
+        <div>
+          <label>Ставка НДС для чека (vatCode)</label>
+          <select name="vatCode">
+            <?php foreach ([0 => 'чек не формируем', 1 => '1 — без НДС', 2 => '2 — 0%',
+                            3 => '3 — 10%', 4 => '4 — 20%', 5 => '5 — 10/110', 6 => '6 — 20/120'] as $v => $t): ?>
+              <option value="<?= $v ?>" <?= (int)$conf['vatCode'] === $v ? 'selected' : '' ?>><?= h($t) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <p class="muted" style="margin:12px 0 0">Ставка нужна, если у магазина включена фискализация
+        (54-ФЗ): тогда страница покупки попросит у игрока e-mail, и чек уйдёт на него.</p>
+      <p style="margin-top:18px">
+        <button class="btn green" type="submit">ПРИМЕНИТЬ</button>
+        <?php if ($hasShop || $hasKey): ?>
+          <button class="btn small ghost" type="submit" name="act" value="offkassa"
+                  formnovalidate>Выключить ЮKassa</button>
+        <?php endif; ?>
+      </p>
+    </form>
+
+    <details style="margin-top:16px">
+      <summary class="muted" style="cursor:pointer">Можно и файлом на сервере — если так привычнее</summary>
+      <div class="ym-code" id="kConf" style="margin-top:10px">mkdir -p /etc/geodash
 cat &gt; /etc/geodash/pay.json &lt;&lt;'EOF'
 {
   "shopId":    "123456",
@@ -149,16 +241,11 @@ cat &gt; /etc/geodash/pay.json &lt;&lt;'EOF'
 EOF
 chown root:www-data /etc/geodash/pay.json
 chmod 640 /etc/geodash/pay.json</div>
-    <p class="ym-row" style="margin-top:10px">
-      <button class="btn small ghost ym-copy" data-copy="kConf" type="button">Скопировать команды</button>
-      <span class="muted">права 640 — файл читает только сайт</span>
-    </p>
-    <p><code>vatCode</code> — ставка НДС для чека: <code>0</code> значит «чек не формируем».
-      Если у магазина включена фискализация (54-ФЗ), поставьте нужную ставку
-      (<code>1</code> — без НДС, <code>2</code> — 0%, <code>6</code> — 20%): тогда страница покупки
-      попросит у игрока e-mail, и чек уйдёт на него.</p>
-    <p class="muted">Цена ключа — <code>price</code>, меняется в этом же файле, пересборка не нужна.
-      Файл сейчас: <?= $hasFile ? 'читается' : '<b>не найден или недоступен сайту</b>' ?>.</p>
+      <p class="ym-row" style="margin-top:10px">
+        <button class="btn small ghost ym-copy" data-copy="kConf" type="button">Скопировать команды</button>
+        <span class="muted">что сохранено через «Применить», важнее файла</span>
+      </p>
+    </details>
   </div>
 
   <!-- 4 -->
@@ -209,13 +296,53 @@ chmod 640 /etc/geodash/pay.json</div>
       Рядом будет <b>секрет</b> (секретное слово) — скопируйте его, он нужен на шаге 3.</p>
     <p class="muted">Секрет — это пароль уведомлений. По нему мы проверяем, что оплату
       подтвердила именно ЮMoney, а не кто-то посторонний. Никому его не показывайте.</p>
+    <p class="muted"><b>Приложение на <code>yoomoney.ru/myservices/new</code> регистрировать не нужно.</b>
+      Та страница выдаёт <code>client_id</code> для OAuth — доступа к кошельку по API (история операций,
+      переводы от вашего имени). Нашей оплате это не требуется: форма оплаты и уведомления работают
+      от номера кошелька и секрета, ничего больше.</p>
   </div>
 
   <!-- 3 -->
-  <div class="step <?= ($hasFile && $how === 'yoomoney') ? 'done' : 'wait' ?>">
-    <h3>Шаг 3. Положить настройки на сервер <?= $dot($hasFile && $how === 'yoomoney') ?></h3>
-    <p>Файл на сервере — <code><?= h(GD_PAY_FILE) ?></code>:</p>
-    <div class="ym-code" id="ymConf">mkdir -p /etc/geodash
+  <div class="step <?= $how === 'yoomoney' ? 'done' : 'wait' ?>">
+    <h3>Шаг 3. Ввести кошелёк и секрет <?= $dot($how === 'yoomoney') ?></h3>
+    <p>Заполните поля и нажмите «Применить» — приём оплаты включится сразу.</p>
+
+    <form class="form" method="post" style="margin-top:16px">
+      <input type="hidden" name="act" value="money">
+      <div class="grid c2" style="gap:16px">
+        <div>
+          <label>Номер кошелька</label>
+          <input type="text" name="receiver" value="<?= h($conf['receiver']) ?>"
+                 placeholder="4100XXXXXXXXXXX" inputmode="numeric" autocomplete="off">
+        </div>
+        <div>
+          <label>Секрет HTTP-уведомлений</label>
+          <input type="password" name="secret" autocomplete="new-password"
+                 placeholder="<?= $hasSecr ? 'сохранён — оставьте пустым' : 'из настроек кошелька' ?>">
+        </div>
+        <div>
+          <label>Цена ключа, ₽</label>
+          <input type="number" name="price" min="1" max="100000" value="<?= (int)$conf['price'] ?>">
+        </div>
+        <div>
+          <label style="margin-top:26px">
+            <input type="checkbox" name="askEmail" value="1" <?= !empty($conf['askEmail']) ? 'checked' : '' ?>>
+            спрашивать e-mail у покупателя
+          </label>
+        </div>
+      </div>
+      <p style="margin-top:18px">
+        <button class="btn green" type="submit">ПРИМЕНИТЬ</button>
+        <?php if ($hasRecv || $hasSecr): ?>
+          <button class="btn small ghost" type="submit" name="act" value="offmoney"
+                  formnovalidate>Выключить кошелёк</button>
+        <?php endif; ?>
+      </p>
+    </form>
+
+    <details style="margin-top:16px">
+      <summary class="muted" style="cursor:pointer">Можно и файлом на сервере — если так привычнее</summary>
+      <div class="ym-code" id="ymConf" style="margin-top:10px">mkdir -p /etc/geodash
 cat &gt; /etc/geodash/pay.json &lt;&lt;'EOF'
 {
   "receiver": "4100XXXXXXXXXXX",
@@ -226,13 +353,11 @@ cat &gt; /etc/geodash/pay.json &lt;&lt;'EOF'
 EOF
 chown root:www-data /etc/geodash/pay.json
 chmod 640 /etc/geodash/pay.json</div>
-    <p class="ym-row" style="margin-top:10px">
-      <button class="btn small ghost ym-copy" data-copy="ymConf" type="button">Скопировать команды</button>
-      <span class="muted">права 640 — файл читает только сайт</span>
-    </p>
-    <p class="muted">Файл сейчас: <?= $hasFile
-        ? 'читается — кошелёк ' . ($hasRecv ? 'указан' : '<b>не указан</b>') . ', секрет ' . ($hasSecr ? 'указан' : '<b>не указан</b>')
-        : '<b>не найден или недоступен сайту</b>' ?>.</p>
+      <p class="ym-row" style="margin-top:10px">
+        <button class="btn small ghost ym-copy" data-copy="ymConf" type="button">Скопировать команды</button>
+        <span class="muted">что сохранено через «Применить», важнее файла</span>
+      </p>
+    </details>
   </div>
 
   <!-- 4 -->

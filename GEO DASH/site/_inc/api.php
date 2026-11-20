@@ -111,6 +111,7 @@ function gd_head(string $title, string $active = '') {
   <a class="link<?= $active==='download'?' active':'' ?>" href="/download/">Скачать</a>
   <?php if ($user): ?>
     <a class="link<?= $active==='friends'?' active':'' ?>" href="/friends/">Друзья</a>
+    <a class="link<?= $active==='keys'?' active':'' ?>" href="/keys/">Ключи</a>
     <a class="link<?= $active==='account'?' active':'' ?>" href="/account/">Аккаунт</a>
     <?php if (gd_is_admin()): ?><a class="link" href="/admin/">Админка</a><?php endif; ?>
   <?php endif; ?>
