@@ -53,14 +53,14 @@ namespace GEO_DASH.Core
             Add(new ObjectDef { Id = 9, Name = "Стекло", Category = "Блоки", Kind = ObjKind.Block, Style = DrawStyle.Glass, Solid = true, WormPhase = true });
 
             // ---------- шипы и пилы ----------
-            Add(new ObjectDef { Id = 20, Name = "Шип", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.Spike, Deadly = true, Hx = 11, Hy = 2, Hw = 8, Hh = 16 });
-            Add(new ObjectDef { Id = 21, Name = "Малый шип", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeSmall, Deadly = true, H = 15, Hx = 12, Hy = 2, Hw = 6, Hh = 8 });
-            Add(new ObjectDef { Id = 22, Name = "Шип с потолка", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.Spike, Deadly = true, Hx = 11, Hy = 12, Hw = 8, Hh = 16 });
+            Add(new ObjectDef { Id = 20, Name = "Шип", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.Spike, Deadly = true, Hx = 10, Hy = 2, Hw = 10, Hh = 11 });
+            Add(new ObjectDef { Id = 21, Name = "Малый шип", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeSmall, Deadly = true, H = 15, Hx = 11, Hy = 2, Hw = 8, Hh = 6 });
+            Add(new ObjectDef { Id = 22, Name = "Шип с потолка", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.Spike, Deadly = true, Hx = 10, Hy = 17, Hw = 10, Hh = 11 });
             Add(new ObjectDef { Id = 23, Name = "Пила", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.Saw, Deadly = true, Hx = 5, Hy = 5, Hw = 20, Hh = 20 });
             Add(new ObjectDef { Id = 24, Name = "Большая пила", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SawBig, Deadly = true, W = 60, H = 60, Hx = 10, Hy = 10, Hw = 40, Hh = 40 });
-            Add(new ObjectDef { Id = 25, Name = "Три шипа", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeRow, Deadly = true, W = 90, Hx = 6, Hy = 2, Hw = 78, Hh = 14 });
+            Add(new ObjectDef { Id = 25, Name = "Три шипа", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeRow, Deadly = true, W = 90, Hx = 7, Hy = 2, Hw = 76, Hh = 11 });
             Add(new ObjectDef { Id = 26, Name = "Опасный блок", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.HazardBlock, Deadly = true, Solid = false });
-            Add(new ObjectDef { Id = 27, Name = "Половина шипа", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeHalf, Deadly = true, H = 15, Hx = 10, Hy = 1, Hw = 10, Hh = 9 });
+            Add(new ObjectDef { Id = 27, Name = "Половина шипа", Category = "Шипы", Kind = ObjKind.Hazard, Style = DrawStyle.SpikeHalf, Deadly = true, H = 15, Hx = 10, Hy = 1, Hw = 10, Hh = 6 });
 
             // ---------- шары (орбы) ----------
             Add(new ObjectDef { Id = 40, Name = "Шар (орб)", Category = "Шары и пады", Kind = ObjKind.Orb, Style = DrawStyle.Orb, Hx = -3, Hy = -3, Hw = 36, Hh = 36 });

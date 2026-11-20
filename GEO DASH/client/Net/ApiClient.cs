@@ -458,8 +458,13 @@ namespace GEO_DASH.Net
         // -------------------------------------------------------- лицензия
 
         /// <summary>Открыта ли игра на этом аккаунте и какие ключи за ним.</summary>
-        public static Task<ApiReply<LicenceMineDto>> LicenceMineAsync() =>
-            GetAsync<LicenceMineDto>("/api/licence/mine", "licence");
+        public static Task<ApiReply<LicenceMineDto>> LicenceMineAsync(string device = "", string platform = "", string name = "") =>
+            GetAsync<LicenceMineDto>("/api/licence/mine" +
+                (device.Length > 0
+                    ? "?device=" + Uri.EscapeDataString(device) + "&platform=" + platform +
+                      "&name=" + Uri.EscapeDataString(name)
+                    : ""),
+                "licence");
 
         /// <summary>Активировать ключ на этом аккаунте — один раз и навсегда.</summary>
         public static Task<ApiReply<LicenceMineDto>> LicenceActivateAsync(string key, string device, string platform) =>

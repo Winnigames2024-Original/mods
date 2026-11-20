@@ -77,11 +77,16 @@ public class Lic {
     /** Сервер в этом запуске ответил — значит проверка настоящая. */
     public static boolean online = false;
 
+    /** Ключ занят другим устройством — текст сервера. */
+    public static String deviceError = "";
+
     /** Что показать игроку, когда игра не открывается. */
     public static String reasonText() {
         if (reason.equals("off")) return "Ваш ключ отключён — включите его в аккаунте на сайте";
         if (reason.equals("revoked")) return "Ваш ключ отозван администратором";
         if (reason.equals("offline")) return "Включите интернет: ключ проверяется на сервере";
+        if (reason.equals("device")) return deviceError.isEmpty()
+                ? "Ключ уже занят другим устройством — отключите его в аккаунте на сайте" : deviceError;
         return "Вы не ввели лицензионный ключ";
     }
 
@@ -171,6 +176,7 @@ public class Lic {
             online = true;
             String why = r.optString("reason", "");
             reason = why.isEmpty() ? "none" : why;
+            deviceError = r.optString("deviceError", "");
             if (r.optBoolean("licensed")) {
                 String k = r.optString("key", "");
                 remember(k.isEmpty() ? key() : k, Store.user());

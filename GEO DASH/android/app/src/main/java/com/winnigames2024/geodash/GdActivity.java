@@ -34,11 +34,36 @@ public abstract class GdActivity extends Activity {
     /** Здесь экран собирается из View внутри FrameLayout. */
     protected abstract void build();
 
+    /**
+     * Просим у телефона самую высокую герцовку с текущим разрешением.
+     * Без этого многие экраны держат 60 Гц, даже когда умеют 120, и игра
+     * выглядит дёрганой при том же FPS.
+     */
+    private void unlockHighRefresh() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 23) return;
+            android.view.Display d = getWindowManager().getDefaultDisplay();
+            android.view.Display.Mode cur = d.getMode();
+            android.view.Display.Mode best = cur;
+            for (android.view.Display.Mode m : d.getSupportedModes()) {
+                if (m.getPhysicalWidth() != cur.getPhysicalWidth()) continue;
+                if (m.getPhysicalHeight() != cur.getPhysicalHeight()) continue;
+                if (m.getRefreshRate() > best.getRefreshRate()) best = m;
+            }
+            if (best.getModeId() != cur.getModeId()) {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.preferredDisplayModeId = best.getModeId();
+                getWindow().setAttributes(lp);
+            }
+        } catch (Exception ignored) { }
+    }
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        unlockHighRefresh();
         Store.init(this);
 
         root = new FrameLayout(this);

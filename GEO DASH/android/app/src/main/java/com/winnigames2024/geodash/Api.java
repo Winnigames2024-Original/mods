@@ -138,7 +138,12 @@ public class Api {
 
     /** Открыта ли игра на этом аккаунте и какие ключи за ним. */
     public static JSONObject licenceMine() {
-        String s = rawGet("/api/licence/mine");
+        String q = "";
+        try {
+            q = "?device=" + java.net.URLEncoder.encode(Lic.device(), "UTF-8")
+              + "&platform=android&name=" + java.net.URLEncoder.encode(android.os.Build.MODEL, "UTF-8");
+        } catch (Exception ignored) { }
+        String s = rawGet("/api/licence/mine" + q);
         try { return s == null ? null : new JSONObject(s); } catch (Exception e) { return null; }
     }
 

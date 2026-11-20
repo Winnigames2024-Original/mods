@@ -67,6 +67,9 @@ namespace GEO_DASH.Net
         /// <summary>Сервер в этом запуске ответил — значит проверка настоящая.</summary>
         public static bool Online { get; private set; }
 
+        /// <summary>Ключ занят другим компьютером или телефоном — текст сервера.</summary>
+        public static string DeviceError { get; private set; } = "";
+
         /// <summary>Игра поставлена установщиком.</summary>
         public static bool Installed => InstallInfo() != null;
 
@@ -195,11 +198,12 @@ namespace GEO_DASH.Net
             string user = AppConfig.Settings.UserName ?? "";
 
             Online = false;
-            var r = await ApiClient.LicenceMineAsync();
+            var r = await ApiClient.LicenceMineAsync(Device, "pc", Environment.MachineName);
             if (r.Ok && r.Data != null)
             {
                 Online = true;
                 Reason = string.IsNullOrEmpty(r.Data.Reason) ? "none" : r.Data.Reason;
+                DeviceError = r.Data.DeviceError ?? "";
                 if (r.Data.Licensed)
                 {
                     St.Key = string.IsNullOrEmpty(r.Data.Key) ? (St.Key ?? "") : r.Data.Key;
@@ -264,6 +268,8 @@ namespace GEO_DASH.Net
             "off" => "Ваш ключ отключён — включите его в аккаунте на сайте",
             "revoked" => "Ваш ключ отозван администратором",
             "offline" => "Включите интернет: ключ проверяется на сервере",
+            "device" => DeviceError.Length > 0 ? DeviceError
+                : "Ключ уже занят другим устройством — отвяжите их в аккаунте на сайте",
             _ => "Вы не ввели лицензионный ключ"
         };
 

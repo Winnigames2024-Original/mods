@@ -19,6 +19,9 @@ namespace GEO_DASH.Core
         public const double CubeGravity = 2800;
         public const double CubeJump = 661;
 
+        /// <summary>Сколько живёт нажатие: клик чуть раньше орба или земли не пропадает.</summary>
+        public const double PressBuffer = 0.065;
+
         // плавание: тянет слабее, зажатая кнопка гребёт вверх
         public const double SwimGravityScale = 0.34;
         public const double SwimPush = 1750;
@@ -63,6 +66,13 @@ namespace GEO_DASH.Core
         public double VY;
         public int GravityDir = 1;      // 1 — вниз, -1 — вверх
         public GameMode Mode = GameMode.Cube;
+
+        /// <summary>Едем по склону: нужен для наклона на 45° и для прыжка с него.</summary>
+        public bool OnSlope;
+        /// <summary>Куда наклонён игрок на склоне: -45 на подъёме, +45 на спуске.</summary>
+        public double SlopeTilt;
+        /// <summary>Нажатие помнится несколько кадров — чтобы орб не «проглатывался».</summary>
+        public double JumpBuf;
         public SpeedTier Speed = SpeedTier.Normal;
         public bool Mini;
         public bool Mirror;
@@ -292,10 +302,21 @@ namespace GEO_DASH.Core
                 case GameMode.Cube:
                 case GameMode.Robot:
                 case GameMode.Spider:
-                    if (!OnGround && !OnCeiling)
+                    if (OnSlope)
+                    {
+                        // на склоне не крутимся, а плавно ложимся на поверхность
+                        double want = SlopeTilt * GravityDir * (Mirror ? -1 : 1);
+                        Rotation += (want - Rotation) * Math.Min(1, dt * 18);
+                    }
+                    else if (!OnGround && !OnCeiling)
                         Rotation += 418 * dt * GravityDir * (Mirror ? -1 : 1);
                     else
-                        Rotation = SnapAngle(Rotation);
+                    {
+                        // приземлились — плавно выравниваемся на ближайшие 90°
+                        double want = SnapAngle(Rotation);
+                        Rotation += (want - Rotation) * Math.Min(1, dt * 22);
+                        if (Math.Abs(want - Rotation) < 0.6) Rotation = want;
+                    }
                     break;
                 case GameMode.Ball:
                     Rotation += SpeedUnits * dt * 1.6 * GravityDir * (Mirror ? -1 : 1);

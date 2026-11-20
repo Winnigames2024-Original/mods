@@ -215,8 +215,10 @@ namespace GEO_DASH.Net
         [JsonPropertyName("ok")] public bool Ok { get; set; }
         [JsonPropertyName("error")] public string Error { get; set; } = "";
         [JsonPropertyName("licensed")] public bool Licensed { get; set; }
-        /// <summary>ok · none · off (владелец отключил) · revoked (отозван админом).</summary>
+        /// <summary>ok · none · off (владелец отключил) · revoked (отозван админом) · device.</summary>
         [JsonPropertyName("reason")] public string Reason { get; set; } = "";
+        /// <summary>Чужое устройство: текст от сервера.</summary>
+        [JsonPropertyName("deviceError")] public string DeviceError { get; set; } = "";
         [JsonPropertyName("admin")] public bool Admin { get; set; }
         [JsonPropertyName("key")] public string Key { get; set; } = "";
         [JsonPropertyName("licences")] public List<LicenceDto> Licences { get; set; } = new();

@@ -26,6 +26,12 @@ public class Engine {
     static final double PAD_YELLOW = 700, PAD_PINK = 500, PAD_RED = 1000;
 
     public static class Player {
+        /** Едем по склону: нужен для наклона и прыжка с него. */
+        public boolean onSlope;
+        /** Наклон на склоне: -45 на подъёме, +45 на спуске. */
+        public double slopeTilt;
+        /** Нажатие помнится несколько кадров, чтобы орб не «проглатывался». */
+        public double jumpBuf;
         public double x, y, vy, rotation, gravityMul = 1, wormBurrow, spiderFlash, robotHold;
         /** След телепорта: откуда шёл и сколько ещё рисовать. */
         public double teleFromY, teleT;
@@ -284,7 +290,13 @@ public class Engine {
         for (ObjState s : st) if (s.pulseT > 0) { s.pulseT -= dt; if (s.pulseT <= 0) { s.hasPulse = false; s.pulseScale = 1; } }
     }
 
+    /** Сколько живёт нажатие: клик чуть раньше орба или земли не пропадает. */
+    static final double PRESS_BUFFER = 0.065;
+
     void step(Player p, double dt, boolean hold, boolean pressed) {
+        if (pressed) p.jumpBuf = PRESS_BUFFER;
+        else if (p.jumpBuf > 0) p.jumpBuf = Math.max(0, p.jumpBuf - dt);
+
         // платформер: едем туда, куда жмём, а не вперёд сами
         double vx = platformer
                 ? p.speedUnits() * Math.max(-1, Math.min(1, moveX))
@@ -477,7 +489,7 @@ public class Engine {
 
     void resolveSolids(Player p, double prevY) {
         boolean worm = p.mode == Gd.WORM;
-        p.onGround = false; p.onCeiling = false;
+        p.onGround = false; p.onCeiling = false; p.onSlope = false;
         List<Integer> list = new ArrayList<>(candidates(p.box()));
 
         for (int i : list) {
@@ -492,7 +504,8 @@ public class Engine {
             // Насквозь пропускаем лишь когда он уже оказался внутри блока.
             if (worm && d.wormPhase && p.noClipWorm) continue;
 
-            // склон не убивает: по нему заезжают наверх, как в игре
+            // Склон никогда не убивает — по нему едут. До боковой проверки
+            // «удар в стену» дело не доходит: ветка всегда уходит в continue.
             if (d.kind == Catalog.SLOPE) {
                 double lo = Math.min(r.top, r.bottom), hi = Math.max(r.top, r.bottom);
                 double left = Math.min(rBottomX(r), rTopX(r));
@@ -504,27 +517,24 @@ public class Engine {
                 double frac = up ? t : 1 - t;
                 double surf = lo + (hi - lo) * frac;
                 double halfS = p.size() / 2;
+                double rise = (hi - lo) / wide;
 
-                // склон подкидывает, как трамплин: чем круче и быстрее, тем сильнее
-                double slope = (hi - lo) / wide;
-                double lift = up ? Math.min(p.speedUnits() * slope, CUBE_JUMP * 1.35) : 0;
+                // Скорость подъёма берётся из геометрии: едем по гипотенузе.
+                // На сходе с вершины она остаётся — отсюда естественный подброс,
+                // без отдельного толчка при первом касании.
+                double climb = p.speedUnits() * rise;
+                boolean gdown = p.gravityDir > 0;
+                double want = gdown ? surf + halfS : surf - halfS;
+                boolean touching = gdown ? p.y <= want + 6 : p.y >= want - 6;
 
-                if (p.gravityDir > 0) {
-                    double want = surf + halfS;
-                    if (p.y <= want + 4) {
-                        p.y = want;
-                        if (p.vy < lift) p.vy = lift;
-                        p.onGround = lift <= 0;
-                        p.robotJumping = false;
-                    }
-                } else {
-                    double want = hi - (surf - lo) - halfS;
-                    if (p.y >= want - 4) {
-                        p.y = want;
-                        if (p.vy > -lift) p.vy = -lift;
-                        p.onGround = lift <= 0;
-                        p.robotJumping = false;
-                    }
+                if (touching) {
+                    p.y = want;
+                    p.onGround = true;
+                    p.robotJumping = false;
+                    p.onSlope = true;
+                    p.slopeTilt = up ? -45 : 45;
+                    if (up) p.vy = gdown ? climb : -climb;
+                    else p.vy = gdown ? Math.min(p.vy, 0) : Math.max(p.vy, 0);
                 }
                 continue;
             }
@@ -700,7 +710,11 @@ public class Engine {
                     if (hit(r, box)) applyPortal(p, o, i);
                     break;
                 case Catalog.ORB:
-                    if (pressed && hit(r, box)) applyOrb(p, o, i);
+                    // орб ловит и нажатие, сделанное чуть раньше касания
+                    if ((pressed || p.jumpBuf > 0) && hit(r, box)) {
+                        applyOrb(p, o, i);
+                        p.jumpBuf = 0;
+                    }
                     break;
                 case Catalog.PAD:
                     if (hit(r, box)) applyPad(p, o, i);

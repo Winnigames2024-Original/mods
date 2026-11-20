@@ -1515,7 +1515,11 @@ function licNew(meta) {
       price: meta.price | 0,
       order: String(meta.order || '').slice(0, 64),
       buyer: String(meta.buyer || '').slice(0, 40),
-      user: null, usedAt: null, devices: [], platform: '', revoked: false, off: false
+      user: null, usedAt: null, devices: [], platform: '', revoked: false, off: false,
+      // один ключ живёт на одном компьютере и одном телефоне разом
+      pcDevice: '', androidDevice: '',
+      seats: {},          // id устройства → { platform, name, seen }
+      banned: []          // устройства, которым этот ключ закрыт
     };
     db.licences[raw] = rec;
     return rec;
@@ -1530,6 +1534,10 @@ function licPub(r, full) {
     order: r.order || '', buyer: r.buyer || '', user: r.user || null,
     usedAt: r.usedAt || null, used: !!r.user, revoked: !!r.revoked, off: !!r.off
   };
+  o.pcDevice = r.pcDevice || '';
+  o.androidDevice = r.androidDevice || '';
+  o.seats = r.seats || {};
+  o.banned = r.banned || [];
   if (full) { o.devices = r.devices || []; o.platform = r.platform || ''; o.by = r.by || ''; }
   return o;
 }
@@ -1573,11 +1581,46 @@ function licActivate(u, keyText, device, platform) {
     r.devices.push(dev);
     while (r.devices.length > 10) r.devices.shift();
   }
+  const seat = licTakeSeat(r, device, platform, '');
+  if (seat) return seat;
+
   u.licence = r.key;
   u.licenceAt = r.usedAt;
   u.licences = u.licences || [];
   if (!u.licences.includes(r.key)) u.licences.push(r.key);
   save.licences(); save.users();
+  return null;
+}
+
+/**
+ * Занять место на ключе под это устройство. На ключе по одному месту на
+ * компьютер и на телефон: пустое занимается, своё пропускается, чужое — отказ.
+ * Возвращает текст ошибки или null.
+ */
+function licTakeSeat(r, device, platform, name) {
+  device = String(device || '').slice(0, 80);
+  if (!r || !device) return null;
+  const field = platform === 'android' ? 'androidDevice' : (platform === 'pc' ? 'pcDevice' : '');
+  if (!field) return null;                    // сайт и прочее мест не занимают
+
+  r.seats = r.seats || {};
+  r.banned = r.banned || [];
+  if (r.banned.includes(device))
+    return 'Это устройство закрыто для ключа — снимите бан в аккаунте на сайте';
+
+  const has = r[field] || '';
+  if (has && has !== device)
+    return platform === 'android'
+      ? 'Этот ключ уже занят другим телефоном — отключите его в аккаунте на сайте'
+      : 'Этот ключ уже занят другим компьютером — отключите его в аккаунте на сайте';
+
+  if (!has) r[field] = device;
+  r.seats[device] = {
+    platform,
+    name: String(name || r.seats[device]?.name || '').slice(0, 40),
+    seen: now()
+  };
+  save.licences();
   return null;
 }
 
@@ -1592,14 +1635,23 @@ function licReason(u) {
 }
 
 /** Игра спрашивает: можно ли играть на этом аккаунте. */
-route('GET', '/api/licence/mine', (req, res) => {
+route('GET', '/api/licence/mine', (req, res, p, q) => {
   const u = requireUser(req, res); if (!u) return;
   const mine = Object.values(db.licences).filter(r =>
     key(r.user || '') === key(u.name) || key(r.buyer || '') === key(u.name));
+
+  // игра говорит, с какого устройства спрашивает: место на ключе занимается
+  // первым компьютером и первым телефоном, чужое устройство получает отказ
+  let seatErr = null;
+  const own = licFind(u.licence || '');
+  if (own && q && !u.admin)
+    seatErr = licTakeSeat(own, q.get('device'), q.get('platform'), q.get('name'));
+
   ok(res, {
     ok: true,
-    licensed: licOkFor(u),
-    reason: licReason(u),
+    licensed: seatErr ? false : licOkFor(u),
+    reason: seatErr ? 'device' : licReason(u),
+    deviceError: seatErr || '',
     admin: !!u.admin || key(u.name) === key(ADMIN),
     key: u.licence || '',
     licences: mine.map(r => licPub(r))
@@ -1627,6 +1679,59 @@ route('POST', '/api/licence/toggle', async (req, res) => {
   r.off = want;
   save.licences();
   ok(res, { ok: true, licence: licPub(r), licensed: licOkFor(u), reason: licReason(u) });
+});
+
+/** Ключ мой (или я админ) — иначе трогать устройства нельзя. */
+function licMine(r, u) {
+  return key(r.user || '') === key(u.name) || key(r.buyer || '') === key(u.name) || !!u.admin;
+}
+
+/**
+ * Отключить устройство от ключа. Без device снимаются оба места сразу.
+ * Отключённое устройство при следующей проверке получит отказ и выйдет из игры.
+ */
+route('POST', '/api/licence/kick', async (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const b = await readBody(req);
+  const r = licFind(b.key);
+  if (!r) return bad(res, 'Такого ключа нет', 404);
+  if (!licMine(r, u)) return bad(res, 'Это не ваш ключ', 403);
+
+  const dev = String(b.device || '');
+  r.seats = r.seats || {};
+  if (dev) {
+    if (r.pcDevice === dev) r.pcDevice = '';
+    if (r.androidDevice === dev) r.androidDevice = '';
+    delete r.seats[dev];
+  } else {
+    r.pcDevice = ''; r.androidDevice = ''; r.seats = {}; r.devices = [];
+  }
+  save.licences();
+  ok(res, { ok: true, licence: licPub(r) });
+});
+
+/** Закрыть ключ для устройства или снова открыть. */
+route('POST', '/api/licence/ban', async (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  const b = await readBody(req);
+  const r = licFind(b.key);
+  if (!r) return bad(res, 'Такого ключа нет', 404);
+  if (!licMine(r, u)) return bad(res, 'Это не ваш ключ', 403);
+
+  const dev = String(b.device || '');
+  if (!dev) return bad(res, 'Не указано устройство');
+  r.banned = r.banned || [];
+  const ban = b.ban === false ? false : true;
+
+  if (ban) {
+    if (!r.banned.includes(dev)) r.banned.push(dev);
+    if (r.pcDevice === dev) r.pcDevice = '';
+    if (r.androidDevice === dev) r.androidDevice = '';
+  } else {
+    r.banned = r.banned.filter(x => x !== dev);
+  }
+  save.licences();
+  ok(res, { ok: true, licence: licPub(r) });
 });
 
 /**

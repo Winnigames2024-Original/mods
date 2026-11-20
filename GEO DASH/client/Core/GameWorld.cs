@@ -280,6 +280,12 @@ namespace GEO_DASH.Core
 
         void StepPlayer(Player p, double dt, PlayerInput inp, ref SpiderRequest sreq)
         {
+            // Нажатие живёт ещё несколько кадров: в игре клик за пару кадров до орба
+            // или до земли должен срабатывать, а не пропадать между шагами физики.
+            _dt = dt;
+            if (inp.Pressed) p.JumpBuf = Phys.PressBuffer;
+            else if (p.JumpBuf > 0) p.JumpBuf = Math.Max(0, p.JumpBuf - dt);
+
             // платформер: едем туда, куда жмём, а не вперёд сами
             double vx = Platformer
                 ? p.SpeedUnits * Math.Clamp(inp.MoveX, -1, 1)
@@ -381,10 +387,13 @@ namespace GEO_DASH.Core
             return false;
         }
 
+        /// <summary>Шаг физики — нужен, чтобы подъём по склону шёл не рывком.</summary>
+        double _dt = 1.0 / 240;
+
         void ResolveSolids(Player p, double prevX, double prevY)
         {
             bool worm = p.Mode == GameMode.Worm;
-            p.OnGround = false; p.OnCeiling = false;
+            p.OnGround = false; p.OnCeiling = false; p.OnSlope = false;
 
             var box = p.Box;
             var list = new List<int>(Candidates(box));
@@ -404,7 +413,8 @@ namespace GEO_DASH.Core
                 // чтобы не застрял намертво.
                 if (worm && d.WormPhase && p.NoClipWorm) continue;
 
-                // склон не убивает: по нему заезжают наверх, как в игре
+                // Склон никогда не убивает — по нему едут. Боковой проверки
+                // «удар в стену» он не достигает: ветка всегда уходит в continue.
                 if (d.Kind == ObjKind.Slope)
                 {
                     double lo = Math.Min(r.Top, r.Bottom), hi = Math.Max(r.Top, r.Bottom);
@@ -412,34 +422,37 @@ namespace GEO_DASH.Core
                     double t = Math.Clamp((p.X - left) / wide, 0, 1);
                     bool up = d.Style is DrawStyle.SlopeUp or DrawStyle.SlopeUpHalf or DrawStyle.SlopeUpLong;
                     double frac = up ? t : 1 - t;
-                    double surf = lo + (hi - lo) * frac;      // высота склона под игроком
+                    double surf = lo + (hi - lo) * frac;       // высота поверхности под игроком
+                    double rise = (hi - lo) / wide;            // крутизна: 1 — это 45°
 
-                    // Склон не просто держит — он разгоняет вверх, как трамплин:
-                    // чем круче и чем быстрее едем, тем сильнее подкидывает.
-                    double slope = (hi - lo) / wide;
-                    double lift = up ? Math.Min(p.SpeedUnits * slope, Phys.CubeJump * 1.35) : 0;
+                    // Скорость подъёма берётся из самой геометрии: едем по гипотенузе,
+                    // значит вверх идём со скоростью «горизонтальная × крутизна».
+                    // На сходе с вершины эта скорость остаётся — отсюда и естественный
+                    // подброс, без всякого отдельного «толчка» при первом касании.
+                    double climb = p.SpeedUnits * rise;
+                    double half = p.Size / 2;
+                    bool gdown = p.GravityDir > 0;
+                    double want = gdown ? surf + half : surf - half;
+                    bool touching = gdown ? p.Y <= want + 6 : p.Y >= want - 6;
 
-                    if (p.GravityDir > 0)
+                    if (touching)
                     {
-                        double want = surf + p.Size / 2;
-                        if (p.Y <= want + 4)
-                        {
-                            p.Y = want;
-                            if (p.VY < lift) p.VY = lift;
-                            p.OnGround = lift <= 0;
-                            p.RobotJumping = false;
-                        }
-                    }
-                    else
-                    {
-                        double want = hi - (surf - lo) - p.Size / 2;
-                        if (p.Y >= want - 4)
-                        {
-                            p.Y = want;
-                            if (p.VY > -lift) p.VY = -lift;
-                            p.OnGround = lift <= 0;
-                            p.RobotJumping = false;
-                        }
+                        // Поднимаем не рывком: за шаг нельзя подскочить выше, чем
+                        // позволяет сама поверхность. Иначе при въезде в высокую
+                        // грань спуска игрока телепортировало бы на верхушку.
+                        double maxStep = Math.Max(3, Math.Abs(climb) * _dt * 2 + 2);
+                        double dy = want - p.Y;
+                        bool catching = Math.Abs(dy) > maxStep;
+                        if (catching) p.Y += Math.Sign(dy) * maxStep;
+                        else p.Y = want;
+
+                        p.OnGround = true;
+                        p.RobotJumping = false;
+                        p.OnSlope = true;
+                        p.SlopeTilt = up ? -45 : 45;          // наклон как в игре
+                        if (catching) p.VY = 0;
+                        else if (up) p.VY = gdown ? climb : -climb;
+                        else p.VY = gdown ? Math.Min(p.VY, 0) : Math.Max(p.VY, 0);
                     }
                     continue;
                 }
@@ -657,6 +670,9 @@ namespace GEO_DASH.Core
                         break;
 
                     case ObjKind.Hazard:
+                        // Смертельная зона задана в каталоге (Hx/Hy/Hw/Hh) и у шипов
+                        // это сердцевина, а не весь тайл: касание пустого угла картинки
+                        // не убивает, как и в оригинале.
                         if (r.IntersectsWith(inner)) { Die(p); return; }
                         break;
 
@@ -665,7 +681,12 @@ namespace GEO_DASH.Core
                         break;
 
                     case ObjKind.Orb:
-                        if (inp.Pressed && r.IntersectsWith(box)) ApplyOrb(p, o, i);
+                        // орб ловит и нажатие, сделанное чуть раньше касания
+                        if ((inp.Pressed || p.JumpBuf > 0) && r.IntersectsWith(box))
+                        {
+                            ApplyOrb(p, o, i);
+                            p.JumpBuf = 0;
+                        }
                         break;
 
                     case ObjKind.Pad:

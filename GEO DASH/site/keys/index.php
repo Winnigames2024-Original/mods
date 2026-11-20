@@ -18,6 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'activate' => gd_post('/api/licence/activate', ['key' => $key, 'device' => 'site', 'platform' => 'site'], gd_token()),
         'off'      => gd_post('/api/licence/toggle', ['key' => $key, 'off' => true], gd_token()),
         'on'       => gd_post('/api/licence/toggle', ['key' => $key, 'off' => false], gd_token()),
+        'kick'     => gd_post('/api/licence/kick', ['key' => $key,
+                               'device' => (string)($_POST['device'] ?? '')], gd_token()),
+        'kickall'  => gd_post('/api/licence/kick', ['key' => $key], gd_token()),
+        'ban'      => gd_post('/api/licence/ban', ['key' => $key,
+                               'device' => (string)($_POST['device'] ?? ''), 'ban' => true], gd_token()),
+        'unban'    => gd_post('/api/licence/ban', ['key' => $key,
+                               'device' => (string)($_POST['device'] ?? ''), 'ban' => false], gd_token()),
         default    => [false, ['error' => 'неизвестное действие']],
     };
     if ($ok) {
@@ -25,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'activate' => 'Ключ активирован — игра открыта на этом аккаунте',
             'off'      => 'Ключ отключён. Игра на нём больше не запустится, пока не включите обратно',
             'on'       => 'Ключ включён — можно играть',
+            'kick'     => 'Устройство отключено: при следующей проверке игра на нём закроется',
+            'kickall'  => 'Все устройства отключены — ключ свободен для новых',
+            'ban'      => 'Устройство закрыто для ключа',
+            'unban'    => 'Устройство снова допущено',
             default    => 'Готово',
         };
     } else $err = $r['error'] ?? 'Не получилось';
@@ -54,6 +65,8 @@ gd_head('Мои ключи', 'keys');
   .kcode { font-family:Consolas,monospace; font-size:21px; letter-spacing:.5px }
   .kbadge { font-size:12px; font-weight:bold; padding:3px 9px; border-radius:20px; color:#071 }
   .kgrow { flex:1 1 220px }
+  .kdev { width:100%; border-top:2px solid #0004; margin-top:10px; padding-top:10px }
+  .kdevrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:6px 0 }
 </style>
 <section class="section"><div class="container" style="max-width:860px">
   <h2>Мои ключи</h2>
@@ -121,9 +134,68 @@ gd_head('Мои ключи', 'keys');
           </form>
         <?php endif; ?>
       </div>
+
+      <?php
+        $seats  = is_array($k['seats'] ?? null) ? $k['seats'] : [];
+        $banned = is_array($k['banned'] ?? null) ? $k['banned'] : [];
+        $live   = [];
+        foreach ([$k['pcDevice'] ?? '', $k['androidDevice'] ?? ''] as $d) if ($d !== '') $live[] = $d;
+        $all = array_unique(array_merge($live, array_keys($seats), $banned));
+      ?>
+      <?php if ($all): ?>
+        <div class="kdev">
+          <div class="muted" style="font-size:13px;margin-bottom:6px">Устройства на этом ключе —
+            по одному компьютеру и одному телефону:</div>
+          <?php foreach ($all as $dev): ?>
+            <?php
+              $info = $seats[$dev] ?? [];
+              $plat = (string)($info['platform'] ?? (str_starts_with($dev, 'and-') ? 'android' : 'pc'));
+              $isBan = in_array($dev, $banned, true);
+              $isLive = in_array($dev, $live, true);
+            ?>
+            <div class="kdevrow">
+              <span><?= $plat === 'android' ? '📱' : '💻' ?></span>
+              <span class="kgrow">
+                <b><?= h(($info['name'] ?? '') !== '' ? $info['name'] : ($plat === 'android' ? 'телефон' : 'компьютер')) ?></b>
+                <span class="muted" style="font-size:12px"> · <?= h($dev) ?></span>
+                <?php if (!empty($info['seen'])): ?>
+                  <span class="muted" style="font-size:12px"><br>последний раз: <?= h(substr((string)$info['seen'], 0, 16)) ?></span>
+                <?php endif; ?>
+              </span>
+              <span class="kbadge" style="background:<?= $isBan ? '#a33' : ($isLive ? '#1d6' : '#456') ?>">
+                <?= $isBan ? 'забанено' : ($isLive ? 'подключено' : 'отключено') ?></span>
+              <?php if (!$isBan && $isLive): ?>
+                <form method="post" style="display:inline">
+                  <input type="hidden" name="act" value="kick">
+                  <input type="hidden" name="key" value="<?= h($k['key']) ?>">
+                  <input type="hidden" name="device" value="<?= h($dev) ?>">
+                  <button class="btn small ghost" type="submit">ОТКЛЮЧИТЬ</button>
+                </form>
+              <?php endif; ?>
+              <form method="post" style="display:inline">
+                <input type="hidden" name="act" value="<?= $isBan ? 'unban' : 'ban' ?>">
+                <input type="hidden" name="key" value="<?= h($k['key']) ?>">
+                <input type="hidden" name="device" value="<?= h($dev) ?>">
+                <button class="btn small <?= $isBan ? 'green' : 'red' ?>" type="submit">
+                  <?= $isBan ? 'РАЗБАНИТЬ' : 'ЗАБАНИТЬ' ?></button>
+              </form>
+            </div>
+          <?php endforeach; ?>
+          <?php if ($live): ?>
+            <form method="post" style="margin-top:8px">
+              <input type="hidden" name="act" value="kickall">
+              <input type="hidden" name="key" value="<?= h($k['key']) ?>">
+              <button class="btn small ghost" type="submit">ОТКЛЮЧИТЬ ВСЕ</button>
+            </form>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
     <?php endforeach; ?>
     <p class="muted">Отключённый ключ не работает ни на одном устройстве: игра попросит другой ключ,
       пока вы не включите этот обратно. Отключение ничего не тратит — ключ остаётся вашим.</p>
+    <p class="muted">Один ключ держит один компьютер и один телефон разом. Пересели на новое
+      устройство — нажмите «Отключить» у старого, место освободится. «Забанить» закрывает ключ
+      для устройства совсем, пока не разбаните.</p>
   <?php endif; ?>
 </div></section>
 <?php gd_foot();

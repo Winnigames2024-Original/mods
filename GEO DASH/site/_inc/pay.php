@@ -180,6 +180,12 @@ function gd_pay_claim(string $order, string $name): array {
     return [$ok, $d, $code];
 }
 
+/** Спросить сервер игры про ключ — тем же способом, что и установщик. */
+function gd_key_check(string $key): array {
+    [$ok, $d] = gd_pay_api('POST', '/api/licence/validate', ['key' => $key]);
+    return [$ok, $d];
+}
+
 /** Последние уведомления об оплате. */
 function gd_pay_events(): array {
     [$ok, $d] = gd_pay_api('GET', '/api/licence/payevents');

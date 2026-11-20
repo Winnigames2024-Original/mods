@@ -49,14 +49,14 @@ public final class Catalog {
         add(new Def(8, BLOCK, ST_BRICK).solid());
         add(new Def(9, BLOCK, ST_GLASS).solid());
 
-        add(new Def(20, HAZARD, ST_SPIKE).hit(11, 2, 8, 16).deadly());
-        add(new Def(21, HAZARD, ST_SPIKE_SMALL).size(30, 15).hit(12, 2, 6, 8).deadly());
-        add(new Def(22, HAZARD, ST_SPIKE).hit(11, 12, 8, 16).deadly());
+        add(new Def(20, HAZARD, ST_SPIKE).hit(10, 2, 10, 11).deadly());
+        add(new Def(21, HAZARD, ST_SPIKE_SMALL).size(30, 15).hit(11, 2, 8, 6).deadly());
+        add(new Def(22, HAZARD, ST_SPIKE).hit(10, 17, 10, 11).deadly());
         add(new Def(23, HAZARD, ST_SAW).hit(5, 5, 20, 20).deadly());
         add(new Def(24, HAZARD, ST_SAW_BIG).size(60, 60).hit(10, 10, 40, 40).deadly());
-        add(new Def(25, HAZARD, ST_SPIKE_ROW).size(90, 30).hit(6, 2, 78, 14).deadly());
+        add(new Def(25, HAZARD, ST_SPIKE_ROW).size(90, 30).hit(7, 2, 76, 11).deadly());
         add(new Def(26, HAZARD, ST_HAZARD_BLOCK).deadly());
-        add(new Def(27, HAZARD, ST_SPIKE_HALF).size(30, 15).hit(10, 1, 10, 9).deadly());
+        add(new Def(27, HAZARD, ST_SPIKE_HALF).size(30, 15).hit(10, 1, 10, 6).deadly());
 
         add(new Def(40, ORB, ST_ORB).hit(-3, -3, 36, 36));
         add(new Def(50, PAD, ST_PAD).size(30, 10).hit(0, 0, 30, 10));

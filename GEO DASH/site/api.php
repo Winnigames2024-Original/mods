@@ -137,6 +137,21 @@ switch ($action) {
             'at' => date('c'),
         ]);
 
+    /**
+     * Что сервер думает о ключе — ровно то же, что спрашивает установщик.
+     * /api.php?action=checkkey&value=key:АДМИНКЛЮЧ;licence:GD-XXXX-...;
+     */
+    case 'checkkey':
+        $v = gd_parse_value((string)($_GET['value'] ?? ''));
+        $given = (string)($v['key'] ?? '');
+        if ($given === '' || !hash_equals(GD_LICENCE_KEY, $given)) gd_deny('json');
+        $lic = (string)($v['licence'] ?? ($_GET['licence'] ?? ''));
+        if ($lic === '') out(['ok' => false, 'error' => 'Не указан ключ: licence:GD-...'], 400);
+        [$ok, $d] = gd_key_check($lic);
+        if (!$ok) out(['ok' => false, 'error' => 'Сервер игры не отвечает или не знает такой проверки',
+                       'answer' => $d], 502);
+        out(['ok' => true, 'licence' => $lic] + (array)$d);
+
     /** Сводка по ключам: сколько выдано, занято, свободно. */
     case 'licenceinfo':
         $v = gd_parse_value((string)($_GET['value'] ?? ''));
@@ -214,7 +229,7 @@ switch ($action) {
         out([
             'ok' => false,
             'error' => 'Неизвестное действие',
-            'actions' => ['updateserver', 'status', 'getlicencekey', 'licenceinfo', 'order',
-                          'yoomoney', 'yookassa']
+            'actions' => ['updateserver', 'status', 'getlicencekey', 'licenceinfo', 'checkkey',
+                          'order', 'yoomoney', 'yookassa']
         ], 400);
 }
