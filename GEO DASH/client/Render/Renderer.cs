@@ -1,3 +1,4 @@
+using System.Drawing.Imaging;
 using System.Drawing.Drawing2D;
 using GEO_DASH.Core;
 using GEO_DASH.UI;
@@ -132,53 +133,114 @@ namespace GEO_DASH.Render
         /// <summary>Одна кисть на все частицы — меняем только цвет.</summary>
         static readonly SolidBrush ParticleBrush = new(Color.White);
 
-        // кисти для глаз создаются один раз — в кадре ничего не выделяется
-        static readonly SolidBrush EyeWhite = new(Color.FromArgb(235, 245, 245, 245));
-        static readonly SolidBrush EyeDark = new(Color.FromArgb(255, 12, 12, 14));
-        static readonly SolidBrush EyePupil = new(Color.FromArgb(255, 220, 30, 40));
-        static readonly Pen EyePen = new(Color.FromArgb(255, 10, 10, 12), 6f);
+        /// <summary>
+        /// Запечённые глаза: белок с ресницами и отдельно зрачок.
+        /// Рисуются один раз в картинки, в кадре только копируются и сдвигаются.
+        /// </summary>
+        static readonly Bitmap[] EyeBall = new Bitmap[3];
+        static Bitmap _pupilImg;
+
+        /// <summary>Доля такта трека BIKE: 141,3 удара в минуту.</summary>
+        public const double BeatSeconds = 60.0 / 141.3;
+
+        static Bitmap BakeEye(int w)
+        {
+            int h = (int)(w * 0.62f);
+            var bm = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
+            using var g = Graphics.FromImage(bm);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Color.Transparent);
+
+            var eye = new RectangleF(w * 0.06f, h * 0.06f, w * 0.88f, h * 0.88f);
+
+            // ресницы-шипы по верхней дуге
+            using (var br = new SolidBrush(Color.FromArgb(235, 12, 12, 14)))
+                for (int i = 0; i < 9; i++)
+                {
+                    double a = Math.PI + i * Math.PI / 8;
+                    float cx = w / 2f + (float)Math.Cos(a) * w * 0.44f;
+                    float cy = h / 2f + (float)Math.Sin(a) * h * 0.44f;
+                    g.FillPolygon(br, new[]
+                    {
+                        new PointF(cx - w * 0.02f, cy),
+                        new PointF(cx + (float)Math.Cos(a) * w * 0.07f, cy + (float)Math.Sin(a) * h * 0.12f),
+                        new PointF(cx + w * 0.02f, cy)
+                    });
+                }
+
+            using (var br = new SolidBrush(Color.FromArgb(240, 246, 246, 248))) g.FillEllipse(br, eye);
+            using (var pen = new Pen(Color.FromArgb(255, 10, 10, 12), Math.Max(3f, w * 0.03f)))
+                g.DrawEllipse(pen, eye);
+            return bm;
+        }
+
+        static Bitmap BakePupil(int d)
+        {
+            var bm = new Bitmap(d, d, PixelFormat.Format32bppPArgb);
+            using var g = Graphics.FromImage(bm);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Color.Transparent);
+            using (var br = new SolidBrush(Color.FromArgb(255, 12, 12, 14)))
+                g.FillEllipse(br, 0, 0, d - 1, d - 1);
+            using (var br = new SolidBrush(Color.FromArgb(255, 200, 24, 34)))
+                g.FillEllipse(br, d * 0.22f, d * 0.22f, d * 0.56f, d * 0.56f);
+            using (var br = new SolidBrush(Color.FromArgb(255, 255, 230, 230)))
+                g.FillEllipse(br, d * 0.58f, d * 0.18f, d * 0.18f, d * 0.18f);
+            return bm;
+        }
+
+        static readonly SolidBrush EyeFlashBrush = new(Color.Transparent);
 
         /// <summary>
-        /// Фон уровня «iSpy»: три огромных глаза. Зрачок тянется к игроку,
-        /// на долю такта белок вспыхивает красным.
+        /// Фон уровня «iSpy»: огромные глаза. Зрачок тянется к игроку,
+        /// на долю такта по глазам проходит красная вспышка.
         /// </summary>
         static void DrawEyes(Graphics g, GameWorld w, ViewTransform v)
         {
             float cw = v.Client.Width, ch = v.Client.Height;
             if (cw < 10 || ch < 10) return;
 
-            // доля такта: трек BIKE идёт примерно на 107,7 удара в минуту
-            double beat = (w.Time % 0.557) / 0.557;
+            if (EyeBall[0] == null)
+            {
+                EyeBall[0] = BakeEye(260);
+                EyeBall[1] = BakeEye(400);
+                EyeBall[2] = BakeEye(180);
+                _pupilImg = BakePupil(96);
+            }
+
+            double beat = (w.Time % BeatSeconds) / BeatSeconds;
             float flash = (float)Math.Max(0, 1 - beat * 3);
 
             var px = v.W2S(w.P1.X, w.P1.Y);
+            var oldMode = g.InterpolationMode;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
 
             for (int i = 0; i < 3; i++)
             {
-                // глаза едут медленнее уровня — получается глубина
+                var img = EyeBall[i];
+                float scale = ch / 620f * (i == 1 ? 1.25f : 1f);
+                float rw = img.Width * scale, rh = img.Height * scale;
+
                 float ex = (float)(((i * 0.37 + 0.18) * cw - w.Cam.CamX * v.Scale * 0.08) % (cw * 1.5));
                 if (ex < -cw * 0.4f) ex += cw * 1.5f;
                 float ey = ch * (i == 1 ? 0.30f : 0.46f);
-                float rw = ch * (i == 1 ? 0.42f : 0.30f);
-                float rh = rw * 0.62f;
 
-                var eye = new RectangleF(ex - rw / 2, ey - rh / 2, rw, rh);
-                EyeWhite.Color = Color.FromArgb(235,
-                    245, (int)(245 * (1 - flash * 0.85f)), (int)(245 * (1 - flash * 0.85f)));
-                g.FillEllipse(EyeWhite, eye);
-                g.DrawEllipse(EyePen, eye);
+                g.DrawImage(img, ex - rw / 2, ey - rh / 2, rw, rh);
 
                 // зрачок смотрит на игрока
                 float dx = Math.Clamp((px.X - ex) / (cw * 0.5f), -1f, 1f);
                 float dy = Math.Clamp((px.Y - ey) / (ch * 0.5f), -1f, 1f);
-                float pr = rh * 0.34f;
-                var pupil = new RectangleF(ex + dx * rw * 0.22f - pr, ey + dy * rh * 0.22f - pr, pr * 2, pr * 2);
-                g.FillEllipse(EyeDark, pupil);
+                float pd = rh * 0.44f;
+                g.DrawImage(_pupilImg, ex + dx * rw * 0.2f - pd / 2, ey + dy * rh * 0.2f - pd / 2, pd, pd);
 
-                EyePupil.Color = Color.FromArgb((int)(120 + 135 * flash), 220, 30, 40);
-                g.FillEllipse(EyePupil, new RectangleF(pupil.X + pr * 0.45f, pupil.Y + pr * 0.45f,
-                                                       pr * 1.1f, pr * 1.1f));
+                // вспышка в такт — одной полупрозрачной заливкой
+                if (flash > 0.02f)
+                {
+                    EyeFlashBrush.Color = Color.FromArgb((int)(110 * flash), 230, 30, 40);
+                    g.FillEllipse(EyeFlashBrush, ex - rw / 2, ey - rh / 2, rw, rh);
+                }
             }
+            g.InterpolationMode = oldMode;
         }
 
         static void DrawGroundAndRoof(Graphics g, GameWorld w, ViewTransform v)

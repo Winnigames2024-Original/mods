@@ -1,8 +1,8 @@
 {
-  "version": "1.9.4",
+  "version": "1.9.5",
   "exe": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.exe",
   "setup": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH_Setup.exe",
   "apk": "https://raw.githubusercontent.com/Winnigames2024-Original/mods/main/GEO%20DASH/download/GEO_DASH.apk",
-  "notes": "Починено отсечение: блоки у края экрана и пол снова рисуются. Червяк теперь ездит по блокам и проходит их только прорывом по клику.",
+  "notes": "Глаза на фоне запечены в спрайты и пульсируют точно в такт трека (141,3 удара в минуту). Починено отсечение по вертикали, червяк ездит по блокам и проходит их только прорывом.",
   "date": "2026-11-20"
 }

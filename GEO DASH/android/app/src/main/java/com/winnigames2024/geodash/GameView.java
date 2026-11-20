@@ -362,7 +362,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         eyeLine.setStyle(Paint.Style.STROKE);
         eyeLine.setStrokeWidth(Math.max(3f, H * 0.008f));
 
-        double beat = (eng.time % 0.557) / 0.557;
+        // доля такта трека BIKE: 141,3 удара в минуту
+        final double BEAT = 60.0 / 141.3;
+        double beat = (eng.time % BEAT) / BEAT;
         float flash = (float) Math.max(0, 1 - beat * 3);
 
         float px = (float) ((eng.p1.x - eng.camX) * scale() + W / 2.0);
