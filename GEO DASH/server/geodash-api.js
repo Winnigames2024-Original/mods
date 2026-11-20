@@ -1660,10 +1660,38 @@ route('GET', '/api/licence/stats', (req, res) => {
     used: all.filter(r => r.user).length,
     free: all.filter(r => !r.user && !r.revoked).length,
     revoked: all.filter(r => r.revoked).length,
-    orders: Object.keys(db.orders).length,
+    orders: Object.keys(db.orders).filter(k => k !== '__events').length,
     last: all.sort((a, b) => String(b.created).localeCompare(String(a.created)))
              .slice(0, 10).map(r => ({ key: r.key, created: r.created, user: r.user, note: r.note }))
   });
+});
+
+/**
+ * Журнал уведомлений об оплате: последние 30 событий. Нужен, чтобы на странице
+ * настройки ЮMoney было видно, дошло ли уведомление и сошлась ли подпись.
+ */
+route('POST', '/api/licence/payevent', async (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const b = await readBody(req);
+  if (!secretOk(headerText(req, 'x-gd-issue') || b.secret)) return bad(res, 'Неверный ключ админа', 403);
+  const log = db.orders.__events || (db.orders.__events = { order: '__events', list: [] });
+  log.list.push({
+    at: now(),
+    kind: String(b.kind || '').slice(0, 40),
+    order: String(b.order || '').slice(0, 64),
+    sum: Number(b.sum) || 0,
+    sign: String(b.sign || '').slice(0, 20),
+    note: String(b.note || '').slice(0, 200)
+  });
+  while (log.list.length > 30) log.list.shift();
+  save.orders();
+  ok(res, { ok: true });
+});
+
+route('GET', '/api/licence/payevents', (req, res) => {
+  if (!localCall(req)) return bad(res, 'Только с сервера', 403);
+  const log = db.orders.__events;
+  ok(res, { ok: true, events: log ? log.list.slice().reverse() : [] });
 });
 
 /** Записать заказ до оплаты: кто покупает и сколько ключей. */

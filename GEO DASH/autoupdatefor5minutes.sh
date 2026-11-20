@@ -147,13 +147,45 @@ fix_download_location() {
   fi
 }
 
+fix_hidden_files() {
+  local CONF=/etc/nginx/sites-available/geodash
+  [ -f "$CONF" ] || return 0
+
+  # уже закрыты?
+  grep -q 'location ~ /\\\.' "$CONF" && return 0
+  grep -q 'location ~ /\.(git|env)' "$CONF" || return 0
+
+  awk '
+    /location ~ \/\\\.\(git\|env\)/ {
+      print "    location ^~ /.well-known/ { allow all; }";
+      print "    location ~ /\\. { deny all; }";
+      next
+    }
+    { print }
+  ' "$CONF" > "$CONF.new" 2>/dev/null || return 0
+
+  [ -s "$CONF.new" ] || { rm -f "$CONF.new"; return 0; }
+  cp -f "$CONF" "$CONF.bak2"
+  mv -f "$CONF.new" "$CONF"
+
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1 || true
+    log "служебные файлы с точки закрыты от посторонних"
+  else
+    mv -f "$CONF.bak2" "$CONF"
+    log "правка nginx про служебные файлы не подошла, вернул прежний конфиг"
+  fi
+}
+
 if [ "$ONLY_BUILDS" = "--only-builds" ]; then
   fetch_builds
   fix_download_location
+  fix_hidden_files
   exit 0
 fi
 
 fix_download_location
+fix_hidden_files
 
 # заявка с сайта: /api.php?action=updateserver&value=КЛЮЧ
 REQ="$WEB/.update-request"

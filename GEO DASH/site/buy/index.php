@@ -27,6 +27,9 @@ gd_head('Купить ключ', 'account');
     <?php if (!gd_pay_ready()): ?>
       <div class="alert err" style="margin-top:16px">
         Оплата на сайте пока не настроена. Ключ можно получить у <?= h(GD_ADMIN) ?>.
+        <?php if (gd_is_admin()): ?>
+          <br><a href="/admin/yoomoney.php"><b>Настроить ЮMoney →</b></a>
+        <?php endif; ?>
       </div>
     <?php elseif (!$order): ?>
       <div class="alert err" style="margin-top:16px">Сервер игры не отвечает — попробуйте чуть позже.</div>

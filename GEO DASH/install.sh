@@ -166,7 +166,10 @@ server {
         fastcgi_read_timeout 120s;
     }
 
-    location ~ /\.(git|env) { deny all; }
+    # служебные файлы с точки наружу не отдаём: .update-request, .update-log,
+    # .sitever и прочее — исключение только для проверки сертификата
+    location ^~ /.well-known/ { allow all; }
+    location ~ /\. { deny all; }
 }
 NGINX
 

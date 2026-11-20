@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../_inc/api.php';
+require_once __DIR__ . '/../_inc/pay.php';
 gd_login_required();
 if (!gd_is_admin()) { http_response_code(403); gd_head('Админка'); echo '<section class="section"><div class="container"><h2>Только для ' . h(GD_ADMIN) . '</h2></div></section>'; gd_foot(); exit; }
 
@@ -122,6 +123,12 @@ gd_head('Админка', 'admin');
       Ту же выдачу можно получить ссылкой, без входа в админку:
       <code>/api.php?action=getlicencekey&amp;value=key:АДМИНКЛЮЧ;format:json;</code> —
       см. <a href="/admin/docs.php">документацию</a>.
+    </p>
+    <p style="margin-top:6px">
+      <?php $payOk = gd_pay_ready(); ?>
+      <a class="btn small <?= $payOk ? 'ghost' : 'gold' ?>" href="/admin/yoomoney.php">
+        ОПЛАТА ЧЕРЕЗ ЮMONEY<?= $payOk ? '' : ' — НАСТРОИТЬ' ?></a>
+      <span class="muted">продажа ключей на сайте: <b><?= $payOk ? 'включена' : 'выключена' ?></b></span>
     </p>
 
     <?php if ($okK && !empty($lic['licences'])): ?>
