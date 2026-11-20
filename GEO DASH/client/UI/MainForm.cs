@@ -71,7 +71,7 @@ namespace GEO_DASH.UI
             Close();
         }
 
-        GdButton _bEditor, _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync, _bChat, _bIcons;
+        GdButton _bOnline, _bProfile, _bFriends, _bSettings, _bAdmin, _bSaved, _bDaily, _bSync, _bChat, _bIcons;
 
         void BuildUi()
         {
@@ -79,8 +79,6 @@ namespace GEO_DASH.UI
             _play.Click += (s, e) => { Sfx.Play("click"); Open(new PlayMenuForm()); };
             Host(_play);
 
-            _bEditor = Add("EDITOR", GdIcon.Edit, 0, 0, 190, 64, Color.FromArgb(255, 170, 60), Color.FromArgb(180, 90, 10),
-                (s, e) => Open(new EditorMenuForm()), "мои уровни и редактор");
             _bOnline = Add("CREATOR", GdIcon.Online, 0, 0, 190, 64, Color.FromArgb(80, 160, 255), Color.FromArgb(20, 70, 180),
                 (s, e) => Open(new CreatorForm()), "поиск, daily, игроки");
             _bSaved = Add("SAVED", GdIcon.Download, 0, 0, 190, 64, Color.FromArgb(120, 230, 160), Color.FromArgb(30, 130, 80),
@@ -120,12 +118,12 @@ namespace GEO_DASH.UI
             int cx = ClientSize.Width / 2, cy = ClientSize.Height / 2 + (int)(10 * k);
             if (_play != null) _play.Location = new Point(cx - _play.Width / 2, cy - _play.Height / 2 - (int)(10 * k));
 
-            if (_bEditor == null) return;
+            // Редактор живёт в CREATOR — отдельной кнопки в меню больше нет
+            if (_bOnline == null) return;
             int side = (int)(420 * k), right = (int)(230 * k), row = (int)(80 * k);
-            _bEditor.Location = new Point(cx - side, cy - row);
-            _bOnline.Location = new Point(cx - side, cy + 0);
-            _bSaved.Location = new Point(cx + right, cy - row);
-            _bDaily.Location = new Point(cx + right, cy + 0);
+            _bOnline.Location = new Point(cx - side, cy - row);
+            _bSaved.Location = new Point(cx - side, cy + 0);
+            _bDaily.Location = new Point(cx + right, cy - row / 2);
 
             int y = ClientSize.Height - (int)(112 * k);
             int count = 6 + (AppConfig.IsAdminUser ? 1 : 0);

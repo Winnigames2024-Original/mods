@@ -171,6 +171,10 @@ namespace GEO_DASH.UI
             // сам (GdForm.ScaleUi) — отсюда ему и сообщается разметка.
             if (f is GdForm gf && gf.DesignSize.Width == 0) gf.DesignSize = want;
             f.Bounds = new Rectangle(0, 0, host.Width, host.Height);
+
+            // Окно игры слоёное (WS_EX_COMPOSITED): после разворачивания новая
+            // площадь остаётся чёрной, пока её не попросить перерисоваться.
+            try { f.PerformLayout(); f.Invalidate(true); _host.Invalidate(true); } catch { }
         }
     }
 }

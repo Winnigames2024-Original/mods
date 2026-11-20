@@ -45,6 +45,8 @@ namespace GEO_DASH.UI
 
         public GameForm(LevelData level, bool practice = false, bool testMode = false)
         {
+            AppConfig.Trace("уровень открывается: " + (level?.Settings?.Name ?? "без названия")
+                + ", объектов: " + (level?.Objects?.Count ?? 0));
             _level = level;
             _practice = practice;
             _testMode = testMode;
@@ -391,8 +393,11 @@ namespace GEO_DASH.UI
         Point Scene(Point p) =>
             _sceneK == 1 ? p : new Point((int)Math.Round(p.X * _sceneK), (int)Math.Round(p.Y * _sceneK));
 
+        bool _firstFrame = true;
+
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (_firstFrame) { _firstFrame = false; AppConfig.Trace("первый кадр уровня нарисован"); }
             var size = View;
             _sceneK = size.Height / (double)Math.Max(1, ClientSize.Height);
 

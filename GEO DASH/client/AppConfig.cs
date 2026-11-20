@@ -95,6 +95,20 @@ namespace GEO_DASH
             }
         }
 
+        /// <summary>
+        /// Короткая запись в crash.log: по ней видно, до какого места дошла
+        /// игра, если она вылетела без всякой ошибки.
+        /// </summary>
+        public static void Trace(string what)
+        {
+            try
+            {
+                File.AppendAllText(Path.Combine(DataDir, "crash.log"),
+                    $"[{DateTime.Now:s}] {what}\n");
+            }
+            catch { }
+        }
+
         public static string LevelsDir => Ensure(Path.Combine(DataDir, "levels"));
         public static string SavedDir => Ensure(Path.Combine(DataDir, "saved"));
         public static string CacheDir => Ensure(Path.Combine(DataDir, "cache"));

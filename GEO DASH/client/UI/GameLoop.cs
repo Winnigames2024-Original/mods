@@ -75,7 +75,13 @@ namespace GEO_DASH.UI
         {
             if (!Running) return;
             var c = _owner;
-            if (c == null || c.IsDisposed || !c.IsHandleCreated) { Pump(); return; }
+            if (c == null) { Pump(); return; }     // цикл без окна — считаем на месте
+
+            // Пока окно не готово, такт пропускаем. Раньше в этом случае шаг
+            // физики и отрисовка выполнялись прямо в потоке таймера — заодно
+            // с потоком интерфейса, и игра могла вылететь без всякой ошибки
+            // при открытии уровня.
+            if (c.IsDisposed || !c.IsHandleCreated) return;
             try { c.BeginInvoke(new Action(Pump)); } catch { }
         }
 

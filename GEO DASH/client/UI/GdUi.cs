@@ -687,7 +687,7 @@ namespace GEO_DASH.UI
             finally { _scaling = false; }
 
             OnUiScaled();
-            Content.Invalidate();
+            Content.Invalidate(true);
         }
 
         /// <summary>Экран может доразместить что-то своё после масштабирования.</summary>

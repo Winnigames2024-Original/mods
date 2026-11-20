@@ -40,6 +40,9 @@ namespace GEO_DASH.UI
 
         PointF _dragStart, _lastMouse;
         bool _panning, _movingSel, _boxSelect;
+        /// <summary>Где нажали в режиме BUILD: объект ставится на отпускании, если мышь не ехала.</summary>
+        Point _buildPress;
+        bool _buildClick;
         RectangleF _selBox;
 
         /// <summary>Свайп-выделение: ведёшь мышью/пальцем — всё под курсором выделяется.</summary>
@@ -792,7 +795,11 @@ namespace GEO_DASH.UI
             switch (_mode)
             {
                 case Mode.Build:
-                    PlaceObject(WorldOf(e.Location));   // один клик — один объект
+                    // Объект ставится не здесь, а на отпускании: иначе то же
+                    // самое нажатие, которым тащат камеру, успевало положить
+                    // блок под курсор.
+                    _buildPress = e.Location;
+                    _buildClick = true;
                     break;
 
                 case Mode.Edit:
@@ -894,6 +901,11 @@ namespace GEO_DASH.UI
             // в режиме BUILD перетаскивание двигает вид, а не ставит объекты
             if (_mode == Mode.Build && e.Button == MouseButtons.Left)
             {
+                // уехали дальше пары пикселей — это перетаскивание, а не клик
+                if (_buildClick &&
+                    (Math.Abs(e.X - _buildPress.X) > 4 || Math.Abs(e.Y - _buildPress.Y) > 4))
+                    _buildClick = false;
+
                 float sc = _v.Scale;
                 _camX -= (e.X - _lastMouse.X) / sc;
                 _camY += (e.Y - _lastMouse.Y) / sc;
@@ -904,6 +916,13 @@ namespace GEO_DASH.UI
 
         void CanvasUp(object s, MouseEventArgs e)
         {
+            if (_buildClick)
+            {
+                _buildClick = false;
+                if (e.Button == MouseButtons.Left && _mode == Mode.Build)
+                    PlaceObject(WorldOf(_buildPress));   // один клик — один объект
+            }
+
             if (_swiping)
             {
                 _swiping = false;
