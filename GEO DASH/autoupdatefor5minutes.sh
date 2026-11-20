@@ -29,19 +29,34 @@ fetch_builds() {
   local changed_build=0
 
   if [ -d "$SRC/.git" ]; then
-    # autoupdate.exe — та же программа, что и установщик, просто под другим именем
-    if [ -f "$SRC/$SUBDIR/download/GEO_DASH_Setup.exe" ]; then
-      cp -f "$SRC/$SUBDIR/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"
-    fi
     for f in GEO_DASH.exe GEO_DASH.apk GEO_DASH_Setup.exe; do
-      if [ -f "$SRC/$SUBDIR/download/$f" ]; then
-        if ! cmp -s "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"; then
-          cp -f "$SRC/$SUBDIR/download/$f" "$WEB/download/$f"
-          log "$f обновлён ($(du -h "$WEB/download/$f" | cut -f1))"
-          changed_build=1
-        fi
+      src="$SRC/$SUBDIR/download/$f"
+      dst="$WEB/download/$f"
+      [ -f "$src" ] || continue
+      cmp -s "$src" "$dst" && continue
+
+      # места должно хватить: файл весит до 70 МБ, иначе получится обрезок
+      need=$(( $(stat -c%s "$src" 2>/dev/null || echo 0) / 1024 + 20480 ))
+      free=$(df -Pk "$WEB/download" | awk 'NR==2{print $4}')
+      if [ -n "$free" ] && [ "$free" -lt "$need" ]; then
+        log "мало места на диске: нужно ${need}К, свободно ${free}К — $f не обновляю"
+        continue
       fi
+
+      cp -f "$src" "$dst.part" && mv -f "$dst.part" "$dst" || { rm -f "$dst.part"; continue; }
+      log "$f обновлён ($(du -h "$dst" | cut -f1))"
+      changed_build=1
     done
+
+    # autoupdate.exe — та же программа, что установщик. Делаем жёсткую ссылку,
+    # чтобы не держать на диске вторую копию в 70 МБ.
+    if [ -f "$WEB/download/GEO_DASH_Setup.exe" ]; then
+      if ! cmp -s "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"; then
+        rm -f "$WEB/download/autoupdate.exe"
+        ln -f "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe" 2>/dev/null \
+          || cp -f "$WEB/download/GEO_DASH_Setup.exe" "$WEB/download/autoupdate.exe"
+      fi
+    fi
   fi
 
   # запасной путь: если репозиторий ещё не скачан — тянем напрямую с raw.githubusercontent
