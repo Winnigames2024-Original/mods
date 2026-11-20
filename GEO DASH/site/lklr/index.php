@@ -14,6 +14,14 @@
 require_once __DIR__ . '/../_inc/api.php';
 require_once __DIR__ . '/../_inc/pay.php';
 
+// Если этот адрес вписали в «Redirect URI» приложения ЮMoney, сюда придёт код
+// авторизации. Не теряем его: отправляем на страницу подключения приложения.
+if (isset($_GET['code']) || (isset($_GET['error']) && !isset($_GET['value']))) {
+    $q = http_build_query(array_intersect_key($_GET, ['code' => 1, 'error' => 1]));
+    header('Location: /admin/ymauth.php?' . $q, true, 302);
+    exit;
+}
+
 $action = strtolower((string)($_GET['action'] ?? 'givelicense'));
 $token  = preg_replace('/[^0-9a-f]/', '', (string)($_GET['value'] ?? $_POST['value'] ?? ''));
 $good   = strlen($token) === 32 && $action === 'givelicense';

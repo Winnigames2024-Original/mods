@@ -537,12 +537,17 @@ function gd_ym_notify_url(string $host = ''): string {
 
 /** Обменять временный код на постоянный токен. */
 function gd_ym_token_from_code(string $code, string $host = ''): array {
+    return gd_ym_token_from_code_at($code, gd_ym_redirect($host));
+}
+
+/** То же, но с заданным redirect_uri: ЮMoney сверяет его побайтно. */
+function gd_ym_token_from_code_at(string $code, string $redirect): array {
     $c = gd_pay_conf();
     $post = [
         'code' => $code,
         'client_id' => (string)$c['clientId'],
         'grant_type' => 'authorization_code',
-        'redirect_uri' => gd_ym_redirect($host),
+        'redirect_uri' => $redirect,
     ];
     if (!empty($c['clientSecret'])) $post['client_secret'] = (string)$c['clientSecret'];
 
