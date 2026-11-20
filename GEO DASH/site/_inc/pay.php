@@ -485,6 +485,140 @@ function gd_kassa_notify(string $raw, string $ip): array {
     return ['ok' => true, 'note' => 'Ключ выдан'];
 }
 
+// ------------------------------------- приложение ЮMoney (проверка оплаты)
+//
+// Приложение, зарегистрированное на yoomoney.ru/myservices/new, даёт доступ к
+// API кошелька. Нам от него нужно одно право — operation-history: по нему сайт
+// сам спрашивает у ЮMoney, пришёл ли платёж с меткой нашего заказа. Тогда ключ
+// выдаётся, даже если уведомление не дошло.
+
+define('GD_YM_SCOPE', 'account-info operation-history');
+define('GD_YM_HOST', getenv('GEODASH_YM_HOST') ?: 'https://yoomoney.ru');
+
+function gd_ym_ready(): bool {
+    $c = gd_pay_conf();
+    return !empty($c['clientId']) && !empty($c['ymToken']);
+}
+
+/** Адрес, который нужно вписать в «Redirect URI» при регистрации приложения. */
+function gd_ym_redirect(string $host = ''): string {
+    $host = $host ?: ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru');
+    return 'https://' . $host . '/admin/ymauth.php';
+}
+
+/** Адрес для «Notification URI» — без параметров, их ЮMoney не принимает. */
+function gd_ym_notify_url(string $host = ''): string {
+    $host = $host ?: ($_SERVER['HTTP_HOST'] ?? 'geodash.winnigames2024.ru');
+    return 'https://' . $host . '/pay/yoomoney.php';
+}
+
+/** Обменять временный код на постоянный токен. */
+function gd_ym_token_from_code(string $code, string $host = ''): array {
+    $c = gd_pay_conf();
+    $post = [
+        'code' => $code,
+        'client_id' => (string)$c['clientId'],
+        'grant_type' => 'authorization_code',
+        'redirect_uri' => gd_ym_redirect($host),
+    ];
+    if (!empty($c['clientSecret'])) $post['client_secret'] = (string)$c['clientSecret'];
+
+    $ch = curl_init(GD_YM_HOST . '/oauth/token');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($post),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_TIMEOUT => 25,
+    ]);
+    $raw = curl_exec($ch);
+    curl_close($ch);
+    $j = json_decode((string)$raw, true);
+    if (!is_array($j)) return [false, 'ЮMoney не ответила'];
+    if (!empty($j['access_token'])) return [true, (string)$j['access_token']];
+    return [false, 'ЮMoney отказала: ' . (string)($j['error'] ?? 'неизвестно')];
+}
+
+/** Запрос к API кошелька. Токен уходит только заголовком, как требует ЮMoney. */
+function gd_ym_api(string $path, array $params = []): array {
+    $c = gd_pay_conf();
+    if (empty($c['ymToken'])) return [false, ['error' => 'Приложение не подключено']];
+    $ch = curl_init(GD_YM_HOST . '/api/' . ltrim($path, '/'));
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($params),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $c['ymToken'],
+            'Content-Type: application/x-www-form-urlencoded',
+        ],
+        CURLOPT_TIMEOUT => 25,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $j = json_decode((string)$raw, true);
+    if ($code === 401) return [false, ['error' => 'Токен больше не действует — подключите приложение заново']];
+    if (!is_array($j)) return [false, ['error' => 'ЮMoney не ответила']];
+    return [$code >= 200 && $code < 300, $j];
+}
+
+/**
+ * Нашёлся ли успешный приход с меткой заказа.
+ * Возвращает [платёж|null, текст ошибки]: ошибку ЮMoney важно показать,
+ * иначе протухший токен выглядит как «оплаты нет».
+ */
+function gd_ym_find_payment(string $label): array {
+    [$ok, $r] = gd_ym_api('operation-history', [
+        'type' => 'deposition', 'label' => $label, 'records' => 10,
+    ]);
+    if (!$ok) return [null, (string)($r['error'] ?? 'ЮMoney не ответила')];
+    if (empty($r['operations'])) return [null, ''];
+    foreach ((array)$r['operations'] as $op) {
+        if (($op['direction'] ?? '') !== 'in') continue;
+        if (($op['status'] ?? '') !== 'success') continue;
+        if ((string)($op['label'] ?? '') !== $label) continue;
+        return [['amount' => (float)($op['amount'] ?? 0), 'id' => (string)($op['operation_id'] ?? '')], ''];
+    }
+    return [null, ''];
+}
+
+/**
+ * Спросить у ЮMoney напрямую, оплачен ли заказ, и выдать ключи, если да.
+ * Нужна, когда уведомление не дошло — например кошелёк его не отправил.
+ */
+function gd_pay_poll(string $order): array {
+    if (!preg_match('/^gd[0-9a-f]{16}$/', $order)) return [false, 'Неверный номер заказа'];
+    if (!gd_ym_ready()) return [false, 'Приложение ЮMoney не подключено'];
+
+    [$found, $info] = gd_pay_order($order);
+    $o = $found ? ($info['order'] ?? null) : null;
+    if (!$o) return [false, 'Заказ не найден'];
+    if (!empty($o['keys'])) return [true, 'Ключи по этому заказу уже выданы'];
+
+    [$pay, $why] = gd_ym_find_payment($order);
+    if (!$pay) return [false, $why !== '' ? $why : 'ЮMoney пока не видит оплату по этому заказу'];
+
+    $count = max(1, (int)($o['count'] ?? 1));
+    if ($pay['amount'] + 0.01 < gd_pay_price() * $count * 0.9) {
+        gd_pay_event('недоплата', ['order' => $order, 'sum' => $pay['amount'], 'sign' => 'проверка',
+            'note' => 'найдено в истории операций']);
+        return [false, 'Платёж найден, но сумма меньше цены'];
+    }
+
+    gd_pay_issue([
+        'count' => $count,
+        'note'  => 'ЮMoney ' . $pay['id'] . ' (проверка по истории)',
+        'price' => gd_pay_price(),
+        'order' => $order,
+        'buyer' => (string)($o['buyer'] ?? ''),
+        'by'    => 'yoomoney-api',
+    ]);
+    gd_pay_event('ключ выдан', ['order' => $order, 'sum' => $pay['amount'], 'sign' => 'проверка',
+        'note' => 'уведомление не дошло, нашли сами по истории операций']);
+    return [true, 'Оплата найдена — ключи выданы'];
+}
+
 /** Куда отправляется форма кошелька ЮMoney. */
 function gd_pay_action(): string { return 'https://yoomoney.ru/quickpay/confirm.xml'; }
 

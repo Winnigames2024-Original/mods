@@ -44,6 +44,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $failed = 'Номер кошелька — 16 цифр, обычно начинается на 4100';
     }
 
+    if ($act === 'app') {
+        $patch['clientId'] = trim((string)($_POST['clientId'] ?? ''));
+        $cs = trim((string)($_POST['clientSecret'] ?? ''));
+        if ($cs !== '') $patch['clientSecret'] = $cs;
+    }
+    if ($act === 'offapp') { $patch = ['clientId' => null, 'clientSecret' => null, 'ymToken' => null]; }
+
+    if ($act === 'checkorder') {
+        [$pok, $ptext] = gd_pay_poll(trim((string)($_POST['order'] ?? '')));
+        if ($pok) $saved = $ptext; else $failed = $ptext;
+    }
+
     if ($act === 'offkassa') { $patch = ['shopId' => null, 'secretKey' => null]; }
     if ($act === 'offmoney') { $patch = ['receiver' => null, 'secret' => null]; }
 
@@ -52,6 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ok) $saved = match ($act) {
             'offkassa' => 'Приём через ЮKassa выключен',
             'offmoney' => 'Приём через кошелёк выключен',
+            'offapp'   => 'Приложение ЮMoney отключено',
+            'app'      => 'Данные приложения сохранены — теперь нажмите «Разрешить доступ»',
             default    => 'Настройки сохранены и уже работают',
         };
         else $failed = (string)($r['error'] ?? 'Сервер игры не отвечает — настройки не сохранены');
@@ -358,6 +372,85 @@ chmod 640 /etc/geodash/pay.json</div>
         <span class="muted">что сохранено через «Применить», важнее файла</span>
       </p>
     </details>
+  </div>
+
+  <!-- приложение -->
+  <div class="step <?= gd_ym_ready() ? 'done' : '' ?>" style="border-color:<?= gd_ym_ready() ? '#1d6' : '#4af' ?>">
+    <h3>Необязательно: приложение ЮMoney <?= gd_ym_ready()
+        ? '<span class="badge" style="background:#1d6;color:#042">подключено</span>'
+        : '<span class="badge" style="background:#456">не подключено</span>' ?></h3>
+    <p>Приложение даёт сайту доступ к API кошелька. Нужно оно ровно для одного:
+      сайт сам спрашивает у ЮMoney, пришёл ли платёж с меткой заказа — и выдаёт ключ,
+      даже если уведомление не дошло. Без приложения всё тоже работает, просто
+      на уведомления остаётся надежда.</p>
+
+    <p><b>1.</b> Откройте
+      <a href="https://yoomoney.ru/myservices/new" target="_blank" rel="noopener">yoomoney.ru/myservices/new</a>
+      и заполните так:</p>
+    <table class="lv">
+      <tr><th>Поле</th><th>Что вписать</th></tr>
+      <tr><td>Название для пользователей</td><td><code>GEO DASH</code></td></tr>
+      <tr><td>Адрес сайта</td><td><code id="ymSite">https://<?= h($host) ?></code></td></tr>
+      <tr><td>Почта для связи</td><td>ваша почта</td></tr>
+      <tr><td>Redirect URI</td><td><code id="ymRedir"><?= h(gd_ym_redirect($host)) ?></code>
+        <button class="btn small ghost ym-copy" data-copy="ymRedir" type="button">Скопировать</button></td></tr>
+      <tr><td>Notification URI</td><td><code id="ymNotif"><?= h(gd_ym_notify_url($host)) ?></code>
+        <button class="btn small ghost ym-copy" data-copy="ymNotif" type="button">Скопировать</button></td></tr>
+      <tr><td>Проверять подлинность (client_secret)</td>
+          <td>поставьте галочку — так надёжнее, ЮMoney выдаст ещё и секрет</td></tr>
+    </table>
+    <p class="muted">Redirect URI должен совпадать знак в знак — ЮMoney сверяет его побайтно.
+      Notification URI без «?» и параметров, поэтому адрес у него свой, короткий; старый
+      <code>/api.php?action=yoomoney</code> тоже продолжает работать.</p>
+
+    <p><b>2.</b> Впишите сюда то, что выдала ЮMoney после регистрации:</p>
+    <form class="form" method="post">
+      <input type="hidden" name="act" value="app">
+      <div class="grid c2" style="gap:16px">
+        <div>
+          <label>client_id</label>
+          <input type="text" name="clientId" value="<?= h((string)($conf['clientId'] ?? '')) ?>"
+                 autocomplete="off" placeholder="выдаётся при регистрации">
+        </div>
+        <div>
+          <label>client_secret</label>
+          <input type="password" name="clientSecret" autocomplete="new-password"
+                 placeholder="<?= !empty($conf['clientSecret']) ? 'сохранён — оставьте пустым' : 'если включали галочку' ?>">
+        </div>
+      </div>
+      <p style="margin-top:18px">
+        <button class="btn green" type="submit">СОХРАНИТЬ</button>
+        <?php if (!empty($conf['clientId']) || gd_ym_ready()): ?>
+          <button class="btn small ghost" type="submit" name="act" value="offapp" formnovalidate>Отключить приложение</button>
+        <?php endif; ?>
+      </p>
+    </form>
+
+    <?php if (!empty($conf['clientId'])): ?>
+      <p style="margin-top:16px"><b>3.</b> Разрешите приложению читать историю вашего кошелька —
+        откроется страница ЮMoney, там нужно нажать «Разрешить»:</p>
+      <form method="POST" action="https://yoomoney.ru/oauth/authorize" target="_blank">
+        <input type="hidden" name="client_id" value="<?= h((string)$conf['clientId']) ?>">
+        <input type="hidden" name="response_type" value="code">
+        <input type="hidden" name="redirect_uri" value="<?= h(gd_ym_redirect($host)) ?>">
+        <input type="hidden" name="scope" value="<?= h(GD_YM_SCOPE) ?>">
+        <button class="btn gold" type="submit"><?= gd_ym_ready() ? 'ПОДКЛЮЧИТЬ ЗАНОВО' : 'РАЗРЕШИТЬ ДОСТУП' ?></button>
+      </form>
+      <p class="muted" style="margin-top:10px">Запрашиваем два права: <code>account-info</code> и
+        <code>operation-history</code> — только чтение. Ни переводов, ни списаний приложение делать не может.</p>
+    <?php endif; ?>
+
+    <?php if (gd_ym_ready()): ?>
+      <form method="post" style="margin-top:14px">
+        <input type="hidden" name="act" value="checkorder">
+        <label>Проверить заказ вручную</label>
+        <div class="flex" style="gap:8px;flex-wrap:wrap">
+          <input type="text" name="order" placeholder="gd…" style="max-width:280px"
+                 value="<?= h((string)($_POST['order'] ?? '')) ?>">
+          <button class="btn small" type="submit">СПРОСИТЬ У ЮMONEY</button>
+        </div>
+      </form>
+    <?php endif; ?>
   </div>
 
   <!-- 4 -->

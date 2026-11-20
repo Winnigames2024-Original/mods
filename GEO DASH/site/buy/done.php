@@ -38,6 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $good) {
 
 $keys = []; $found = false; $buyer = ''; $paid = false;
 if ($good) {
+    // уведомление могло не дойти — спросим у ЮMoney напрямую, если можем
+    [$fok, $finfo] = gd_pay_order($order);
+    $pending = $fok && !empty($finfo['order']) && empty($finfo['order']['keys']);
+    if ($pending && gd_ym_ready()) gd_pay_poll($order);
+
     [$ok, $info] = gd_pay_order($order);
     $o = $ok ? ($info['order'] ?? null) : null;
     $found = (bool)$o;
@@ -80,7 +85,7 @@ gd_head('Оплата', 'keys');
   <h2>Оплата обрабатывается</h2>
   <div class="card">
     <p>Платёжная система ещё не подтвердила оплату. Обычно это занимает несколько секунд —
-      страница обновится сама.</p>
+      страница обновится сама<?= gd_ym_ready() ? ' и заодно спросит у ЮMoney напрямую' : '' ?>.</p>
     <p class="muted">Номер заказа: <code><?= h($order) ?></code></p>
     <meta http-equiv="refresh" content="7">
   </div>

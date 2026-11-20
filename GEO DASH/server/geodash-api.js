@@ -1739,7 +1739,8 @@ function paySave(obj) {
 }
 
 /** Поля, которые админка вправе менять. */
-const PAY_FIELDS = ['shopId', 'secretKey', 'receiver', 'secret', 'price', 'vatCode', 'askEmail', 'currency'];
+const PAY_FIELDS = ['shopId', 'secretKey', 'receiver', 'secret', 'price', 'vatCode', 'askEmail',
+                    'currency', 'clientId', 'clientSecret', 'ymToken'];
 
 route('GET', '/api/licence/payconf', (req, res) => {
   if (!localCall(req)) return bad(res, 'Только с сервера', 403);
