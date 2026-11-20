@@ -92,6 +92,32 @@ public abstract class GdActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
+    /**
+     * Падение на телефоне: отчёт уходит админу (виден в админке на сайте),
+     * после чего приложение закрывается как обычно.
+     */
+    private static boolean crashHooked = false;
+
+    private void catchCrashes() {
+        if (crashHooked) return;
+        crashHooked = true;
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try {
+                java.io.StringWriter w = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(w));
+                final String text = w.toString();
+                Thread send = new Thread(() -> Api.report("вылет", text, stage));
+                send.start();
+                send.join(2500);           // ждём недолго: отчёт важен, но не ценой зависания
+            } catch (Throwable ignored) { }
+            if (prev != null) prev.uncaughtException(t, e);
+        });
+    }
+
+    /** Что приложение делает прямо сейчас — попадает в отчёт. */
+    public static volatile String stage = "запуск";
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -100,6 +126,7 @@ public abstract class GdActivity extends Activity {
         unlockHighRefresh();
         edgeToEdge();
         Store.init(this);
+        catchCrashes();
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Gd.BG_BLUE);

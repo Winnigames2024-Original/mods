@@ -157,6 +157,33 @@ public class Api {
         } catch (Exception e) { return null; }
     }
 
+    /**
+     * Подобрать ключ по логину и паролю: сервер ищет среди ключей аккаунта
+     * тот, у которого свободно место для этого телефона.
+     */
+    public static JSONObject licencePick(String name, String pass, String device) {
+        try {
+            JSONObject b = new JSONObject()
+                    .put("name", name).put("pass", pass)
+                    .put("platform", "android").put("device", device);
+            String s = rawPostAny("/api/licence/pick", b.toString());
+            if (s == null) return null;
+            return new JSONObject(s);
+        } catch (Exception e) { return null; }
+    }
+
+    /** Молча рассказать админу об ошибке: отчёт виден в админке на сайте. */
+    public static void report(String kind, String text, String stage) {
+        try {
+            JSONObject b = new JSONObject()
+                    .put("kind", kind).put("text", text).put("stage", stage)
+                    .put("platform", "android")
+                    .put("version", Store.appVersion())
+                    .put("user", Store.user());
+            rawPostAny("/api/report", b.toString());
+        } catch (Exception ignored) { }
+    }
+
     public static JSONArray levels(String q, String sort, int diff) {
         String path = "/api/levels?q=" + enc(q) + "&sort=" + enc(sort) + "&diff=" + diff;
         String s = cachedGet(path, "levels_" + sort + "_" + diff + "_" + q);

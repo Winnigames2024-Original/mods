@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 namespace GEO_DASH
@@ -107,6 +108,62 @@ namespace GEO_DASH
                     $"[{DateTime.Now:s}] {what}\n");
             }
             catch { }
+        }
+
+        // ---- чёрный ящик ----
+        // Жёсткий вылет (не исключение, а падение процесса) не даёт ничего
+        // записать: обработчики уже не выполняются. Поэтому текущий этап
+        // лежит в файле, отображённом в память: запись туда почти бесплатна,
+        // а содержимое остаётся на диске, даже если процесс убит.
+
+        static System.IO.MemoryMappedFiles.MemoryMappedViewAccessor _stage;
+        static string _stageLast = "";
+
+        static void StageOpen()
+        {
+            if (_stage != null) return;
+            try
+            {
+                var path = Path.Combine(DataDir, "stage.bin");
+                var bytes = File.Exists(path) ? File.ReadAllBytes(path) : Array.Empty<byte>();
+                _stageLast = bytes.Length > 1
+                    ? Encoding.UTF8.GetString(bytes).TrimEnd('\0').Trim()
+                    : "";
+
+                var mmf = System.IO.MemoryMappedFiles.MemoryMappedFile.CreateFromFile(
+                    path, FileMode.Create, null, 256);
+                _stage = mmf.CreateViewAccessor(0, 256);
+            }
+            catch { }
+        }
+
+        /// <summary>Что игра делает прямо сейчас — переживает даже жёсткий вылет.</summary>
+        public static void Stage(string what)
+        {
+            StageOpen();
+            if (_stage == null) return;
+            try
+            {
+                var b = new byte[256];
+                var t = Encoding.UTF8.GetBytes(what ?? "");
+                Array.Copy(t, b, Math.Min(t.Length, 255));
+                _stage.WriteArray(0, b, 0, 256);
+            }
+            catch { }
+        }
+
+        /// <summary>Чем игра была занята перед прошлым вылетом (пусто — вышли штатно).</summary>
+        public static string LastStage()
+        {
+            StageOpen();
+            return _stageLast;
+        }
+
+        /// <summary>Штатный выход: чёрный ящик чистим, чтобы не слать ложных отчётов.</summary>
+        public static void StageClear()
+        {
+            Stage("");
+            try { _stage?.Flush(); } catch { }
         }
 
         public static string LevelsDir => Ensure(Path.Combine(DataDir, "levels"));

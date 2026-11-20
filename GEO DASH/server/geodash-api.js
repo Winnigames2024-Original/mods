@@ -70,7 +70,8 @@ const db = {
   comments: loadJson('comments.json', {}),
   chats: loadJson('chats.json', {}),
   licences: loadJson('licences.json', {}),
-  orders: loadJson('orders.json', {})
+  orders: loadJson('orders.json', {}),
+  reports: loadJson('reports.json', [])
 };
 
 const save = {
@@ -83,7 +84,8 @@ const save = {
   comments: () => saveJson('comments.json', db.comments),
   chats: () => saveJson('chats.json', db.chats),
   licences: () => saveJson('licences.json', db.licences),
-  orders: () => saveJson('orders.json', db.orders)
+  orders: () => saveJson('orders.json', db.orders),
+  reports: () => saveJson('reports.json', db.reports)
 };
 
 // ------------------------------------------------------------------ утилиты
@@ -1819,6 +1821,117 @@ route('POST', '/api/licence/validate', async (req, res) => {
   if (r.user) return ok(res, { ok: true, state: 'used', usable: true,
     text: 'Ключ уже активирован — в игре войдите под тем же аккаунтом' });
   ok(res, { ok: true, state: 'free', usable: true, text: 'Ключ годен' });
+});
+
+/**
+ * Подобрать ключ для устройства по аккаунту.
+ *
+ * Установщик (и диалог на телефоне) умеет не спрашивать ключ, а спросить
+ * логин с паролем: сервер сам находит среди ключей аккаунта тот, у которого
+ * свободно место для этой платформы, и отдаёт его — игроку остаётся нажать
+ * «Далее». Если свободного нет, приходит понятный текст, а не пустота.
+ *
+ * Принимает либо токен в заголовке, либо name + pass.
+ */
+/**
+ * Отчёт об ошибке из игры. Шлёт сама игра, когда вылетает: админ видит
+ * их в панели и понимает, на чём падает, не дожидаясь письма от игрока.
+ */
+const reportHits = new Map();
+route('POST', '/api/report', async (req, res) => {
+  const ip = String(req.socket.remoteAddress || '');
+  const t = Date.now();
+  const hits = (reportHits.get(ip) || []).filter(x => t - x < 600000);
+  if (hits.length > 20) return bad(res, 'Слишком много отчётов', 429);
+  hits.push(t);
+  reportHits.set(ip, hits);
+  if (reportHits.size > 3000) reportHits.clear();
+
+  const b = await readBody(req);
+  const u = userOf(req);
+  const rec = {
+    id: 'r' + t.toString(36) + Math.random().toString(36).slice(2, 6),
+    at: now(),
+    user: u ? u.name : String(b.user || '').slice(0, 40),
+    kind: String(b.kind || 'вылет').slice(0, 40),
+    platform: String(b.platform || '').slice(0, 20),
+    version: String(b.version || '').slice(0, 20),
+    stage: String(b.stage || '').slice(0, 200),
+    text: String(b.text || '').slice(0, 4000),
+    seen: false
+  };
+  db.reports.unshift(rec);
+  if (db.reports.length > 500) db.reports.length = 500;
+  save.reports();
+  ok(res, { ok: true, id: rec.id });
+});
+
+route('GET', '/api/admin/reports', (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  if (!u.admin) return bad(res, 'Только для админа', 403);
+  ok(res, { ok: true, reports: db.reports.slice(0, 200), total: db.reports.length,
+            fresh: db.reports.filter(r => !r.seen).length });
+});
+
+route('POST', '/api/admin/reports/seen', async (req, res) => {
+  const u = requireUser(req, res); if (!u) return;
+  if (!u.admin) return bad(res, 'Только для админа', 403);
+  const b = await readBody(req);
+  if (b.clear) db.reports = [];
+  else db.reports.forEach(r => { r.seen = true; });
+  save.reports();
+  ok(res, { ok: true, total: db.reports.length });
+});
+
+route('POST', '/api/licence/pick', async (req, res) => {
+  const b = await readBody(req);
+  const platform = String(b.platform || '') === 'android' ? 'android' : 'pc';
+  const device = String(b.device || '').slice(0, 80);
+  const where = platform === 'android' ? 'телефона' : 'компьютера';
+
+  let u = userOf(req);
+  if (!u) {
+    u = db.users[key(b.name)];
+    if (!u) return bad(res, 'Игрок не найден');
+    if (u.pass !== hash(String(b.pass || ''), u.salt)) return bad(res, 'Неверный пароль');
+    if (u.banned) return bad(res, 'Аккаунт заблокирован', 403);
+  }
+
+  const field = platform === 'android' ? 'androidDevice' : 'pcDevice';
+  const mine = Object.values(db.licences).filter(r =>
+    key(r.user || '') === key(u.name) || key(r.buyer || '') === key(u.name));
+
+  // годится ключ, который работает и у которого место под эту платформу
+  // либо свободно, либо уже занято этим же устройством
+  const free = mine.filter(r => {
+    if (r.revoked || r.off) return false;
+    if (device && (r.banned || []).includes(device)) return false;
+    const has = r[field] || '';
+    return !has || (device && has === device);
+  });
+
+  // сначала тот, что уже привязан к этому устройству, потом свой, потом любой
+  free.sort((a, c) => {
+    const an = (a[field] || '') === device ? 0 : 1;
+    const cn = (c[field] || '') === device ? 0 : 1;
+    if (an !== cn) return an - cn;
+    const am = key(a.user || '') === key(u.name) ? 0 : 1;
+    const cm = key(c.user || '') === key(u.name) ? 0 : 1;
+    return am - cm;
+  });
+
+  if (!free.length) {
+    const any = mine.length;
+    return ok(res, {
+      ok: false,
+      account: u.name,
+      error: any
+        ? 'Свободный ключ для ' + where + ' не найден — все ваши ключи уже заняты другим устройством или отключены'
+        : 'Свободный ключ для ' + where + ' не найден — на этом аккаунте ключей нет, купите его на сайте'
+    });
+  }
+
+  ok(res, { ok: true, account: u.name, key: free[0].key, taken: !!free[0][field] });
 });
 
 route('POST', '/api/licence/activate', async (req, res) => {

@@ -470,5 +470,20 @@ namespace GEO_DASH.Net
         public static Task<ApiReply<LicenceMineDto>> LicenceActivateAsync(string key, string device, string platform) =>
             PostAsync<LicenceMineDto>("/api/licence/activate", new { key, device, platform });
 
+        /// <summary>
+        /// Отчёт об ошибке: игра сама рассказывает админу, на чём вылетела.
+        /// Отправляется молча — игроку ничего делать не нужно.
+        /// </summary>
+        public static Task<ApiReply<OkDto>> ReportAsync(string kind, string text, string stage) =>
+            PostAsync<OkDto>("/api/report", new
+            {
+                kind,
+                text,
+                stage,
+                platform = "pc",
+                version = Application.ProductVersion.Split('+')[0],
+                user = AppConfig.Settings.UserName
+            });
+
     }
 }

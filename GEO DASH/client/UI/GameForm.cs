@@ -398,6 +398,7 @@ namespace GEO_DASH.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             if (_firstFrame) { _firstFrame = false; AppConfig.Trace("первый кадр уровня нарисован"); }
+            AppConfig.Stage("кадр: подготовка");
             var size = View;
             _sceneK = size.Height / (double)Math.Max(1, ClientSize.Height);
 
@@ -422,6 +423,8 @@ namespace GEO_DASH.UI
         /// <summary>Нарисовать кадр целиком в заданную поверхность.</summary>
         void PaintScene(Graphics g, Size size)
         {
+            AppConfig.Stage("кадр: " + size.Width + "x" + size.Height
+                + (_w != null && _w.Fx.AnyPost ? ", экранные эффекты" : ""));
             _v.Client = size;
             _v.CamX = _w.Cam.CamX + _w.GameplayOffsetX;
             _v.CamY = _w.Cam.CamY + _w.GameplayOffsetY;
@@ -429,7 +432,9 @@ namespace GEO_DASH.UI
 
             if (_w.Fx.AnyPost) DrawWithFx(g);
             else Renderer.Draw(g, _w, _v, false);
+            AppConfig.Stage("кадр: другие игроки");
             DrawOthers(g);
+            AppConfig.Stage("кадр: интерфейс");
             DrawHud(g);
             if (_paused) DrawPause(g);
             if (_w.Dead) DrawDeath(g);
@@ -439,6 +444,7 @@ namespace GEO_DASH.UI
         /// <summary>Экранные эффекты 2.2: сначала рисуем мир в картинку, потом портим её как надо.</summary>
         void DrawWithFx(Graphics g)
         {
+            AppConfig.Stage("эффекты: подготовка картинки");
             int w = Math.Max(1, View.Width), h = Math.Max(1, View.Height);
             if (_buf == null || _buf.Width != w || _buf.Height != h)
             {
@@ -454,6 +460,7 @@ namespace GEO_DASH.UI
 
             var fx = _w.Fx;
             Image img = _buf;
+            AppConfig.Stage("эффекты: " + fx.Describe());
 
             // крупные пиксели
             if (fx.Pixelate.On)

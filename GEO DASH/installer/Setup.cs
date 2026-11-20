@@ -241,6 +241,68 @@ namespace GeoDashSetup
             }
         }
 
+        /// <summary>
+        /// Тот же отпечаток устройства, что считает игра: ключ, подобранный
+        /// установщиком, должен занимать ровно то место, на котором игра
+        /// потом и представится серверу.
+        /// </summary>
+        public static string DeviceId()
+        {
+            string seed = Environment.MachineName + "|" + Environment.UserName + "|" +
+                          Environment.ProcessorCount + "|" + Environment.OSVersion.Platform;
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var h = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(seed));
+            return "pc-" + Convert.ToHexString(h, 0, 6).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Подобрать ключ по аккаунту: сервер ищет среди ключей игрока тот,
+        /// у которого свободно место для этого компьютера.
+        /// </summary>
+        public static async Task<(bool ok, string key, string text)> PickKeyAsync(string name, string pass)
+        {
+            try
+            {
+                string json = "{\"name\":" + JsonText(name) + ",\"pass\":" + JsonText(pass) +
+                              ",\"platform\":\"pc\",\"device\":\"" + DeviceId() + "\"}";
+                var body = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+                using var r = await Http.PostAsync(Cfg.ApiBase + "/api/licence/pick", body, cts.Token);
+                var text = await r.Content.ReadAsStringAsync();
+                using var d = JsonDocument.Parse(text);
+                var root = d.RootElement;
+
+                if (root.TryGetProperty("maintenance", out var m) && m.ValueKind == JsonValueKind.True)
+                    return (false, "", "Сервер сейчас закрыт на обновление — попробуйте через пару минут");
+
+                bool good = root.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True;
+                string err = root.TryGetProperty("error", out var e) ? (e.GetString() ?? "") : "";
+                if (!good) return (false, "", err.Length > 0 ? err : "Войти не удалось");
+
+                string k = root.TryGetProperty("key", out var kk) ? (kk.GetString() ?? "") : "";
+                string who = root.TryGetProperty("account", out var a) ? (a.GetString() ?? "") : name;
+                if (k.Length == 0) return (false, "", "Сервер не вернул ключ");
+                return (true, k, "Ключ найден на аккаунте " + who);
+            }
+            catch
+            {
+                return (false, "", "Сервер не отвечает — включите интернет");
+            }
+        }
+
+        /// <summary>Строка в виде json: кавычки и слэши внутри не ломают запрос.</summary>
+        static string JsonText(string s)
+        {
+            var sb = new System.Text.StringBuilder("\"");
+            foreach (char c in s ?? "")
+            {
+                if (c == '"' || c == '\\') sb.Append('\\').Append(c);
+                else if (c < ' ') sb.Append(' ');
+                else sb.Append(c);
+            }
+            return sb.Append('"').ToString();
+        }
+
         /// <summary>Пробуем адреса по порядку, пока файл не скачается.</summary>
         public static async Task<bool> DownloadFirstAsync(string[] urls, string path,
                                                           IProgress<string> log = null, IProgress<double> pct = null)

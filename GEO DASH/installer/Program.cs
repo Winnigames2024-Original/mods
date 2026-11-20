@@ -49,7 +49,9 @@ namespace GeoDashSetup
         static readonly Color Paper = Color.FromArgb(240, 244, 255);
         static readonly Color Blue = Color.FromArgb(40, 125, 255);
 
-        readonly TextBox _dir, _key;
+        readonly TextBox _dir, _key, _login, _pass;
+        readonly CheckBox _byAccount;
+        readonly Button _pick;
         readonly CheckBox _desktop, _menu, _service, _run, _assoc, _offline;
         readonly ProgressBar _bar;
         readonly Label _status;
@@ -59,7 +61,7 @@ namespace GeoDashSetup
         public SetupForm(bool uninstallMode)
         {
             Text = Cfg.AppName + " — установка";
-            ClientSize = new Size(640, 520);
+            ClientSize = new Size(640, 584);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -147,16 +149,53 @@ namespace GeoDashSetup
             };
             Controls.Add(_key);
 
-            _bar = new ProgressBar { Left = 28, Top = 396, Width = 584, Height = 16, Style = ProgressBarStyle.Continuous };
+            _byAccount = C("Войти в аккаунт вместо ключа — подберу свободный ключ сам", 386, false);
+            _byAccount.ForeColor = Color.FromArgb(150, 220, 255);
+
+            TextBox F(int x, int w, string hint, bool secret)
+            {
+                var t = new TextBox
+                {
+                    Left = x, Top = 412, Width = w, Visible = false,
+                    BackColor = Color.FromArgb(22, 20, 52), ForeColor = Paper,
+                    BorderStyle = BorderStyle.FixedSingle, PlaceholderText = hint,
+                    UseSystemPasswordChar = secret, Font = new Font("Segoe UI", 10f)
+                };
+                Controls.Add(t);
+                return t;
+            }
+
+            _login = F(28, 214, "логин на сайте", false);
+            _pass = F(250, 184, "пароль", true);
+
+            _pick = new Button
+            {
+                Text = "НАЙТИ КЛЮЧ", Left = 444, Top = 411, Width = 168, Height = 25,
+                FlatStyle = FlatStyle.Flat, Visible = false,
+                BackColor = Color.FromArgb(40, 90, 170), ForeColor = Paper,
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold)
+            };
+            _pick.Click += async (s, e) => await PickKeyAsync();
+            Controls.Add(_pick);
+
+            _byAccount.CheckedChanged += (s, e) =>
+            {
+                bool on = _byAccount.Checked;
+                _login.Visible = _pass.Visible = _pick.Visible = on;
+                _key.Enabled = !on || _key.Text.Length > 0;
+                if (on) _login.Focus();
+            };
+
+            _bar = new ProgressBar { Left = 28, Top = 448, Width = 584, Height = 16, Style = ProgressBarStyle.Continuous };
             Controls.Add(_bar);
 
-            _status = L("Готов к установке", 28, 416, 584);
+            _status = L("Готов к установке", 28, 470, 584);
             _status.ForeColor = Color.FromArgb(200, 215, 255);
 
             _go = new Button
             {
                 Text = Installed() == null ? "УСТАНОВИТЬ" : "ОБНОВИТЬ",
-                Left = 360, Top = 448, Width = 250, Height = 44, FlatStyle = FlatStyle.Flat,
+                Left = 360, Top = 502, Width = 250, Height = 44, FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(32, 150, 100), ForeColor = Paper,
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold)
             };
@@ -165,7 +204,7 @@ namespace GeoDashSetup
 
             _remove = new Button
             {
-                Text = "УДАЛИТЬ", Left = 28, Top = 448, Width = 170, Height = 44, FlatStyle = FlatStyle.Flat,
+                Text = "УДАЛИТЬ", Left = 28, Top = 502, Width = 170, Height = 44, FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(120, 40, 48), ForeColor = Paper,
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 Visible = Installed() != null
@@ -236,6 +275,28 @@ namespace GeoDashSetup
         {
             if (InvokeRequired) { BeginInvoke(() => Status(s)); return; }
             _status.Text = s;
+        }
+
+        /// <summary>Спросить у сервера ключ по логину и паролю.</summary>
+        async Task PickKeyAsync()
+        {
+            string name = _login.Text.Trim(), pass = _pass.Text;
+            if (name.Length == 0 || pass.Length == 0)
+            {
+                Status("Введите логин и пароль от аккаунта на сайте");
+                return;
+            }
+
+            _pick.Enabled = false;
+            Status("Ищу ключ на вашем аккаунте…");
+            var (good, key, text) = await Net.PickKeyAsync(name, pass);
+            _pick.Enabled = true;
+
+            if (!good) { Status(text); return; }
+
+            _key.Enabled = true;
+            _key.Text = Lic.Pretty(key);
+            Status(text + " — можно устанавливать");
         }
 
         async Task InstallAsync()

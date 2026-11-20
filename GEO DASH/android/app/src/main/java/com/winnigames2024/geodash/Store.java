@@ -75,6 +75,13 @@ public class Store {
      */
     public static int renderHeight() { return prefs.getInt("renderh", 720); }
 
+    /** Версия приложения — нужна в отчётах об ошибках. */
+    public static String appVersion() {
+        try {
+            return ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionName;
+        } catch (Exception e) { return "?"; }
+    }
+
     public static void setRenderHeight(int h) { prefs.edit().putInt("renderh", h).apply(); }
 
     // ------------------------------------------------------------ файлы

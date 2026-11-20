@@ -247,6 +247,13 @@ public class GdDialog {
      */
     public static void inputOr(Activity a, String title, String message, String hint, String def,
                                String okText, String cancelText, OnText cb, Runnable onCancel) {
+        inputOr(a, title, message, hint, def, okText, null, cancelText, cb, null, onCancel);
+    }
+
+    /** То же самое, но с третьей кнопкой посередине (например «войти в аккаунт»). */
+    public static void inputOr(Activity a, String title, String message, String hint, String def,
+                               String okText, String altText, String cancelText,
+                               OnText cb, Runnable onAlt, Runnable onCancel) {
         FrameLayout o = open(a, title, message);
         LinearLayout box = boxOf(o);
 
@@ -279,9 +286,79 @@ public class GdDialog {
         LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, h, 1f);
         lp1.setMargins(6, 16, 6, 0);
         row.addView(ok, lp1);
+
+        if (altText != null && !altText.isEmpty()) {
+            Ui.GdBtn alt = new Ui.GdBtn(a).set(altText, Ui.I_PROFILE,
+                    Color.rgb(150, 200, 255), Color.rgb(40, 90, 170));
+            alt.setOnClickListener(v -> { close(a, o); if (onAlt != null) onAlt.run(); });
+            LinearLayout.LayoutParams lpA = new LinearLayout.LayoutParams(0, h, 1f);
+            lpA.setMargins(6, 16, 6, 0);
+            row.addView(alt, lpA);
+        }
+
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, h, 1f);
         lp2.setMargins(6, 16, 6, 0);
         row.addView(no, lp2);
+    }
+
+    /** Что ввели в диалоге входа. */
+    public interface OnLogin { void login(String name, String pass); }
+
+    /**
+     * Вход в аккаунт: логин и пароль в одном окне. Нужен там, где ключ
+     * проще подобрать по аккаунту, чем набирать руками.
+     */
+    public static void account(Activity a, String title, String message,
+                               String okText, String cancelText,
+                               OnLogin cb, Runnable onCancel) {
+        FrameLayout o = open(a, title, message);
+        LinearLayout box = boxOf(o);
+
+        EditText name = field(a, "логин на сайте", false);
+        box.addView(name, fieldLp());
+        EditText pass = field(a, "пароль", true);
+        box.addView(pass, fieldLp());
+
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(row);
+        int h = (int) (rootOf(a).getHeight() * 0.13f);
+
+        Ui.GdBtn ok = new Ui.GdBtn(a).set(okText, Ui.I_CHECK, Color.rgb(120, 255, 170), Color.rgb(20, 150, 100));
+        ok.setOnClickListener(v -> {
+            close(a, o);
+            if (cb != null) cb.login(name.getText().toString().trim(), pass.getText().toString());
+        });
+        Ui.GdBtn no = new Ui.GdBtn(a).set(cancelText, Ui.I_CROSS, Color.rgb(220, 120, 120), Color.rgb(140, 40, 50));
+        no.setOnClickListener(v -> { close(a, o); if (onCancel != null) onCancel.run(); });
+
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, h, 1f);
+        lp1.setMargins(6, 16, 6, 0);
+        row.addView(ok, lp1);
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, h, 1f);
+        lp2.setMargins(6, 16, 6, 0);
+        row.addView(no, lp2);
+    }
+
+    static EditText field(Activity a, String hint, boolean secret) {
+        EditText e = new EditText(a);
+        e.setHint(hint);
+        e.setTextColor(Gd.PAPER);
+        e.setHintTextColor(Gd.DIM);
+        e.setBackgroundColor(Color.rgb(20, 18, 48));
+        e.setPadding(20, 14, 20, 14);
+        e.setSingleLine(true);
+        e.setTextSize(17);
+        if (secret) e.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        return e;
+    }
+
+    static LinearLayout.LayoutParams fieldLp() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 14, 0, 0);
+        return lp;
     }
 
     /** Список вариантов (вместо setItems у AlertDialog). */

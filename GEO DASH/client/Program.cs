@@ -45,7 +45,10 @@ namespace GEO_DASH
                 if (!RestartAuth) return;
             }
 
+            ReportLastCrash();          // прошлый запуск оборвался? расскажем админу
+            AppConfig.Stage("главное меню");
             Application.Run(new MainForm());
+            AppConfig.StageClear();     // вышли штатно — чёрный ящик чистим
         }
 
         /// <summary>Открыть уровень из файла .gdl: кладём в «мои уровни» и показываем карточку.</summary>
@@ -71,7 +74,39 @@ namespace GEO_DASH
             {
                 var log = Path.Combine(AppConfig.DataDir, "crash.log");
                 File.AppendAllText(log, $"[{DateTime.Now:s}] {ex}\n\n");
+                Report("ошибка", ex?.ToString() ?? "неизвестно", AppConfig.LastStage());
                 GdDialog.Info(null, "ОШИБКА", (ex?.Message ?? "неизвестно") + "\n\nПодробности: " + log);
+            }
+            catch { }
+        }
+
+        /// <summary>Молча рассказать админу об ошибке — игроку ничего делать не нужно.</summary>
+        static void Report(string kind, string text, string stage)
+        {
+            try { _ = Net.ApiClient.ReportAsync(kind, text, stage); } catch { }
+        }
+
+        /// <summary>
+        /// Если в прошлый раз игра умерла жёстко (без исключения), чёрный ящик
+        /// хранит последний этап. Рассказываем о нём и чистим.
+        /// </summary>
+        static void ReportLastCrash()
+        {
+            try
+            {
+                string stage = AppConfig.LastStage();
+                if (string.IsNullOrWhiteSpace(stage)) return;
+
+                string tail = "";
+                var log = Path.Combine(AppConfig.DataDir, "crash.log");
+                if (File.Exists(log))
+                {
+                    var lines = File.ReadAllLines(log);
+                    tail = string.Join("\n", lines.Skip(Math.Max(0, lines.Length - 12)));
+                }
+                AppConfig.Trace("прошлый запуск оборвался на этапе: " + stage);
+                Report("вылет", "Игра закрылась без ошибки.\n\nПоследние записи:\n" + tail, stage);
+                AppConfig.StageClear();
             }
             catch { }
         }

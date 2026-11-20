@@ -72,7 +72,7 @@ public class LicenceGate {
                 "и он приходит сразу после покупки.";
 
         GdDialog.inputOr(a, "ЛИЦЕНЗИОННЫЙ КЛЮЧ", text, "GD-XXXX-XXXX-XXXX-XXXX", prefill,
-                "ПРОВЕРИТЬ", "ВЫЙТИ",
+                "ПРОВЕРИТЬ", "ВОЙТИ В АККАУНТ", "ВЫЙТИ",
                 value -> {
                     final String k = Lic.pretty(value);
                     if (!Lic.wellFormed(k)) {
@@ -92,6 +92,41 @@ public class LicenceGate {
                         });
                     });
                 },
+                () -> byAccount(a),
                 () -> { asking = false; a.finishAffinity(); });
+    }
+
+    /**
+     * Вместо ключа — логин и пароль: сервер сам находит ключ со свободным
+     * местом для этого телефона и подставляет его в строку.
+     */
+    private static void byAccount(final GdActivity a) {
+        GdDialog.account(a, "ВХОД В АККАУНТ",
+                "Введите логин и пароль от аккаунта на сайте — я найду ваш ключ сам.",
+                "НАЙТИ КЛЮЧ", "НАЗАД",
+                (name, pass) -> {
+                    if (name.isEmpty() || pass.isEmpty()) {
+                        ask(a, "", "Введите логин и пароль.");
+                        return;
+                    }
+                    Api.async(() -> {
+                        org.json.JSONObject r = Api.licencePick(name, pass, Lic.device());
+                        a.ui.post(() -> {
+                            if (r == null) {
+                                ask(a, "", "Сервер не отвечает — включите интернет.");
+                                return;
+                            }
+                            if (!r.optBoolean("ok")) {
+                                ask(a, "", r.optString("error", "Войти не удалось"));
+                                return;
+                            }
+                            // ключ нашёлся — подставляем в строку, проверка как обычно
+                            ask(a, Lic.pretty(r.optString("key", "")),
+                                    "Ключ найден на аккаунте " + r.optString("account", name) +
+                                            " — нажмите «Проверить».");
+                        });
+                    });
+                },
+                () -> ask(a, "", ""));
     }
 }

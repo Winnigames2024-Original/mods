@@ -78,6 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
         'unrevoke'  => gd_post('/api/admin/licence/revoke', ['key' => trim($_POST['key'] ?? ''),
                                 'revoked' => false], gd_token()),
         'maintoff'  => gd_post('/api/admin/maintenance', ['on' => false], gd_token()),
+        'repseen'   => gd_post('/api/admin/reports/seen', [], gd_token()),
+        'repclear'  => gd_post('/api/admin/reports/seen', ['clear' => true], gd_token()),
         default     => [false, ['error' => 'неизвестное действие']],
     };
     if ($ok) {
@@ -94,6 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 [$okK, $lic]    = gd_get('/api/admin/licences', gd_token());
 [$okM, $state]  = gd_get('/api/state');
 $maint = $okM && !empty($state['maintenance']);
+
+// отчёты об ошибках: игра присылает их сама, когда вылетает
+[$okR, $repData] = gd_get('/api/admin/reports', gd_token());
+$reports = $okR && !empty($repData['reports']) ? $repData['reports'] : [];
+$repFresh = $okR ? (int)($repData['fresh'] ?? 0) : 0;
 gd_head('Админка', 'admin');
 ?>
 <section class="section"><div class="container">
@@ -137,6 +144,45 @@ gd_head('Админка', 'admin');
       сообщение и выходит. После обновления не забудьте нажать «Открыть игру».
     </p>
   </div>
+  <div class="card" style="margin-bottom:18px;<?= $repFresh ? 'border-color:#ff8a8a' : '' ?>">
+    <h3>Отчёты об ошибках<?= $repFresh ? ' — новых: ' . $repFresh : '' ?></h3>
+    <?php if (!$reports): ?>
+      <p class="muted">Пока пусто. Игра присылает отчёт сама, когда вылетает: видно аккаунт,
+        версию, платформу и на чём именно оборвалось.</p>
+    <?php else: ?>
+      <div class="flex" style="gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <form method="post">
+          <input type="hidden" name="act" value="repseen">
+          <button class="btn small" type="submit">ОТМЕТИТЬ ПРОЧИТАННЫМИ</button>
+        </form>
+        <form method="post" onsubmit="return confirm('Удалить все отчёты?')">
+          <input type="hidden" name="act" value="repclear">
+          <button class="btn small red" type="submit">ОЧИСТИТЬ</button>
+        </form>
+      </div>
+      <table class="tbl">
+        <tr><th>Когда</th><th>Аккаунт</th><th>Где</th><th>На чём оборвалось</th></tr>
+        <?php foreach (array_slice($reports, 0, 40) as $r): ?>
+          <tr<?= empty($r['seen']) ? ' style="background:rgba(255,120,120,.08)"' : '' ?>>
+            <td style="white-space:nowrap"><?= h(substr((string)($r['at'] ?? ''), 0, 19)) ?></td>
+            <td><?= h((string)($r['user'] ?? '—')) ?></td>
+            <td><?= h((string)($r['platform'] ?? '')) ?> <?= h((string)($r['version'] ?? '')) ?></td>
+            <td>
+              <b><?= h((string)($r['kind'] ?? '')) ?></b>
+              <?php if (!empty($r['stage'])): ?> · <?= h((string)$r['stage']) ?><?php endif; ?>
+              <?php if (!empty($r['text'])): ?>
+                <details style="margin-top:4px">
+                  <summary class="muted">подробности</summary>
+                  <pre style="white-space:pre-wrap;font-size:12px;margin:6px 0 0"><?= h(mb_substr((string)$r['text'], 0, 1500)) ?></pre>
+                </details>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php endif; ?>
+  </div>
+
   <?php if ($msg): ?><div class="alert ok"><?= h($msg) ?></div><?php endif; ?>
   <?php if ($err): ?><div class="alert err"><?= h($err) ?></div><?php endif; ?>
 

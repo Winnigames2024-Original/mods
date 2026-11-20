@@ -64,6 +64,19 @@ namespace GEO_DASH.Core
 
         public bool AnyPost => Invert.On || Gray.On || Pixelate.On || Glitch.On || Chromatic.On || Blur.On;
 
+        /// <summary>Что сейчас включено — строкой, для чёрного ящика.</summary>
+        public string Describe()
+        {
+            var s = "";
+            if (Invert.On) s += "инверсия ";
+            if (Gray.On) s += "ч/б ";
+            if (Pixelate.On) s += "пиксели ";
+            if (Glitch.On) s += "глюк ";
+            if (Chromatic.On) s += "хроматика ";
+            if (Blur.On) s += "размытие ";
+            return s.Length == 0 ? "нет" : s.Trim();
+        }
+
         public void Burst(double x, double y, int count, Color col, double power)
         {
             var rnd = Random.Shared;
