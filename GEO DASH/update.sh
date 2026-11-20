@@ -44,15 +44,20 @@ if [ ! -d "$SRC/.git" ]; then
 fi
 
 # ---------------------------------------------------------------- применяем обновление
-if [ -x /usr/local/bin/geodash-autoupdate ]; then
-  say "Применяю обновление"
-  /usr/local/bin/geodash-autoupdate || true
-else
-  say "Скрипта автообновления нет — ставлю его из репозитория"
-  cd "$SRC" && git fetch --quiet origin && git reset --hard --quiet origin/main
+# Сначала тянем репозиторий и ставим свежий скрипт обновления: иначе починка
+# в самом скрипте никогда бы не доехала — работала бы старая копия.
+say "Тяну репозиторий"
+cd "$SRC" && git fetch --quiet origin && git reset --hard --quiet origin/main
+
+if [ -f "$SRC/$SUBDIR/autoupdatefor5minutes.sh" ]; then
   install -m 0755 "$SRC/$SUBDIR/autoupdatefor5minutes.sh" /usr/local/bin/geodash-autoupdate
-  /usr/local/bin/geodash-autoupdate || true
 fi
+if [ -f "$SRC/$SUBDIR/update.sh" ]; then
+  install -m 0755 "$SRC/$SUBDIR/update.sh" /usr/local/bin/geodash-update
+fi
+
+say "Применяю обновление"
+/usr/local/bin/geodash-autoupdate || true
 
 # ---------------------------------------------------------------- автозапуск API
 say "Проверяю автозапуск"

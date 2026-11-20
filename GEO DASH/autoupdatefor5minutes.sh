@@ -74,11 +74,31 @@ fix_download_location() {
   grep -q 'location = /download/' "$CONF" && return 0
   grep -q 'location /download/' "$CONF" || return 0
 
-  perl -0pi -e 's|\s*location /download/ \{\n\s*add_header Content-Disposition "attachment";\n\s*try_files \$uri =404;\n\s*\}|\n    location = /download/ { try_files /download/index.php =404; }\n    location ~ ^/download/.+\\.(exe|apk|zip)\$ {\n        add_header Content-Disposition "attachment";\n        try_files \$uri =404;\n    }|s' "$CONF"
+  # перебираем конфиг построчно: старый блок /download/ меняем на два новых
+  awk '
+    /location \/download\/ \{/ {
+      print "    location = /download/ { try_files /download/index.php =404; }";
+      print "    location ~ ^/download/.+\\.(exe|apk|zip)$ {";
+      print "        add_header Content-Disposition \"attachment\";";
+      print "        try_files $uri =404;";
+      print "    }";
+      skip = 1; next
+    }
+    skip && /\}/ { skip = 0; next }
+    skip { next }
+    { print }
+  ' "$CONF" > "$CONF.new" 2>/dev/null || return 0
+
+  [ -s "$CONF.new" ] || { rm -f "$CONF.new"; return 0; }
+  cp -f "$CONF" "$CONF.bak"
+  mv -f "$CONF.new" "$CONF"
 
   if nginx -t >/dev/null 2>&1; then
     systemctl reload nginx >/dev/null 2>&1 || true
     log "страница /download/ починена в nginx"
+  else
+    mv -f "$CONF.bak" "$CONF"            # не прошло — возвращаем как было
+    log "правка nginx не подошла, вернул прежний конфиг"
   fi
 }
 
@@ -109,7 +129,13 @@ after="$(git rev-parse HEAD 2>/dev/null || echo none)"
 
 changed=0
 
-if [ "$before" != "$after" ] || [ "$FORCED" = "1" ]; then
+# синхронизируем не только когда пришёл новый коммит: бывает, что коммит уже
+# подтянут, а файлы на сервере остались от прошлой неудачной попытки
+STALE=0
+if [ ! -f "$APP/update.json" ] || ! cmp -s "$SRC/$SUBDIR/update.json" "$APP/update.json"; then STALE=1; fi
+if [ ! -f "$WEB/index.php" ]; then STALE=1; fi
+
+if [ "$before" != "$after" ] || [ "$FORCED" = "1" ] || [ "$STALE" = "1" ]; then
   # ---- сайт ----
   if [ -d "$SRC/$SUBDIR/site" ]; then
     cp -r "$SRC/$SUBDIR/site/." "$WEB/"
