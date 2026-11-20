@@ -7,6 +7,7 @@ require_once __DIR__ . '/_inc/api.php';
 [$okP, $ping]   = gd_get('/api/ping');
 
 $exe = file_exists(__DIR__ . '/download/GEO_DASH.exe');
+$setup = file_exists(__DIR__ . '/download/GEO_DASH_Setup.exe');
 $apk = file_exists(__DIR__ . '/download/GEO_DASH.apk');
 
 gd_head('Главная', 'home');
@@ -21,7 +22,11 @@ gd_head('Главная', 'home');
   </p>
   <div class="cta">
     <a class="btn green" href="/download/">СКАЧАТЬ ИГРУ</a>
-    <?php if ($exe): ?><a class="btn" href="/download/GEO_DASH.exe">Windows (.exe)</a><?php endif; ?>
+    <?php if ($setup): ?>
+      <a class="btn gold" href="/download/GEO_DASH_Setup.exe">Windows — установщик</a>
+    <?php elseif ($exe): ?>
+      <a class="btn" href="/download/GEO_DASH.exe">Windows (.exe)</a>
+    <?php endif; ?>
     <?php if ($apk): ?><a class="btn pink" href="/download/GEO_DASH.apk">Android (.apk)</a><?php endif; ?>
     <a class="btn ghost" href="/levels/">Уровни игроков</a>
   </div>

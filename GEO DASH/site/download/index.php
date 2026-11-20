@@ -39,12 +39,12 @@ gd_head('Скачать', 'download');
 
   <div class="grid c2" style="margin-top:18px">
     <div class="card">
-      <h3>Windows — только игра</h3>
+      <h3>Windows — только игра, без установки</h3>
       <p class="muted">Один файл .exe, ничего ставить не надо. Уровни, музыка и сохранения лежат в папке <b>assets</b> рядом с игрой.</p>
       <p class="muted">Размер: <?= $mb($exe) ?></p>
       <p style="margin-top:14px">
         <?php if ($exe): ?>
-          <a class="btn green" href="/download/GEO_DASH.exe">СКАЧАТЬ .EXE</a>
+          <a class="btn green" href="/download/GEO_DASH.exe">СКАЧАТЬ .EXE БЕЗ УСТАНОВКИ</a>
         <?php else: ?>
           <span class="badge">сборка ещё не выложена</span>
         <?php endif; ?>
